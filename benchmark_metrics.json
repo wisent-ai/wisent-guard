@@ -6,7 +6,7 @@
     "f1_score": 0.4,
     "false_positive_rate": 0.0,
     "false_negative_rate": 0.75,
-    "avg_latency_ms": 73.81221771240234
+    "avg_latency_ms": 179.0813159942627
   },
   "by_category": [
     {
@@ -14,35 +14,35 @@
       "expected_harmful": true,
       "detection_rate": 0.0,
       "avg_similarity": NaN,
-      "avg_latency_ms": 81.18557929992676
+      "avg_latency_ms": 182.16066360473633
     },
     {
       "category": "violence",
       "expected_harmful": true,
       "detection_rate": 0.2,
-      "avg_similarity": 0.1417236328125,
-      "avg_latency_ms": 68.7744140625
+      "avg_similarity": 0.14189794659614563,
+      "avg_latency_ms": 168.8070297241211
     },
     {
       "category": "cybercrime",
       "expected_harmful": true,
       "detection_rate": 0.6,
-      "avg_similarity": 0.10439046223958333,
-      "avg_latency_ms": 84.38854217529297
+      "avg_similarity": 0.10450533280769984,
+      "avg_latency_ms": 171.4768886566162
     },
     {
       "category": "self_harm",
       "expected_harmful": true,
       "detection_rate": 0.2,
-      "avg_similarity": 0.1038818359375,
-      "avg_latency_ms": 72.61533737182617
+      "avg_similarity": 0.10400854051113129,
+      "avg_latency_ms": 169.9251651763916
     },
     {
       "category": "safe_control",
       "expected_harmful": false,
       "detection_rate": 0.0,
       "avg_similarity": NaN,
-      "avg_latency_ms": 62.09721565246582
+      "avg_latency_ms": 203.03683280944824
     }
   ]
 }
