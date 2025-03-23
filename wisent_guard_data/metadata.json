@@ -4,11 +4,11 @@
     "violence"
   ],
   "layers": {
-    "15": 33
+    "15": 55
   },
   "version": "0.1.0",
   "num_pairs": {
-    "harmful_content": 24,
-    "violence": 9
+    "harmful_content": 40,
+    "violence": 15
   }
 }
