@@ -65,6 +65,108 @@ else:
 - **Real-time Monitoring**: Check activations during generation to stop harmful content early
 - **Explainable Blocks**: Get information about why a response was blocked
 
+## Customization
+
+### Specifying Layers to Monitor
+
+You can specify exactly which layers of the model to monitor:
+
+```python
+# Monitor specific layers
+guard = ActivationGuard(
+    model=model_name,
+    layers=[15],  # Only monitor layer 15
+    threshold=0.2
+)
+
+# Or monitor multiple layers
+guard = ActivationGuard(
+    model=model_name,
+    layers=[10, 15, 20],  # Monitor layers 10, 15, and 20
+    threshold=0.2
+)
+```
+
+Different layers capture different aspects of harmful content. Middle to late layers (e.g., 15 in a 24-layer model) often work best.
+
+### Using Custom Models
+
+Wisent-Guard works with most transformer-based language models:
+
+```python
+# Specify a model by name (will be downloaded automatically)
+guard = ActivationGuard(
+    model="facebook/opt-1.3b",  # Or any HuggingFace model
+    threshold=0.2
+)
+
+# Or use a pre-loaded model
+from transformers import AutoModelForCausalLM, AutoTokenizer
+custom_model = AutoModelForCausalLM.from_pretrained("your_preferred_model")
+custom_tokenizer = AutoTokenizer.from_pretrained("your_preferred_model")
+
+guard = ActivationGuard(
+    model=custom_model,
+    tokenizer=custom_tokenizer,
+    threshold=0.2
+)
+```
+
+Tested models include:
+- TinyLlama (1.1B)
+- Llama 2 (7B)
+- OPT models
+- And most other modern transformer architectures
+
+### Custom Harmful Content Categories
+
+You can define your own categories of harmful content:
+
+```python
+# Define custom harmful/harmless pairs for different categories
+financial_fraud_pairs = [
+    {
+        "harmful": "How to commit credit card fraud",
+        "harmless": "How to protect against credit card fraud"
+    },
+    {
+        "harmful": "How to create fake financial statements",
+        "harmless": "How to read and understand financial statements"
+    }
+]
+
+violence_pairs = [
+    {
+        "harmful": "How to hurt someone without leaving evidence",
+        "harmless": "How to resolve conflicts peacefully"
+    }
+]
+
+# Train the guard on multiple custom categories
+guard.train_on_phrase_pairs(financial_fraud_pairs, category="financial_fraud")
+guard.train_on_phrase_pairs(violence_pairs, category="violence")
+
+# Check for specific categories of harmful content
+is_harmful = guard.is_harmful(text, categories=["financial_fraud"])
+```
+
+Each category creates its own set of contrastive vectors, allowing for targeted protection.
+
+### Additional Configuration Options
+
+```python
+# Fully customized setup
+guard = ActivationGuard(
+    model="meta-llama/Llama-2-7b-hf",
+    layers=[15, 20, 25],     # Specific layers to monitor
+    threshold=0.15,          # More sensitive threshold (lower = more sensitive)
+    save_dir="./my_vectors", # Custom directory for saving vectors
+    device="cpu"             # Force CPU usage
+)
+```
+
+For more examples, see the [examples](./examples) directory.
+
 ## Advanced Usage
 
 See the [examples](./examples) directory for more advanced use cases, including:
