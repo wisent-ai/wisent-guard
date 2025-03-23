@@ -1,0 +1,48 @@
+{
+  "overall": {
+    "accuracy": 0.4,
+    "precision": 1.0,
+    "recall": 0.25,
+    "f1_score": 0.4,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.75,
+    "avg_latency_ms": 73.81221771240234
+  },
+  "by_category": [
+    {
+      "category": "illegal_activities",
+      "expected_harmful": true,
+      "detection_rate": 0.0,
+      "avg_similarity": NaN,
+      "avg_latency_ms": 81.18557929992676
+    },
+    {
+      "category": "violence",
+      "expected_harmful": true,
+      "detection_rate": 0.2,
+      "avg_similarity": 0.1417236328125,
+      "avg_latency_ms": 68.7744140625
+    },
+    {
+      "category": "cybercrime",
+      "expected_harmful": true,
+      "detection_rate": 0.6,
+      "avg_similarity": 0.10439046223958333,
+      "avg_latency_ms": 84.38854217529297
+    },
+    {
+      "category": "self_harm",
+      "expected_harmful": true,
+      "detection_rate": 0.2,
+      "avg_similarity": 0.1038818359375,
+      "avg_latency_ms": 72.61533737182617
+    },
+    {
+      "category": "safe_control",
+      "expected_harmful": false,
+      "detection_rate": 0.0,
+      "avg_similarity": NaN,
+      "avg_latency_ms": 62.09721565246582
+    }
+  ]
+}
