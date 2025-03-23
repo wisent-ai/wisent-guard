@@ -2,11 +2,13 @@
 /CAA/
 /circuit-breakers/*
 
+# Environment files
 .env
 
-# Ignore any new folders not already in the repository
-# Whitelist approach - only include specific folders
+# Ignore everything by default
 /*
+
+# Whitelist approach - only include specific folders
 !/wisent_guard/
 !/models/
 !/examples/
