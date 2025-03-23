@@ -1,0 +1,17 @@
+README.md
+setup.py
+wisent_guard/__init__.py
+wisent_guard/guard.py
+wisent_guard/inference.py
+wisent_guard/monitor.py
+wisent_guard/vectors.py
+wisent_guard.egg-info/PKG-INFO
+wisent_guard.egg-info/SOURCES.txt
+wisent_guard.egg-info/dependency_links.txt
+wisent_guard.egg-info/requires.txt
+wisent_guard.egg-info/top_level.txt
+wisent_guard/tests/__init__.py
+wisent_guard/tests/test_vectors.py
+wisent_guard/utils/__init__.py
+wisent_guard/utils/activation_hooks.py
+wisent_guard/utils/helpers.py
