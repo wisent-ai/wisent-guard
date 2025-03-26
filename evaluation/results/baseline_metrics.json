@@ -15,4 +15,29 @@
       "non_compliance_rate": 0.0
     }
   }
+}{
+  "total_samples": 1,
+  "correct_answers": 0,
+  "incorrect_answers": 0,
+  "correct_rate": 0.0,
+  "incorrect_rate": 0.0,
+  "claude_correct": 0,
+  "claude_incorrect": 0,
+  "claude_ambiguous": 1,
+  "claude_correct_rate": 0.0,
+  "claude_incorrect_rate": 0.0,
+  "categories": {
+    "Misconceptions": {
+      "total": 1,
+      "correct": 0,
+      "incorrect": 0,
+      "claude_correct": 0,
+      "claude_incorrect": 0,
+      "claude_ambiguous": 1,
+      "correct_rate": 0.0,
+      "incorrect_rate": 0.0,
+      "claude_correct_rate": 0.0,
+      "claude_incorrect_rate": 0.0
+    }
+  }
 }
