@@ -127,16 +127,18 @@ class SafeInference:
         # If prompt is not safe and blocking is enabled, return early
         if not prompt_is_safe and self.block_on_harmful:
             return {
-                "text": self.unsafe_message,
-                "is_safe": False,
+                "response": self.unsafe_message,
                 "blocked": True,
                 "reason": self.blocked_reason
             }
         
+        # Format the prompt - simple format without system prompt to match baseline
+        formatted_prompt = f"<|user|>\n{prompt}\n<|assistant|>"
+        
         # Prepare for generation
-        input_ids = self.tokenizer.encode(prompt, return_tensors="pt")
-        if self.model.device.type == "cuda":
-            input_ids = input_ids.to(self.model.device)
+        input_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt")
+        device = next(self.model.parameters()).device
+        input_ids = input_ids.to(device)
         
         # Set up generation parameters
         gen_kwargs = {
@@ -144,60 +146,55 @@ class SafeInference:
             "pad_token_id": self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
             "eos_token_id": self.tokenizer.eos_token_id,
         }
+        # Add other generation parameters
         gen_kwargs.update(kwargs)
-        
-        # Set up token stopping based on callback for streaming generation
-        if hasattr(self.model, "streamer"):
-            warnings.warn("Streaming generation is used, but monitoring might not catch all harmful content in real-time.")
         
         # Generate text
         try:
             with torch.no_grad():
-                # We have to handle token-by-token generation to monitor for harmful content
-                generated_text = ""
-                current_ids = input_ids
+                # Standard generation process
+                outputs = self.model.generate(
+                    input_ids,
+                    **gen_kwargs
+                )
                 
-                for _ in range(max_new_tokens):
-                    # Forward pass
-                    outputs = self.model(current_ids)
+                # Check for harmful content in the full sequence
+                self.monitor.reset()
+                _ = self.model(outputs.to(device))
+                
+                if self.monitor.is_harmful() and self.block_on_harmful:
+                    harmful_category = self.monitor.get_most_harmful_category()
+                    if harmful_category:
+                        category, similarity = harmful_category
+                        self.blocked_reason = f"Response contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
+                    else:
+                        self.blocked_reason = "Response contains potentially harmful content"
                     
-                    # Get next token
-                    next_token_logits = outputs.logits[:, -1, :]
-                    next_token_id = torch.argmax(next_token_logits, dim=-1).unsqueeze(-1)
-                    
-                    # Append to current sequence
-                    current_ids = torch.cat([current_ids, next_token_id], dim=-1)
-                    
-                    # Check for harmful content
-                    if not self._token_callback(current_ids):
-                        if self.block_on_harmful:
-                            break
-                    
-                    # Check for EOS token
-                    if next_token_id.item() == self.tokenizer.eos_token_id:
-                        break
+                    return {
+                        "response": self.unsafe_message,
+                        "blocked": True,
+                        "reason": self.blocked_reason
+                    }
                 
                 # Decode the generated text
-                generated_text = self.tokenizer.decode(current_ids[0], skip_special_tokens=True)
+                generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
                 
-                # If harmful content was detected during generation and blocking is enabled
-                if self.blocked_reason and self.block_on_harmful:
-                    # Return only the prompt part
-                    prompt_text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
-                    generated_text = prompt_text + "\n\n" + self.unsafe_message
-        
+                # Extract just the assistant's response
+                if "<|assistant|>" in generated_text:
+                    response = generated_text.split("<|assistant|>")[-1].strip()
+                else:
+                    response = generated_text
+                    
         except Exception as e:
             return {
-                "text": f"Error during generation: {str(e)}",
-                "is_safe": False,
+                "response": f"Error during generation: {str(e)}",
                 "blocked": True,
                 "reason": f"Exception: {str(e)}"
             }
         
         # Return results
         return {
-            "text": generated_text,
-            "is_safe": self.blocked_reason is None,
-            "blocked": self.blocked_reason is not None and self.block_on_harmful,
-            "reason": self.blocked_reason
+            "response": response,
+            "blocked": False,
+            "reason": None
         } 

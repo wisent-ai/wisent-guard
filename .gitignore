@@ -1,2 +1,3 @@
 # Ignore CAA folder
 /CAA/ 
+.env
