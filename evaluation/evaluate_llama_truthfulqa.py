@@ -257,7 +257,7 @@ def create_training_pairs(train_df, max_pairs=0):
     print(f"Created {len(training_pairs)} training pairs")
     return training_pairs
 
-def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperature=0.1, max_eval_samples=0, use_claude=False):
+def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperature=0.1, max_eval_samples=0):
     """
     Evaluate model on TruthfulQA dataset without using the guard.
     This serves as a baseline for comparison.
@@ -270,8 +270,13 @@ def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperatur
         max_tokens: Maximum tokens to generate per response
         temperature: Temperature for sampling
         max_eval_samples: Maximum number of samples to evaluate (0 for all)
-        use_claude: Whether to use Claude for evaluation
     """
+    # Check for Claude API key
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ERROR: ANTHROPIC_API_KEY environment variable is not set. Claude evaluation is required.")
+        print("Please set the environment variable with: export ANTHROPIC_API_KEY='your-api-key-here'")
+        return []
+    
     # If max_eval_samples is specified, sample the dataframe
     if max_eval_samples > 0 and max_eval_samples < len(eval_df):
         eval_df = eval_df.sample(max_eval_samples, random_state=42)
@@ -284,47 +289,53 @@ def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperatur
         best_answer = row['Best Answer'] if not pd.isna(row['Best Answer']) else row['Correct Answers'].split(';')[0]
         incorrect_answer = row['Incorrect Answers'].split(';')[0] if not pd.isna(row['Incorrect Answers']) else "No answer available"
         
-        # Format prompt
-        prompt = format_prompt(f"Answer the following question accurately: {question}")
+        # Format prompt - same as the guard
+        prompt_text = f"Answer the following question accurately: {question}"
+        formatted_prompt = f"<|user|>\n{prompt_text}\n<|assistant|>"
         
-        # Generate response
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        # Generate response using same parameters as guard
+        input_ids = tokenizer.encode(formatted_prompt, return_tensors="pt").to(device)
+        
+        # Set up generation parameters to match the guard
+        gen_kwargs = {
+            "max_new_tokens": max_tokens,
+            "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+            "eos_token_id": tokenizer.eos_token_id,
+        }
+        
+        # Only add temperature if it's not the default
+        if temperature != 0.0:
+            gen_kwargs["temperature"] = temperature
+            gen_kwargs["do_sample"] = True
         
         with torch.no_grad():
             outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_tokens,
-                temperature=temperature,
-                do_sample=(temperature > 0),
+                input_ids,
+                **gen_kwargs
             )
         
-        # Decode and extract response
-        full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        response = full_response.split("<|assistant|>")[-1].strip()
+        # Decode and extract response - matching the guard's extraction method
+        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        if "<|assistant|>" in generated_text:
+            response = generated_text.split("<|assistant|>")[-1].strip()
+        else:
+            response = generated_text
         
-        # Use Claude to evaluate response quality if requested
-        claude_score = -1
-        if use_claude:
-            try:
-                claude_score = call_claude_and_evaluate(
-                    actual_response=response,
-                    good_response=best_answer,
-                    bad_response=incorrect_answer
-                )
-                print(f"Claude evaluation for question {i+1}: {claude_score}")
-            except Exception as e:
-                print(f"Error during Claude evaluation: {e}")
-        
-        # Also keep the string matching for comparison
-        correct_answers = row['Correct Answers'].split(';')
-        correct_match = any(correct.lower() in response.lower() for correct in correct_answers)
-        incorrect_match = any(incorrect.lower() in response.lower() for incorrect in row['Incorrect Answers'].split(';'))
+        # Use Claude to evaluate response quality
+        try:
+            claude_score = call_claude_and_evaluate(
+                actual_response=response,
+                good_response=best_answer,
+                bad_response=incorrect_answer
+            )
+            print(f"Claude evaluation for question {i+1}: {claude_score}")
+        except Exception as e:
+            print(f"Error during Claude evaluation: {e}")
+            claude_score = -1  # Error case
         
         results.append({
             'question': question,
             'response': response,
-            'correct_match': correct_match,
-            'incorrect_match': incorrect_match,
             'claude_score': claude_score,
             'category': row['Category']
         })
@@ -335,7 +346,7 @@ def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperatur
     
     return results
 
-def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0, use_claude=False):
+def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0):
     """
     Evaluate model on TruthfulQA dataset using the guard to detect and prevent hallucinations.
     
@@ -344,8 +355,13 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
         eval_df: DataFrame containing TruthfulQA evaluation data
         max_tokens: Maximum tokens to generate per response
         max_eval_samples: Maximum number of samples to evaluate (0 for all)
-        use_claude: Whether to use Claude for evaluation
     """
+    # Check for Claude API key
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ERROR: ANTHROPIC_API_KEY environment variable is not set. Claude evaluation is required.")
+        print("Please set the environment variable with: export ANTHROPIC_API_KEY='your-api-key-here'")
+        return []
+    
     # If max_eval_samples is specified, sample the dataframe
     if max_eval_samples > 0 and max_eval_samples < len(eval_df):
         eval_df = eval_df.sample(max_eval_samples, random_state=42)
@@ -358,47 +374,39 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
         best_answer = row['Best Answer'] if not pd.isna(row['Best Answer']) else row['Correct Answers'].split(';')[0]
         incorrect_answer = row['Incorrect Answers'].split(';')[0] if not pd.isna(row['Incorrect Answers']) else "No answer available"
         
-        # Format a proper prompt with user tags
-        formatted_prompt = f"<|user|>\nAnswer the following question accurately: {question}\n<|assistant|>"
+        # Format prompt - exactly the same as baseline
+        prompt_text = f"Answer the following question accurately: {question}"
+        formatted_prompt = f"<|user|>\n{prompt_text}\n<|assistant|>"
         
         # Check if the guard detects potential hallucination in the formatted prompt
         is_harmful = guard.is_harmful(formatted_prompt)
         similarity_score = guard.get_similarity(formatted_prompt) if is_harmful else None
         
-        # Generate safe response
+        # Generate safe response - without system prompt to match baseline
         result = guard.generate_safe_response(
-            f"Answer the following question accurately: {question}",
-            max_new_tokens=max_tokens,
-            system_prompt="You are a helpful, honest, and accurate assistant. Always provide factual information and admit when you don't know something."
+            prompt_text,
+            max_new_tokens=max_tokens
         )
         
         response = result.get('response', '')
         blocked = result.get('blocked', False)
         reason = result.get('reason', '') if blocked else ''
         
-        # Use Claude to evaluate response quality if requested
-        claude_score = -1
-        if use_claude:
-            try:
-                claude_score = call_claude_and_evaluate(
-                    actual_response=response,
-                    good_response=best_answer,
-                    bad_response=incorrect_answer
-                )
-                print(f"Claude evaluation for guarded question {i+1}: {claude_score}")
-            except Exception as e:
-                print(f"Error during Claude evaluation: {e}")
-        
-        # Also keep the string matching for comparison
-        correct_answers = row['Correct Answers'].split(';')
-        correct_match = any(correct.lower() in response.lower() for correct in correct_answers)
-        incorrect_match = any(incorrect.lower() in response.lower() for incorrect in row['Incorrect Answers'].split(';'))
+        # Use Claude to evaluate response quality
+        try:
+            claude_score = call_claude_and_evaluate(
+                actual_response=response,
+                good_response=best_answer,
+                bad_response=incorrect_answer
+            )
+            print(f"Claude evaluation for guarded question {i+1}: {claude_score}")
+        except Exception as e:
+            print(f"Error during Claude evaluation: {e}")
+            claude_score = -1  # Error case
         
         results.append({
             'question': question,
             'response': response,
-            'correct_match': correct_match,
-            'incorrect_match': incorrect_match,
             'claude_score': claude_score,
             'category': row['Category'],
             'is_harmful': is_harmful,
@@ -416,72 +424,50 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
 def compute_metrics(results):
     """Compute evaluation metrics"""
     total = len(results)
-    correct_count = sum(1 for r in results if r['correct_match'])
-    incorrect_count = sum(1 for r in results if r['incorrect_match'])
     
-    # Calculate Claude-based metrics if available
-    has_claude_scores = 'claude_score' in results[0]
-    claude_correct = sum(1 for r in results if has_claude_scores and r['claude_score'] == 1)
-    claude_incorrect = sum(1 for r in results if has_claude_scores and r['claude_score'] == 0)
-    claude_ambiguous = sum(1 for r in results if has_claude_scores and r['claude_score'] == -1)
+    # Calculate Claude-based metrics
+    claude_correct = sum(1 for r in results if r['claude_score'] == 1)
+    claude_incorrect = sum(1 for r in results if r['claude_score'] == 0)
+    claude_ambiguous = sum(1 for r in results if r['claude_score'] == -1)
     
     metrics = {
         'total_samples': total,
-        'correct_answers': correct_count,
-        'incorrect_answers': incorrect_count,
-        'correct_rate': correct_count / total if total > 0 else 0,
-        'incorrect_rate': incorrect_count / total if total > 0 else 0,
+        'claude_correct': claude_correct,
+        'claude_incorrect': claude_incorrect,
+        'claude_ambiguous': claude_ambiguous,
+        'claude_correct_rate': claude_correct / total if total > 0 else 0,
+        'claude_incorrect_rate': claude_incorrect / total if total > 0 else 0,
     }
-    
-    # Add Claude metrics if available
-    if has_claude_scores:
-        metrics.update({
-            'claude_correct': claude_correct,
-            'claude_incorrect': claude_incorrect,
-            'claude_ambiguous': claude_ambiguous,
-            'claude_correct_rate': claude_correct / total if total > 0 else 0,
-            'claude_incorrect_rate': claude_incorrect / total if total > 0 else 0,
-        })
     
     # Compute metrics by category
     categories = {}
     for r in results:
         cat = r['category']
         if cat not in categories:
-            category_metrics = {'total': 0, 'correct': 0, 'incorrect': 0}
-            if has_claude_scores:
-                category_metrics.update({
-                    'claude_correct': 0,
-                    'claude_incorrect': 0,
-                    'claude_ambiguous': 0
-                })
+            category_metrics = {
+                'total': 0,
+                'claude_correct': 0,
+                'claude_incorrect': 0,
+                'claude_ambiguous': 0
+            }
             categories[cat] = category_metrics
         
         categories[cat]['total'] += 1
-        if r['correct_match']:
-            categories[cat]['correct'] += 1
-        if r['incorrect_match']:
-            categories[cat]['incorrect'] += 1
-            
-        # Add Claude metrics by category if available
-        if has_claude_scores:
-            claude_score = r['claude_score']
-            if claude_score == 1:
-                categories[cat]['claude_correct'] += 1
-            elif claude_score == 0:
-                categories[cat]['claude_incorrect'] += 1
-            else:
-                categories[cat]['claude_ambiguous'] += 1
+        
+        # Add Claude metrics by category
+        claude_score = r['claude_score']
+        if claude_score == 1:
+            categories[cat]['claude_correct'] += 1
+        elif claude_score == 0:
+            categories[cat]['claude_incorrect'] += 1
+        else:
+            categories[cat]['claude_ambiguous'] += 1
     
     # Calculate rates for each category
     for cat in categories:
         cat_total = categories[cat]['total']
-        categories[cat]['correct_rate'] = categories[cat]['correct'] / cat_total if cat_total > 0 else 0
-        categories[cat]['incorrect_rate'] = categories[cat]['incorrect'] / cat_total if cat_total > 0 else 0
-        
-        if has_claude_scores:
-            categories[cat]['claude_correct_rate'] = categories[cat]['claude_correct'] / cat_total if cat_total > 0 else 0
-            categories[cat]['claude_incorrect_rate'] = categories[cat]['claude_incorrect'] / cat_total if cat_total > 0 else 0
+        categories[cat]['claude_correct_rate'] = categories[cat]['claude_correct'] / cat_total if cat_total > 0 else 0
+        categories[cat]['claude_incorrect_rate'] = categories[cat]['claude_incorrect'] / cat_total if cat_total > 0 else 0
     
     metrics['categories'] = categories
     
@@ -490,31 +476,20 @@ def compute_metrics(results):
         harmful_detected = sum(1 for r in results if r['is_harmful'])
         blocked_count = sum(1 for r in results if r.get('blocked', False))
         
-        # Compute correlation between detection and correctness
-        harmful_and_incorrect = sum(1 for r in results if r['is_harmful'] and r['incorrect_match'])
-        not_harmful_and_correct = sum(1 for r in results if not r['is_harmful'] and r['correct_match'])
+        # Compute correlation between detection and Claude scores
+        harmful_and_claude_incorrect = sum(1 for r in results if r['is_harmful'] and r['claude_score'] == 0)
+        not_harmful_and_claude_correct = sum(1 for r in results if not r['is_harmful'] and r['claude_score'] == 1)
         
         metrics['harmful_detected'] = harmful_detected
         metrics['harmful_rate'] = harmful_detected / total if total > 0 else 0
         metrics['blocked_count'] = blocked_count
         metrics['blocked_rate'] = blocked_count / total if total > 0 else 0
         
-        metrics['harmful_and_incorrect'] = harmful_and_incorrect
-        metrics['harmful_and_incorrect_rate'] = harmful_and_incorrect / incorrect_count if incorrect_count > 0 else 0
+        metrics['harmful_and_claude_incorrect'] = harmful_and_claude_incorrect
+        metrics['harmful_and_claude_incorrect_rate'] = harmful_and_claude_incorrect / claude_incorrect if claude_incorrect > 0 else 0
         
-        metrics['not_harmful_and_correct'] = not_harmful_and_correct
-        metrics['not_harmful_and_correct_rate'] = not_harmful_and_correct / correct_count if correct_count > 0 else 0
-        
-        # Compute correlation with Claude scores if available
-        if has_claude_scores:
-            harmful_and_claude_incorrect = sum(1 for r in results if r['is_harmful'] and r['claude_score'] == 0)
-            not_harmful_and_claude_correct = sum(1 for r in results if not r['is_harmful'] and r['claude_score'] == 1)
-            
-            metrics['harmful_and_claude_incorrect'] = harmful_and_claude_incorrect
-            metrics['harmful_and_claude_incorrect_rate'] = harmful_and_claude_incorrect / claude_incorrect if claude_incorrect > 0 else 0
-            
-            metrics['not_harmful_and_claude_correct'] = not_harmful_and_claude_correct
-            metrics['not_harmful_and_claude_correct_rate'] = not_harmful_and_claude_correct / claude_correct if claude_correct > 0 else 0
+        metrics['not_harmful_and_claude_correct'] = not_harmful_and_claude_correct
+        metrics['not_harmful_and_claude_correct_rate'] = not_harmful_and_claude_correct / claude_correct if claude_correct > 0 else 0
     
     return metrics
 
@@ -523,39 +498,23 @@ def print_metrics(metrics, title="Model Evaluation Metrics"):
     print(f"\n===== {title} =====")
     print(f"Total samples: {metrics['total_samples']}")
     
-    # String matching metrics
-    print("\n* String Matching Metrics *")
-    print(f"Correct answers: {metrics['correct_answers']} ({metrics['correct_rate']:.2%})")
-    print(f"Incorrect answers: {metrics['incorrect_answers']} ({metrics['incorrect_rate']:.2%})")
-    
-    # Claude-based metrics if available
-    if 'claude_correct' in metrics:
-        print("\n* Claude-based Evaluation Metrics *")
-        print(f"Correct responses (Claude): {metrics['claude_correct']} ({metrics['claude_correct_rate']:.2%})")
-        print(f"Incorrect responses (Claude): {metrics['claude_incorrect']} ({metrics['claude_incorrect_rate']:.2%})")
-        print(f"Ambiguous: {metrics['claude_ambiguous']} ({metrics['claude_ambiguous'] / metrics['total_samples']:.2%})")
+    # Claude-based metrics
+    print("\n* Claude-based Evaluation Metrics *")
+    print(f"Correct responses (Claude): {metrics['claude_correct']} ({metrics['claude_correct_rate']:.2%})")
+    print(f"Incorrect responses (Claude): {metrics['claude_incorrect']} ({metrics['claude_incorrect_rate']:.2%})")
+    print(f"Ambiguous responses: {metrics['claude_ambiguous']} ({metrics['claude_ambiguous'] / metrics['total_samples']:.2%})")
     
     if 'harmful_detected' in metrics:
         print(f"\nHarmful (hallucination) detection:")
         print(f"Hallucinations detected: {metrics['harmful_detected']} ({metrics['harmful_rate']:.2%})")
         print(f"Responses blocked: {metrics['blocked_count']} ({metrics['blocked_rate']:.2%})")
-        print(f"Correlation between detection and incorrectness: {metrics['harmful_and_incorrect_rate']:.2%}")
-        print(f"Correlation between non-detection and correctness: {metrics['not_harmful_and_correct_rate']:.2%}")
-        
-        if 'claude_correct' in metrics:
-            print(f"Correlation between detection and Claude incorrectness: {metrics.get('harmful_and_claude_incorrect_rate', 0):.2%}")
-            print(f"Correlation between non-detection and Claude correctness: {metrics.get('not_harmful_and_claude_correct_rate', 0):.2%}")
+        print(f"Correlation between detection and Claude incorrectness: {metrics.get('harmful_and_claude_incorrect_rate', 0):.2%}")
+        print(f"Correlation between non-detection and Claude correctness: {metrics.get('not_harmful_and_claude_correct_rate', 0):.2%}")
     
     # Show category results
-    print("\nResults by category:")
+    print("\nResults by category (Claude-based):")
     for cat, values in metrics['categories'].items():
-        print(f"  {cat}: {values['correct']} correct / {values['total']} total ({values['correct_rate']:.2%})")
-        
-    # Show Claude category results if available
-    if 'claude_correct' in metrics:
-        print("\nResults by category (Claude-based):")
-        for cat, values in metrics['categories'].items():
-            print(f"  {cat}: {values['claude_correct']} correct / {values['total']} total ({values['claude_correct_rate']:.2%})")
+        print(f"  {cat}: {values['claude_correct']} correct / {values['total']} total ({values['claude_correct_rate']:.2%})")
 
 def save_results(results, filename):
     """Save results to a CSV file"""
@@ -584,20 +543,13 @@ def save_combined_results(baseline_results, guard_results, filename):
                 'category': guard_result['category'],
                 'baseline_response': baseline_result['response'],
                 'guard_response': guard_result['response'],
-                'baseline_correct_match': baseline_result['correct_match'],
-                'guard_correct_match': guard_result['correct_match'],
-                'baseline_incorrect_match': baseline_result['incorrect_match'],
-                'guard_incorrect_match': guard_result['incorrect_match'],
+                'baseline_claude_score': baseline_result['claude_score'],
+                'guard_claude_score': guard_result['claude_score'],
                 'is_harmful': guard_result.get('is_harmful', False),
                 'similarity_score': guard_result.get('similarity_score', None),
                 'blocked': guard_result.get('blocked', False),
                 'block_reason': guard_result.get('reason', '')
             }
-            
-            # Add Claude scores if available
-            if 'claude_score' in baseline_result:
-                combined_entry['baseline_claude_score'] = baseline_result['claude_score']
-                combined_entry['guard_claude_score'] = guard_result['claude_score']
                 
             combined_results.append(combined_entry)
     
@@ -616,16 +568,11 @@ def save_metrics(metrics, filename):
     print(f"Metrics saved to {filename}")
 
 def main(args):
-    # Check for Claude API key if using Claude evaluation
-    if args.use_claude and not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ERROR: ANTHROPIC_API_KEY environment variable is not set. Claude evaluation cannot be used.")
+    # Check for Claude API key
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ERROR: ANTHROPIC_API_KEY environment variable is not set. Claude evaluation is required.")
         print("Please set the environment variable with: export ANTHROPIC_API_KEY='your-api-key-here'")
-        if not args.force_continue:
-            print("Exiting. Use --force-continue to run without Claude evaluation.")
-            return
-        else:
-            print("Continuing without Claude evaluation. All claude_score values will be -1.")
-            args.use_claude = False
+        return
     
     # Device configuration
     if args.cpu_only:
@@ -723,8 +670,7 @@ def main(args):
             eval_df,
             device,
             max_tokens=args.max_tokens,
-            max_eval_samples=args.sample_size,
-            use_claude=args.use_claude
+            max_eval_samples=args.sample_size
         )
         
         # Compute and print metrics
@@ -743,8 +689,7 @@ def main(args):
         guard, 
         eval_df,
         max_tokens=args.max_tokens,
-        max_eval_samples=args.sample_size,
-        use_claude=args.use_claude
+        max_eval_samples=args.sample_size
     )
     
     # Compute and print metrics
@@ -813,12 +758,6 @@ if __name__ == "__main__":
     # New parameter for limiting the number of training pairs
     parser.add_argument("--max-pairs", type=int, default=0, 
                         help="Maximum number of training pairs to create (0 for all)")
-    
-    # New parameter for using Claude for evaluation
-    parser.add_argument("--use-claude", action="store_true",
-                        help="Use Claude for evaluation")
-    parser.add_argument("--force-continue", action="store_true",
-                        help="Continue even if Claude API key is not set")
     
     args = parser.parse_args()
     main(args)

@@ -3,10 +3,10 @@
     "hallucination"
   ],
   "layers": {
-    "15": 5
+    "15": 1385
   },
   "version": "0.1.0",
   "num_pairs": {
-    "hallucination": 5
+    "hallucination": 1385
   }
 }
