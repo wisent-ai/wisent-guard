@@ -56,6 +56,12 @@ else:
     print(response)
 ```
 
+## Evaluation
+
+Before running any evaluations set the .env of the judge to whatever works. You can do it using 
+
+export ANTHROPIC_API_KEY='your-api-key-here'
+
 ## Features
 
 - **Model-Agnostic**: Works with most transformer-based language models
