@@ -32,34 +32,52 @@ def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
         if isinstance(v1, torch.Tensor):
             if v1.device.type in ['mps', 'cuda']:
                 v1 = v1.detach().cpu()
-            v1 = v1.detach()
+            v1 = v1.detach().numpy()
             
         if isinstance(v2, torch.Tensor):
             if v2.device.type in ['mps', 'cuda']:
                 v2 = v2.detach().cpu()
-            v2 = v2.detach()
+            v2 = v2.detach().numpy()
         
-        # Flatten tensors
-        v1_flat = v1.reshape(1, -1)
-        v2_flat = v2.reshape(1, -1)
+        # Convert to numpy arrays if not already
+        if isinstance(v1, torch.Tensor):
+            v1 = v1.numpy()
+        if isinstance(v2, torch.Tensor):
+            v2 = v2.numpy()
+        
+        # Flatten arrays
+        v1_flat = v1.flatten()
+        v2_flat = v2.flatten()
         
         # Ensure dimensions match
-        if v1_flat.shape[1] != v2_flat.shape[1]:
-            min_dim = min(v1_flat.shape[1], v2_flat.shape[1])
-            v1_flat = v1_flat[:, :min_dim]
-            v2_flat = v2_flat[:, :min_dim]
+        if v1_flat.shape != v2_flat.shape:
+            raise ValueError(f"Vector dimensions do not match: {v1_flat.shape} vs {v2_flat.shape}")
         
+        # Calculate cosine similarity
+        dot_product = np.dot(v1_flat, v2_flat)
+        norm_v1 = np.linalg.norm(v1_flat)
+        norm_v2 = np.linalg.norm(v2_flat)
+        
+        if norm_v1 == 0 or norm_v2 == 0:
+            return 0.0
+        
+        return dot_product / (norm_v1 * norm_v2)
         # Check for NaN or Inf values that could cause issues
-        if torch.isnan(v1_flat).any() or torch.isnan(v2_flat).any() or torch.isinf(v1_flat).any() or torch.isinf(v2_flat).any():
+        if np.isnan(v1).any() or np.isnan(v2).any() or np.isinf(v1).any() or np.isinf(v2).any():
             print("Warning: NaN or Inf values detected in vectors")
             # Replace NaN/Inf with zeros
-            v1_flat = torch.nan_to_num(v1_flat, nan=0.0, posinf=0.0, neginf=0.0)
-            v2_flat = torch.nan_to_num(v2_flat, nan=0.0, posinf=0.0, neginf=0.0)
-        
-        # Calculate similarity using PyTorch
-        sim = torch.nn.functional.cosine_similarity(v1_flat, v2_flat, dim=1)
-        return sim.item()  # Get scalar value
-        
+            v1 = np.nan_to_num(v1)
+            v2 = np.nan_to_num(v2)
+            
+        # Verify shapes match for comparison
+        if v1.shape[1] != v2.shape[1]:
+            # Truncate to the smaller dimension
+            min_dim = min(v1.shape[1], v2.shape[1])
+            v1 = v1[:, :min_dim]
+            v2 = v2[:, :min_dim]
+            
+        return float(cosine_similarity(v1, v2)[0][0])
+>>>>>>> 6baa369 (logger version)
     except Exception as e:
         print(f"Error calculating cosine similarity: {e}")
         # Return a low similarity value to be safe

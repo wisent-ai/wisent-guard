@@ -50,11 +50,6 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from wisent_guard import ActivationGuard
 
-# Apply MPS patches if on Apple Silicon (M1/M2/M3)
-if torch.backends.mps.is_available():
-    from patches import apply_mps_patches
-    apply_mps_patches()
-
 # Initialize model and tokenizer
 model_name = "meta-llama/Llama-3.1-8B-Instruct"  # Or any other compatible model
 model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
@@ -74,6 +69,7 @@ phrase_pairs = [
 ]
 
 # Initialize the guard with target token strategy
+# MPS (Apple Silicon) will be used automatically if available
 guard = ActivationGuard(
     model=model,
     tokenizer=tokenizer, 
@@ -90,14 +86,14 @@ if guard.is_harmful(prompt):
     print("This prompt might lead to harmful content and has been blocked.")
 else:
     response = guard.generate_safe_response(prompt, use_multiple_choice=True)
-    print(response["text"])
+    print(response["response"])
 ```
 
 ## Features
 
 - **Multiple-Choice Format**: Uses A/B choices to provide consistent activation collection for better detection
 - **Model-Agnostic**: Works with most transformer-based language models
-- **Apple Silicon Compatible**: Full support for MPS (Metal Performance Shaders) on Apple Silicon GPUs
+- **Apple Silicon Native Support**: Built-in support for MPS (Metal Performance Shaders) on Apple Silicon GPUs
 - **Customizable Thresholds**: Adjust sensitivity to match your safety needs
 - **Contrastive Learning**: Uses pairs of harmful/harmless examples for better detection
 - **Layer Selection**: Focus on the most predictive layers for harmful content
@@ -152,55 +148,24 @@ The multiple-choice format ensures that activations are collected from the same 
 
 ## Apple Silicon (M1/M2/M3) Compatibility
 
-Wisent-Guard now fully supports Apple Silicon GPUs through MPS (Metal Performance Shaders) with comprehensive compatibility patches:
+Wisent-Guard now fully supports Apple Silicon GPUs through MPS (Metal Performance Shaders) with native integration:
 
 ```python
 import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from wisent_guard import ActivationGuard
 
-# Apply MPS patches if available
-if torch.backends.mps.is_available():
-    from patches import apply_mps_patches
-    apply_mps_patches()
-
-# Device will be automatically determined
+# Device will be automatically determined (CUDA, MPS, or CPU)
 model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B-Instruct", device_map="auto")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
 
+# MPS will be used automatically on Apple Silicon
 guard = ActivationGuard(
     model=model,
     tokenizer=tokenizer,
-    token_strategy="target_token"  # Important for MPS compatibility
+    token_strategy="target_token"
 )
 ```
-
-### MPS Compatibility Patches
-
-For full compatibility on Apple Silicon, we provide comprehensive patches that fix several device allocation issues:
-
-1. **Installation**:
-   ```bash
-   # Clone the repository to get the patches
-   git clone https://github.com/your-username/wisent-activation-guardrails.git
-   cd wisent-activation-guardrails
-   ```
-
-2. **Usage**:
-   ```python
-   import torch
-   
-   # Apply MPS patches if on Apple Silicon
-   if torch.backends.mps.is_available():
-       from patches import apply_mps_patches
-       apply_mps_patches()
-   ```
-
-These patches address several device allocation issues when running on Apple Silicon:
-- Fix activation hook tensor allocation
-- Ensure proper device placement during training
-- Handle tensor movement between CPU and MPS correctly
-- Improve multiple-choice response generation
-
-See `examples/mps_patch_example.py` for a complete example of using these patches.
 
 ## Customization
 

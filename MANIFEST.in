@@ -1,0 +1,5 @@
+include LICENSE
+include README.md
+include MPS_INTEGRATION.md
+include requirements.txt
+recursive-include wisent_guard *.py 
