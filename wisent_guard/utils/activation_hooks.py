@@ -178,8 +178,12 @@ class ActivationHooks:
                         if hasattr(module, '_last_input_ids'):
                             input_ids = module._last_input_ids[0]  # Batch size 1
                             if last_token_idx < len(input_ids):
-                                self.last_token_id = input_ids[last_token_idx].item()
-                                self.logger.debug(f"Last token ID: {self.last_token_id}, position: {last_token_idx}")
+                                try:
+                                    self.last_token_id = input_ids[last_token_idx].item()
+                                    self.logger.debug(f"Last token ID: {self.last_token_id}, position: {last_token_idx}")
+                                except (RuntimeError, ValueError) as e:
+                                    self.logger.debug(f"Error extracting last token ID: {e}")
+                                    self.last_token_id = None
                     
                     elif self.token_strategy == "target_token" and len(self.target_tokens) > 0:
                         self.logger.debug(f"Using target token strategy, looking for tokens: {self.target_tokens}")
@@ -193,15 +197,20 @@ class ActivationHooks:
                             
                             # Look for target tokens from the end (where A/B would be)
                             for i in range(len(input_ids)-1, -1, -1):
-                                token_id = input_ids[i].item()
-                                if token_id in self.target_tokens:
-                                    self.logger.debug(f"Found target token {token_id} at position {i}")
-                                    # Ensure tensor is properly allocated on the device (important for MPS)
-                                    self.layer_activations[layer_idx] = hidden_states[:, i, :].detach().clone().to(device)
-                                    self.last_token_id = token_id
-                                    self.last_token_position = i
-                                    found = True
-                                    break
+                                try:
+                                    token_id = input_ids[i].item()
+                                    if token_id in self.target_tokens:
+                                        self.logger.debug(f"Found target token {token_id} at position {i}")
+                                        # Ensure tensor is properly allocated on the device (important for MPS)
+                                        self.layer_activations[layer_idx] = hidden_states[:, i, :].detach().clone().to(device)
+                                        self.last_token_id = token_id
+                                        self.last_token_position = i
+                                        found = True
+                                        break
+                                except (RuntimeError, ValueError) as e:
+                                    # This happens when input_ids[i] is not a scalar tensor
+                                    self.logger.debug(f"Error extracting token at position {i}: {e}")
+                                    # Skip this position and continue with the next
                             
                             # Fallback to last token if target not found
                             if not found:
@@ -210,7 +219,11 @@ class ActivationHooks:
                                 # Ensure tensor is properly allocated on the device (important for MPS)
                                 self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
                                 if last_token_idx < len(input_ids):
-                                    self.last_token_id = input_ids[last_token_idx].item()
+                                    try:
+                                        self.last_token_id = input_ids[last_token_idx].item()
+                                    except (RuntimeError, ValueError) as e:
+                                        self.logger.debug(f"Error extracting last token ID: {e}")
+                                        self.last_token_id = None
                                 self.last_token_position = last_token_idx
                     
                     elif self.token_strategy == "all":
@@ -223,9 +236,14 @@ class ActivationHooks:
                         if hasattr(module, '_last_input_ids'):
                             input_ids = module._last_input_ids[0]  # Batch size 1
                             last_idx = min(hidden_states.shape[1] - 1, len(input_ids) - 1)
-                            self.last_token_id = input_ids[last_idx].item()
-                            self.last_token_position = last_idx
-                            self.logger.debug(f"Saved last token ID: {self.last_token_id}, position: {last_idx}")
+                            try:
+                                self.last_token_id = input_ids[last_idx].item()
+                                self.last_token_position = last_idx
+                                self.logger.debug(f"Saved last token ID: {self.last_token_id}, position: {last_idx}")
+                            except (RuntimeError, ValueError) as e:
+                                self.logger.debug(f"Error extracting last token ID: {e}")
+                                self.last_token_id = None
+                                self.last_token_position = last_idx
                     
                     else:
                         # Default to last token
@@ -239,8 +257,12 @@ class ActivationHooks:
                         if hasattr(module, '_last_input_ids'):
                             input_ids = module._last_input_ids[0]  # Batch size 1
                             if last_token_idx < len(input_ids):
-                                self.last_token_id = input_ids[last_token_idx].item()
-                                self.logger.debug(f"Last token ID: {self.last_token_id}")
+                                try:
+                                    self.last_token_id = input_ids[last_token_idx].item()
+                                    self.logger.debug(f"Last token ID: {self.last_token_id}")
+                                except (RuntimeError, ValueError) as e:
+                                    self.logger.debug(f"Error extracting last token ID: {e}")
+                                    self.last_token_id = None
         
         return hook
     

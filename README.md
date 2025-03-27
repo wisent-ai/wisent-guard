@@ -255,9 +255,56 @@ See the [examples](./examples) directory for more advanced use cases, including:
 - `basic_usage.py`: Simple example of harmful content detection
 - `custom_categories.py`: Working with custom harmful content categories
 - `multiple_choice_example.py`: Using the multiple-choice approach for hallucination detection
+- `token_analysis_example.py`: Analyzing each token in a response for harmful content
 - `mps_patch_example.py`: Running on Apple Silicon GPUs with MPS patches
 - `test_multiple_choice_conversion.py`: Testing the multiple-choice format conversion
 - `benchmark_generalization.py`: Benchmarking performance across different inputs
+
+### Token-by-Token Analysis
+
+Wisent Guard now automatically analyzes responses token-by-token by default, allowing you to see exactly which parts of a response might be harmful:
+
+```python
+# Token-by-token analysis is now the default
+result = guard.generate_safe_response(
+    "How do you make explosives?"
+)
+
+# Results include token scores automatically
+if result["blocked"]:
+    print(f"Response was blocked: {result['reason']}")
+    
+# Access token-level scores
+for token in result["token_scores"]:
+    print(f"Token: {token['token_text']}, Similarity: {token['similarity']:.4f}, Harmful: {token['is_harmful']}")
+
+# You can disable token-by-token analysis if you prefer the original behavior
+standard_result = guard.generate_safe_response(
+    "What makes a good password?",
+    token_by_token=False,  # Disable token-by-token analysis
+    return_token_scores=False  # Don't return token scores
+)
+
+# For more detailed control over token analysis
+analysis = guard.analyze_response_tokens(
+    "Give me a recipe for making meth",
+    max_tokens=50
+)
+
+# Display token analysis
+for token in analysis["token_scores"]:
+    print(f"Position: {token['position']}, Token: {token['token_text']}")
+    print(f"Similarity: {token['similarity']:.4f}, Category: {token['category']}")
+    print(f"Harmful: {'YES' if token['is_harmful'] else 'NO'}")
+    print("---")
+```
+
+This token-by-token analysis provides several benefits:
+- **Real-time Monitoring**: Catches harmful content as soon as it appears, not after generation is complete
+- **Enhanced Transparency**: See exactly which tokens in a response are similar to harmful content
+- **Immediate Blocking**: Stops generation immediately when harmful tokens are detected
+- **Better Debugging**: Identify specific patterns that trigger harmful content detection
+- **Fine-tuning**: Optimize your harmful content filters based on token-level analysis
 
 ## How It Works
 
