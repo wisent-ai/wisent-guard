@@ -2033,62 +2033,42 @@ class ActivationGuard:
         if self.inference is None:
             raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
         
-        # If token-by-token approach is requested, use that regardless of multiple-choice setting
-        if token_by_token:
-            return self.inference.generate(
-                prompt=prompt,
-                max_new_tokens=max_new_tokens,
-                skip_prompt_check=skip_prompt_check,
-                token_by_token=True,
-                return_token_scores=return_token_scores,
-                **kwargs
-            )
+        # Generate response using simplified inference API
+        result = self.inference.generate(
+            prompt=prompt,
+            max_new_tokens=max_new_tokens,
+            **kwargs
+        )
         
-        if use_multiple_choice:
-            # Create a simple multiple-choice format with the prompt
-            choice_a = "I'll provide a helpful and accurate response."
-            choice_b = "I'll provide a response with inaccurate or harmful information."
-            question = f"{prompt}\nSelect one:"
-            
-            result = self.generate_multiple_choice_response(
-                question=question,
-                choice_a=choice_a,
-                choice_b=choice_b,
-                max_new_tokens=1,  # Just need A or B
-                **kwargs
-            )
-            
-            # If not blocked and response contains A, generate a real response
-            if not result.get("blocked", False) and "A" in result.get("response", ""):
-                # Generate the actual response with standard function
-                return self.inference.generate(
-                    prompt=prompt,
-                    max_new_tokens=max_new_tokens,
-                    skip_prompt_check=True,  # Already checked in multiple-choice
-                    token_by_token=token_by_token,
-                    return_token_scores=return_token_scores,
-                    **kwargs
-                )
-            elif not result.get("blocked", False):
-                # Model chose B or something else, block it
-                return {
-                    "response": "I cannot provide that response as it might contain inaccurate information.",
-                    "blocked": True,
-                    "reason": "Model showed intent to provide problematic content"
-                }
-            else:
-                # Already blocked
-                return result
-        else:
-            # Use standard generation
-            return self.inference.generate(
-                prompt=prompt,
-                max_new_tokens=max_new_tokens,
-                skip_prompt_check=skip_prompt_check,
-                token_by_token=token_by_token,
-                return_token_scores=return_token_scores,
-                **kwargs
-            )
+        # Process token scores to determine if any token is harmful
+        blocked = False
+        block_reason = None
+        harmful_token = None
+        
+        # Check if any token exceeds the threshold
+        if 'token_scores' in result:
+            for token in result['token_scores']:
+                if token.get('similarity', 0.0) >= self.threshold:
+                    blocked = True
+                    harmful_category = token.get('category', 'unknown')
+                    token_text = token.get('token_text', '')
+                    token_position = token.get('position', 0)
+                    similarity = token.get('similarity', 0.0)
+                    
+                    harmful_token = token
+                    block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
+                    break
+        
+        # Add safety information to the result
+        enhanced_result = {
+            "response": result["response"],
+            "token_scores": result.get("token_scores", []) if return_token_scores else [],
+            "blocked": blocked,
+            "reason": block_reason,
+            "harmful_token": harmful_token
+        }
+        
+        return enhanced_result
     
     def generate_multiple_choice_response(
         self,
@@ -2124,7 +2104,29 @@ class ActivationGuard:
             **kwargs
         )
         
-        return result
+        # Process token scores to determine if any token is harmful
+        blocked = False
+        block_reason = None
+        
+        # Check if any token exceeds the threshold
+        if 'token_scores' in result:
+            for token in result['token_scores']:
+                if token.get('similarity', 0.0) >= self.threshold:
+                    blocked = True
+                    harmful_category = token.get('category', 'unknown')
+                    similarity = token.get('similarity', 0.0)
+                    block_reason = f"Response token exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
+                    break
+        
+        # Add safety information to the result
+        enhanced_result = {
+            "response": result["response"],
+            "token_scores": result.get("token_scores", []),
+            "blocked": blocked,
+            "reason": block_reason
+        }
+        
+        return enhanced_result
     
     def get_available_categories(self) -> List[str]:
         """
@@ -2360,13 +2362,50 @@ class ActivationGuard:
         if self.inference is None:
             raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
             
-        return self.inference.generate(
+        # Use the simplified inference API
+        result = self.inference.generate(
             prompt=prompt,
             max_new_tokens=max_tokens,
-            token_by_token=True,
-            return_token_scores=True,
             **kwargs
         )
+        
+        # Process token scores to determine if any token is harmful
+        blocked = False
+        block_reason = None
+        harmful_token = None
+        max_similarity = 0.0
+        max_similarity_category = None
+        
+        # Check each token's similarity score
+        if 'token_scores' in result:
+            for token in result['token_scores']:
+                similarity = token.get('similarity', 0.0)
+                if similarity > max_similarity:
+                    max_similarity = similarity
+                    max_similarity_category = token.get('category')
+                
+                if similarity >= self.threshold:
+                    blocked = True
+                    harmful_category = token.get('category', 'unknown')
+                    token_text = token.get('token_text', '')
+                    token_position = token.get('position', 0)
+                    
+                    harmful_token = token
+                    block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
+                    break
+        
+        # Add analysis information to the result
+        enhanced_result = {
+            "response": result["response"],
+            "token_scores": result.get("token_scores", []),
+            "blocked": blocked,
+            "reason": block_reason,
+            "harmful_token": harmful_token,
+            "max_similarity": max_similarity,
+            "max_similarity_category": max_similarity_category
+        }
+        
+        return enhanced_result
     
     def load_vectors(self, categories: Optional[List[str]] = None, layers: Optional[List[int]] = None) -> bool:
         """

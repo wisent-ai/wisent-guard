@@ -18,181 +18,6 @@ import pandas as pd
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Apply MPS compatibility fixes before importing wisent_guard
-def apply_mps_patches():
-    """Apply patches to fix MPS compatibility issues"""
-    # Only apply patches if MPS is available
-    if not (hasattr(torch, 'mps') and torch.backends.mps.is_available()):
-        return
-    
-    print("Applying MPS compatibility patches...")
-    
-    # Import the modules we need to patch
-    from wisent_guard.utils.activation_hooks import ActivationHooks
-    from wisent_guard.inference import SafeInference
-    
-    # Store the original methods to patch
-    original_activation_hook = ActivationHooks._activation_hook
-    original_check_prompt_safety = SafeInference._check_prompt_safety
-    
-    def patched_activation_hook(self, layer_idx):
-        """
-        Patched version of the activation hook that ensures MPS compatibility
-        by explicitly keeping tensors on the same device as the model.
-        """
-        # Get the original hook
-        original_hook = original_activation_hook(self, layer_idx)
-        
-        # Create a new hook function that ensures device compatibility
-        def hook(module, input, output):
-            # Get the current device from the module
-            device = next(module.parameters()).device
-            
-            # Call the original hook function
-            original_hook(module, input, output)
-            
-            # Ensure the activation tensor is on the same device as the model
-            if layer_idx in self.layer_activations and device.type == 'mps':
-                self.layer_activations[layer_idx] = self.layer_activations[layer_idx].to(device)
-        
-        return hook
-    
-    def patched_check_prompt_safety(self, input_text):
-        """
-        Patched version of check_prompt_safety that ensures MPS compatibility
-        by properly handling device placement.
-        """
-        # Reset monitor state
-        self.monitor.reset()
-        
-        # Tokenize and encode input
-        input_ids = self.tokenizer.encode(input_text, return_tensors="pt")
-        
-        # Get the model's device and move input_ids to it
-        device = next(self.model.parameters()).device
-        input_ids = input_ids.to(device)
-        
-        # Run a forward pass through the model to get activations
-        with torch.no_grad():
-            self.model(input_ids)
-        
-        # Check if activations match harmful patterns
-        if self.monitor.is_harmful():
-            harmful_category = self.monitor.get_most_harmful_category()
-            if harmful_category:
-                category, similarity = harmful_category
-                self.blocked_reason = f"Prompt contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
-            else:
-                self.blocked_reason = "Prompt contains potentially harmful content"
-            return False
-        
-        return True
-    
-    # Also patch the generate method to ensure complete MPS compatibility
-    original_generate = SafeInference.generate
-    
-    def patched_generate(self, prompt, max_new_tokens=100, skip_prompt_check=False, **kwargs):
-        """
-        Patched version of generate that ensures MPS compatibility.
-        """
-        # Reset monitoring state
-        self.monitor.reset()
-        self.blocked_reason = None
-        
-        # Extract system_prompt if provided
-        system_prompt = kwargs.pop('system_prompt', None)
-        
-        # Check if the prompt itself is safe
-        prompt_is_safe = True
-        if not skip_prompt_check:
-            prompt_is_safe = self._check_prompt_safety(prompt)
-        
-        # If prompt is not safe and blocking is enabled, return early
-        if not prompt_is_safe and self.block_on_harmful:
-            return {
-                "response": self.unsafe_message,
-                "blocked": True,
-                "reason": self.blocked_reason
-            }
-        
-        # Format the prompt with system prompt if provided
-        if system_prompt:
-            formatted_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{prompt}\n<|assistant|>"
-        else:
-            formatted_prompt = f"<|user|>\n{prompt}\n<|assistant|>"
-        
-        # Prepare for generation - ensure device placement
-        input_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt")
-        device = next(self.model.parameters()).device
-        input_ids = input_ids.to(device)
-        
-        # Set up generation parameters
-        gen_kwargs = {
-            "max_new_tokens": max_new_tokens,
-            "pad_token_id": self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
-        }
-        gen_kwargs.update(kwargs)
-        
-        # Generate text
-        try:
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    input_ids,
-                    **gen_kwargs
-                )
-                
-                # Check for harmful content in the full sequence
-                self.monitor.reset()
-                _ = self.model(outputs.to(device))
-                
-                if self.monitor.is_harmful() and self.block_on_harmful:
-                    harmful_category = self.monitor.get_most_harmful_category()
-                    if harmful_category:
-                        category, similarity = harmful_category
-                        self.blocked_reason = f"Response contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
-                    else:
-                        self.blocked_reason = "Response contains potentially harmful content"
-                    
-                    return {
-                        "response": self.unsafe_message,
-                        "blocked": True,
-                        "reason": self.blocked_reason
-                    }
-                
-                # Decode the generated text
-                generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-                
-                # Extract just the assistant's response
-                if "<|assistant|>" in generated_text:
-                    response = generated_text.split("<|assistant|>")[-1].strip()
-                else:
-                    response = generated_text
-                    
-        except Exception as e:
-            return {
-                "response": self.unsafe_message,
-                "blocked": True,
-                "reason": f"Exception: {str(e)}"
-            }
-        
-        # Return results
-        return {
-            "response": response,
-            "blocked": False,
-            "reason": None
-        }
-    
-    # Apply the patches
-    ActivationHooks._activation_hook = patched_activation_hook
-    SafeInference._check_prompt_safety = patched_check_prompt_safety
-    SafeInference.generate = patched_generate
-    
-    print("✅ Applied MPS compatibility patches")
-
-# Apply patches first
-apply_mps_patches()
-
 # Now import wisent_guard
 from wisent_guard import ActivationGuard
 from evaluation.evaluate_string import call_claude_and_evaluate
@@ -382,7 +207,7 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
         is_harmful = guard.is_harmful(formatted_prompt)
         similarity_score = guard.get_similarity(formatted_prompt) if is_harmful else None
         
-        # Generate safe response - without system prompt to match baseline
+        # Generate safe response - ensure token scores are captured
         result = guard.generate_safe_response(
             prompt_text,
             max_new_tokens=max_tokens
@@ -391,6 +216,7 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
         response = result.get('response', '')
         blocked = result.get('blocked', False)
         reason = result.get('reason', '') if blocked else ''
+        token_scores = result.get('token_scores', [])  # Get token scores (if available by default)
         
         # Use Claude to evaluate response quality
         try:
@@ -412,7 +238,8 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
             'is_harmful': is_harmful,
             'similarity_score': similarity_score,
             'blocked': blocked,
-            'reason': reason
+            'reason': reason,
+            'token_scores': token_scores  # Store token scores
         })
         
         # Print progress every 10 samples
@@ -517,11 +344,37 @@ def print_metrics(metrics, title="Model Evaluation Metrics"):
         print(f"  {cat}: {values['claude_correct']} correct / {values['total']} total ({values['claude_correct_rate']:.2%})")
 
 def save_results(results, filename):
-    """Save results to a CSV file"""
+    """Save results to a CSV file with token scores"""
+    # Create a list of dictionaries for CSV output
+    csv_results = []
+    
+    for result in results:
+        # Create a copy of the result dictionary without token_scores
+        result_copy = {k: v for k, v in result.items() if k != 'token_scores'}
+        
+        # Process token scores if they exist
+        if 'token_scores' in result and result['token_scores']:
+            # Format token scores as string
+            token_data = []
+            for token in result['token_scores']:
+                # Format: position:token_id:token_text:similarity:category:is_harmful
+                token_text = token.get('token_text', '').replace('\n', '\\n').replace(',', '\\,')
+                token_info = f"{token.get('position', '')}:{token.get('token_id', '')}:{token_text}:{token.get('similarity', 0.0):.6f}:{token.get('category', '')}:{token.get('is_harmful', False)}"
+                token_data.append(token_info)
+            
+            # Add formatted token data to result
+            result_copy['token_scores'] = '|'.join(token_data)
+        else:
+            result_copy['token_scores'] = ''
+        
+        csv_results.append(result_copy)
+    
+    # Write to CSV
     with open(filename, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=results[0].keys())
+        writer = csv.DictWriter(f, fieldnames=csv_results[0].keys())
         writer.writeheader()
-        writer.writerows(results)
+        writer.writerows(csv_results)
+    
     print(f"Results saved to {filename}")
 
 def save_combined_results(baseline_results, guard_results, filename):
@@ -537,6 +390,19 @@ def save_combined_results(baseline_results, guard_results, filename):
             baseline_idx = question_map[question]
             baseline_result = baseline_results[baseline_idx]
             
+            # Process token scores if they exist
+            token_scores_formatted = ""
+            if 'token_scores' in guard_result and guard_result['token_scores']:
+                # Format token scores as string
+                token_data = []
+                for token in guard_result['token_scores']:
+                    # Format: position:token_id:token_text:similarity:category:is_harmful
+                    token_text = token.get('token_text', '').replace('\n', '\\n').replace(',', '\\,')
+                    token_info = f"{token.get('position', '')}:{token.get('token_id', '')}:{token_text}:{token.get('similarity', 0.0):.6f}:{token.get('category', '')}:{token.get('is_harmful', False)}"
+                    token_data.append(token_info)
+                
+                token_scores_formatted = '|'.join(token_data)
+            
             # Create combined entry with both baseline and guard results
             combined_entry = {
                 'question': question,
@@ -548,7 +414,8 @@ def save_combined_results(baseline_results, guard_results, filename):
                 'is_harmful': guard_result.get('is_harmful', False),
                 'similarity_score': guard_result.get('similarity_score', None),
                 'blocked': guard_result.get('blocked', False),
-                'block_reason': guard_result.get('reason', '')
+                'block_reason': guard_result.get('reason', ''),
+                'token_scores': token_scores_formatted
             }
                 
             combined_results.append(combined_entry)
