@@ -87,12 +87,15 @@ class ActivationMonitor:
         self.hooks.clear_activations()
         self.logger.debug("Monitor state reset complete")
     
-    def check_activations(self, categories: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+    def check_activations(self, categories: Optional[List[str]] = None, is_response_token: bool = False) -> Dict[str, Dict[str, Any]]:
         """
         Check if current activations are similar to harmful patterns.
         
         Args:
             categories: Categories to check. If None, all available categories are checked.
+            is_response_token: Whether we're checking a token from the model's response.
+                              When True, the system will focus on the last token position,
+                              which is likely the first generated token of the response.
             
         Returns:
             Dictionary with results for each category.
@@ -114,7 +117,10 @@ class ActivationMonitor:
             try:
                 # Try to decode the token for better logging
                 token_text = self.model.config.tokenizer.decode([token_info["token_id"]])
-                self.logger.debug(f"Token text: '{token_text}'")
+                if is_response_token:
+                    self.logger.debug(f"Checking response token: '{token_text}'")
+                else:
+                    self.logger.debug(f"Token text: '{token_text}'")
             except:
                 pass
         
@@ -203,7 +209,11 @@ class ActivationMonitor:
                 
                 # Check if threshold is exceeded
                 if similarity >= self.threshold:
-                    self.logger.info(f"Harmful pattern detected in layer {layer} for category '{category}' (similarity: {similarity:.4f})")
+                    if is_response_token:
+                        self.logger.info(f"Harmful response pattern detected in layer {layer} for category '{category}' (similarity: {similarity:.4f})")
+                    else:
+                        self.logger.info(f"Harmful pattern detected in layer {layer} for category '{category}' (similarity: {similarity:.4f})")
+                    
                     self.triggered_layers[category].add(layer)
                     category_results["is_harmful"] = True
                     self.is_triggered = True
@@ -273,23 +283,27 @@ class ActivationMonitor:
         self.logger.debug("No harmful categories found")
         return None
     
-    def is_harmful(self, categories: Optional[List[str]] = None) -> bool:
+    def is_harmful(self, categories: Optional[List[str]] = None, is_response_token: bool = False) -> bool:
         """
         Check if current activations indicate harmful content.
         
         Args:
             categories: Categories to check. If None, all available categories are checked.
+            is_response_token: Whether we're checking a token from the model's response.
             
         Returns:
             True if harmful content is detected, False otherwise
         """
         self.logger.debug("Checking if content is harmful")
-        results = self.check_activations(categories)
+        results = self.check_activations(categories, is_response_token=is_response_token)
         
         # Check if any category is flagged as harmful
         for category, category_result in results.items():
             if category_result["is_harmful"]:
-                self.logger.info(f"Content flagged as harmful in category '{category}'")
+                if is_response_token:
+                    self.logger.info(f"Response content flagged as harmful in category '{category}'")
+                else:
+                    self.logger.info(f"Content flagged as harmful in category '{category}'")
                 return True
         
         self.logger.debug("Content not flagged as harmful")

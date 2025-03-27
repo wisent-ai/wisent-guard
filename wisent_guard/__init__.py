@@ -9,6 +9,7 @@ Features:
 - Monitor model activations during inference
 - Block responses that show activation patterns similar to harmful content
 - Convert examples to multiple-choice format for consistent activation collection
+- Token-by-token analysis of all response tokens (default behavior)
 
 Device Support:
 - CUDA (NVIDIA GPUs)
@@ -21,5 +22,5 @@ from .monitor import ActivationMonitor
 from .vectors import ContrastiveVectors
 from .inference import SafeInference
 
-# Updated with MPS support
-__version__ = "0.2.2" 
+# Updated with MPS support and token-by-token analysis
+__version__ = "0.3.0" 
