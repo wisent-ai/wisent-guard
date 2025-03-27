@@ -792,12 +792,13 @@ class ContrastiveVectors:
         
         self.logger.info(f"Successfully saved {saved_count} contrastive vectors")
     
-    def load_vectors(self, categories: Optional[List[str]] = None) -> bool:
+    def load_vectors(self, categories: Optional[List[str]] = None, layers: Optional[List[int]] = None) -> bool:
         """
         Load vectors from disk.
         
         Args:
             categories: List of categories to load. If None, loads all available categories.
+            layers: List of layers to load. If None, loads all available layers.
             
         Returns:
             True if vectors were loaded successfully, False otherwise
@@ -811,6 +812,11 @@ class ContrastiveVectors:
             self.logger.debug(f"Loading all {len(categories)} available categories")
         else:
             self.logger.debug(f"Loading specific categories: {categories}")
+        
+        # Convert layers to integers if provided
+        if layers is not None:
+            layers = [int(layer) for layer in layers]
+            self.logger.debug(f"Loading specific layers: {layers}")
         
         success = True
         loaded_count = 0
@@ -828,48 +834,41 @@ class ContrastiveVectors:
             self.contrastive_vectors[category] = {}
             
             # Load contrastive vectors
-            layers = [int(layer) for layer in self.metadata["layers"].keys()]
-            for layer in layers:
+            metadata_layers = [int(layer) for layer in self.metadata["layers"].keys()]
+            # Filter layers if specified
+            target_layers = layers if layers is not None else metadata_layers
+            
+            for layer in target_layers:
+                # Skip layers not in metadata
+                if layer not in metadata_layers:
+                    self.logger.debug(f"Layer {layer} not in metadata, skipping")
+                    continue
+                    
                 vector_path = os.path.join(category_dir, f"contrastive_layer_{layer}.pt")
                 self.logger.debug(f"Attempting to load vector from {vector_path}")
                 
                 if os.path.exists(vector_path):
                     try:
-                        # Load to CPU first for consistency
-                        self.contrastive_vectors[category][layer] = torch.load(vector_path, map_location='cpu')
+                        vector_tensor = torch.load(vector_path, map_location=torch.device('cpu'))
+                        self.contrastive_vectors[category][layer] = vector_tensor
                         loaded_count += 1
-                        self.logger.debug(f"Successfully loaded vector for layer {layer}")
+                        self.logger.debug(f"Successfully loaded vector from {vector_path}")
                     except Exception as e:
-                        self.logger.error(f"Error loading vector from {vector_path}: {e}")
+                        self.logger.warning(f"Error loading vector file {vector_path}: {e}")
                         success = False
                 else:
                     self.logger.warning(f"Vector file {vector_path} does not exist")
                     success = False
-            
-            # Try to load raw vectors if available
-            try:
-                harmful_path = os.path.join(category_dir, "harmful_vectors.pkl")
-                harmless_path = os.path.join(category_dir, "harmless_vectors.pkl")
-                
-                if os.path.exists(harmful_path):
-                    self.logger.debug(f"Loading harmful vectors from {harmful_path}")
-                    with open(harmful_path, 'rb') as f:
-                        self.harmful_vectors[category] = pickle.load(f)
-                
-                if os.path.exists(harmless_path):
-                    self.logger.debug(f"Loading harmless vectors from {harmless_path}")
-                    with open(harmless_path, 'rb') as f:
-                        self.harmless_vectors[category] = pickle.load(f)
-            except Exception as e:
-                self.logger.error(f"Error loading raw vectors: {e}")
-                # Not critical for functionality, so don't update success flag
         
-        if success:
+        if loaded_count > 0:
             self.logger.info(f"Successfully loaded {loaded_count} contrastive vectors")
+            return True
         else:
-            self.logger.warning(f"Loaded {loaded_count} vectors with some errors")
-            
-        return success
+            if not success:
+                self.logger.warning(f"Loaded {loaded_count} vectors with some errors")
+            else:
+                self.logger.info("No vectors found to load")
+            return loaded_count > 0
     
     def clear_vectors(self, category: Optional[str] = None) -> None:
         """

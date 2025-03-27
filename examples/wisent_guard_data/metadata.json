@@ -4,10 +4,10 @@
   ],
   "layers": {
     "24": 1,
-    "15": 3
+    "15": 7
   },
   "version": "0.1.0",
   "num_pairs": {
-    "explosives": 4
+    "explosives": 8
   }
 }
