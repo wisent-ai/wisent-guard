@@ -1,0 +1,13 @@
+{
+  "categories": [
+    "explosives"
+  ],
+  "layers": {
+    "24": 1,
+    "15": 3
+  },
+  "version": "0.1.0",
+  "num_pairs": {
+    "explosives": 4
+  }
+}

@@ -1914,33 +1914,94 @@ class ActivationGuard:
     
     def is_harmful(self, text: str, categories: Optional[List[str]] = None) -> bool:
         """
-        Check if text contains harmful content.
+        Check if text would lead to a harmful response by evaluating the first token of the response.
         
         Args:
-            text: Text to check
+            text: Input prompt to check
             categories: Specific categories to check against
             
         Returns:
-            True if harmful content is detected, False otherwise
+            True if harmful content is detected in the response, False otherwise
         """
         if self.monitor is None:
             raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
         
-        # Format as multiple-choice if needed
-        text = self._format_input_as_multiple_choice(text)
+        # Reset monitor
+        self.monitor.reset()
+        
+        # Format the prompt for generation
+        formatted_prompt = f"<|user|>\n{text}\n<|assistant|>"
+        
+        # Encode the prompt
+        prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
+        
+        # Generate just the first token of the response
+        with torch.no_grad():
+            # Get the first token of what would be generated
+            outputs = self.model.generate(
+                prompt_ids,
+                max_new_tokens=1,  # Just generate the first token
+                return_dict_in_generate=True,
+                output_scores=True
+            )
+            
+            # Get the full sequence including the prompt and the first generated token
+            full_sequence = torch.cat([prompt_ids, outputs.sequences[:, prompt_ids.shape[1]:]], dim=1)
+            
+            # Process the full sequence to get activations
+            self.model(full_sequence)
+        
+        # Check if harmful
+        return self.monitor.is_harmful(categories=categories, is_response_token=True)
+    
+    def get_similarity(self, text: str, categories: Optional[List[str]] = None) -> float:
+        """
+        Get the similarity of the first token of response to harmful patterns.
+        
+        Args:
+            text: Input prompt to check
+            categories: Specific categories to check against
+            
+        Returns:
+            Highest similarity score
+        """
+        if self.monitor is None:
+            raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
         
         # Reset monitor
         self.monitor.reset()
         
-        # Encode text
-        input_ids = self.tokenizer.encode(text, return_tensors="pt").to(self.device)
+        # Format the prompt for generation
+        formatted_prompt = f"<|user|>\n{text}\n<|assistant|>"
         
-        # Run forward pass to get activations
+        # Encode the prompt
+        prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
+        
+        # Generate just the first token of the response
         with torch.no_grad():
-            self.model(input_ids)
+            # Get the first token of what would be generated
+            outputs = self.model.generate(
+                prompt_ids,
+                max_new_tokens=1,  # Just generate the first token
+                return_dict_in_generate=True,
+                output_scores=True
+            )
+            
+            # Get the full sequence including the prompt and the first generated token
+            full_sequence = torch.cat([prompt_ids, outputs.sequences[:, prompt_ids.shape[1]:]], dim=1)
+            
+            # Process the full sequence to get activations
+            self.model(full_sequence)
         
-        # Check if harmful
-        return self.monitor.is_harmful(categories=categories)
+        # Get similarity scores
+        results = self.monitor.check_activations(categories=categories, is_response_token=True)
+        
+        # Find the highest similarity score
+        max_similarity = 0.0
+        for category_result in results.values():
+            max_similarity = max(max_similarity, category_result["max_similarity"])
+        
+        return max_similarity
     
     def generate_safe_response(
         self,
@@ -1948,6 +2009,8 @@ class ActivationGuard:
         max_new_tokens: int = 100,
         skip_prompt_check: bool = False,
         use_multiple_choice: bool = True,
+        token_by_token: bool = True,
+        return_token_scores: bool = True,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1958,13 +2021,27 @@ class ActivationGuard:
             max_new_tokens: Maximum number of tokens to generate
             skip_prompt_check: Whether to skip the initial prompt safety check
             use_multiple_choice: Whether to use multiple-choice format internally
+            token_by_token: Whether to generate token-by-token and check each token (default: True)
+            return_token_scores: Whether to include similarity scores for each token (default: True)
             **kwargs: Additional keyword arguments for the generation function
             
         Returns:
-            Dictionary containing the generated text and safety information
+            Dictionary containing the generated text and safety information.
+            Also includes token-level similarity scores by default.
         """
         if self.inference is None:
             raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
+        
+        # If token-by-token approach is requested, use that regardless of multiple-choice setting
+        if token_by_token:
+            return self.inference.generate(
+                prompt=prompt,
+                max_new_tokens=max_new_tokens,
+                skip_prompt_check=skip_prompt_check,
+                token_by_token=True,
+                return_token_scores=return_token_scores,
+                **kwargs
+            )
         
         if use_multiple_choice:
             # Create a simple multiple-choice format with the prompt
@@ -1987,6 +2064,8 @@ class ActivationGuard:
                     prompt=prompt,
                     max_new_tokens=max_new_tokens,
                     skip_prompt_check=True,  # Already checked in multiple-choice
+                    token_by_token=token_by_token,
+                    return_token_scores=return_token_scores,
                     **kwargs
                 )
             elif not result.get("blocked", False):
@@ -2005,6 +2084,8 @@ class ActivationGuard:
                 prompt=prompt,
                 max_new_tokens=max_new_tokens,
                 skip_prompt_check=skip_prompt_check,
+                token_by_token=token_by_token,
+                return_token_scores=return_token_scores,
                 **kwargs
             )
     
@@ -2053,49 +2134,12 @@ class ActivationGuard:
         """
         return self.vectors.get_available_categories()
     
-    def get_similarity(self, text: str, categories: Optional[List[str]] = None) -> float:
-        """
-        Get the similarity of text to harmful patterns.
-        
-        Args:
-            text: Text to check
-            categories: Specific categories to check against
-            
-        Returns:
-            Highest similarity score
-        """
-        if self.monitor is None:
-            raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
-        
-        # Format as multiple-choice if needed
-        text = self._format_input_as_multiple_choice(text)
-        
-        # Reset monitor
-        self.monitor.reset()
-        
-        # Encode text
-        input_ids = self.tokenizer.encode(text, return_tensors="pt").to(self.device)
-        
-        # Run forward pass to get activations
-        with torch.no_grad():
-            self.model(input_ids)
-        
-        # Get similarity scores
-        results = self.monitor.check_activations(categories=categories)
-        
-        # Find the highest similarity score
-        max_similarity = 0.0
-        for category_result in results.values():
-            max_similarity = max(max_similarity, category_result["max_similarity"])
-        
-        return max_similarity
-    
     def get_triggered_category(self, text: str) -> Optional[str]:
         """
-        Get the category that was triggered by the text.
+        Get the category that was triggered by the model's first response token.
         
         Args:
-            text: Text to check
+            text: Input prompt to check
             
         Returns:
             Category name or None if no category was triggered
@@ -2103,23 +2147,37 @@ class ActivationGuard:
         if self.monitor is None:
             raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
         
-        # Format as multiple-choice if needed
-        text = self._format_input_as_multiple_choice(text)
-        
         # Reset monitor
         self.monitor.reset()
         
-        # Encode text
-        input_ids = self.tokenizer.encode(text, return_tensors="pt").to(self.device)
+        # Format the prompt for generation
+        formatted_prompt = f"<|user|>\n{text}\n<|assistant|>"
         
-        # Run forward pass to get activations
+        # Encode the prompt
+        prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
+        
+        # Generate just the first token of the response
         with torch.no_grad():
-            self.model(input_ids)
+            # Get the first token of what would be generated
+            outputs = self.model.generate(
+                prompt_ids,
+                max_new_tokens=1,  # Just generate the first token
+                return_dict_in_generate=True,
+                output_scores=True
+            )
+            
+            # Get the full sequence including the prompt and the first generated token
+            full_sequence = torch.cat([prompt_ids, outputs.sequences[:, prompt_ids.shape[1]:]], dim=1)
+            
+            # Process the full sequence to get activations
+            self.model(full_sequence)
         
         # Get the most harmful category
-        category_info = self.monitor.get_most_harmful_category()
-        if category_info is not None:
-            return category_info[0]
+        most_harmful = self.monitor.get_most_harmful_category()
+        if most_harmful is not None:
+            category, similarity = most_harmful
+            if similarity >= self.threshold:
+                return category
         
         return None
     
@@ -2275,4 +2333,36 @@ class ActivationGuard:
                 print(f"      - Negative: '{neg_info['text']}'")
                 print(f"        Max Similarity: {neg_max:.4f} (Harmful: {is_harmful})")
         
-        print("\n" + "="*80) 
+        print("\n" + "="*80)
+    
+    def analyze_response_tokens(
+        self,
+        prompt: str,
+        max_tokens: int = 50,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Generate a response token-by-token and analyze each token for harmful content.
+        
+        This method provides detailed token-level analysis, including similarity scores
+        for each token generated in the response. It's useful for understanding why 
+        specific responses might be flagged as harmful.
+        
+        Args:
+            prompt: Input prompt
+            max_tokens: Maximum number of tokens to generate
+            **kwargs: Additional keyword arguments for the generation function
+            
+        Returns:
+            Dictionary containing the response, token scores, and blocking information
+        """
+        if self.inference is None:
+            raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
+            
+        return self.inference.generate(
+            prompt=prompt,
+            max_new_tokens=max_tokens,
+            token_by_token=True,
+            return_token_scores=True,
+            **kwargs
+        ) 

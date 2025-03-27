@@ -22,5 +22,5 @@ from .monitor import ActivationMonitor
 from .vectors import ContrastiveVectors
 from .inference import SafeInference
 
-# Updated with Torch only support 
+# Updated with MPS support and token-by-token analysis
 __version__ = "0.4.1" 
