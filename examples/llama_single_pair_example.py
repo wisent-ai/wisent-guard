@@ -4,7 +4,7 @@ Enhanced example demonstrating Wisent Guard with token-by-token monitoring.
 
 This script shows how to:
 1. Load the Llama 3.1 model
-2. Create a contrastive vector from a single harmful/harmless pair 
+2. Create a contrastive vector from a single harmful/harmless pair
 3. Monitor EVERY token in the response for harmfulness and print scores
 4. Block generation if any token exceeds the threshold
 
@@ -212,11 +212,11 @@ def main():
         result = analyze_token_by_token(
             model=model,
             tokenizer=tokenizer,
-            prompt=prompt,
+                prompt=prompt,
             guard=guard,
             max_tokens=args.max_tokens
-        )
-        
+            )
+            
         if result["blocked"]:
             logger.info(f"Response was blocked: {result['reason']}")
         else:
