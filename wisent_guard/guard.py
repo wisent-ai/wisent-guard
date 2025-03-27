@@ -12,6 +12,7 @@ from .vectors import ContrastiveVectors
 from .monitor import ActivationMonitor
 from .inference import SafeInference
 from .utils.helpers import ensure_dir
+from .utils.logger import get_logger
 
 class ActivationGuard:
     """
@@ -30,6 +31,8 @@ class ActivationGuard:
         save_dir: str = "./wisent_guard_data",
         device: Optional[str] = None,
         token_strategy: str = "target_token",  # Default to target_token for A/B tokens
+        log_level: str = "info",
+        log_file: Optional[str] = None,
     ):
         """
         Initialize the ActivationGuard.
@@ -45,54 +48,79 @@ class ActivationGuard:
                            - "target_token": Look for specific tokens like "A" or "B" (default)
                            - "last": Last token in sequence (legacy)
                            - "all": Store all tokens for later selection
+            log_level: Logging level ('debug', 'info', 'warning', 'error')
+            log_file: Optional file to write logs to
         """
+        # Set up logger
+        self.logger = get_logger(level=log_level, log_file=log_file)
+        self.logger.info("Initializing ActivationGuard")
+        
         # Set up directories
         self.save_dir = save_dir
         ensure_dir(self.save_dir)
+        self.logger.info(f"Using save directory: {self.save_dir}")
         
         # Set device
         if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            if torch.cuda.is_available():
+                self.device = "cuda"
+                self.logger.info("Using CUDA GPU")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                self.device = "mps"
+                self.logger.info("Using Apple Silicon GPU via MPS")
+            else:
+                self.device = "cpu"
+                self.logger.info("Using CPU")
         else:
             self.device = device
+            self.logger.info(f"Using user-specified device: {self.device}")
         
         # Set token strategy - default to target_token for multiple-choice
         self.token_strategy = token_strategy
+        self.logger.info(f"Using token strategy: {self.token_strategy}")
         
         # Load model and tokenizer if strings are provided
         if isinstance(model, str):
-            print(f"Loading model from {model}...")
+            self.logger.info(f"Loading model from {model}...")
             self.model = AutoModelForCausalLM.from_pretrained(model)
             self.model.to(self.device)
         else:
             self.model = model
+            self.logger.info("Using provided model")
             
         if tokenizer is None and isinstance(model, str):
-            print(f"Loading tokenizer from {model}...")
+            self.logger.info(f"Loading tokenizer from {model}...")
             self.tokenizer = AutoTokenizer.from_pretrained(model)
         elif isinstance(tokenizer, str):
+            self.logger.info(f"Loading tokenizer from {tokenizer}...")
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         else:
             self.tokenizer = tokenizer
+            self.logger.info("Using provided tokenizer")
             
         # Ensure tokenizer has padding token
         if self.tokenizer.pad_token is None:
+            self.logger.info("Setting padding token to EOS token")
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
         # Set up layers to monitor
         self.layers = layers if layers is not None else list(range(min(12, self.model.config.num_hidden_layers)))
+        self.logger.info(f"Monitoring layers: {self.layers}")
         
         # Initialize vectors, monitor, and inference
         self.vectors = ContrastiveVectors(save_dir=self.save_dir)
         self.monitor = None
         self.inference = None
         self.threshold = threshold
+        self.logger.info(f"Similarity threshold set to {self.threshold}")
         
         # Try to load existing vectors
         if self.vectors.load_vectors():
-            print(f"Loaded existing vectors from {self.save_dir}")
+            self.logger.info(f"Loaded existing vectors from {self.save_dir}")
             # Initialize monitor and inference with loaded vectors
             self._initialize_monitor_and_inference()
+        else:
+            self.logger.info("No existing vectors found")
         
         # Set target tokens for multiple-choice format
         self._setup_target_tokens()
@@ -105,14 +133,16 @@ class ActivationGuard:
         
         target_tokens = ["A", "B"]
         self.monitor.hooks.set_target_tokens(self.tokenizer, target_tokens)
-        print(f"Multiple-choice tokens set: {target_tokens}")
+        self.logger.info(f"Multiple-choice tokens set: {target_tokens}")
     
     def _initialize_monitor_and_inference(self):
         """Initialize monitor and inference components with current vectors."""
+        self.logger.debug("Initializing monitor and inference components")
+        
         # Always use target_token strategy internally for token selection
         actual_token_strategy = "target_token"
         if self.token_strategy != "target_token":
-            print(f"Note: Using 'target_token' strategy internally instead of '{self.token_strategy}' for more consistent results")
+            self.logger.info(f"Note: Using 'target_token' strategy internally instead of '{self.token_strategy}' for more consistent results")
         
         self.monitor = ActivationMonitor(
             model=self.model,
@@ -130,6 +160,8 @@ class ActivationGuard:
         
         # Set up target tokens for multiple-choice format
         self._setup_target_tokens()
+        
+        self.logger.debug("Monitor and inference components initialized")
     
     def _convert_to_multiple_choice(self, harmful_phrase: str, harmless_phrase: str) -> Tuple[str, str]:
         """
@@ -142,6 +174,8 @@ class ActivationGuard:
         Returns:
             Tuple of (harmful_mc, harmless_mc) in multiple-choice format
         """
+        self.logger.debug("Converting to multiple-choice format")
+        
         # Create question from the phrases
         question = "Which of the following statements is true?"
         
@@ -160,6 +194,7 @@ class ActivationGuard:
             "B"  # Harmful answer is B
         )
         
+        self.logger.debug("Multiple-choice conversion complete")
         return harmful_mc, harmless_mc
     
     def train_on_phrase_pairs(self, phrase_pairs: List[Dict[str, str]], category: str = "harmful_content") -> None:
@@ -171,53 +206,82 @@ class ActivationGuard:
             phrase_pairs: List of dictionaries with 'harmful' and 'harmless' keys
             category: Category label for the vector pairs
         """
-        print(f"Training on {len(phrase_pairs)} phrase pairs for category '{category}'...")
-        print("Converting phrase pairs to multiple-choice format for consistent activation collection...")
+        self.logger.info(f"Training on {len(phrase_pairs)} phrase pairs for category '{category}'...")
+        self.logger.info("Converting phrase pairs to multiple-choice format for consistent activation collection...")
         
         # Make sure we have a monitor initialized
         if self.monitor is None:
+            self.logger.debug("Initializing monitor for the first time")
             self._initialize_monitor_and_inference()
         
         # Convert phrase pairs to multiple-choice and process each pair
-        for pair in tqdm(phrase_pairs, desc="Processing phrase pairs"):
+        for i, pair in enumerate(tqdm(phrase_pairs, desc="Processing phrase pairs")):
             harmful_phrase = pair["harmful"]
             harmless_phrase = pair["harmless"]
+            
+            self.logger.debug(f"Processing pair {i+1}/{len(phrase_pairs)}")
+            self.logger.debug(f"Harmful: {harmful_phrase[:50]}..." if len(harmful_phrase) > 50 else f"Harmful: {harmful_phrase}")
+            self.logger.debug(f"Harmless: {harmless_phrase[:50]}..." if len(harmless_phrase) > 50 else f"Harmless: {harmless_phrase}")
             
             # Convert to multiple-choice format
             harmful_mc, harmless_mc = self._convert_to_multiple_choice(harmful_phrase, harmless_phrase)
             
             # Get activations for harmful phrase in multiple-choice format
+            self.logger.debug("Collecting activations for harmful phrase")
             self.monitor.reset()
             harmful_input_ids = self.tokenizer.encode(harmful_mc, return_tensors="pt").to(self.device)
             with torch.no_grad():
                 self.model(harmful_input_ids)
             harmful_activations = self.monitor.hooks.get_activations()
+            self.logger.debug(f"Collected activations from {len(harmful_activations)} layers for harmful phrase")
             
             # Get activations for harmless phrase in multiple-choice format
+            self.logger.debug("Collecting activations for harmless phrase")
             self.monitor.reset()
             harmless_input_ids = self.tokenizer.encode(harmless_mc, return_tensors="pt").to(self.device)
             with torch.no_grad():
                 self.model(harmless_input_ids)
             harmless_activations = self.monitor.hooks.get_activations()
+            self.logger.debug(f"Collected activations from {len(harmless_activations)} layers for harmless phrase")
+            
+            # Move activations to CPU for consistent storage (especially important for MPS)
+            self.logger.debug("Moving activations to CPU for consistent storage")
+            cpu_harmful_activations = {}
+            cpu_harmless_activations = {}
+            
+            for layer, tensor in harmful_activations.items():
+                cpu_harmful_activations[layer] = tensor.detach().cpu()
+            
+            for layer, tensor in harmless_activations.items():
+                cpu_harmless_activations[layer] = tensor.detach().cpu()
             
             # Store activations for each layer
+            self.logger.debug("Storing activations for each layer")
             for layer in self.layers:
-                if layer in harmful_activations and layer in harmless_activations:
+                if layer in cpu_harmful_activations and layer in cpu_harmless_activations:
                     self.vectors.add_vector_pair(
                         category=category,
                         layer=layer,
-                        harmful_vector=harmful_activations[layer],
-                        harmless_vector=harmless_activations[layer]
+                        harmful_vector=cpu_harmful_activations[layer],
+                        harmless_vector=cpu_harmless_activations[layer]
                     )
+                    self.logger.debug(f"Stored vector pair for layer {layer}")
+                else:
+                    self.logger.warning(f"Missing activations for layer {layer}")
+            
+            self.logger.debug(f"Completed processing pair {i+1}/{len(phrase_pairs)}")
         
         # Compute and save contrastive vectors
+        self.logger.info("Computing contrastive vectors...")
         self.vectors.compute_contrastive_vectors()
+        self.logger.info("Saving vectors to disk...")
         self.vectors.save_vectors()
         
         # Re-initialize monitor with new vectors
+        self.logger.info("Reinitializing monitor with new vectors")
         self._initialize_monitor_and_inference()
         
-        print(f"Successfully trained on {len(phrase_pairs)} phrase pairs")
+        self.logger.info(f"Successfully trained on {len(phrase_pairs)} phrase pairs")
     
     def train_on_multiple_choice_pairs(self, questions: List[Dict[str, Any]], category: str = "hallucination") -> None:
         """
@@ -570,4 +634,143 @@ class ActivationGuard:
         self.threshold = threshold
         
         if self.monitor is not None:
-            self.monitor.threshold = threshold 
+            self.monitor.threshold = threshold
+    
+    def get_contrastive_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of the contrastive vectors and their properties.
+        
+        This method provides an overview of all vectors, training data, and settings
+        to help understand the complete contrastive vector flow.
+        
+        Returns:
+            Dictionary with summary information
+        """
+        self.logger.info("Generating contrastive vector summary")
+        
+        summary = {
+            "settings": {
+                "layers": self.layers,
+                "device": self.device,
+                "threshold": self.threshold,
+                "token_strategy": self.token_strategy,
+                "save_dir": self.save_dir
+            },
+            "vectors": {},
+            "categories": self.vectors.get_available_categories()
+        }
+        
+        # Get category statistics
+        for category in summary["categories"]:
+            self.logger.debug(f"Collecting summary for category: {category}")
+            category_info = {
+                "num_pairs": self.vectors.metadata["num_pairs"].get(category, 0),
+                "layers": [],
+                "sample_similarities": {}
+            }
+            
+            # Collect layer information
+            available_layers = set()
+            for layer in self.layers:
+                vector = self.vectors.get_contrastive_vector(category, layer)
+                if vector is not None:
+                    self.logger.debug(f"Found vector for layer {layer}")
+                    available_layers.add(layer)
+                    category_info["layers"].append({
+                        "layer": layer,
+                        "shape": list(vector.shape),
+                        "norm": float(torch.norm(vector).item())
+                    })
+            
+            # Calculate some sample similarities if we have a monitor
+            if self.monitor is not None and available_layers:
+                self.logger.debug("Calculating sample similarities")
+                
+                # Generate a few test cases (positive and negative)
+                positive_case = f"I'll provide information on how to engage in {category}"
+                negative_case = f"I'll provide information on how to prevent {category}"
+                
+                # Get similarities
+                self.monitor.reset()
+                positive_ids = self.tokenizer.encode(positive_case, return_tensors="pt").to(self.device)
+                with torch.no_grad():
+                    self.model(positive_ids)
+                pos_results = self.monitor.check_activations([category])
+                
+                self.monitor.reset()
+                negative_ids = self.tokenizer.encode(negative_case, return_tensors="pt").to(self.device)
+                with torch.no_grad():
+                    self.model(negative_ids)
+                neg_results = self.monitor.check_activations([category])
+                
+                # Add to summary
+                category_info["sample_similarities"]["positive_case"] = {
+                    "text": positive_case,
+                    "max_similarity": float(pos_results[category]["max_similarity"]),
+                    "is_harmful": pos_results[category]["is_harmful"],
+                    "layer_similarities": {k: float(v) for k, v in pos_results[category]["layer_similarities"].items()}
+                }
+                
+                category_info["sample_similarities"]["negative_case"] = {
+                    "text": negative_case,
+                    "max_similarity": float(neg_results[category]["max_similarity"]),
+                    "is_harmful": neg_results[category]["is_harmful"],
+                    "layer_similarities": {k: float(v) for k, v in neg_results[category]["layer_similarities"].items()}
+                }
+            
+            summary["vectors"][category] = category_info
+        
+        self.logger.info("Summary generation complete")
+        return summary
+    
+    def print_contrastive_summary(self) -> None:
+        """
+        Print a formatted summary of the contrastive vectors to the console.
+        
+        This method generates a human-readable report of all vectors and their properties.
+        """
+        summary = self.get_contrastive_summary()
+        
+        print("\n" + "="*80)
+        print(" "*30 + "CONTRASTIVE VECTOR SUMMARY")
+        print("="*80)
+        
+        # Print settings
+        print("\nSETTINGS:")
+        print(f"  Device: {summary['settings']['device']}")
+        print(f"  Layers: {summary['settings']['layers']}")
+        print(f"  Threshold: {summary['settings']['threshold']}")
+        print(f"  Token Strategy: {summary['settings']['token_strategy']}")
+        print(f"  Save Directory: {summary['settings']['save_dir']}")
+        
+        # Print categories
+        print(f"\nCATEGORIES ({len(summary['categories'])}):")
+        for category in summary["categories"]:
+            cat_info = summary["vectors"][category]
+            print(f"\n  • {category.upper()} ({cat_info['num_pairs']} pairs)")
+            
+            # Print layers
+            if cat_info["layers"]:
+                print("    Layers:")
+                for layer_info in cat_info["layers"]:
+                    print(f"      - Layer {layer_info['layer']}: shape={layer_info['shape']}, norm={layer_info['norm']:.4f}")
+            else:
+                print("    No layer vectors found")
+            
+            # Print sample similarities
+            if "sample_similarities" in cat_info and cat_info["sample_similarities"]:
+                print("    Sample Similarities:")
+                
+                pos_info = cat_info["sample_similarities"]["positive_case"]
+                pos_max = pos_info["max_similarity"]
+                is_harmful = "YES" if pos_info["is_harmful"] else "NO"
+                print(f"      - Positive: '{pos_info['text']}'")
+                print(f"        Max Similarity: {pos_max:.4f} (Harmful: {is_harmful})")
+                
+                neg_info = cat_info["sample_similarities"]["negative_case"]
+                neg_max = neg_info["max_similarity"]
+                is_harmful = "YES" if neg_info["is_harmful"] else "NO"
+                print(f"      - Negative: '{neg_info['text']}'")
+                print(f"        Max Similarity: {neg_max:.4f} (Harmful: {is_harmful})")
+        
+        print("\n" + "="*80) 
