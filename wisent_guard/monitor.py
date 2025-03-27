@@ -466,6 +466,7 @@ class ActivationMonitor:
         layers: Optional[List[int]] = None,
         model_type: Optional[str] = None,
         threshold: float = 0.7,
+        token_strategy: str = "last",
     ):
         """
         Initialize the activation monitor.
@@ -477,10 +478,15 @@ class ActivationMonitor:
                    from the vectors object.
             model_type: Type of the model for correct activation extraction
             threshold: Similarity threshold for detecting harmful content
+            token_strategy: Strategy for token selection:
+                           - "last": Last token in sequence (default)
+                           - "target_token": Look for specific tokens like "A" or "B"
+                           - "all": Store all tokens for later selection
         """
         self.model = model
         self.vectors = vectors
         self.threshold = threshold
+        self.token_strategy = token_strategy
         
         # Determine which layers to monitor
         if layers is None:
@@ -489,7 +495,7 @@ class ActivationMonitor:
             self.layers = layers
         
         # Set up activation hooks
-        self.hooks = ActivationHooks(model, model_type)
+        self.hooks = ActivationHooks(model, model_type, token_strategy=token_strategy)
         self.hooks.register_hooks(self.layers)
         
         # Initialize similarity tracking
@@ -497,11 +503,15 @@ class ActivationMonitor:
         self.triggered_layers: Dict[str, Set[int]] = {}
         self.is_triggered = False
         
+        # Track the most recent token that triggered a pattern
+        self.triggering_token_id = None
+        
     def reset(self) -> None:
         """Reset the monitor state."""
         self.max_similarities = {}
         self.triggered_layers = {}
         self.is_triggered = False
+        self.triggering_token_id = None
         self.hooks.clear_activations()
     
     def check_activations(self, categories: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
@@ -567,6 +577,10 @@ class ActivationMonitor:
                     self.triggered_layers[category].add(layer)
                     category_results["is_harmful"] = True
                     self.is_triggered = True
+                    
+                    # If using target_token strategy, try to identify the triggering token
+                    if self.token_strategy == "target_token" and hasattr(self.hooks, "last_token_id"):
+                        self.triggering_token_id = self.hooks.last_token_id
                 
                 # Store layer similarity in results
                 category_results["layer_similarities"][str(layer)] = float(similarity)
@@ -623,4 +637,33 @@ class ActivationMonitor:
             if category_result["is_harmful"]:
                 return True
         
-        return False 
+        return False
+    
+    def get_token_classification(self) -> Optional[str]:
+        """
+        For multiple-choice format, get the classification of the current token.
+        
+        Returns:
+            "truthful" if the token is A, "hallucinatory" if the token is B, or None if not detected
+        """
+        if self.token_strategy != "target_token" or self.triggering_token_id is None:
+            return None
+        
+        # Get the token text
+        token_text = None
+        try:
+            token_text = self.model.config.tokenizer.decode([self.triggering_token_id])
+        except:
+            try:
+                # Try a different way to access the tokenizer
+                if hasattr(self.model, "tokenizer"):
+                    token_text = self.model.tokenizer.decode([self.triggering_token_id])
+            except:
+                pass
+        
+        if token_text == "A":
+            return "truthful"
+        elif token_text == "B":
+            return "hallucinatory"
+        
+        return None 

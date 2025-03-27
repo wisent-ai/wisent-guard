@@ -1,4 +1,4 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: wisent-guard
 Version: 0.4.1
 Summary: Monitor and guard against harmful content in language models
@@ -387,6 +387,12 @@ else:
     response = guard.generate_safe_response(prompt)
     print(response)
 ```
+
+## Evaluation
+
+Before running any evaluations set the .env of the judge to whatever works. You can do it using 
+
+export ANTHROPIC_API_KEY='your-api-key-here'
 
 ## Features
 

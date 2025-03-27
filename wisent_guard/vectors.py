@@ -782,6 +782,67 @@ class ContrastiveVectors:
         
         return success
     
+    def clear_vectors(self, category: Optional[str] = None) -> None:
+        """
+        Clear vectors for a specific category or all categories.
+        
+        Args:
+            category: Category to clear. If None, clears all categories.
+        """
+        if category is not None:
+            # Clear specific category
+            if category in self.harmful_vectors:
+                del self.harmful_vectors[category]
+            if category in self.harmless_vectors:
+                del self.harmless_vectors[category]
+            if category in self.contrastive_vectors:
+                del self.contrastive_vectors[category]
+            
+            # Remove from metadata
+            if category in self.metadata["categories"]:
+                self.metadata["categories"].remove(category)
+            if category in self.metadata["num_pairs"]:
+                del self.metadata["num_pairs"][category]
+            
+            # Remove files from disk
+            category_dir = os.path.join(self.vectors_dir, category)
+            if os.path.exists(category_dir):
+                # Remove all files in the directory
+                for filename in os.listdir(category_dir):
+                    file_path = os.path.join(category_dir, filename)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                
+                # Remove the directory
+                os.rmdir(category_dir)
+        else:
+            # Clear all categories
+            self.harmful_vectors = {}
+            self.harmless_vectors = {}
+            self.contrastive_vectors = {}
+            
+            # Reset metadata
+            self.metadata["categories"] = []
+            self.metadata["num_pairs"] = {}
+            # Keep layers info in case it's useful
+            
+            # Remove files from disk
+            if os.path.exists(self.vectors_dir):
+                # Remove all category directories
+                for category_name in os.listdir(self.vectors_dir):
+                    category_dir = os.path.join(self.vectors_dir, category_name)
+                    if os.path.isdir(category_dir):
+                        # Remove all files in the directory
+                        for filename in os.listdir(category_dir):
+                            file_path = os.path.join(category_dir, filename)
+                            if os.path.isfile(file_path):
+                                os.remove(file_path)
+                        # Remove the directory
+                        os.rmdir(category_dir)
+        
+        # Save updated metadata
+        self._save_metadata()
+    
     def get_contrastive_vector(self, category: str, layer: int) -> Optional[torch.Tensor]:
         """
         Get the contrastive vector for a specific category and layer.
@@ -813,4 +874,13 @@ class ContrastiveVectors:
         Returns:
             List of layer indices
         """
-        return [int(layer) for layer in self.metadata["layers"].keys()] 
+        return [int(layer) for layer in self.metadata["layers"].keys()]
+    
+    def get_contrastive_vectors(self) -> Dict[str, Dict[int, torch.Tensor]]:
+        """
+        Get all contrastive vectors.
+        
+        Returns:
+            Dictionary mapping categories to dictionaries mapping layers to contrastive vectors
+        """
+        return self.contrastive_vectors 
