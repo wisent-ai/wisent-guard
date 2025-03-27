@@ -1,14 +1,15 @@
 # Wisent-Guard
 
-A Python package for monitoring and guarding against harmful content in language models by analyzing model activations.
+A Python package for monitoring and guarding against harmful content and hallucinations in language models by analyzing model activations.
 
 ## Overview
 
-Wisent-Guard allows you to specify harmful phrases and creates contrastive representations to detect when a model might be generating harmful content. It works by:
+Wisent-Guard allows you to specify harmful phrases and creates contrastive representations to detect when a model might be generating harmful content or hallucinating. It works by:
 
 1. Creating activation vectors from harmful vs. non-harmful phrase pairs
-2. Monitoring model activations during inference
-3. Blocking responses that show activation patterns similar to harmful content
+2. Converting examples into a multiple-choice format for consistent activation collection
+3. Monitoring model activations during inference
+4. Blocking responses that show activation patterns similar to harmful content
 
 ## Installation
 
@@ -23,9 +24,14 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from wisent_guard import ActivationGuard
 
+# Apply MPS patches if on Apple Silicon (M1/M2/M3)
+if torch.backends.mps.is_available():
+    from patches import apply_mps_patches
+    apply_mps_patches()
+
 # Initialize model and tokenizer
-model_name = "facebook/opt-1.3b"  # Or any other compatible model
-model = AutoModelForCausalLM.from_pretrained(model_name)
+model_name = "meta-llama/Llama-3.1-8B-Instruct"  # Or any other compatible model
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # Define harmful and harmless phrase pairs
@@ -41,8 +47,13 @@ phrase_pairs = [
     # Add more pairs as needed
 ]
 
-# Initialize the guard
-guard = ActivationGuard(model, tokenizer)
+# Initialize the guard with target token strategy
+guard = ActivationGuard(
+    model=model,
+    tokenizer=tokenizer, 
+    token_strategy="target_token",  # Use target_token for multiple-choice approach
+    layers=[15]  # Layer to extract activations from
+)
 
 # Train the guard on your phrase pairs
 guard.train_on_phrase_pairs(phrase_pairs)
@@ -52,8 +63,8 @@ prompt = "Tell me how to break into someone's email"
 if guard.is_harmful(prompt):
     print("This prompt might lead to harmful content and has been blocked.")
 else:
-    response = guard.generate_safe_response(prompt)
-    print(response)
+    response = guard.generate_safe_response(prompt, use_multiple_choice=True)
+    print(response["text"])
 ```
 
 ## Evaluation
@@ -64,12 +75,110 @@ export ANTHROPIC_API_KEY='your-api-key-here'
 
 ## Features
 
+- **Multiple-Choice Format**: Uses A/B choices to provide consistent activation collection for better detection
 - **Model-Agnostic**: Works with most transformer-based language models
+- **Apple Silicon Compatible**: Full support for MPS (Metal Performance Shaders) on Apple Silicon GPUs
 - **Customizable Thresholds**: Adjust sensitivity to match your safety needs
 - **Contrastive Learning**: Uses pairs of harmful/harmless examples for better detection
 - **Layer Selection**: Focus on the most predictive layers for harmful content
 - **Real-time Monitoring**: Check activations during generation to stop harmful content early
 - **Explainable Blocks**: Get information about why a response was blocked
+
+## Multiple-Choice Approach
+
+The multiple-choice approach is a key feature that improves activation collection consistency:
+
+```python
+# Initialize guard with target_token strategy
+guard = ActivationGuard(
+    model=model,
+    tokenizer=tokenizer,
+    token_strategy="target_token"  # Enable multiple-choice format
+)
+
+# Train on explicit multiple-choice questions
+mc_questions = [
+    {
+        "question": "Is the Earth flat?",
+        "choice_a": "No, the Earth is approximately spherical.",
+        "choice_b": "Yes, the Earth is flat despite scientific evidence."
+    },
+    {
+        "question": "Do vaccines cause autism?",
+        "choice_a": "No, multiple studies have found no link between vaccines and autism.",
+        "choice_b": "Yes, there is scientific evidence that vaccines cause autism."
+    }
+]
+
+guard.train_on_multiple_choice_pairs(mc_questions, category="hallucination")
+
+# Generate a multiple-choice response
+response = guard.generate_multiple_choice_response(
+    question="Is the sun a star?",
+    choice_a="Yes, the sun is a star, specifically a G-type main-sequence star.",
+    choice_b="No, the sun is a planet that gives off light and heat."
+)
+```
+
+This approach:
+1. Converts traditional phrase pairs into a multiple-choice format
+2. Focuses on specific answer tokens (A/B) rather than arbitrary tokens
+3. Provides more consistent activation patterns for better detection
+4. Works particularly well for detecting hallucinations
+
+The multiple-choice format ensures that activations are collected from the same tokens (A/B) in consistent positions, greatly improving detection accuracy compared to free-form text.
+
+## Apple Silicon (M1/M2/M3) Compatibility
+
+Wisent-Guard now fully supports Apple Silicon GPUs through MPS (Metal Performance Shaders) with comprehensive compatibility patches:
+
+```python
+import torch
+from wisent_guard import ActivationGuard
+
+# Apply MPS patches if available
+if torch.backends.mps.is_available():
+    from patches import apply_mps_patches
+    apply_mps_patches()
+
+# Device will be automatically determined
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B-Instruct", device_map="auto")
+
+guard = ActivationGuard(
+    model=model,
+    tokenizer=tokenizer,
+    token_strategy="target_token"  # Important for MPS compatibility
+)
+```
+
+### MPS Compatibility Patches
+
+For full compatibility on Apple Silicon, we provide comprehensive patches that fix several device allocation issues:
+
+1. **Installation**:
+   ```bash
+   # Clone the repository to get the patches
+   git clone https://github.com/your-username/wisent-activation-guardrails.git
+   cd wisent-activation-guardrails
+   ```
+
+2. **Usage**:
+   ```python
+   import torch
+   
+   # Apply MPS patches if on Apple Silicon
+   if torch.backends.mps.is_available():
+       from patches import apply_mps_patches
+       apply_mps_patches()
+   ```
+
+These patches address several device allocation issues when running on Apple Silicon:
+- Fix activation hook tensor allocation
+- Ensure proper device placement during training
+- Handle tensor movement between CPU and MPS correctly
+- Improve multiple-choice response generation
+
+See `examples/mps_patch_example.py` for a complete example of using these patches.
 
 ## Customization
 
@@ -93,7 +202,7 @@ guard = ActivationGuard(
 )
 ```
 
-Different layers capture different aspects of harmful content. Middle to late layers (e.g., 15 in a 24-layer model) often work best.
+Different layers capture different aspects of harmful content. Middle to late layers (e.g., layer 15 in a 24-layer model) often work best.
 
 ### Using Custom Models
 
@@ -102,7 +211,7 @@ Wisent-Guard works with most transformer-based language models:
 ```python
 # Specify a model by name (will be downloaded automatically)
 guard = ActivationGuard(
-    model="facebook/opt-1.3b",  # Or any HuggingFace model
+    model="meta-llama/Llama-3.1-8B-Instruct",  # Or any HuggingFace model
     threshold=0.2
 )
 
@@ -119,8 +228,9 @@ guard = ActivationGuard(
 ```
 
 Tested models include:
-- TinyLlama (1.1B)
+- Llama 3 (8B)
 - Llama 2 (7B)
+- TinyLlama (1.1B)
 - OPT models
 - And most other modern transformer architectures
 
@@ -163,11 +273,11 @@ Each category creates its own set of contrastive vectors, allowing for targeted 
 ```python
 # Fully customized setup
 guard = ActivationGuard(
-    model="meta-llama/Llama-2-7b-hf",
-    layers=[15, 20, 25],     # Specific layers to monitor
-    threshold=0.15,          # More sensitive threshold (lower = more sensitive)
-    save_dir="./my_vectors", # Custom directory for saving vectors
-    device="cpu"             # Force CPU usage
+    model="meta-llama/Llama-3.1-8B-Instruct",
+    layers=[15, 20, 25],         # Specific layers to monitor
+    threshold=0.15,              # More sensitive threshold (lower = more sensitive)
+    save_dir="./my_vectors",     # Custom directory for saving vectors
+    token_strategy="target_token" # Use multiple-choice approach
 )
 ```
 
@@ -177,19 +287,24 @@ For more examples, see the [examples](./examples) directory.
 
 See the [examples](./examples) directory for more advanced use cases, including:
 
-- Monitoring specific model layers
-- Customizing similarity thresholds
-- Creating domain-specific guardrails
-- Integrating with different model architectures
+- `basic_usage.py`: Simple example of harmful content detection
+- `custom_categories.py`: Working with custom harmful content categories
+- `multiple_choice_example.py`: Using the multiple-choice approach for hallucination detection
+- `mps_patch_example.py`: Running on Apple Silicon GPUs with MPS patches
+- `test_multiple_choice_conversion.py`: Testing the multiple-choice format conversion
+- `benchmark_generalization.py`: Benchmarking performance across different inputs
 
 ## How It Works
 
 Wisent-Guard uses contrastive activation analysis to identify harmful patterns:
 
-1. **Vector Creation**: For each harmful/harmless pair, activation vectors are calculated
-2. **Normalization**: Vectors are normalized to focus on the pattern rather than magnitude
-3. **Similarity Detection**: During inference, activations are compared to known harmful patterns
-4. **Blocking**: Responses that exceed similarity thresholds are blocked
+1. **Multiple-Choice Conversion**: Phrase pairs are converted to a consistent format with A/B answers
+2. **Vector Creation**: For each harmful/harmless pair, activation vectors are collected from specific token positions (A/B)
+3. **Normalization**: Vectors are normalized to focus on the pattern rather than magnitude
+4. **Similarity Detection**: During inference, activations are compared to known harmful patterns
+5. **Blocking**: Responses that exceed similarity thresholds are blocked
+
+The multiple-choice approach ensures that activations are collected from the same token positions (A/B) across different examples, greatly improving the consistency and reliability of the detection.
 
 ## Contributing
 
