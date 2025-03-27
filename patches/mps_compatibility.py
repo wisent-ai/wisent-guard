@@ -238,20 +238,42 @@ def apply_mps_patches():
             if not self.hooks.has_activations() or not categories:
                 return {}
             
+            # Initialize result dictionary
             results = {}
+            self.is_triggered = False
             
             # Check each category
             for category in categories:
-                category_results = {}
+                # Initialize category results
+                if category not in self.max_similarities:
+                    self.max_similarities[category] = {}
+                
+                if category not in self.triggered_layers:
+                    self.triggered_layers[category] = set()
+                
+                category_results = {
+                    "is_harmful": False,
+                    "max_similarity": 0.0,
+                    "triggered_layers": [],
+                    "layer_similarities": {}
+                }
                 
                 # Get activations for each layer
                 activations = self.hooks.get_activations()
                 
-                # Get contrastive vectors for this category
-                contrastive_vectors = self.vectors.get_contrastive_vectors(category)
+                # Get contrastive vectors for all categories
+                contrastive_vectors = self.vectors.get_contrastive_vectors()
                 
-                # Check each layer
-                for layer, contrastive_vector in contrastive_vectors.items():
+                # Skip if category not in contrastive vectors
+                if category not in contrastive_vectors:
+                    results[category] = category_results
+                    continue
+                
+                # Check each layer in this category
+                for layer_str, contrastive_vector in contrastive_vectors[category].items():
+                    # Convert layer to int if it's a string
+                    layer = int(layer_str) if isinstance(layer_str, str) else layer_str
+                    
                     # Skip if we don't have activations for this layer
                     if layer not in activations:
                         continue
@@ -261,32 +283,59 @@ def apply_mps_patches():
                     
                     try:
                         # Check for dimension mismatch and fix if possible
-                        if activation.shape[1] != contrastive_vector.shape[1]:
-                            print(f"Warning: Dimension mismatch - activation: {activation.shape[1]}, vector: {contrastive_vector.shape[1]}")
-                            if activation.shape[1] > contrastive_vector.shape[1]:
-                                # Truncate activation to match vector dimension
-                                activation = activation[:, :contrastive_vector.shape[1]]
-                                print(f"  Truncated activation to {activation.shape}")
+                        if activation.shape != contrastive_vector.shape:
+                            print(f"Warning: Dimension mismatch - activation: {activation.shape}, vector: {contrastive_vector.shape}")
+                            if len(activation.shape) > 1 and len(contrastive_vector.shape) > 1:
+                                # Reshape to same dimensions if possible
+                                if activation.shape[0] == 1 and contrastive_vector.shape[0] == 1:
+                                    activation = activation.view(1, -1)
+                                    contrastive_vector = contrastive_vector.view(1, -1)
+                                else:
+                                    print(f"  Skipping layer {layer} due to incompatible dimensions")
+                                    continue
                             else:
-                                # Skip this layer if we can't fix the dimensions
-                                print(f"  Skipping layer {layer} due to incompatible dimensions")
-                                continue
-                        
-                        # Move tensor to CPU for sklearn compatibility
+                                # Try to reshape to same dimensions
+                                activation = activation.view(1, -1)
+                                contrastive_vector = contrastive_vector.view(1, -1)
+                                
+                        # Move tensor to CPU for cosine similarity calculation
                         activation = activation.cpu()
                         contrastive_vector = contrastive_vector.cpu()
                         
                         # Calculate similarity
                         similarity = cosine_sim(activation, contrastive_vector)
-                        category_results[layer] = similarity
+                        
+                        # Update max similarity for this layer
+                        self.max_similarities[category][layer] = max(
+                            similarity,
+                            self.max_similarities[category].get(layer, -1.0)
+                        )
+                        
+                        # Store layer similarity in results
+                        category_results["layer_similarities"][str(layer)] = float(similarity)
+                        
+                        # Check if threshold is exceeded
+                        if similarity >= self.threshold:
+                            self.triggered_layers[category].add(layer)
+                            category_results["is_harmful"] = True
+                            self.is_triggered = True
+                            
+                            # If using target_token strategy, try to identify the triggering token
+                            if self.token_strategy == "target_token" and hasattr(self.hooks, "last_token_id"):
+                                self.triggering_token_id = self.hooks.last_token_id
                         
                     except Exception as e:
                         print(f"Error comparing activations for layer {layer}: {e}")
                         continue
                 
-                # Store the maximum similarity across layers
-                if category_results:
-                    results[category] = max(category_results.values())
+                # Update category results
+                if self.max_similarities[category]:
+                    category_results["max_similarity"] = max(self.max_similarities[category].values())
+                
+                if self.triggered_layers[category]:
+                    category_results["triggered_layers"] = list(self.triggered_layers[category])
+                
+                results[category] = category_results
             
             return results
             
@@ -434,8 +483,15 @@ def apply_mps_patches():
             
             # Process each phrase pair
             for pair in tqdm(formatted_pairs, desc="Processing formatted pairs"):
-                harmful_phrase = pair["harmful"]
-                harmless_phrase = pair["harmless"]
+                # Handle both dictionary and tuple formats
+                if isinstance(pair, tuple) and len(pair) == 2:
+                    harmful_phrase, harmless_phrase = pair
+                elif isinstance(pair, dict) and "harmful" in pair and "harmless" in pair:
+                    harmful_phrase = pair["harmful"]
+                    harmless_phrase = pair["harmless"]
+                else:
+                    print(f"Warning: Skipping improperly formatted pair: {pair}")
+                    continue
                 
                 # IMPORTANT: Create and move all tensors in a consistent way
                 # Get activations for harmful phrase
@@ -573,6 +629,65 @@ def apply_mps_patches():
                 return []
                 
             return list(self.contrastive_vectors.keys())
+            
+        # Patch calculate_average_vector to handle different size tensors
+        def patched_calculate_average_vector(vectors: List[torch.Tensor]) -> torch.Tensor:
+            """
+            Calculate the average of a list of vectors, handling different sizes.
+            
+            This patched version can handle tensors of different dimensions by either
+            truncating to the smallest dimension or padding to the largest dimension.
+            
+            Args:
+                vectors: List of vectors to average
+                
+            Returns:
+                Average vector
+            """
+            if not vectors:
+                raise ValueError("Empty list of vectors provided")
+            
+            # Check if all vectors have the same shape
+            shapes = [v.shape for v in vectors]
+            if len(set([tuple(s) for s in shapes])) == 1:
+                # All same shape, use standard method
+                stacked = torch.stack(vectors)
+                return torch.mean(stacked, dim=0)
+            
+            # Different shapes detected
+            print(f"Warning: Vectors have different shapes: {shapes}")
+            
+            # Find the most common dimensionality
+            dims = {}
+            for v in vectors:
+                dim = v.shape[-1]
+                if dim not in dims:
+                    dims[dim] = 0
+                dims[dim] += 1
+            
+            # Use the most common dimension
+            target_dim = max(dims.items(), key=lambda x: x[1])[0]
+            print(f"Using most common dimension: {target_dim}")
+            
+            # Adjust vectors to target dimension
+            adjusted_vectors = []
+            for v in vectors:
+                if v.shape[-1] > target_dim:
+                    # Truncate
+                    adjusted_vectors.append(v[..., :target_dim])
+                elif v.shape[-1] < target_dim:
+                    # Skip vectors that are too small
+                    print(f"Skipping vector with dimension {v.shape[-1]} (too small)")
+                    continue
+                else:
+                    adjusted_vectors.append(v)
+            
+            if not adjusted_vectors:
+                raise ValueError("No vectors remained after dimension adjustment")
+            
+            # Stack and calculate mean
+            stacked = torch.stack(adjusted_vectors)
+            return torch.mean(stacked, dim=0)
         
         # Apply all patches
         ActivationHooks._activation_hook = patched_activation_hook
@@ -599,6 +714,10 @@ def apply_mps_patches():
             
         if not hasattr(ContrastiveVectors, 'get_categories'):
             ContrastiveVectors.get_categories = get_categories
+        
+        # Patch the calculate_average_vector function in helpers
+        from wisent_guard.utils.helpers import calculate_average_vector
+        sys.modules['wisent_guard.utils.helpers'].calculate_average_vector = patched_calculate_average_vector
         
         print("✅ Applied comprehensive MPS compatibility patches to wisent-guard")
         return True
