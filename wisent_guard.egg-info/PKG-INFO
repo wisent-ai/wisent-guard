@@ -1,4 +1,4 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: wisent-guard
 Version: 0.1.0
 Summary: A package for guarding against harmful content in language models using activation monitoring
@@ -16,15 +16,6 @@ Requires-Dist: numpy>=1.20.0
 Requires-Dist: tqdm>=4.62.0
 Requires-Dist: scikit-learn>=0.24.0
 Requires-Dist: matplotlib>=3.5.0
-Dynamic: author
-Dynamic: author-email
-Dynamic: classifier
-Dynamic: description
-Dynamic: description-content-type
-Dynamic: home-page
-Dynamic: requires-dist
-Dynamic: requires-python
-Dynamic: summary
 
 # Wisent-Guard
 
@@ -83,6 +74,12 @@ else:
     response = guard.generate_safe_response(prompt)
     print(response)
 ```
+
+## Evaluation
+
+Before running any evaluations set the .env of the judge to whatever works. You can do it using 
+
+export ANTHROPIC_API_KEY='your-api-key-here'
 
 ## Features
 
