@@ -33,6 +33,7 @@ class ActivationGuard:
         token_strategy: str = "target_token",  # Default to target_token for A/B tokens
         log_level: str = "info",
         log_file: Optional[str] = None,
+        auto_load_vectors: bool = False,  # Add parameter to control automatic vector loading
     ):
         """
         Initialize the ActivationGuard.
@@ -50,6 +51,7 @@ class ActivationGuard:
                            - "all": Store all tokens for later selection
             log_level: Logging level ('debug', 'info', 'warning', 'error')
             log_file: Optional file to write logs to
+            auto_load_vectors: Whether to automatically load all vectors from save_dir (default: False)
         """
         # Set up logger
         self.logger = get_logger(level=log_level, log_file=log_file)
@@ -114,13 +116,12 @@ class ActivationGuard:
         self.threshold = threshold
         self.logger.info(f"Similarity threshold set to {self.threshold}")
         
-        # Try to load existing vectors
-        if self.vectors.load_vectors():
-            self.logger.info(f"Loaded existing vectors from {self.save_dir}")
-            # Initialize monitor and inference with loaded vectors
-            self._initialize_monitor_and_inference()
+        # Only load vectors if auto_load_vectors is True
+        if auto_load_vectors:
+            self.logger.info("Auto-loading vectors from save directory")
+            self.load_vectors()
         else:
-            self.logger.info("No existing vectors found")
+            self.logger.info("Skipping auto-loading of vectors (use load_vectors() to load explicitly)")
         
         # Set target tokens for multiple-choice format
         self._setup_target_tokens()
@@ -863,4 +864,60 @@ class ActivationGuard:
             token_by_token=True,
             return_token_scores=True,
             **kwargs
-        ) 
+        )
+    
+    def load_vectors(self, categories: Optional[List[str]] = None, layers: Optional[List[int]] = None) -> bool:
+        """
+        Explicitly load contrastive vectors from disk with fine-grained control.
+        
+        Args:
+            categories: Specific categories to load. If None, all available categories are loaded.
+            layers: Specific layers to load. If None, all available layers are loaded.
+            
+        Returns:
+            True if vectors were loaded successfully, False otherwise
+        """
+        self.logger.info(f"Explicitly loading vectors from {self.save_dir}")
+        
+        if categories:
+            self.logger.info(f"Loading specific categories: {categories}")
+        else:
+            self.logger.info("No categories specified, will load all available categories")
+            
+        if layers:
+            self.logger.info(f"Loading specific layers: {layers}")
+        else:
+            self.logger.info("No layers specified, will load all available layers")
+        
+        # Load vectors with specified filters
+        success = self.vectors.load_vectors(categories=categories, layers=layers)
+        
+        if success:
+            self.logger.info(f"Successfully loaded vectors from {self.save_dir}")
+            # Initialize monitor and inference with loaded vectors
+            self._initialize_monitor_and_inference()
+        else:
+            self.logger.warning("Failed to load vectors")
+            
+        return success
+        
+    def clear_vectors(self, categories: Optional[List[str]] = None) -> None:
+        """
+        Clear loaded vectors to start fresh.
+        
+        Args:
+            categories: Specific categories to clear. If None, all categories are cleared.
+        """
+        self.logger.info("Clearing loaded vectors")
+        
+        if categories:
+            self.logger.info(f"Clearing specific categories: {categories}")
+            for category in categories:
+                self.vectors.clear_vectors(category=category)
+        else:
+            self.logger.info("Clearing all categories")
+            self.vectors.clear_vectors()
+            
+        # Reinitialize monitor with empty vectors
+        if self.monitor is not None:
+            self._initialize_monitor_and_inference() 
