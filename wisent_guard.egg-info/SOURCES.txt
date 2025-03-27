@@ -1,4 +1,8 @@
+LICENSE
+MANIFEST.in
+MPS_INTEGRATION.md
 README.md
+requirements.txt
 setup.py
 wisent_guard/__init__.py
 wisent_guard/guard.py
@@ -15,3 +19,4 @@ wisent_guard/tests/test_vectors.py
 wisent_guard/utils/__init__.py
 wisent_guard/utils/activation_hooks.py
 wisent_guard/utils/helpers.py
+wisent_guard/utils/logger.py

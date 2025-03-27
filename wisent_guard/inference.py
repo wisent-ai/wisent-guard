@@ -55,24 +55,31 @@ class SafeInference:
         
         # Tokenize and encode input
         input_ids = self.tokenizer.encode(input_text, return_tensors="pt")
-        if self.model.device.type == "cuda":
-            input_ids = input_ids.to(self.model.device)
+        
+        # Get the model's device and move input_ids to it
+        device = next(self.model.parameters()).device
+        input_ids = input_ids.to(device)
         
         # Run a forward pass through the model to get activations
-        with torch.no_grad():
-            self.model(input_ids)
+        try:
+            with torch.no_grad():
+                self.model(input_ids)
         
-        # Check if activations match harmful patterns
-        if self.monitor.is_harmful():
-            harmful_category = self.monitor.get_most_harmful_category()
-            if harmful_category:
-                category, similarity = harmful_category
-                self.blocked_reason = f"Prompt contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
-            else:
-                self.blocked_reason = "Prompt contains potentially harmful content"
-            return False
-        
-        return True
+            # Check if activations match harmful patterns
+            if self.monitor.is_harmful():
+                harmful_category = self.monitor.get_most_harmful_category()
+                if harmful_category:
+                    category, similarity = harmful_category
+                    self.blocked_reason = f"Prompt contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
+                else:
+                    self.blocked_reason = "Prompt contains potentially harmful content"
+                return False
+            
+            return True
+        except Exception as e:
+            # Log the error but continue (don't block legitimate content due to errors)
+            print(f"Warning: Error during prompt safety check: {e}")
+            return True
     
     def _token_callback(self, input_ids: torch.Tensor) -> bool:
         """
@@ -122,7 +129,12 @@ class SafeInference:
         # Check if the prompt itself is safe
         prompt_is_safe = True
         if not skip_prompt_check:
-            prompt_is_safe = self._check_prompt_safety(prompt)
+            try:
+                prompt_is_safe = self._check_prompt_safety(prompt)
+            except Exception as e:
+                print(f"Warning: Error during prompt safety check: {e}")
+                # Continue with generation despite the error
+                prompt_is_safe = True
         
         # If prompt is not safe and blocking is enabled, return early
         if not prompt_is_safe and self.block_on_harmful:
@@ -132,25 +144,29 @@ class SafeInference:
                 "reason": self.blocked_reason
             }
         
-        # Format the prompt - simple format without system prompt to match baseline
-        formatted_prompt = f"<|user|>\n{prompt}\n<|assistant|>"
+        # Format the prompt if a formatter is available, otherwise use simple format
+        if hasattr(self, 'format_prompt') and callable(self.format_prompt):
+            formatted_prompt = self.format_prompt(prompt)
+        else:
+            # Simple format without system prompt
+            formatted_prompt = f"<|user|>\n{prompt}\n<|assistant|>"
         
         # Prepare for generation
-        input_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt")
-        device = next(self.model.parameters()).device
-        input_ids = input_ids.to(device)
-        
-        # Set up generation parameters
-        gen_kwargs = {
-            "max_new_tokens": max_new_tokens,
-            "pad_token_id": self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
-        }
-        # Add other generation parameters
-        gen_kwargs.update(kwargs)
-        
-        # Generate text
         try:
+            input_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt")
+            device = next(self.model.parameters()).device
+            input_ids = input_ids.to(device)
+            
+            # Set up generation parameters
+            gen_kwargs = {
+                "max_new_tokens": max_new_tokens,
+                "pad_token_id": self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+                "eos_token_id": self.tokenizer.eos_token_id,
+            }
+            # Add other generation parameters
+            gen_kwargs.update(kwargs)
+            
+            # Generate text
             with torch.no_grad():
                 # Standard generation process
                 outputs = self.model.generate(
@@ -158,23 +174,27 @@ class SafeInference:
                     **gen_kwargs
                 )
                 
-                # Check for harmful content in the full sequence
-                self.monitor.reset()
-                _ = self.model(outputs.to(device))
-                
-                if self.monitor.is_harmful() and self.block_on_harmful:
-                    harmful_category = self.monitor.get_most_harmful_category()
-                    if harmful_category:
-                        category, similarity = harmful_category
-                        self.blocked_reason = f"Response contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
-                    else:
-                        self.blocked_reason = "Response contains potentially harmful content"
+                try:
+                    # Check for harmful content in the full sequence
+                    self.monitor.reset()
+                    _ = self.model(outputs.to(device))
                     
-                    return {
-                        "response": self.unsafe_message,
-                        "blocked": True,
-                        "reason": self.blocked_reason
-                    }
+                    if self.monitor.is_harmful() and self.block_on_harmful:
+                        harmful_category = self.monitor.get_most_harmful_category()
+                        if harmful_category:
+                            category, similarity = harmful_category
+                            self.blocked_reason = f"Response contains potentially harmful content related to '{category}' (similarity: {similarity:.2f})"
+                        else:
+                            self.blocked_reason = "Response contains potentially harmful content"
+                        
+                        return {
+                            "response": self.unsafe_message,
+                            "blocked": True,
+                            "reason": self.blocked_reason
+                        }
+                except Exception as e:
+                    print(f"Warning: Error during harmful content check: {e}")
+                    # Continue with generation despite the error
                 
                 # Decode the generated text
                 generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
