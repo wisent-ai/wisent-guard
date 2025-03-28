@@ -1,0 +1,72 @@
+{
+  "1.0%": {
+    "threshold": 0.119372,
+    "true_positives": 1,
+    "true_negatives": 90,
+    "false_positives": 1,
+    "false_negatives": 72,
+    "precision": 0.5,
+    "recall": 0.0136986301369863,
+    "f1": 0.02666666666666666,
+    "accuracy": 0.5548780487804879,
+    "potential_accuracy": 0.5548780487804879,
+    "realistic_accuracy": 0.5573170731707318,
+    "improvement_percentage_points": 0.24390243902439046
+  },
+  "5.0%": {
+    "threshold": 0.110697,
+    "true_positives": 2,
+    "true_negatives": 87,
+    "false_positives": 4,
+    "false_negatives": 71,
+    "precision": 0.3333333333333333,
+    "recall": 0.0273972602739726,
+    "f1": 0.05063291139240506,
+    "accuracy": 0.5426829268292683,
+    "potential_accuracy": 0.5426829268292683,
+    "realistic_accuracy": 0.5560975609756098,
+    "improvement_percentage_points": 0.12195121951219523
+  },
+  "10.0%": {
+    "threshold": 0.100506,
+    "true_positives": 7,
+    "true_negatives": 82,
+    "false_positives": 9,
+    "false_negatives": 66,
+    "precision": 0.4375,
+    "recall": 0.0958904109589041,
+    "f1": 0.15730337078651688,
+    "accuracy": 0.5426829268292683,
+    "potential_accuracy": 0.5426829268292683,
+    "realistic_accuracy": 0.5682926829268293,
+    "improvement_percentage_points": 1.3414634146341475
+  },
+  "20.0%": {
+    "threshold": 0.092033,
+    "true_positives": 15,
+    "true_negatives": 73,
+    "false_positives": 18,
+    "false_negatives": 58,
+    "precision": 0.45454545454545453,
+    "recall": 0.2054794520547945,
+    "f1": 0.2830188679245283,
+    "accuracy": 0.5365853658536586,
+    "potential_accuracy": 0.5365853658536586,
+    "realistic_accuracy": 0.5859756097560975,
+    "improvement_percentage_points": 3.1097560975609673
+  },
+  "50.0%": {
+    "threshold": 0.081621,
+    "true_positives": 25,
+    "true_negatives": 46,
+    "false_positives": 45,
+    "false_negatives": 48,
+    "precision": 0.35714285714285715,
+    "recall": 0.3424657534246575,
+    "f1": 0.34965034965034963,
+    "accuracy": 0.4329268292682927,
+    "potential_accuracy": 0.4329268292682927,
+    "realistic_accuracy": 0.5792682926829268,
+    "improvement_percentage_points": 2.4390243902438935
+  }
+}

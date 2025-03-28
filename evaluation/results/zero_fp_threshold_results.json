@@ -1,0 +1,10 @@
+{
+  "zero_fp_threshold": 0.050022,
+  "caught_hallucinations": 71,
+  "total_hallucinations": 73,
+  "correct_responses": 91,
+  "total_responses": 164,
+  "baseline_accuracy": 0.5548780487804879,
+  "improved_accuracy": 0.9878048780487805,
+  "net_improvement": 0.4329268292682926
+}
