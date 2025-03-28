@@ -2,10 +2,15 @@
 Token generation and activation monitoring for Wisent-Guard
 """
 
+import os
 import torch
 from typing import List, Dict, Any, Optional
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from .utils.logger import get_logger
+
+# Default tokens that can be overridden via environment variables
+DEFAULT_USER_TOKEN = "<|user|>"
+DEFAULT_ASSISTANT_TOKEN = "<|assistant|>"
 
 class SafeInference:
     """
@@ -16,7 +21,9 @@ class SafeInference:
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizer,
         monitor: Any,
-        log_level: str = "info"
+        log_level: str = "info",
+        user_token: Optional[str] = None,
+        assistant_token: Optional[str] = None
     ):
         """
         Initialize the inference module.
@@ -26,9 +33,17 @@ class SafeInference:
             tokenizer: Tokenizer for the model
             monitor: Monitor instance for tracking activations
             log_level: Logging level ('debug', 'info', 'warning', 'error')
+            user_token: Custom user token override (default: from WISENT_USER_TOKEN env var or "<|user|>")
+            assistant_token: Custom assistant token override (default: from WISENT_ASSISTANT_TOKEN env var or "<|assistant|>")
         """
         self.logger = get_logger(name="wisent_guard.inference", level=log_level)
         self.logger.info("Initializing SafeInference for token generation and activation analysis")
+        
+        # Get user/assistant tokens from parameters, env vars, or defaults
+        self.user_token = user_token or os.environ.get("WISENT_USER_TOKEN", DEFAULT_USER_TOKEN)
+        self.assistant_token = assistant_token or os.environ.get("WISENT_ASSISTANT_TOKEN", DEFAULT_ASSISTANT_TOKEN)
+        self.logger.info(f"Using user token: {self.user_token}")
+        self.logger.info(f"Using assistant token: {self.assistant_token}")
         
         self.model = model
         self.tokenizer = tokenizer
@@ -79,8 +94,8 @@ class SafeInference:
                           if k not in ['token_by_token', 'return_token_scores', 'skip_prompt_check']}
             self.logger.debug(f"Filtered kwargs: {list(model_kwargs.keys())}")
             
-            # Format prompt
-            formatted_prompt = f"<|user|>\n{prompt}\n<|assistant|>"
+            # Format prompt with user and assistant tokens
+            formatted_prompt = f"{self.user_token}\n{prompt}\n{self.assistant_token}"
             
             # Initialize generation
             device = next(self.model.parameters()).device

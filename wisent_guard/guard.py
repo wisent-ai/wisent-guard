@@ -14,6 +14,10 @@ from .inference import SafeInference
 from .utils.helpers import ensure_dir
 from .utils.logger import get_logger
 
+# Default tokens that can be overridden via environment variables
+DEFAULT_USER_TOKEN = "<|user|>"
+DEFAULT_ASSISTANT_TOKEN = "<|assistant|>"
+
 class ActivationGuard:
     """
     Main class for monitoring and guarding against harmful content using activation vectors.
@@ -34,6 +38,8 @@ class ActivationGuard:
         log_level: str = "info",
         log_file: Optional[str] = None,
         auto_load_vectors: bool = False,  # Add parameter to control automatic vector loading
+        user_token: Optional[str] = None,
+        assistant_token: Optional[str] = None,
     ):
         """
         Initialize the ActivationGuard.
@@ -52,10 +58,18 @@ class ActivationGuard:
             log_level: Logging level ('debug', 'info', 'warning', 'error')
             log_file: Optional file to write logs to
             auto_load_vectors: Whether to automatically load all vectors from save_dir (default: False)
+            user_token: Custom user token override (default: from WISENT_USER_TOKEN env var or "<|user|>")
+            assistant_token: Custom assistant token override (default: from WISENT_ASSISTANT_TOKEN env var or "<|assistant|>")
         """
         # Set up logger
         self.logger = get_logger(level=log_level, log_file=log_file)
         self.logger.info("Initializing ActivationGuard")
+        
+        # Get user/assistant tokens from parameters, env vars, or defaults
+        self.user_token = user_token or os.environ.get("WISENT_USER_TOKEN", DEFAULT_USER_TOKEN)
+        self.assistant_token = assistant_token or os.environ.get("WISENT_ASSISTANT_TOKEN", DEFAULT_ASSISTANT_TOKEN)
+        self.logger.info(f"Using user token: {self.user_token}")
+        self.logger.info(f"Using assistant token: {self.assistant_token}")
         
         # Set up directories
         self.save_dir = save_dir
@@ -156,7 +170,9 @@ class ActivationGuard:
         self.inference = SafeInference(
             model=self.model,
             tokenizer=self.tokenizer,
-            monitor=self.monitor
+            monitor=self.monitor,
+            user_token=self.user_token,
+            assistant_token=self.assistant_token
         )
         
         # Set up target tokens for multiple-choice format
@@ -388,7 +404,7 @@ class ActivationGuard:
         Returns:
             Formatted text with the answer
         """
-        return f"<|user|>\n{question}\nA. {choice_a}\nB. {choice_b}\n<|assistant|>\n{answer}"
+        return f"{self.user_token}\n{question}\nA. {choice_a}\nB. {choice_b}\n{self.assistant_token}\n{answer}"
     
     def _format_input_as_multiple_choice(self, text: str) -> str:
         """
@@ -401,12 +417,12 @@ class ActivationGuard:
             Multiple-choice formatted text if possible, or original text
         """
         # Check if text already appears to be in multiple-choice format
-        if "<|assistant|>\nA" in text or "<|assistant|>\nB" in text:
+        if f"{self.assistant_token}\nA" in text or f"{self.assistant_token}\nB" in text:
             return text
         
         # For detection, add a temporary A answer
-        if "<|user|>" in text and "<|assistant|>" not in text:
-            return f"{text}\n<|assistant|>\nA"
+        if self.user_token in text and self.assistant_token not in text:
+            return f"{text}\n{self.assistant_token}\nA"
         
         # Can't easily convert, return as is
         return text
@@ -429,7 +445,7 @@ class ActivationGuard:
         self.monitor.reset()
         
         # Format the prompt for generation
-        formatted_prompt = f"<|user|>\n{text}\n<|assistant|>"
+        formatted_prompt = f"{self.user_token}\n{text}\n{self.assistant_token}"
         
         # Encode the prompt
         prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
@@ -471,7 +487,7 @@ class ActivationGuard:
         self.monitor.reset()
         
         # Format the prompt for generation
-        formatted_prompt = f"<|user|>\n{text}\n<|assistant|>"
+        formatted_prompt = f"{self.user_token}\n{text}\n{self.assistant_token}"
         
         # Encode the prompt
         prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
@@ -652,7 +668,7 @@ class ActivationGuard:
         self.monitor.reset()
         
         # Format the prompt for generation
-        formatted_prompt = f"<|user|>\n{text}\n<|assistant|>"
+        formatted_prompt = f"{self.user_token}\n{text}\n{self.assistant_token}"
         
         # Encode the prompt
         prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
