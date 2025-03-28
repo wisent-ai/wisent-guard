@@ -17,6 +17,41 @@ Wisent-Guard allows you to specify harmful phrases and creates contrastive repre
 pip install wisent-guard
 ```
 
+## Set User and Assistant tokens - critical for good activation collection!
+
+Different language models use different formatting for conversations. By default, Wisent-Guard uses Llama-style `<|user|>` and `<|assistant|>` tokens. You can customize these to match your model's expected format using:
+
+### Environment Variables (Recommended)
+
+Set these before running your script:
+
+```bash
+# For OpenAI/ChatGPT style models
+export WISENT_USER_TOKEN="<|im_start|>user"
+export WISENT_ASSISTANT_TOKEN="<|im_start|>assistant"
+
+# For Anthropic Claude style
+export WISENT_USER_TOKEN="Human:"
+export WISENT_ASSISTANT_TOKEN="Assistant:"
+
+# For Mistral style
+export WISENT_USER_TOKEN="[INST]"
+export WISENT_ASSISTANT_TOKEN="[/INST]"
+```
+
+### Direct Parameter Setting
+
+You can also set these directly when creating the guard:
+
+```python
+guard = ActivationGuard(
+    model=model,
+    tokenizer=tokenizer,
+    user_token="<|im_start|>user",
+    assistant_token="<|im_start|>assistant"
+)
+```
+
 ## Quick Start
 
 ```python
