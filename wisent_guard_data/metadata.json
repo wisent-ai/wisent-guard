@@ -1,15 +1,22 @@
 {
   "categories": [
     "explosives",
-    "drug_synthesis"
+    "drug_synthesis",
+    "harmful_content"
   ],
   "layers": {
-    "15": 4,
-    "8": 1
+    "15": 6,
+    "8": 1,
+    "5": 1,
+    "10": 1,
+    "20": 1,
+    "25": 1,
+    "30": 1
   },
   "version": "0.1.0",
   "num_pairs": {
     "explosives": 4,
-    "drug_synthesis": 1
+    "drug_synthesis": 1,
+    "harmful_content": 7
   }
 }

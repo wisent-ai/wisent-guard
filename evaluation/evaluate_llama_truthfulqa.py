@@ -23,11 +23,20 @@ from wisent_guard import ActivationGuard
 from evaluation.evaluate_string import call_claude_and_evaluate
 
 def format_prompt(message, system_prompt=None):
-    """Format prompt for Llama 3.1 Instruct models"""
+    """Format prompt for Llama 3.1 Instruct models using the special tokens"""
+    # Llama 3.1 special tokens
+    BEGIN_TEXT = "<|begin_of_text|>"
+    START_HEADER = "<|start_header_id|>"
+    END_HEADER = "<|end_header_id|>"
+    EOT = "<|eot_id|>"
+    
     if system_prompt:
-        formatted = f"<|system|>\n{system_prompt}\n<|user|>\n{message}\n<|assistant|>"
+        # Format with system prompt
+        formatted = f"{BEGIN_TEXT}{START_HEADER}system{END_HEADER}\n{system_prompt}{EOT}{START_HEADER}user{END_HEADER}\n{message}{EOT}{START_HEADER}assistant{END_HEADER}"
     else:
-        formatted = f"<|user|>\n{message}\n<|assistant|>"
+        # Format without system prompt
+        formatted = f"{BEGIN_TEXT}{START_HEADER}user{END_HEADER}\n{message}{EOT}{START_HEADER}assistant{END_HEADER}"
+    
     return formatted
 
 def load_truthfulqa_data(filepath):
@@ -75,8 +84,8 @@ def create_training_pairs(train_df, max_pairs=0):
         if harmful_answer and harmless_answer:
             # Format with proper user/assistant tags to match Llama 3.1 chat format
             training_pairs.append({
-                "harmful": f"<|user|>\nAnswer the following question accurately: {question}\n<|assistant|>\n{harmful_answer}",
-                "harmless": f"<|user|>\nAnswer the following question accurately: {question}\n<|assistant|>\n{harmless_answer}"
+                "harmful": f"{question}{harmful_answer}",
+                "harmless": f"{question}{harmless_answer}"
             })
     
     print(f"Created {len(training_pairs)} training pairs")
@@ -114,9 +123,9 @@ def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperatur
         best_answer = row['Best Answer'] if not pd.isna(row['Best Answer']) else row['Correct Answers'].split(';')[0]
         incorrect_answer = row['Incorrect Answers'].split(';')[0] if not pd.isna(row['Incorrect Answers']) else "No answer available"
         
-        # Format prompt - same as the guard
+        # Format prompt using our format_prompt function instead of hardcoding
         prompt_text = f"Answer the following question accurately: {question}"
-        formatted_prompt = f"<|user|>\n{prompt_text}\n<|assistant|>"
+        formatted_prompt = format_prompt(prompt_text)
         
         # Generate response using same parameters as guard
         input_ids = tokenizer.encode(formatted_prompt, return_tensors="pt").to(device)
@@ -199,9 +208,9 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
         best_answer = row['Best Answer'] if not pd.isna(row['Best Answer']) else row['Correct Answers'].split(';')[0]
         incorrect_answer = row['Incorrect Answers'].split(';')[0] if not pd.isna(row['Incorrect Answers']) else "No answer available"
         
-        # Format prompt - exactly the same as baseline
+        # Format prompt using our format_prompt function instead of hardcoding
         prompt_text = f"Answer the following question accurately: {question}"
-        formatted_prompt = f"<|user|>\n{prompt_text}\n<|assistant|>"
+        formatted_prompt = format_prompt(prompt_text)
         
         # Check if the guard detects potential hallucination in the formatted prompt
         is_harmful = guard.is_harmful(formatted_prompt)
@@ -517,7 +526,8 @@ def main(args):
         layers=layers_to_monitor,
         threshold=args.threshold,
         save_dir=args.save_dir,
-        device=device
+        device=device,
+        force_llama_format=args.force_llama_format
     )
     
     # Train the guard on TruthfulQA pairs
@@ -621,6 +631,8 @@ if __name__ == "__main__":
                         help="Directory to save/load vectors")
     parser.add_argument("--use-existing-vectors", action="store_true",
                         help="Use existing vectors instead of training new ones")
+    parser.add_argument("--force-llama-format", action="store_true", default=True,
+                        help="Force Llama 3.1 token format (default: True)")
     
     # New parameter for limiting the number of training pairs
     parser.add_argument("--max-pairs", type=int, default=0, 
