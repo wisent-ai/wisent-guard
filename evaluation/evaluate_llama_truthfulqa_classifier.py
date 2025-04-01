@@ -160,22 +160,14 @@ def evaluate_model(model, tokenizer, eval_df, device, max_tokens=100, temperatur
         else:
             response = generated_text
         
-        # Use Claude to evaluate response quality
-        try:
-            claude_score = call_claude_and_evaluate(
-                actual_response=response,
-                good_response=best_answer,
-                bad_response=incorrect_answer
-            )
-            print(f"Claude evaluation for question {i+1}: {claude_score}")
-        except Exception as e:
-            print(f"Error during Claude evaluation: {e}")
-            claude_score = -1  # Error case
+        # Add empty human_score instead of calling Claude
+        human_score = ""
+        print(f"Added empty human_score for question {i+1}")
         
         results.append({
             'question': question,
             'response': response,
-            'claude_score': claude_score,
+            'human_score': human_score,
             'category': row['Category']
         })
         
@@ -232,22 +224,14 @@ def evaluate_model_with_guard(guard, eval_df, max_tokens=100, max_eval_samples=0
         reason = result.get('reason', '') if blocked else ''
         token_scores = result.get('token_scores', [])  # Get token scores (if available by default)
         
-        # Use Claude to evaluate response quality
-        try:
-            claude_score = call_claude_and_evaluate(
-                actual_response=response,
-                good_response=best_answer,
-                bad_response=incorrect_answer
-            )
-            print(f"Claude evaluation for guarded question {i+1}: {claude_score}")
-        except Exception as e:
-            print(f"Error during Claude evaluation: {e}")
-            claude_score = -1  # Error case
+        # Add empty human_score instead of calling Claude
+        human_score = ""
+        print(f"Added empty human_score for guarded question {i+1}")
         
         results.append({
             'question': question,
             'response': response,
-            'claude_score': claude_score,
+            'human_score': human_score,
             'category': row['Category'],
             'is_harmful': is_harmful,
             'similarity_score': similarity_score,
@@ -267,28 +251,28 @@ def compute_metrics(results):
     if not results:
         return {
             'total_samples': 0,
-            'claude_correct': 0,
-            'claude_incorrect': 0,
-            'claude_ambiguous': 0,
-            'claude_correct_rate': 0,
-            'claude_incorrect_rate': 0,
+            'human_correct': 0,
+            'human_incorrect': 0,
+            'human_ambiguous': 0,
+            'human_correct_rate': 0,
+            'human_incorrect_rate': 0,
             'categories': {}
         }
         
     total = len(results)
     
-    # Calculate Claude-based metrics
-    claude_correct = sum(1 for r in results if r['claude_score'] == 1)
-    claude_incorrect = sum(1 for r in results if r['claude_score'] == 0)
-    claude_ambiguous = sum(1 for r in results if r['claude_score'] == -1)
+    # Instead of calculating Claude-based metrics, initialize empty placeholders
+    human_correct = 0
+    human_incorrect = 0
+    human_ambiguous = 0
     
     metrics = {
         'total_samples': total,
-        'claude_correct': claude_correct,
-        'claude_incorrect': claude_incorrect,
-        'claude_ambiguous': claude_ambiguous,
-        'claude_correct_rate': claude_correct / total if total > 0 else 0,
-        'claude_incorrect_rate': claude_incorrect / total if total > 0 else 0,
+        'human_correct': human_correct,
+        'human_incorrect': human_incorrect,
+        'human_ambiguous': human_ambiguous,
+        'human_correct_rate': human_correct / total if total > 0 else 0,
+        'human_incorrect_rate': human_incorrect / total if total > 0 else 0,
     }
     
     # Compute metrics by category
@@ -298,28 +282,19 @@ def compute_metrics(results):
         if cat not in categories:
             category_metrics = {
                 'total': 0,
-                'claude_correct': 0,
-                'claude_incorrect': 0,
-                'claude_ambiguous': 0
+                'human_correct': 0,
+                'human_incorrect': 0,
+                'human_ambiguous': 0
             }
             categories[cat] = category_metrics
         
         categories[cat]['total'] += 1
-        
-        # Add Claude metrics by category
-        claude_score = r['claude_score']
-        if claude_score == 1:
-            categories[cat]['claude_correct'] += 1
-        elif claude_score == 0:
-            categories[cat]['claude_incorrect'] += 1
-        else:
-            categories[cat]['claude_ambiguous'] += 1
     
     # Calculate rates for each category
     for cat in categories:
         cat_total = categories[cat]['total']
-        categories[cat]['claude_correct_rate'] = categories[cat]['claude_correct'] / cat_total if cat_total > 0 else 0
-        categories[cat]['claude_incorrect_rate'] = categories[cat]['claude_incorrect'] / cat_total if cat_total > 0 else 0
+        categories[cat]['human_correct_rate'] = categories[cat]['human_correct'] / cat_total if cat_total > 0 else 0
+        categories[cat]['human_incorrect_rate'] = categories[cat]['human_incorrect'] / cat_total if cat_total > 0 else 0
     
     metrics['categories'] = categories
     
@@ -328,20 +303,10 @@ def compute_metrics(results):
         harmful_detected = sum(1 for r in results if r['is_harmful'])
         blocked_count = sum(1 for r in results if r.get('blocked', False))
         
-        # Compute correlation between detection and Claude scores
-        harmful_and_claude_incorrect = sum(1 for r in results if r['is_harmful'] and r['claude_score'] == 0)
-        not_harmful_and_claude_correct = sum(1 for r in results if not r['is_harmful'] and r['claude_score'] == 1)
-        
         metrics['harmful_detected'] = harmful_detected
         metrics['harmful_rate'] = harmful_detected / total if total > 0 else 0
         metrics['blocked_count'] = blocked_count
         metrics['blocked_rate'] = blocked_count / total if total > 0 else 0
-        
-        metrics['harmful_and_claude_incorrect'] = harmful_and_claude_incorrect
-        metrics['harmful_and_claude_incorrect_rate'] = harmful_and_claude_incorrect / claude_incorrect if claude_incorrect > 0 else 0
-        
-        metrics['not_harmful_and_claude_correct'] = not_harmful_and_claude_correct
-        metrics['not_harmful_and_claude_correct_rate'] = not_harmful_and_claude_correct / claude_correct if claude_correct > 0 else 0
     
     return metrics
 
@@ -350,23 +315,21 @@ def print_metrics(metrics, title="Model Evaluation Metrics"):
     print(f"\n===== {title} =====")
     print(f"Total samples: {metrics['total_samples']}")
     
-    # Claude-based metrics
-    print("\n* Claude-based Evaluation Metrics *")
-    print(f"Correct responses (Claude): {metrics['claude_correct']} ({metrics['claude_correct_rate']:.2%})")
-    print(f"Incorrect responses (Claude): {metrics['claude_incorrect']} ({metrics['claude_incorrect_rate']:.2%})")
-    print(f"Ambiguous responses: {metrics['claude_ambiguous']} ({metrics['claude_ambiguous'] / metrics['total_samples']:.2%})")
+    # Human-based metrics (placeholders)
+    print("\n* Human-based Evaluation Metrics *")
+    print(f"Correct responses (Human): {metrics['human_correct']} ({metrics['human_correct_rate']:.2%})")
+    print(f"Incorrect responses (Human): {metrics['human_incorrect']} ({metrics['human_incorrect_rate']:.2%})")
+    print(f"Ambiguous responses: {metrics['human_ambiguous']} ({metrics['human_ambiguous'] / metrics['total_samples']:.2%})")
     
     if 'harmful_detected' in metrics:
         print(f"\nHarmful (hallucination) detection:")
         print(f"Hallucinations detected: {metrics['harmful_detected']} ({metrics['harmful_rate']:.2%})")
         print(f"Responses blocked: {metrics['blocked_count']} ({metrics['blocked_rate']:.2%})")
-        print(f"Correlation between detection and Claude incorrectness: {metrics.get('harmful_and_claude_incorrect_rate', 0):.2%}")
-        print(f"Correlation between non-detection and Claude correctness: {metrics.get('not_harmful_and_claude_correct_rate', 0):.2%}")
     
     # Show category results
-    print("\nResults by category (Claude-based):")
+    print("\nResults by category (Human-based):")
     for cat, values in metrics['categories'].items():
-        print(f"  {cat}: {values['claude_correct']} correct / {values['total']} total ({values['claude_correct_rate']:.2%})")
+        print(f"  {cat}: {values['human_correct']} correct / {values['total']} total ({values['human_correct_rate']:.2%})")
 
 def save_results(results, filename):
     """Save results to a CSV file with token scores"""
@@ -434,8 +397,8 @@ def save_combined_results(baseline_results, guard_results, filename):
                 'category': guard_result['category'],
                 'baseline_response': baseline_result['response'],
                 'guard_response': guard_result['response'],
-                'baseline_claude_score': baseline_result['claude_score'],
-                'guard_claude_score': guard_result['claude_score'],
+                'baseline_human_score': baseline_result['human_score'],
+                'guard_human_score': guard_result['human_score'],
                 'is_harmful': guard_result.get('is_harmful', False),
                 'similarity_score': guard_result.get('similarity_score', None),
                 'blocked': guard_result.get('blocked', False),
@@ -613,9 +576,9 @@ def train_classifier(harmful_activations, harmless_activations, args):
     print(f"Classifier trained and saved to {args.classifier_path}")
     return classifier
 
-def test_classifier(args, model_name, model, tokenizer, device):
-    """Test the classifier with a simple example."""
-    print("\n----- TESTING CLASSIFIER WITH EXAMPLE -----")
+def test_classifier(args, model_name, model, tokenizer, device, eval_df=None):
+    """Test the classifier with real examples from the dataset."""
+    print("\n----- TESTING CLASSIFIER WITH REAL EXAMPLES -----")
     
     # Load the classifier
     classifier_path = args.classifier_path
@@ -635,35 +598,72 @@ def test_classifier(args, model_name, model, tokenizer, device):
         log_level="info"
     )
     
-    # Test with a truthful and hallucinated example
-    truthful_example = "The capital of France is Paris."
-    hallucinated_example = "The capital of France is London."
+    # If eval_df wasn't provided, try to load it
+    if eval_df is None:
+        try:
+            eval_df = load_truthfulqa_data(args.eval_data)
+        except Exception as e:
+            print(f"Error loading evaluation data: {e}")
+            return False
     
-    print(f"\nTesting truthful example: '{truthful_example}'")
-    truthful_result = guard.is_harmful(truthful_example)
-    print(f"Classifier result: {'HARMFUL' if truthful_result else 'NOT HARMFUL'}")
+    # Select 2 random examples from the dataset
+    if len(eval_df) > 1:
+        test_samples = eval_df.sample(2, random_state=42)
+    else:
+        test_samples = eval_df
     
-    print(f"\nTesting hallucinated example: '{hallucinated_example}'")
-    hallucinated_result = guard.is_harmful(hallucinated_example)
-    print(f"Classifier result: {'HARMFUL' if hallucinated_result else 'NOT HARMFUL'}")
+    print("\n==== TESTING WITH ACTUAL DATASET EXAMPLES ====")
     
-    # Test with safe response generation
-    print("\nTesting response generation:")
-    prompt = "What is the capital of France?"
-    print(f"Prompt: '{prompt}'")
-    
-    try:
-        response = guard.generate_safe_response(
-            prompt=prompt,
-            max_new_tokens=50
-        )
+    for idx, row in test_samples.iterrows():
+        question = row['Question']
         
-        print(f"Response: '{response['response']}'")
-        print(f"Blocked: {response.get('blocked', False)}")
-        if response.get('blocked', False):
-            print(f"Reason: {response.get('reason', 'Unknown')}")
-    except Exception as e:
-        print(f"Error generating response: {e}")
+        # Get correct answers
+        correct_answers = row['Correct Answers'].split(';')
+        best_answer = row['Best Answer'] if not pd.isna(row['Best Answer']) else correct_answers[0]
+        
+        # Get incorrect answers
+        incorrect_answers = row['Incorrect Answers'].split(';')
+        if len(incorrect_answers) > 0 and not pd.isna(incorrect_answers[0]):
+            incorrect_answer = incorrect_answers[0]
+        else:
+            incorrect_answer = "No incorrect answer available"
+        
+        print(f"\nQuestion: {question}")
+        print(f"Category: {row['Category']}")
+        print(f"Best Answer (truthful): {best_answer}")
+        print(f"Incorrect Answer (hallucination): {incorrect_answer}")
+        
+        # Test with truthful example
+        print(f"\nTesting truthful example...")
+        truthful_result = guard.is_harmful(best_answer)
+        print(f"Classification: {'HARMFUL' if truthful_result else 'NOT HARMFUL'}")
+        
+        # Test with hallucinated example
+        print(f"\nTesting hallucinated example...")
+        hallucinated_result = guard.is_harmful(incorrect_answer)
+        print(f"Classification: {'HARMFUL' if hallucinated_result else 'NOT HARMFUL'}")
+        
+        # Test with response generation
+        print("\nTesting response generation:")
+        print(f"Prompt: '{question}'")
+        
+        try:
+            response = guard.generate_safe_response(
+                prompt=question,
+                max_new_tokens=50
+            )
+            
+            print(f"Response: '{response['response']}'")
+            print(f"Blocked: {response.get('blocked', False)}")
+            if response.get('blocked', False):
+                print(f"Reason: {response.get('reason', 'Unknown')}")
+                
+            # Compare to truthful answer
+            print(f"\nComparison to best answer:")
+            print(f"Best answer: '{best_answer}'")
+            print(f"Generated: '{response['response']}'")
+        except Exception as e:
+            print(f"Error generating response: {e}")
     
     return True
 
@@ -884,7 +884,7 @@ def main(args):
 
     # After evaluation, test the classifier if requested
     if args.test_classifier:
-        test_classifier(args, args.model_name, model, tokenizer, device)
+        test_classifier(args, args.model_name, model, tokenizer, device, eval_df)
     
     print("Done!")
 

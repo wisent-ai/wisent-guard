@@ -141,6 +141,10 @@ class ActivationGuard:
         # Set up approach: classifier or vector
         self.use_classifier = use_classifier
         self.classifier = None
+        self.vectors = None  # Initialize vectors attribute to None
+        
+        # Set default force_format 
+        self.force_format = force_format
         
         # Initialize classifier if requested
         if use_classifier:
@@ -179,57 +183,54 @@ class ActivationGuard:
                 self.force_format = "legacy"
             else:
                 self.force_format = force_format
-            self.logger.info(f"Similarity threshold set to {self.threshold}")
-            
-            # Check if model is likely a Llama 3.1 model and set format accordingly
-            model_name = getattr(self.model.config, "_name_or_path", "").lower()
-            is_llama_3 = bool(re.search(r"llama-?3", model_name, re.IGNORECASE))
-            is_mistral = bool(re.search(r"mistral", model_name, re.IGNORECASE))
-            
-            self.logger.debug(f"Model name: {model_name}")
-            self.logger.debug(f"Llama 3 detection: {is_llama_3}")
-            self.logger.debug(f"Mistral detection: {is_mistral}")
-            
-            if is_llama_3:
-                if self.force_format == "legacy":
-                    self.logger.warning("Detected Llama 3.1 model but legacy format is forced. This may cause issues.")
-                elif self.force_format is None:
-                    self.force_format = "llama31"
-                    self.logger.info("Detected Llama 3.1 model. Automatically enabling Llama 3.1 prompt format.")
-                elif self.force_format == "llama31":
-                    self.logger.info("Detected Llama 3.1 model. Will use Llama 3.1 prompt format.")
-                    
-                if self.force_format == "llama31":
-                    self.logger.info("Llama 3.1 format will use special tokens:")
-                    self.logger.info("  <|begin_of_text|><|start_header_id|>user<|end_header_id|>...")
-                    self.logger.info("  Note: User/assistant token settings don't affect Llama 3.1 format")
-            elif is_mistral:
-                if self.force_format == "legacy":
-                    self.logger.warning("Detected Mistral model but legacy format is forced. This may cause issues.")
-                elif self.force_format is None:
-                    self.force_format = "mistral"
-                    self.logger.info("Detected Mistral model. Automatically enabling Mistral prompt format.")
-                elif self.force_format == "mistral":
-                    self.logger.info("Detected Mistral model. Will use Mistral prompt format.")
-                    
-                if self.force_format == "mistral":
-                    self.logger.info("Mistral format will use special tokens:")
-                    self.logger.info("  [INST] instruction [/INST] response")
-                    self.logger.info("  Note: User/assistant token settings don't affect Mistral format")
-            else:
-                self.logger.info(f"Using legacy format with user token: {self.user_token}")
-                self.logger.info(f"Using legacy format with assistant token: {self.assistant_token}")
-            
-            # Only load vectors if auto_load_vectors is True
-            if auto_load_vectors:
-                self.logger.info("Auto-loading vectors from save directory")
-                self.load_vectors()
-            else:
-                self.logger.info("Skipping auto-loading of vectors (use load_vectors() to load explicitly)")
+        
+        self.logger.info(f"Similarity threshold set to {self.threshold}")
+        
+        # Check if model is likely a Llama 3.1 model and set format accordingly
+        model_name = getattr(self.model.config, "_name_or_path", "").lower()
+        is_llama_3 = bool(re.search(r"llama-?3", model_name, re.IGNORECASE))
+        is_mistral = bool(re.search(r"mistral", model_name, re.IGNORECASE))
+        
+        self.logger.debug(f"Model name: {model_name}")
+        self.logger.debug(f"Llama 3 detection: {is_llama_3}")
+        self.logger.debug(f"Mistral detection: {is_mistral}")
+        
+        if is_llama_3:
+            if self.force_format == "legacy":
+                self.logger.warning("Detected Llama 3.1 model but legacy format is forced. This may cause issues.")
+            elif self.force_format is None:
+                self.force_format = "llama31"
+                self.logger.info("Detected Llama 3.1 model. Automatically enabling Llama 3.1 prompt format.")
+            elif self.force_format == "llama31":
+                self.logger.info("Detected Llama 3.1 model. Will use Llama 3.1 prompt format.")
+                
+            if self.force_format == "llama31":
+                self.logger.info("Llama 3.1 format will use special tokens:")
+                self.logger.info("  <|begin_of_text|><|start_header_id|>user<|end_header_id|>...")
+                self.logger.info("  Note: User/assistant token settings don't affect Llama 3.1 format")
+        elif is_mistral:
+            if self.force_format == "legacy":
+                self.logger.warning("Detected Mistral model but legacy format is forced. This may cause issues.")
+            elif self.force_format is None:
+                self.force_format = "mistral"
+                self.logger.info("Detected Mistral model. Automatically enabling Mistral prompt format.")
+            elif self.force_format == "mistral":
+                self.logger.info("Detected Mistral model. Will use Mistral prompt format.")
+                
+            if self.force_format == "mistral":
+                self.logger.info("Mistral format will use special tokens:")
+                self.logger.info("  [INST] instruction [/INST] response")
+                self.logger.info("  Note: User/assistant token settings don't affect Mistral format")
         else:
-            # Not using vectors at all when classifier is enabled
-            self.vectors = None
-            self.force_format = force_format or "legacy"
+            self.logger.info(f"Using legacy format with user token: {self.user_token}")
+            self.logger.info(f"Using legacy format with assistant token: {self.assistant_token}")
+            
+        # Only load vectors if auto_load_vectors is True
+        if auto_load_vectors:
+            self.logger.info("Auto-loading vectors from save directory")
+            self.load_vectors()
+        else:
+            self.logger.info("Skipping auto-loading of vectors (use load_vectors() to load explicitly)")
         
         # Set target tokens for multiple-choice format
         self._setup_target_tokens()
@@ -961,7 +962,7 @@ class ActivationGuard:
                     harmful_token = token
                     block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
                     break
-            
+        
         # Add safety information to the result
         enhanced_result = {
             "response": result["response"],
