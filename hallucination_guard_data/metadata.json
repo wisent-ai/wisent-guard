@@ -1,0 +1,12 @@
+{
+  "categories": [
+    "hallucination"
+  ],
+  "layers": {
+    "15": 4115
+  },
+  "version": "0.1.0",
+  "num_pairs": {
+    "hallucination": 4115
+  }
+}

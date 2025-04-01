@@ -4,7 +4,7 @@
   <img src="wisent-guard-logo.png" alt="Wisent Guard" width="200">
 </p>
 
-A Python package for monitoring and guarding against harmful content and hallucinations in language models by analyzing model activations.
+A Python package for monitoring and guarding against harmful content and hallucinations in language models by analyzing model activations. Delivered to you by the wisent.ai team of 1 in the form of Lukasz Bartoszcze lukaszbartoszcze.com
 
 ## Overview
 

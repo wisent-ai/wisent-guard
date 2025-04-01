@@ -4,75 +4,62 @@ Hooks for capturing activations from various transformer models
 
 import torch
 from typing import Dict, List, Callable, Any, Set, Optional, Union
+from ..utils.logger import get_logger
 from .helpers import get_layer_name
-from .logger import get_logger
 
 class ActivationHooks:
-    """
-    Class for managing activation hooks on transformer models.
-    """
-    def __init__(self, model: torch.nn.Module, model_type: str = None, token_strategy: str = "last", log_level: str = "info"):
+    """Manages activation hooks for transformer models."""
+    
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        layers: List[int],
+        token_strategy: str = "last",
+        log_level: Union[str, int] = "info"
+    ):
         """
-        Initialize the hooks manager.
-        
-        Args:
-            model: The transformer model to hook into
-            model_type: Type of model ('opt', 'llama', 'gpt2', etc.)
-            token_strategy: Strategy for token selection:
-                            - "last": Last token in sequence (default)
-                            - "target_token": Look for specific tokens like "A" or "B"
-                            - "all": Store all tokens for later selection
-            log_level: Logging level ('debug', 'info', 'warning', 'error')
-        """
-        self.logger = get_logger(name="wisent_guard.hooks", level=log_level)
-        self.logger.info("Initializing activation hooks")
-        
-        self.model = model
-        self.model_type = self._detect_model_type(model) if model_type is None else model_type
-        self.logger.info(f"Using model type: {self.model_type}")
-        
-        self.hooks = {}
-        self.layer_activations = {}
-        self.active_layers = set()
-        self.token_strategy = token_strategy
-        self.logger.info(f"Using token strategy: {self.token_strategy}")
-        
-        self.target_tokens = []  # IDs of tokens to look for (e.g., "A", "B")
-        self.last_token_id = None  # ID of the last token processed
-        self.last_token_position = -1  # Position of the last token processed
-        
-    def _detect_model_type(self, model: torch.nn.Module) -> str:
-        """
-        Auto-detect the model type based on model architecture.
+        Initialize activation hooks for a model.
         
         Args:
             model: Transformer model
-            
-        Returns:
-            String identifier for the model type
+            layers: List of layers to monitor
+            token_strategy: Strategy for token activations (only 'last' is supported)
+            log_level: Logging level
         """
-        self.logger.debug("Attempting to auto-detect model type")
-        model_name = model.__class__.__name__.lower()
-        self.logger.debug(f"Model class name: {model_name}")
+        self.model = model
+        self.layers = layers
+        self.token_strategy = token_strategy
+        self.logger = get_logger("wisent_guard", log_level)
         
-        if 'opt' in model_name:
-            return 'opt'
-        elif 'llama' in model_name:
-            return 'llama'
-        elif 'gpt2' in model_name:
-            return 'gpt2'
-        elif 'neox' in model_name:
-            return 'gpt_neox'
-        elif 'gptj' in model_name:
-            return 'gptj'
-        elif 't5' in model_name:
-            return 't5'
-        elif 'bart' in model_name:
-            return 'bart'
-        else:
-            # Default to a generic approach
-            self.logger.warning(f"Could not detect specific model type from '{model_name}', using generic")
-            return 'generic'
+        # Determine model type
+        model_type = self._detect_model_type(model)
+        self.model_type = model_type
+        self.logger.info(f"Using model type: {model_type}")
+        
+        # Always use last token strategy
+        self.logger.info("Using last token strategy")
+        
+        # Initialize hook storage
+        self.hooks = {}
+        self.activations = {}
+        
+        # Set up monitoring on specified layers
+        self.setup_hooks(layers)
+    
+    def _detect_model_type(self, model) -> str:
+        """Detect model type."""
+        model_config = getattr(model, "config", None)
+        model_name = getattr(model_config, "_name_or_path", "unknown").lower()
+        
+        if hasattr(model, "get_input_embeddings"):
+            if "llama" in model_name:
+                return "llama"
+            elif "mistral" in model_name:
+                return "mistral"
+            elif "mpt" in model_name:
+                return "mpt"
+        
+        return "generic"
     
     def _get_module_by_name(self, name: str) -> torch.nn.Module:
         """
@@ -95,44 +82,13 @@ class ActivationHooks:
     
     def set_target_tokens(self, tokenizer, token_texts: List[str]):
         """
-        Set target tokens to look for (e.g., "A", "B").
+        Set target tokens to look for (kept for backward compatibility).
         
         Args:
             tokenizer: The tokenizer to use for encoding
-            token_texts: List of token texts to look for
+            token_texts: List of token texts to look for (ignored)
         """
-        self.logger.info(f"Setting target tokens: {token_texts}")
-        self.target_tokens = []
-        for text in token_texts:
-            # Try to encode with and without special tokens to find the right token ID
-            tokens_with = tokenizer.encode(text, add_special_tokens=True)
-            tokens_without = tokenizer.encode(text, add_special_tokens=False)
-            
-            self.logger.debug(f"Token '{text}' - with special tokens: {tokens_with}")
-            self.logger.debug(f"Token '{text}' - without special tokens: {tokens_without}")
-            
-            # If single token, take it directly
-            if len(tokens_without) == 1:
-                self.target_tokens.append(tokens_without[0])
-                self.logger.debug(f"Found single token ID for '{text}': {tokens_without[0]}")
-            else:
-                # Try to find the token in the full encoding
-                found = False
-                for token_id in tokens_with:
-                    decoded = tokenizer.decode([token_id])
-                    self.logger.debug(f"Checking token ID {token_id}, decodes to: '{decoded}'")
-                    if decoded == text:
-                        self.target_tokens.append(token_id)
-                        self.logger.debug(f"Found matching token ID for '{text}': {token_id}")
-                        found = True
-                        break
-                
-                if not found:
-                    self.logger.warning(f"Could not find exact token ID for '{text}'")
-        
-        # Log for debugging
-        token_mapping = {token_id: tokenizer.decode([token_id]) for token_id in self.target_tokens}
-        self.logger.info(f"Target tokens set: {token_texts} → IDs: {self.target_tokens} → Decoded: {token_mapping}")
+        self.logger.warning("set_target_tokens is ignored with simplified 'last' token strategy")
     
     def _activation_hook(self, layer_idx: int) -> Callable:
         """
@@ -165,105 +121,26 @@ class ActivationHooks:
                     device = hidden_states.device
                     self.logger.debug(f"Hidden states shape: {hidden_states.shape}, device: {device}")
                     
-                    if self.token_strategy == "last":
-                        # Original behavior: get last token's activations
-                        last_token_idx = hidden_states.shape[1] - 1
-                        self.logger.debug(f"Using last token strategy, token position: {last_token_idx}")
-                        
-                        # Ensure tensor is properly allocated on the device (important for MPS)
-                        self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
-                        self.last_token_position = last_token_idx
-                        
-                        # Try to get the token ID if available
-                        if hasattr(module, '_last_input_ids'):
-                            input_ids = module._last_input_ids[0]  # Batch size 1
-                            if last_token_idx < len(input_ids):
-                                try:
-                                    self.last_token_id = input_ids[last_token_idx].item()
-                                    self.logger.debug(f"Last token ID: {self.last_token_id}, position: {last_token_idx}")
-                                except (RuntimeError, ValueError) as e:
-                                    self.logger.debug(f"Error extracting last token ID: {e}")
-                                    self.last_token_id = None
+                    # Get last token's activations
+                    last_token_idx = hidden_states.shape[1] - 1
+                    self.logger.debug(f"Using last token strategy, token position: {last_token_idx}")
                     
-                    elif self.token_strategy == "target_token" and len(self.target_tokens) > 0:
-                        self.logger.debug(f"Using target token strategy, looking for tokens: {self.target_tokens}")
-                        
-                        # Try to find target tokens in the input_ids
-                        if hasattr(module, '_last_input_ids'):
-                            input_ids = module._last_input_ids[0]  # Batch size 1
-                            self.logger.debug(f"Input IDs: {input_ids[:10]}... (showing first 10)")
-                            
-                            found = False
-                            
-                            # Look for target tokens from the end (where A/B would be)
-                            for i in range(len(input_ids)-1, -1, -1):
-                                try:
-                                    token_id = input_ids[i].item()
-                                    if token_id in self.target_tokens:
-                                        self.logger.debug(f"Found target token {token_id} at position {i}")
-                                        # Ensure tensor is properly allocated on the device (important for MPS)
-                                        self.layer_activations[layer_idx] = hidden_states[:, i, :].detach().clone().to(device)
-                                        self.last_token_id = token_id
-                                        self.last_token_position = i
-                                        found = True
-                                        break
-                                except (RuntimeError, ValueError) as e:
-                                    # This happens when input_ids[i] is not a scalar tensor
-                                    self.logger.debug(f"Error extracting token at position {i}: {e}")
-                                    # Skip this position and continue with the next
-                            
-                            # Fallback to last token if target not found
-                            if not found:
-                                last_token_idx = hidden_states.shape[1] - 1
-                                self.logger.debug(f"Target token not found, using last token at position {last_token_idx}")
-                                # Ensure tensor is properly allocated on the device (important for MPS)
-                                self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
-                                if last_token_idx < len(input_ids):
-                                    try:
-                                        self.last_token_id = input_ids[last_token_idx].item()
-                                    except (RuntimeError, ValueError) as e:
-                                        self.logger.debug(f"Error extracting last token ID: {e}")
-                                        self.last_token_id = None
-                                self.last_token_position = last_token_idx
+                    # Ensure tensor is properly allocated on the device (important for MPS)
+                    self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
+                    self.last_token_position = last_token_idx
                     
-                    elif self.token_strategy == "all":
-                        # Store all tokens for later selection
-                        self.logger.debug(f"Using 'all' strategy, storing the entire sequence of length {hidden_states.shape[1]}")
-                        # Ensure tensor is properly allocated on the device (important for MPS)
-                        self.layer_activations[layer_idx] = hidden_states.detach().clone().to(device)
-                        
-                        # Save the last token ID for reference
-                        if hasattr(module, '_last_input_ids'):
-                            input_ids = module._last_input_ids[0]  # Batch size 1
-                            last_idx = min(hidden_states.shape[1] - 1, len(input_ids) - 1)
+                    # Try to get the token ID if available
+                    if hasattr(module, '_last_input_ids'):
+                        input_ids = module._last_input_ids[0]  # Batch size 1
+                        if last_token_idx < len(input_ids):
                             try:
-                                self.last_token_id = input_ids[last_idx].item()
-                                self.last_token_position = last_idx
-                                self.logger.debug(f"Saved last token ID: {self.last_token_id}, position: {last_idx}")
+                                self.last_token_id = input_ids[last_token_idx].item()
+                                self.logger.debug(f"Last token ID: {self.last_token_id}, position: {last_token_idx}")
                             except (RuntimeError, ValueError) as e:
                                 self.logger.debug(f"Error extracting last token ID: {e}")
                                 self.last_token_id = None
-                                self.last_token_position = last_idx
-                    
-                    else:
-                        # Default to last token
-                        last_token_idx = hidden_states.shape[1] - 1
-                        self.logger.debug(f"Using default strategy (last token), position: {last_token_idx}")
-                        # Ensure tensor is properly allocated on the device (important for MPS)
-                        self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
-                        self.last_token_position = last_token_idx
-                        
-                        # Try to get the token ID if available
-                        if hasattr(module, '_last_input_ids'):
-                            input_ids = module._last_input_ids[0]  # Batch size 1
-                            if last_token_idx < len(input_ids):
-                                try:
-                                    self.last_token_id = input_ids[last_token_idx].item()
-                                    self.logger.debug(f"Last token ID: {self.last_token_id}")
-                                except (RuntimeError, ValueError) as e:
-                                    self.logger.debug(f"Error extracting last token ID: {e}")
-                                    self.last_token_id = None
-        
+                else:
+                    self.logger.warning(f"Hidden states is not a tensor: {type(hidden_states)}")
         return hook
     
     def register_hooks(self, layers: List[int]) -> None:
@@ -332,84 +209,144 @@ class ActivationHooks:
         self.logger.debug(f"has_activations check: {has_act}")
         return has_act
     
-    def get_activations(self, layer_idx: Optional[int] = None, token_idx: Optional[int] = None) -> Dict[int, torch.Tensor]:
+    def get_activations(self) -> Dict[int, torch.Tensor]:
         """
-        Get the stored activations.
+        Get all activations for registered layers.
         
-        Args:
-            layer_idx: Specific layer to get activations for. If None, returns all activations.
-            token_idx: For "all" strategy, the specific token to extract.
-                      Ignored if activations already contain only one token.
-            
         Returns:
             Dictionary mapping layer indices to activation tensors
         """
-        if not self.has_activations():
-            self.logger.warning("No activations to retrieve")
-            return {}
-        
-        self.logger.debug(f"Getting activations: layer_idx={layer_idx}, token_idx={token_idx}")
-            
-        result = {}
-        
-        # Get requested activations
-        if layer_idx is not None:
-            if layer_idx in self.layer_activations:
-                self.logger.debug(f"Retrieving activations for specific layer {layer_idx}")
-                activation = self.layer_activations[layer_idx]
-                
-                # For "all" strategy and if token_idx is specified, get only that token
-                if token_idx is not None and self.token_strategy == "all" and len(activation.shape) > 1 and activation.shape[1] > 1:
-                    self.logger.debug(f"Getting specific token {token_idx} from 'all' strategy activations")
-                    if token_idx < activation.shape[1]:
-                        result[layer_idx] = activation[:, token_idx, :]
-                        self.logger.debug(f"Retrieved activation for token {token_idx}")
-                    else:
-                        # If token_idx is out of range, fall back to last token
-                        self.logger.warning(f"Token index {token_idx} out of range, using last token instead")
-                        result[layer_idx] = activation[:, -1, :]
-                else:
-                    result[layer_idx] = activation
-                    self.logger.debug(f"Retrieved activation with shape: {activation.shape}")
-            else:
-                self.logger.warning(f"No activations found for layer {layer_idx}")
-        else:
-            # Return all activations
-            self.logger.debug(f"Retrieving activations for all layers: {list(self.layer_activations.keys())}")
-            for layer, activation in self.layer_activations.items():
-                # For "all" strategy and if token_idx is specified, get only that token
-                if token_idx is not None and self.token_strategy == "all" and len(activation.shape) > 1 and activation.shape[1] > 1:
-                    self.logger.debug(f"Getting specific token {token_idx} from 'all' strategy activations for layer {layer}")
-                    if token_idx < activation.shape[1]:
-                        result[layer] = activation[:, token_idx, :]
-                    else:
-                        # If token_idx is out of range, fall back to last token
-                        self.logger.warning(f"Token index {token_idx} out of range for layer {layer}, using last token")
-                        result[layer] = activation[:, -1, :]
-                else:
-                    result[layer] = activation
-                    self.logger.debug(f"Retrieved activation for layer {layer} with shape: {activation.shape}")
-        
-        self.logger.debug(f"Returning activations for {len(result)} layers")
-        return result
+        return self.layer_activations
     
-    def get_last_token_info(self):
+    def get_last_token_info(self) -> Dict[str, Any]:
         """
-        Get information about the last token that was processed.
+        Get information about the last token processed.
         
         Returns:
-            Dictionary with token ID and position
+            Dictionary with token_id and position
         """
-        info = {
+        return {
             "token_id": self.last_token_id,
             "position": self.last_token_position
         }
-        self.logger.debug(f"Last token info: {info}")
-        return info
     
-    def clear_activations(self) -> None:
-        """Clear stored activations."""
-        self.logger.debug("Clearing activations")
-        self.layer_activations = {}
-        self.last_token_id = None
-        self.last_token_position = -1 
+    def reset(self):
+        """Reset stored activations."""
+        self.activations = {}
+    
+    def clear_activations(self):
+        """Clear all stored activations (alias for reset)."""
+        self.reset()
+
+    def setup_hooks(self, layers: List[int]):
+        """
+        Set up hooks for specified layers.
+        
+        Args:
+            layers: List of layer indices to hook
+        """
+        self.logger.info(f"Monitoring {len(layers)} specified layers: {layers}")
+        
+        registered = 0
+        for layer_idx in layers:
+            success = self.register_hook(layer_idx)
+            if success:
+                registered += 1
+        
+        self.logger.info(f"Registered {registered} hooks out of {len(layers)} requested layers")
+
+    def register_hook(self, layer_idx: int) -> bool:
+        """
+        Register a hook for a specific layer.
+        
+        Args:
+            layer_idx: Layer index to hook
+            
+        Returns:
+            True if hook was registered successfully, False otherwise
+        """
+        # Get the layer module
+        layer_module = self._get_layer_module(layer_idx)
+        if layer_module is None:
+            self.logger.warning(f"Could not find layer module for layer {layer_idx}")
+            return False
+        
+        # Create the hook
+        def hook_fn(module, input, output):
+            # Get the activations
+            if isinstance(output, tuple):
+                # For layers that return multiple tensors
+                hidden_states = output[0]
+            else:
+                # For layers that return a single tensor
+                hidden_states = output
+            
+            # Store the activations (last token)
+            self.activations[layer_idx] = hidden_states[:, -1].detach()
+        
+        # Register the hook
+        hook = layer_module.register_forward_hook(hook_fn)
+        self.hooks[layer_idx] = hook
+        
+        self.logger.debug(f"Registered hook for layer {layer_idx}")
+        return True
+
+    def _get_layer_module(self, layer_idx: int) -> Optional[torch.nn.Module]:
+        """
+        Get the module for a specific layer.
+        
+        Args:
+            layer_idx: Layer index
+            
+        Returns:
+            Module for the layer
+        """
+        if self.model_type == "llama":
+            try:
+                return self.model.model.layers[layer_idx]
+            except (AttributeError, IndexError):
+                try:
+                    return self.model.layers[layer_idx]
+                except (AttributeError, IndexError):
+                    self.logger.warning(f"Could not find layer {layer_idx} in Llama model")
+                    return None
+        elif self.model_type == "mistral":
+            try:
+                return self.model.model.layers[layer_idx]
+            except (AttributeError, IndexError):
+                try:
+                    return self.model.layers[layer_idx]
+                except (AttributeError, IndexError):
+                    self.logger.warning(f"Could not find layer {layer_idx} in Mistral model")
+                    return None
+        else:
+            # Generic approach
+            try:
+                # Try common patterns
+                if hasattr(self.model, 'transformer') and hasattr(self.model.transformer, 'h'):
+                    # GPT-2 style
+                    return self.model.transformer.h[layer_idx]
+                elif hasattr(self.model, 'model') and hasattr(self.model.model, 'layers'):
+                    # Common pattern
+                    return self.model.model.layers[layer_idx]
+                elif hasattr(self.model, 'encoder') and hasattr(self.model.encoder, 'layer'):
+                    # BERT style
+                    return self.model.encoder.layer[layer_idx]
+                else:
+                    self.logger.warning(f"Could not find layer {layer_idx} with generic approach")
+                    return None
+            except (AttributeError, IndexError) as e:
+                self.logger.warning(f"Error accessing layer {layer_idx}: {e}")
+                return None
+
+    def get_activation(self, layer_idx: int) -> Optional[torch.Tensor]:
+        """
+        Get activation for a specific layer.
+        
+        Args:
+            layer_idx: Layer index
+            
+        Returns:
+            Activation tensor for the layer
+        """
+        return self.activations.get(layer_idx) 
