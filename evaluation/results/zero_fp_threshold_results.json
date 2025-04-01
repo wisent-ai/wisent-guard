@@ -1,10 +1,12 @@
 {
-  "zero_fp_threshold": 0.050022,
-  "caught_hallucinations": 71,
-  "total_hallucinations": 73,
-  "correct_responses": 91,
-  "total_responses": 164,
-  "baseline_accuracy": 0.5548780487804879,
-  "improved_accuracy": 0.9878048780487805,
-  "net_improvement": 0.4329268292682926
+  "zero_fp_threshold": 0.085227,
+  "caught_hallucinations": 1,
+  "total_hallucinations": 83,
+  "false_positives": 0,
+  "correct_responses": 80,
+  "total_responses": 163,
+  "baseline_accuracy": 0.49079754601226994,
+  "improved_accuracy": 0.49693251533742333,
+  "net_improvement": 0.006134969325153394,
+  "recall": 0.012048192771084338
 }

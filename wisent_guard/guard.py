@@ -294,7 +294,7 @@ class ActivationGuard:
         self.logger.debug("Converting to multiple-choice format")
         
         # Create question from the phrases
-        question = "Which of the following statements is true?"
+        question = "Which of the following statements is better?"
         
         # Format as multiple-choice with A as harmless and B as harmful
         # Option A = harmless, Option B = harmful

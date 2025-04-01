@@ -1,75 +1,75 @@
 {
   "best_params": {
-    "threshold": 0.05,
+    "threshold": 0.08,
     "strategy": "max",
     "n_tokens": 3
   },
   "best_metrics": {
     "params": {
-      "threshold": 0.05,
+      "threshold": 0.08,
       "strategy": "max",
       "n_tokens": 3
     },
-    "precision": 0.4382716049382716,
-    "recall": 0.9726027397260274,
-    "f1_score": 0.6042553191489362,
-    "true_positives": 71,
-    "false_positives": 91,
-    "false_negatives": 2,
+    "precision": 0.5061728395061729,
+    "recall": 0.9879518072289156,
+    "f1_score": 0.6693877551020408,
+    "true_positives": 82,
+    "false_positives": 80,
+    "false_negatives": 1,
     "true_negatives": 0,
-    "detection_rate": 0.9726027397260274,
+    "detection_rate": 0.9879518072289156,
     "false_positive_rate": 1.0,
-    "balanced_accuracy": 0.4863013698630137,
-    "combined_score": 0.652004058853374,
-    "auc": 0.4452807466506097
+    "balanced_accuracy": 0.4939759036144578,
+    "combined_score": 0.69888442659527,
+    "auc": 0.47183734939759037
   },
   "cross_validation": {
     "fold_metrics": [
       {
         "fold": 1,
-        "precision": 0.42424242424242425,
+        "precision": 0.5151515151515151,
         "recall": 1.0,
-        "f1_score": 0.5957446808510638,
-        "auc": 0.5939849624060151
+        "f1_score": 0.68,
+        "auc": 0.4227941176470588
       },
       {
         "fold": 2,
-        "precision": 0.45454545454545453,
+        "precision": 0.5151515151515151,
         "recall": 1.0,
-        "f1_score": 0.625,
-        "auc": 0.4962962962962963
+        "f1_score": 0.68,
+        "auc": 0.44485294117647056
       },
       {
         "fold": 3,
-        "precision": 0.45454545454545453,
+        "precision": 0.5151515151515151,
         "recall": 1.0,
-        "f1_score": 0.625,
-        "auc": 0.2592592592592593
+        "f1_score": 0.68,
+        "auc": 0.5220588235294118
       },
       {
         "fold": 4,
-        "precision": 0.41935483870967744,
-        "recall": 0.8666666666666667,
-        "f1_score": 0.5652173913043478,
-        "auc": 0.40740740740740744
+        "precision": 0.5,
+        "recall": 1.0,
+        "f1_score": 0.6666666666666666,
+        "auc": 0.42578125
       },
       {
         "fold": 5,
-        "precision": 0.4375,
-        "recall": 1.0,
-        "f1_score": 0.6086956521739131,
-        "auc": 0.4444444444444444
+        "precision": 0.4838709677419355,
+        "recall": 0.9375,
+        "f1_score": 0.6382978723404256,
+        "auc": 0.5625
       }
     ],
     "avg_metrics": {
-      "precision": 0.4380376344086022,
-      "precision_std": 0.01472861148075696,
-      "recall": 0.9733333333333334,
-      "recall_std": 0.05333333333333332,
-      "f1_score": 0.6039315448658649,
-      "f1_score_std": 0.02225428835214597,
-      "auc": 0.44027847396268455,
-      "auc_std": 0.11011766382098824
+      "precision": 0.5058651026392962,
+      "precision_std": 0.01246478055076838,
+      "recall": 0.9875,
+      "recall_std": 0.025,
+      "f1_score": 0.6689929078014185,
+      "f1_score_std": 0.016192991297304213,
+      "auc": 0.4755974264705882,
+      "auc_std": 0.056437191531036525
     }
   },
   "all_results": [
@@ -79,1462 +79,1462 @@
         "strategy": "max",
         "n_tokens": 3
       },
-      "precision": 0.4382716049382716,
-      "recall": 0.9726027397260274,
-      "f1_score": 0.6042553191489362,
-      "true_positives": 71,
-      "false_positives": 91,
-      "false_negatives": 2,
-      "true_negatives": 0,
-      "detection_rate": 0.9726027397260274,
-      "false_positive_rate": 1.0,
-      "balanced_accuracy": 0.4863013698630137,
-      "combined_score": 0.652004058853374,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "max",
-        "n_tokens": 5
-      },
-      "precision": 0.4382716049382716,
-      "recall": 0.9726027397260274,
-      "f1_score": 0.6042553191489362,
-      "true_positives": 71,
-      "false_positives": 91,
-      "false_negatives": 2,
-      "true_negatives": 0,
-      "detection_rate": 0.9726027397260274,
-      "false_positive_rate": 1.0,
-      "balanced_accuracy": 0.4863013698630137,
-      "combined_score": 0.652004058853374,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "max",
-        "n_tokens": 10
-      },
-      "precision": 0.4382716049382716,
-      "recall": 0.9726027397260274,
-      "f1_score": 0.6042553191489362,
-      "true_positives": 71,
-      "false_positives": 91,
-      "false_negatives": 2,
-      "true_negatives": 0,
-      "detection_rate": 0.9726027397260274,
-      "false_positive_rate": 1.0,
-      "balanced_accuracy": 0.4863013698630137,
-      "combined_score": 0.652004058853374,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "mean",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "mean",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "mean",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "first_token",
-        "n_tokens": 3
-      },
-      "precision": 0.6666666666666666,
-      "recall": 0.0273972602739726,
-      "f1_score": 0.05263157894736842,
-      "true_positives": 2,
-      "false_positives": 1,
-      "false_negatives": 71,
-      "true_negatives": 90,
-      "detection_rate": 0.0273972602739726,
-      "false_positive_rate": 0.01098901098901099,
-      "balanced_accuracy": 0.5082041246424809,
-      "combined_score": 0.410958904109589,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "first_token",
-        "n_tokens": 5
-      },
-      "precision": 0.6666666666666666,
-      "recall": 0.0273972602739726,
-      "f1_score": 0.05263157894736842,
-      "true_positives": 2,
-      "false_positives": 1,
-      "false_negatives": 71,
-      "true_negatives": 90,
-      "detection_rate": 0.0273972602739726,
-      "false_positive_rate": 0.01098901098901099,
-      "balanced_accuracy": 0.5082041246424809,
-      "combined_score": 0.410958904109589,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "first_token",
-        "n_tokens": 10
-      },
-      "precision": 0.6666666666666666,
-      "recall": 0.0273972602739726,
-      "f1_score": 0.05263157894736842,
-      "true_positives": 2,
-      "false_positives": 1,
-      "false_negatives": 71,
-      "true_negatives": 90,
-      "detection_rate": 0.0273972602739726,
-      "false_positive_rate": 0.01098901098901099,
-      "balanced_accuracy": 0.5082041246424809,
-      "combined_score": 0.410958904109589,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "weighted_pos",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "weighted_pos",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.05,
-        "strategy": "weighted_pos",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "max",
-        "n_tokens": 3
-      },
-      "precision": 0.4117647058823529,
-      "recall": 0.0958904109589041,
-      "f1_score": 0.15555555555555553,
-      "true_positives": 7,
-      "false_positives": 10,
-      "false_negatives": 66,
-      "true_negatives": 81,
-      "detection_rate": 0.0958904109589041,
-      "false_positive_rate": 0.10989010989010989,
-      "balanced_accuracy": 0.49300015053439705,
-      "combined_score": 0.2854149879129734,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "max",
-        "n_tokens": 5
-      },
-      "precision": 0.4117647058823529,
-      "recall": 0.0958904109589041,
-      "f1_score": 0.15555555555555553,
-      "true_positives": 7,
-      "false_positives": 10,
-      "false_negatives": 66,
-      "true_negatives": 81,
-      "detection_rate": 0.0958904109589041,
-      "false_positive_rate": 0.10989010989010989,
-      "balanced_accuracy": 0.49300015053439705,
-      "combined_score": 0.2854149879129734,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "max",
-        "n_tokens": 10
-      },
-      "precision": 0.4117647058823529,
-      "recall": 0.0958904109589041,
-      "f1_score": 0.15555555555555553,
-      "true_positives": 7,
-      "false_positives": 10,
-      "false_negatives": 66,
-      "true_negatives": 81,
-      "detection_rate": 0.0958904109589041,
-      "false_positive_rate": 0.10989010989010989,
-      "balanced_accuracy": 0.49300015053439705,
-      "combined_score": 0.2854149879129734,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "mean",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "mean",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "mean",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "first_token",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "first_token",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "first_token",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "weighted_pos",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "weighted_pos",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.1,
-        "strategy": "weighted_pos",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "max",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "max",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "max",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "mean",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "mean",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "mean",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "first_token",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "first_token",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "first_token",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "weighted_pos",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "weighted_pos",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.2,
-        "strategy": "weighted_pos",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "max",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "max",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "max",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "mean",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "mean",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "mean",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "first_token",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "first_token",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "first_token",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "weighted_pos",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "weighted_pos",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.3,
-        "strategy": "weighted_pos",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "max",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "max",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "max",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "mean",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "mean",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "mean",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "first_token",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "first_token",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "first_token",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "weighted_pos",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "weighted_pos",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.5,
-        "strategy": "weighted_pos",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "max",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "max",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "max",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.4452807466506097
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "mean",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "mean",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "mean",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.502333283155201
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "first_token",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "first_token",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "first_token",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.44678609062170704
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "weighted_pos",
-        "n_tokens": 3
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "weighted_pos",
-        "n_tokens": 5
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.7,
-        "strategy": "weighted_pos",
-        "n_tokens": 10
-      },
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1_score": 0.0,
-      "true_positives": 0,
-      "false_positives": 0,
-      "false_negatives": 73,
-      "true_negatives": 91,
-      "detection_rate": 0.0,
-      "false_positive_rate": 0.0,
-      "balanced_accuracy": 0.5,
-      "combined_score": 0.0,
-      "auc": 0.47433388529278947
-    },
-    {
-      "params": {
-        "threshold": 0.010000000000000002,
-        "strategy": "max",
-        "n_tokens": 3
-      },
       "precision": 0.0,
       "recall": 1.0,
       "f1_score": 0.0,
-      "true_positives": 73,
-      "false_positives": 91,
+      "true_positives": 83,
+      "false_positives": 80,
       "false_negatives": 0,
       "true_negatives": 0,
       "detection_rate": 1.0,
       "false_positive_rate": 1.0,
       "balanced_accuracy": 0.5,
       "combined_score": 0.4,
-      "auc": 0.4452807466506097
+      "auc": 0.47183734939759037
     },
     {
       "params": {
-        "threshold": 0.030000000000000002,
+        "threshold": 0.05,
         "strategy": "max",
-        "n_tokens": 3
+        "n_tokens": 5
       },
       "precision": 0.0,
       "recall": 1.0,
       "f1_score": 0.0,
-      "true_positives": 73,
-      "false_positives": 91,
+      "true_positives": 83,
+      "false_positives": 80,
       "false_negatives": 0,
       "true_negatives": 0,
       "detection_rate": 1.0,
       "false_positive_rate": 1.0,
       "balanced_accuracy": 0.5,
       "combined_score": 0.4,
-      "auc": 0.4452807466506097
+      "auc": 0.47183734939759037
     },
     {
       "params": {
         "threshold": 0.05,
         "strategy": "max",
-        "n_tokens": 3
+        "n_tokens": 10
       },
-      "precision": 0.4382716049382716,
-      "recall": 0.9726027397260274,
-      "f1_score": 0.6042553191489362,
-      "true_positives": 71,
-      "false_positives": 91,
-      "false_negatives": 2,
+      "precision": 0.0,
+      "recall": 1.0,
+      "f1_score": 0.0,
+      "true_positives": 83,
+      "false_positives": 80,
+      "false_negatives": 0,
       "true_negatives": 0,
-      "detection_rate": 0.9726027397260274,
+      "detection_rate": 1.0,
       "false_positive_rate": 1.0,
-      "balanced_accuracy": 0.4863013698630137,
-      "combined_score": 0.652004058853374,
-      "auc": 0.4452807466506097
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.4,
+      "auc": 0.47183734939759037
     },
     {
       "params": {
-        "threshold": 0.07,
-        "strategy": "max",
+        "threshold": 0.05,
+        "strategy": "mean",
         "n_tokens": 3
       },
-      "precision": 0.4166666666666667,
-      "recall": 0.6164383561643836,
-      "f1_score": 0.4972375690607735,
+      "precision": 0.5333333333333333,
+      "recall": 0.7710843373493976,
+      "f1_score": 0.6305418719211823,
+      "true_positives": 64,
+      "false_positives": 56,
+      "false_negatives": 19,
+      "true_negatives": 24,
+      "detection_rate": 0.7710843373493976,
+      "false_positive_rate": 0.7,
+      "balanced_accuracy": 0.5355421686746988,
+      "combined_score": 0.6284337349397591,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "mean",
+        "n_tokens": 5
+      },
+      "precision": 0.5333333333333333,
+      "recall": 0.7710843373493976,
+      "f1_score": 0.6305418719211823,
+      "true_positives": 64,
+      "false_positives": 56,
+      "false_negatives": 19,
+      "true_negatives": 24,
+      "detection_rate": 0.7710843373493976,
+      "false_positive_rate": 0.7,
+      "balanced_accuracy": 0.5355421686746988,
+      "combined_score": 0.6284337349397591,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "mean",
+        "n_tokens": 10
+      },
+      "precision": 0.5333333333333333,
+      "recall": 0.7710843373493976,
+      "f1_score": 0.6305418719211823,
+      "true_positives": 64,
+      "false_positives": 56,
+      "false_negatives": 19,
+      "true_negatives": 24,
+      "detection_rate": 0.7710843373493976,
+      "false_positive_rate": 0.7,
+      "balanced_accuracy": 0.5355421686746988,
+      "combined_score": 0.6284337349397591,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "first_token",
+        "n_tokens": 3
+      },
+      "precision": 0.5909090909090909,
+      "recall": 0.3132530120481928,
+      "f1_score": 0.40944881889763785,
+      "true_positives": 26,
+      "false_positives": 18,
+      "false_negatives": 57,
+      "true_negatives": 62,
+      "detection_rate": 0.3132530120481928,
+      "false_positive_rate": 0.225,
+      "balanced_accuracy": 0.5441265060240964,
+      "combined_score": 0.4798466593647317,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "first_token",
+        "n_tokens": 5
+      },
+      "precision": 0.5909090909090909,
+      "recall": 0.3132530120481928,
+      "f1_score": 0.40944881889763785,
+      "true_positives": 26,
+      "false_positives": 18,
+      "false_negatives": 57,
+      "true_negatives": 62,
+      "detection_rate": 0.3132530120481928,
+      "false_positive_rate": 0.225,
+      "balanced_accuracy": 0.5441265060240964,
+      "combined_score": 0.4798466593647317,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "first_token",
+        "n_tokens": 10
+      },
+      "precision": 0.5909090909090909,
+      "recall": 0.3132530120481928,
+      "f1_score": 0.40944881889763785,
+      "true_positives": 26,
+      "false_positives": 18,
+      "false_negatives": 57,
+      "true_negatives": 62,
+      "detection_rate": 0.3132530120481928,
+      "false_positive_rate": 0.225,
+      "balanced_accuracy": 0.5441265060240964,
+      "combined_score": 0.4798466593647317,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "weighted_pos",
+        "n_tokens": 3
+      },
+      "precision": 0.5232558139534884,
+      "recall": 0.5421686746987951,
+      "f1_score": 0.5325443786982248,
       "true_positives": 45,
-      "false_positives": 63,
-      "false_negatives": 28,
-      "true_negatives": 28,
-      "detection_rate": 0.6164383561643836,
-      "false_positive_rate": 0.6923076923076923,
-      "balanced_accuracy": 0.46206533192834565,
-      "combined_score": 0.4965753424657534,
-      "auc": 0.4452807466506097
+      "false_positives": 41,
+      "false_negatives": 38,
+      "true_negatives": 39,
+      "detection_rate": 0.5421686746987951,
+      "false_positive_rate": 0.5125,
+      "balanced_accuracy": 0.5148343373493975,
+      "combined_score": 0.5308209582516111,
+      "auc": 0.47379518072289156
     },
     {
       "params": {
-        "threshold": 0.09,
+        "threshold": 0.05,
+        "strategy": "weighted_pos",
+        "n_tokens": 5
+      },
+      "precision": 0.5232558139534884,
+      "recall": 0.5421686746987951,
+      "f1_score": 0.5325443786982248,
+      "true_positives": 45,
+      "false_positives": 41,
+      "false_negatives": 38,
+      "true_negatives": 39,
+      "detection_rate": 0.5421686746987951,
+      "false_positive_rate": 0.5125,
+      "balanced_accuracy": 0.5148343373493975,
+      "combined_score": 0.5308209582516111,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.05,
+        "strategy": "weighted_pos",
+        "n_tokens": 10
+      },
+      "precision": 0.5232558139534884,
+      "recall": 0.5421686746987951,
+      "f1_score": 0.5325443786982248,
+      "true_positives": 45,
+      "false_positives": 41,
+      "false_negatives": 38,
+      "true_negatives": 39,
+      "detection_rate": 0.5421686746987951,
+      "false_positive_rate": 0.5125,
+      "balanced_accuracy": 0.5148343373493975,
+      "combined_score": 0.5308209582516111,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.1,
         "strategy": "max",
         "n_tokens": 3
       },
-      "precision": 0.4473684210526316,
-      "recall": 0.2328767123287671,
-      "f1_score": 0.3063063063063063,
-      "true_positives": 17,
-      "false_positives": 21,
-      "false_negatives": 56,
-      "true_negatives": 70,
-      "detection_rate": 0.2328767123287671,
-      "false_positive_rate": 0.23076923076923078,
-      "balanced_accuracy": 0.5010537407797682,
-      "combined_score": 0.3615717375630858,
-      "auc": 0.4452807466506097
+      "precision": 0.5031446540880503,
+      "recall": 0.963855421686747,
+      "f1_score": 0.6611570247933886,
+      "true_positives": 80,
+      "false_positives": 79,
+      "false_negatives": 3,
+      "true_negatives": 1,
+      "detection_rate": 0.963855421686747,
+      "false_positive_rate": 0.9875,
+      "balanced_accuracy": 0.48817771084337347,
+      "combined_score": 0.687428961127529,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "max",
+        "n_tokens": 5
+      },
+      "precision": 0.5031446540880503,
+      "recall": 0.963855421686747,
+      "f1_score": 0.6611570247933886,
+      "true_positives": 80,
+      "false_positives": 79,
+      "false_negatives": 3,
+      "true_negatives": 1,
+      "detection_rate": 0.963855421686747,
+      "false_positive_rate": 0.9875,
+      "balanced_accuracy": 0.48817771084337347,
+      "combined_score": 0.687428961127529,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "max",
+        "n_tokens": 10
+      },
+      "precision": 0.5031446540880503,
+      "recall": 0.963855421686747,
+      "f1_score": 0.6611570247933886,
+      "true_positives": 80,
+      "false_positives": 79,
+      "false_negatives": 3,
+      "true_negatives": 1,
+      "detection_rate": 0.963855421686747,
+      "false_positive_rate": 0.9875,
+      "balanced_accuracy": 0.48817771084337347,
+      "combined_score": 0.687428961127529,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "mean",
+        "n_tokens": 3
+      },
+      "precision": 0.5,
+      "recall": 0.03614457831325301,
+      "f1_score": 0.06741573033707865,
+      "true_positives": 3,
+      "false_positives": 3,
+      "false_negatives": 80,
+      "true_negatives": 77,
+      "detection_rate": 0.03614457831325301,
+      "false_positive_rate": 0.0375,
+      "balanced_accuracy": 0.4993222891566265,
+      "combined_score": 0.3144578313253012,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "mean",
+        "n_tokens": 5
+      },
+      "precision": 0.5,
+      "recall": 0.03614457831325301,
+      "f1_score": 0.06741573033707865,
+      "true_positives": 3,
+      "false_positives": 3,
+      "false_negatives": 80,
+      "true_negatives": 77,
+      "detection_rate": 0.03614457831325301,
+      "false_positive_rate": 0.0375,
+      "balanced_accuracy": 0.4993222891566265,
+      "combined_score": 0.3144578313253012,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "mean",
+        "n_tokens": 10
+      },
+      "precision": 0.5,
+      "recall": 0.03614457831325301,
+      "f1_score": 0.06741573033707865,
+      "true_positives": 3,
+      "false_positives": 3,
+      "false_negatives": 80,
+      "true_negatives": 77,
+      "detection_rate": 0.03614457831325301,
+      "false_positive_rate": 0.0375,
+      "balanced_accuracy": 0.4993222891566265,
+      "combined_score": 0.3144578313253012,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "first_token",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "first_token",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "first_token",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "weighted_pos",
+        "n_tokens": 3
+      },
+      "precision": 0.4,
+      "recall": 0.024096385542168676,
+      "f1_score": 0.045454545454545456,
+      "true_positives": 2,
+      "false_positives": 3,
+      "false_negatives": 81,
+      "true_negatives": 77,
+      "detection_rate": 0.024096385542168676,
+      "false_positive_rate": 0.0375,
+      "balanced_accuracy": 0.49329819277108433,
+      "combined_score": 0.24963855421686745,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "weighted_pos",
+        "n_tokens": 5
+      },
+      "precision": 0.4,
+      "recall": 0.024096385542168676,
+      "f1_score": 0.045454545454545456,
+      "true_positives": 2,
+      "false_positives": 3,
+      "false_negatives": 81,
+      "true_negatives": 77,
+      "detection_rate": 0.024096385542168676,
+      "false_positive_rate": 0.0375,
+      "balanced_accuracy": 0.49329819277108433,
+      "combined_score": 0.24963855421686745,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "weighted_pos",
+        "n_tokens": 10
+      },
+      "precision": 0.4,
+      "recall": 0.024096385542168676,
+      "f1_score": 0.045454545454545456,
+      "true_positives": 2,
+      "false_positives": 3,
+      "false_negatives": 81,
+      "true_negatives": 77,
+      "detection_rate": 0.024096385542168676,
+      "false_positive_rate": 0.0375,
+      "balanced_accuracy": 0.49329819277108433,
+      "combined_score": 0.24963855421686745,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 1,
+      "false_negatives": 83,
+      "true_negatives": 79,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0125,
+      "balanced_accuracy": 0.49375,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "max",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 1,
+      "false_negatives": 83,
+      "true_negatives": 79,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0125,
+      "balanced_accuracy": 0.49375,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "max",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 1,
+      "false_negatives": 83,
+      "true_negatives": 79,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0125,
+      "balanced_accuracy": 0.49375,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "mean",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "mean",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "mean",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "first_token",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "first_token",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "first_token",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "weighted_pos",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "weighted_pos",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.2,
+        "strategy": "weighted_pos",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "max",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "max",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "mean",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "mean",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "mean",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "first_token",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "first_token",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "first_token",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "weighted_pos",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "weighted_pos",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.3,
+        "strategy": "weighted_pos",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "max",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "max",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "mean",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "mean",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "mean",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "first_token",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "first_token",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "first_token",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "weighted_pos",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "weighted_pos",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.5,
+        "strategy": "weighted_pos",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "max",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "max",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "mean",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "mean",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "mean",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.5632530120481927
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "first_token",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "first_token",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "first_token",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.4768825301204819
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "weighted_pos",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "weighted_pos",
+        "n_tokens": 5
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.7,
+        "strategy": "weighted_pos",
+        "n_tokens": 10
+      },
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 83,
+      "true_negatives": 80,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.0,
+      "auc": 0.47379518072289156
+    },
+    {
+      "params": {
+        "threshold": 0.060000000000000005,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.0,
+      "recall": 1.0,
+      "f1_score": 0.0,
+      "true_positives": 83,
+      "false_positives": 80,
+      "false_negatives": 0,
+      "true_negatives": 0,
+      "detection_rate": 1.0,
+      "false_positive_rate": 1.0,
+      "balanced_accuracy": 0.5,
+      "combined_score": 0.4,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.08,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.5061728395061729,
+      "recall": 0.9879518072289156,
+      "f1_score": 0.6693877551020408,
+      "true_positives": 82,
+      "false_positives": 80,
+      "false_negatives": 1,
+      "true_negatives": 0,
+      "detection_rate": 0.9879518072289156,
+      "false_positive_rate": 1.0,
+      "balanced_accuracy": 0.4939759036144578,
+      "combined_score": 0.69888442659527,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.1,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.5031446540880503,
+      "recall": 0.963855421686747,
+      "f1_score": 0.6611570247933886,
+      "true_positives": 80,
+      "false_positives": 79,
+      "false_negatives": 3,
+      "true_negatives": 1,
+      "detection_rate": 0.963855421686747,
+      "false_positive_rate": 0.9875,
+      "balanced_accuracy": 0.48817771084337347,
+      "combined_score": 0.687428961127529,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.12000000000000001,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.5135135135135135,
+      "recall": 0.9156626506024096,
+      "f1_score": 0.658008658008658,
+      "true_positives": 76,
+      "false_positives": 72,
+      "false_negatives": 7,
+      "true_negatives": 8,
+      "detection_rate": 0.9156626506024096,
+      "false_positive_rate": 0.9,
+      "balanced_accuracy": 0.5078313253012048,
+      "combined_score": 0.6743731683490719,
+      "auc": 0.47183734939759037
+    },
+    {
+      "params": {
+        "threshold": 0.14,
+        "strategy": "max",
+        "n_tokens": 3
+      },
+      "precision": 0.4725274725274725,
+      "recall": 0.5180722891566265,
+      "f1_score": 0.4942528735632184,
+      "true_positives": 43,
+      "false_positives": 48,
+      "false_negatives": 40,
+      "true_negatives": 32,
+      "detection_rate": 0.5180722891566265,
+      "false_positive_rate": 0.6,
+      "balanced_accuracy": 0.45903614457831327,
+      "combined_score": 0.4907453991791341,
+      "auc": 0.47183734939759037
     }
   ]
 }
