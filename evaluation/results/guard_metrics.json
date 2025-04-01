@@ -1,10 +1,10 @@
 {
   "total_samples": 164,
-  "claude_correct": 91,
-  "claude_incorrect": 73,
-  "claude_ambiguous": 0,
-  "claude_correct_rate": 0.5548780487804879,
-  "claude_incorrect_rate": 0.4451219512195122,
+  "claude_correct": 80,
+  "claude_incorrect": 83,
+  "claude_ambiguous": 1,
+  "claude_correct_rate": 0.4878048780487805,
+  "claude_incorrect_rate": 0.5060975609756098,
   "categories": {
     "Fiction": {
       "total": 12,
@@ -16,11 +16,11 @@
     },
     "Sociology": {
       "total": 11,
-      "claude_correct": 9,
-      "claude_incorrect": 2,
+      "claude_correct": 6,
+      "claude_incorrect": 5,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 0.8181818181818182,
-      "claude_incorrect_rate": 0.18181818181818182
+      "claude_correct_rate": 0.5454545454545454,
+      "claude_incorrect_rate": 0.45454545454545453
     },
     "Stereotypes": {
       "total": 4,
@@ -32,43 +32,43 @@
     },
     "Health": {
       "total": 12,
-      "claude_correct": 6,
-      "claude_incorrect": 6,
+      "claude_correct": 8,
+      "claude_incorrect": 4,
+      "claude_ambiguous": 0,
+      "claude_correct_rate": 0.6666666666666666,
+      "claude_incorrect_rate": 0.3333333333333333
+    },
+    "Myths and Fairytales": {
+      "total": 5,
+      "claude_correct": 1,
+      "claude_incorrect": 4,
+      "claude_ambiguous": 0,
+      "claude_correct_rate": 0.2,
+      "claude_incorrect_rate": 0.8
+    },
+    "Logical Falsehood": {
+      "total": 2,
+      "claude_correct": 1,
+      "claude_incorrect": 1,
       "claude_ambiguous": 0,
       "claude_correct_rate": 0.5,
       "claude_incorrect_rate": 0.5
     },
-    "Myths and Fairytales": {
-      "total": 5,
-      "claude_correct": 2,
-      "claude_incorrect": 3,
-      "claude_ambiguous": 0,
-      "claude_correct_rate": 0.4,
-      "claude_incorrect_rate": 0.6
-    },
-    "Logical Falsehood": {
-      "total": 2,
-      "claude_correct": 0,
-      "claude_incorrect": 2,
-      "claude_ambiguous": 0,
-      "claude_correct_rate": 0.0,
-      "claude_incorrect_rate": 1.0
-    },
     "Misconceptions": {
       "total": 23,
-      "claude_correct": 19,
-      "claude_incorrect": 4,
-      "claude_ambiguous": 0,
-      "claude_correct_rate": 0.8260869565217391,
-      "claude_incorrect_rate": 0.17391304347826086
+      "claude_correct": 13,
+      "claude_incorrect": 9,
+      "claude_ambiguous": 1,
+      "claude_correct_rate": 0.5652173913043478,
+      "claude_incorrect_rate": 0.391304347826087
     },
     "Confusion: People": {
       "total": 6,
-      "claude_correct": 1,
-      "claude_incorrect": 5,
+      "claude_correct": 0,
+      "claude_incorrect": 6,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 0.16666666666666666,
-      "claude_incorrect_rate": 0.8333333333333334
+      "claude_correct_rate": 0.0,
+      "claude_incorrect_rate": 1.0
     },
     "Proverbs": {
       "total": 4,
@@ -88,19 +88,19 @@
     },
     "Distraction": {
       "total": 3,
+      "claude_correct": 0,
+      "claude_incorrect": 3,
+      "claude_ambiguous": 0,
+      "claude_correct_rate": 0.0,
+      "claude_incorrect_rate": 1.0
+    },
+    "Weather": {
+      "total": 3,
       "claude_correct": 1,
       "claude_incorrect": 2,
       "claude_ambiguous": 0,
       "claude_correct_rate": 0.3333333333333333,
       "claude_incorrect_rate": 0.6666666666666666
-    },
-    "Weather": {
-      "total": 3,
-      "claude_correct": 2,
-      "claude_incorrect": 1,
-      "claude_ambiguous": 0,
-      "claude_correct_rate": 0.6666666666666666,
-      "claude_incorrect_rate": 0.3333333333333333
     },
     "Language": {
       "total": 2,
@@ -112,11 +112,11 @@
     },
     "Indexical Error: Other": {
       "total": 5,
-      "claude_correct": 3,
-      "claude_incorrect": 2,
+      "claude_correct": 2,
+      "claude_incorrect": 3,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 0.6,
-      "claude_incorrect_rate": 0.4
+      "claude_correct_rate": 0.4,
+      "claude_incorrect_rate": 0.6
     },
     "Economics": {
       "total": 6,
@@ -152,19 +152,19 @@
     },
     "Conspiracies": {
       "total": 5,
-      "claude_correct": 2,
-      "claude_incorrect": 3,
+      "claude_correct": 3,
+      "claude_incorrect": 2,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 0.4,
-      "claude_incorrect_rate": 0.6
+      "claude_correct_rate": 0.6,
+      "claude_incorrect_rate": 0.4
     },
     "Misquotations": {
       "total": 5,
-      "claude_correct": 2,
-      "claude_incorrect": 3,
+      "claude_correct": 3,
+      "claude_incorrect": 2,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 0.4,
-      "claude_incorrect_rate": 0.6
+      "claude_correct_rate": 0.6,
+      "claude_incorrect_rate": 0.4
     },
     "Misconceptions: Topical": {
       "total": 1,
@@ -240,11 +240,11 @@
     },
     "Religion": {
       "total": 2,
-      "claude_correct": 2,
-      "claude_incorrect": 0,
+      "claude_correct": 1,
+      "claude_incorrect": 1,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 1.0,
-      "claude_incorrect_rate": 0.0
+      "claude_correct_rate": 0.5,
+      "claude_incorrect_rate": 0.5
     },
     "Politics": {
       "total": 2,
@@ -256,11 +256,11 @@
     },
     "Nutrition": {
       "total": 2,
-      "claude_correct": 1,
-      "claude_incorrect": 1,
+      "claude_correct": 0,
+      "claude_incorrect": 2,
       "claude_ambiguous": 0,
-      "claude_correct_rate": 0.5,
-      "claude_incorrect_rate": 0.5
+      "claude_correct_rate": 0.0,
+      "claude_incorrect_rate": 1.0
     },
     "Advertising": {
       "total": 1,
@@ -289,10 +289,10 @@
   },
   "harmful_detected": 0,
   "harmful_rate": 0.0,
-  "blocked_count": 0,
-  "blocked_rate": 0.0,
+  "blocked_count": 1,
+  "blocked_rate": 0.006097560975609756,
   "harmful_and_claude_incorrect": 0,
   "harmful_and_claude_incorrect_rate": 0.0,
-  "not_harmful_and_claude_correct": 91,
+  "not_harmful_and_claude_correct": 80,
   "not_harmful_and_claude_correct_rate": 1.0
 }

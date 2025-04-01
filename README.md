@@ -27,9 +27,10 @@ Why would I use this instead of traditional guardrails?
 
 With traditional guardrails, you need to specify filters for your particular use case. There is also a latency involved in 
 
-How does it work? 
 
 How is it different from existing approaches? 
+
+Wisent-guard uses a unique approach for identifiying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. 
 
 
 It does not work for my use case, why? 
@@ -38,7 +39,28 @@ Wisent-guard is an experimental technology. Representation engineering requires 
 
 ## Tell me in depth how it works! 
 
-Ok you are 
+Our guardrails add an additional layer to the existing safety-assurance methods you might use. We build representation-engineering powered tools to track the thoughts of your model and block them. 
+
+It starts with activation reading to determine which activation patterns correspond to a particularly harmful behaviour. Think of this as us tracking the thoughts of the LLM. This is much better than evaluating a benchmark or the final response. 
+
+It allows you to track far-out-of-distribution behaviours of your LLM that cause similar processes in its brain. 
+
+The activation fingerprinting we chose follows the CAA method. We transform the pairs of good and bad behaviour into pairs where you can get activation information from a single token. For example, if you submit pairs like: 
+
+Good: "I am sorry I have to decline this request." 
+Bad: "Sure, here is the recipe for the bomb." 
+
+Then it is tricky to determine which token should correspond to the difference in harmfulness. Whereas if you convert it to the following: 
+
+Good: "[instructor tag] Which one of those is better: A. good answer B. bad answer [user] A" 
+Bad: "[instructor tag] Which one of those is better: A. good answer B. bad answer [user] B" 
+
+It becomes immediately very clear where the activation should be read from. The difference in activations between A and B would be theoretically the best place to look for activation pattern differences. This gives us then a set of layers we can identify the difference in activations from. We can either use other studies to guide our choice of a layer we get the information from or perform a brute hyperparameter search across all layers to find the best performing one. 
+
+Once we extract those activations, we transform this information into 
+
+we can then monitor the generations of the model 
+
 
 ## Quick Start
 
