@@ -173,4 +173,71 @@ def get_layer_name(model_type: str, layer_idx: int) -> str:
         "bart": f"model.encoder.layers.{layer_idx}",
     }
     
-    return layer_name_map.get(model_type.lower(), f"layers.{layer_idx}") 
+    return layer_name_map.get(model_type.lower(), f"layers.{layer_idx}")
+
+def get_layer_count(model, model_type: str = None) -> int:
+    """
+    Get the number of layers in the model based on its architecture.
+    
+    Args:
+        model: The transformer model
+        model_type: Type of model ('opt', 'llama', 'gpt2', etc.)
+        
+    Returns:
+        Number of layers in the model
+    """
+    if model_type is None:
+        model_name = model.__class__.__name__.lower()
+        if 'opt' in model_name:
+            model_type = 'opt'
+        elif 'llama' in model_name:
+            model_type = 'llama'
+        elif 'gpt2' in model_name:
+            model_type = 'gpt2'
+        elif 'neox' in model_name:
+            model_type = 'gpt_neox'
+        elif 'gptj' in model_name:
+            model_type = 'gptj'
+        elif 't5' in model_name:
+            model_type = 't5'
+        elif 'bart' in model_name:
+            model_type = 'bart'
+        else:
+            model_type = 'generic'
+    
+    # Check for specific model attributes
+    try:
+        if model_type == 'opt':
+            if hasattr(model, 'model') and hasattr(model.model, 'decoder') and hasattr(model.model.decoder, 'layers'):
+                return len(model.model.decoder.layers)
+        elif model_type == 'llama':
+            if hasattr(model, 'model') and hasattr(model.model, 'layers'):
+                return len(model.model.layers)
+        elif model_type == 'gpt2':
+            if hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):
+                return len(model.transformer.h)
+        elif model_type == 'gpt_neox':
+            if hasattr(model, 'gpt_neox') and hasattr(model.gpt_neox, 'layers'):
+                return len(model.gpt_neox.layers)
+        elif model_type == 'gptj':
+            if hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):
+                return len(model.transformer.h)
+        elif model_type == 't5':
+            if hasattr(model, 'encoder') and hasattr(model.encoder, 'block'):
+                return len(model.encoder.block)
+        elif model_type == 'bart':
+            if hasattr(model, 'model') and hasattr(model.model, 'encoder') and hasattr(model.model.encoder, 'layers'):
+                return len(model.model.encoder.layers)
+        
+        # Use config if available
+        if hasattr(model, 'config') and hasattr(model.config, 'num_hidden_layers'):
+            return model.config.num_hidden_layers
+        elif hasattr(model, 'config') and hasattr(model.config, 'n_layer'):
+            return model.config.n_layer
+        elif hasattr(model, 'config') and hasattr(model.config, 'num_layers'):
+            return model.config.num_layers
+    except Exception as e:
+        print(f"Error determining layer count: {e}")
+    
+    # Default to 0 if we can't determine
+    return 0 

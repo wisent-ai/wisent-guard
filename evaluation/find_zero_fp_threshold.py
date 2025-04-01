@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """
-Script to find the threshold that produces zero false positives.
+Enhanced script to find the optimal zero false positive configuration.
 
 This script:
 1. Loads results from guard_results.csv
-2. Finds the minimum similarity score among correct responses
-3. Sets threshold just below this value to achieve zero false positives
-4. Calculates the recall and other metrics with this threshold
+2. Tests multiple token aggregation strategies (max, mean, first_n, etc.)
+3. For each strategy, finds the threshold that produces zero false positives
+4. Compares strategies to find which one catches the most hallucinations
+   while maintaining zero false positives
+5. Creates visualization and saves detailed results
 """
 
 import os
@@ -15,6 +17,19 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import List, Dict, Tuple, Optional
+from tqdm import tqdm
+
+# Token aggregation strategies to evaluate
+TOKEN_STRATEGIES = [
+    'max',           # Maximum similarity of any token
+    'mean',          # Mean similarity across all tokens
+    'first_token',   # Only consider the first token
+    'first_n',       # Mean of first N tokens
+    'last_n',        # Mean of last N tokens
+    'weighted_pos',  # Position-weighted mean (earlier tokens weighted more)
+    'weighted_neg',  # Position-weighted mean (later tokens weighted more)
+]
 
 def parse_token_scores(token_scores_str):
     """
@@ -69,20 +84,146 @@ def parse_token_scores(token_scores_str):
     
     return tokens
 
-def get_max_similarity(token_scores):
+def aggregate_token_scores(tokens: List[Dict], strategy: str, n_tokens: int = 5) -> float:
     """
-    Get the maximum similarity score from token scores.
+    Aggregate token similarity scores based on the specified strategy.
     
     Args:
-        token_scores: List of token dictionaries
+        tokens: List of token dictionaries with similarity scores
+        strategy: Aggregation strategy from TOKEN_STRATEGIES
+        n_tokens: Number of tokens to consider for first_n and last_n strategies
         
     Returns:
-        Maximum similarity score (0.0 if no tokens)
+        Aggregated similarity score
     """
-    if not token_scores:
+    if not tokens:
         return 0.0
     
-    return max(token.get('similarity', 0.0) for token in token_scores)
+    # Extract similarity scores
+    similarities = [t.get('similarity', 0.0) for t in tokens]
+    
+    if strategy == 'max':
+        return max(similarities)
+    
+    elif strategy == 'mean':
+        return sum(similarities) / len(similarities)
+    
+    elif strategy == 'first_token':
+        return similarities[0] if similarities else 0.0
+    
+    elif strategy == 'first_n':
+        n = min(n_tokens, len(similarities))
+        return sum(similarities[:n]) / n if n > 0 else 0.0
+    
+    elif strategy == 'last_n':
+        n = min(n_tokens, len(similarities))
+        return sum(similarities[-n:]) / n if n > 0 else 0.0
+    
+    elif strategy == 'weighted_pos':
+        # Earlier tokens weighted more (exponential decay)
+        weights = [np.exp(-0.1 * i) for i in range(len(similarities))]
+        return sum(w * s for w, s in zip(weights, similarities)) / sum(weights)
+    
+    elif strategy == 'weighted_neg':
+        # Later tokens weighted more (exponential growth)
+        weights = [np.exp(0.1 * i) for i in range(len(similarities))]
+        return sum(w * s for w, s in zip(weights, similarities)) / sum(weights)
+    
+    else:
+        # Default to max if unknown strategy
+        return max(similarities)
+
+def find_zero_fp_threshold(correct_scores: List[float]) -> Tuple[float, float]:
+    """
+    Find the threshold that produces zero false positives.
+    
+    Args:
+        correct_scores: List of similarity scores from correct responses
+        
+    Returns:
+        Tuple of (threshold, minimum correct score)
+    """
+    if not correct_scores:
+        return 0.0, 0.0
+        
+    min_correct_score = min(correct_scores)
+    
+    # Set threshold just below the minimum correct score
+    epsilon = 0.000001
+    threshold = min_correct_score - epsilon
+    
+    return threshold, min_correct_score
+
+def evaluate_strategy(
+    correct_tokens: List[List[Dict]], 
+    incorrect_tokens: List[List[Dict]],
+    strategy: str,
+    n_tokens_values: List[int] = [3, 5, 10]
+) -> List[Dict]:
+    """
+    Evaluate a strategy with different n_tokens values.
+    
+    Args:
+        correct_tokens: List of token lists from correct responses
+        incorrect_tokens: List of token lists from incorrect responses
+        strategy: Token aggregation strategy
+        n_tokens_values: List of n_tokens values to try
+        
+    Returns:
+        List of results dictionaries
+    """
+    results = []
+    
+    for n_tokens in n_tokens_values:
+        # Aggregate scores using the strategy and n_tokens
+        correct_scores = [aggregate_token_scores(tokens, strategy, n_tokens) for tokens in correct_tokens]
+        incorrect_scores = [aggregate_token_scores(tokens, strategy, n_tokens) for tokens in incorrect_tokens]
+        
+        # Find zero FP threshold
+        threshold, min_correct_score = find_zero_fp_threshold(correct_scores)
+        
+        # Count caught hallucinations
+        caught_hallucinations = sum(1 for score in incorrect_scores if score < threshold)
+        total_hallucinations = len(incorrect_scores)
+        
+        # Calculate recall
+        recall = caught_hallucinations / total_hallucinations if total_hallucinations > 0 else 0.0
+        
+        # Calculate ROC curve for visualization (using thresholds below min_correct)
+        thresholds = np.linspace(0, min_correct_score * 1.2, 100)
+        recalls = []
+        fps = []
+        
+        for t in thresholds:
+            rec = sum(1 for score in incorrect_scores if score < t) / total_hallucinations
+            fp = sum(1 for score in correct_scores if score < t) / len(correct_scores)
+            recalls.append(rec)
+            fps.append(fp)
+        
+        # Calculate AUC (area under ROC curve)
+        auc = 0.0
+        for i in range(1, len(fps)):
+            auc += (recalls[i] - recalls[i-1]) * (1 - (fps[i] + fps[i-1]) / 2)
+        
+        result = {
+            "strategy": strategy,
+            "n_tokens": n_tokens,
+            "threshold": threshold,
+            "min_correct_score": min_correct_score,
+            "caught_hallucinations": caught_hallucinations,
+            "total_hallucinations": total_hallucinations,
+            "recall": recall,
+            "auc": auc,
+            "roc_data": {
+                "thresholds": thresholds.tolist(),
+                "recalls": recalls,
+                "false_positives": fps
+            }
+        }
+        
+        results.append(result)
+    
+    return results
 
 def main():
     results_file = "evaluation/results/guard_results.csv"
@@ -112,10 +253,10 @@ def main():
         return
     
     # Prepare data for analysis
-    correct_max_scores = []
-    incorrect_max_scores = []
+    correct_tokens = []
+    incorrect_tokens = []
     
-    # Store full row data for debug purposes
+    # Store example data for reporting
     correct_examples = []
     incorrect_examples = []
     
@@ -143,9 +284,6 @@ def main():
             skipped += 1
             continue
         
-        # Get maximum similarity score for this response
-        max_sim = get_max_similarity(token_scores)
-        
         # Get Claude score (1 = correct, 0 = incorrect/hallucinatory)
         claude_score = row.get('claude_score', -1)
         
@@ -155,139 +293,111 @@ def main():
             continue
             
         # Add to correct or incorrect list
+        question = row.get('question', '')
         if claude_score == 1:
-            correct_max_scores.append(max_sim)
-            # Store full example for debugging
+            correct_tokens.append(token_scores)
+            # Store example for reporting
             correct_examples.append({
                 'index': idx,
-                'question': row.get('question', ''),
-                'max_sim': max_sim,
-                'num_tokens': len(token_scores),
-                'token_text': token_scores[0].get('token_text', '') if token_scores else ''
+                'question': question,
+                'first_token': token_scores[0].get('token_text', '') if token_scores else ''
             })
         else:
-            incorrect_max_scores.append(max_sim)
-            # Store full example for debugging
+            incorrect_tokens.append(token_scores)
+            # Store example for reporting
             incorrect_examples.append({
                 'index': idx,
-                'question': row.get('question', ''),
-                'max_sim': max_sim,
-                'num_tokens': len(token_scores),
-                'token_text': token_scores[0].get('token_text', '') if token_scores else ''
+                'question': question,
+                'first_token': token_scores[0].get('token_text', '') if token_scores else ''
             })
     
-    print(f"\nProcessed {len(correct_max_scores) + len(incorrect_max_scores)} results (skipped {skipped})")
-    print(f"Correct responses: {len(correct_max_scores)}")
-    print(f"Incorrect/hallucinatory responses: {len(incorrect_max_scores)}")
+    print(f"\nProcessed {len(correct_tokens) + len(incorrect_tokens)} results (skipped {skipped})")
+    print(f"Correct responses: {len(correct_tokens)}")
+    print(f"Incorrect/hallucinatory responses: {len(incorrect_tokens)}")
     print(f"Parsing failures: {parsing_failures}")
     print(f"Rows with empty tokens: {empty_tokens}")
     
-    # Show basic statistics about the scores
-    if correct_max_scores:
-        print("\n===== CORRECT RESPONSES SIMILARITY SCORES =====")
-        print(f"Min: {min(correct_max_scores):.6f}")
-        print(f"Max: {max(correct_max_scores):.6f}")
-        print(f"Mean: {sum(correct_max_scores)/len(correct_max_scores):.6f}")
-        
-    if incorrect_max_scores:
-        print("\n===== INCORRECT RESPONSES SIMILARITY SCORES =====")
-        print(f"Min: {min(incorrect_max_scores):.6f}")
-        print(f"Max: {max(incorrect_max_scores):.6f}")
-        print(f"Mean: {sum(incorrect_max_scores)/len(incorrect_max_scores):.6f}")
+    # Try all strategies and find the best one
+    print("\nEvaluating token aggregation strategies...")
     
-    # Plot histogram of scores
-    if correct_max_scores and incorrect_max_scores:
-        plt.figure(figsize=(12, 6))
-        plt.hist(correct_max_scores, bins=30, alpha=0.5, label='Correct Responses')
-        plt.hist(incorrect_max_scores, bins=30, alpha=0.5, label='Hallucinations')
-        plt.xlabel('Maximum Similarity Score')
-        plt.ylabel('Count')
-        plt.title('Distribution of Maximum Similarity Scores')
-        plt.legend()
-        plt.savefig('evaluation/results/similarity_distribution.png')
-        print(f"\nSaved distribution histogram to evaluation/results/similarity_distribution.png")
+    # N tokens values to try
+    n_tokens_values = [3, 5, 10, 15]
     
-    # Find minimum score among correct responses
-    # Any threshold below this won't cause false positives
-    if correct_max_scores:
-        min_correct_score = min(correct_max_scores)
-        # Subtract a small epsilon to ensure we're below the minimum correct score
-        epsilon = 0.000001
-        zero_fp_threshold = min_correct_score - epsilon
-        
-        print(f"\nMinimum score among correct responses: {min_correct_score:.6f}")
-        print(f"Setting zero false positive threshold to: {zero_fp_threshold:.6f}")
-        
-        # Show examples near the threshold
-        print("\n===== LOWEST-SCORING CORRECT RESPONSES =====")
-        sorted_correct = sorted(correct_examples, key=lambda x: x['max_sim'])
-        for i, example in enumerate(sorted_correct[:5]):  # Show 5 lowest scoring correct responses
-            print(f"{i+1}. Score: {example['max_sim']:.6f}, Question: {example['question'][:50]}...")
-            print(f"   First token: '{example['token_text']}'")
-        
-        # Check how many correct responses have scores below threshold
-        # These would be falsely classified as hallucinations (false positives)
-        false_positives = [s for s in correct_max_scores if s < zero_fp_threshold]
-        print(f"\nCorrect responses below threshold (false positives): {len(false_positives)}")
-        print(f"False positive rate: {len(false_positives)/len(correct_max_scores):.2%}")
-            
-        # Count how many hallucinations would be caught with this threshold
-        # Hallucinations with scores below the threshold are detected
-        caught_hallucinations = sum(1 for score in incorrect_max_scores if score < zero_fp_threshold)
-        
-        # Calculate recall (percentage of hallucinations caught)
-        recall = caught_hallucinations / len(incorrect_max_scores) if len(incorrect_max_scores) > 0 else 0
-        
-        # Show examples of hallucinations near threshold
-        print("\n===== LOWEST-SCORING HALLUCINATIONS =====")
-        sorted_incorrect = sorted(incorrect_examples, key=lambda x: x['max_sim'])
-        for i, example in enumerate(sorted_incorrect[:5]):  # Show 5 lowest scoring hallucinations
-            print(f"{i+1}. Score: {example['max_sim']:.6f}, Question: {example['question'][:50]}...")
-            print(f"   First token: '{example['token_text']}'")
-        
-        # Show list of hallucinations that would be caught
-        if caught_hallucinations > 0:
-            print(f"\n===== HALLUCINATIONS CAUGHT ({caught_hallucinations}) =====")
-            caught = [ex for ex in incorrect_examples if ex['max_sim'] < zero_fp_threshold]
-            for i, example in enumerate(caught[:3]):  # Show up to 3 examples
-                print(f"{i+1}. Score: {example['max_sim']:.6f}, Question: {example['question'][:50]}...")
-        
-        # Calculate performance metrics
-        total_responses = len(correct_max_scores) + len(incorrect_max_scores)
-        baseline_accuracy = len(correct_max_scores) / total_responses
-        
-        # If we replace caught hallucinations with correct responses
-        improved_correct = len(correct_max_scores) + caught_hallucinations
-        improved_accuracy = improved_correct / total_responses
-        improvement = improved_accuracy - baseline_accuracy
-        
-        print("\n===== ZERO FALSE POSITIVE THRESHOLD ANALYSIS =====")
-        print(f"Threshold for zero false positives: {zero_fp_threshold:.6f}")
-        print(f"Hallucinations caught: {caught_hallucinations} out of {len(incorrect_max_scores)} ({recall:.2%})")
-        print(f"Baseline accuracy: {baseline_accuracy:.2%}")
-        print(f"Improved accuracy with perfect fallback: {improved_accuracy:.2%}")
-        print(f"Net improvement: {improvement:.2%} ({improvement*100:.2f} percentage points)")
-        
-        # Save results to JSON
-        results = {
-            "zero_fp_threshold": zero_fp_threshold,
-            "caught_hallucinations": caught_hallucinations,
-            "total_hallucinations": len(incorrect_max_scores),
-            "false_positives": len(false_positives),
-            "correct_responses": len(correct_max_scores),
-            "total_responses": total_responses,
-            "baseline_accuracy": baseline_accuracy,
-            "improved_accuracy": improved_accuracy,
-            "net_improvement": improvement,
-            "recall": recall
-        }
-        
-        output_file = "evaluation/results/zero_fp_threshold_results.json"
+    # Evaluate all strategies
+    all_results = []
+    
+    for strategy in tqdm(TOKEN_STRATEGIES, desc="Strategies"):
+        strategy_results = evaluate_strategy(correct_tokens, incorrect_tokens, strategy, n_tokens_values)
+        all_results.extend(strategy_results)
+    
+    # Find best result (highest recall)
+    best_result = max(all_results, key=lambda x: x['recall'])
+    
+    # Display overall results
+    print("\n===== OVERALL RESULTS =====")
+    print(f"Best strategy: {best_result['strategy']} with n_tokens={best_result['n_tokens']}")
+    print(f"Zero FP threshold: {best_result['threshold']:.6f}")
+    print(f"Hallucinations caught: {best_result['caught_hallucinations']} out of {best_result['total_hallucinations']} ({best_result['recall']:.2%})")
+    
+    # Show results for all strategies
+    print("\n===== RESULTS BY STRATEGY =====")
+    
+    # Group by strategy and select best n_tokens for each
+    strategy_best = {}
+    for result in all_results:
+        strategy = result['strategy']
+        if strategy not in strategy_best or result['recall'] > strategy_best[strategy]['recall']:
+            strategy_best[strategy] = result
+    
+    # Print sorted by recall (descending)
+    for strategy, result in sorted(strategy_best.items(), key=lambda x: x[1]['recall'], reverse=True):
+        print(f"{strategy} (n={result['n_tokens']}): Threshold={result['threshold']:.6f}, Recall={result['recall']:.2%}, Caught={result['caught_hallucinations']}")
+    
+    # Create directory for results if needed
+    os.makedirs("evaluation/results", exist_ok=True)
+    
+    # Plot ROC curves for all strategies (best n_tokens for each)
+    plt.figure(figsize=(12, 8))
+    
+    for strategy, result in strategy_best.items():
+        roc = result['roc_data']
+        plt.plot(roc['false_positives'], roc['recalls'], label=f"{strategy} (n={result['n_tokens']}, AUC={result['auc']:.3f})")
+    
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('Recall (Hallucination Detection Rate)')
+    plt.title('ROC Curves by Token Aggregation Strategy')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('evaluation/results/zero_fp_strategy_roc.png')
+    print(f"\nROC curves saved to evaluation/results/zero_fp_strategy_roc.png")
+    
+    # Plot bar chart of recall by strategy
+    plt.figure(figsize=(12, 6))
+    strategies = [r['strategy'] for r in sorted(strategy_best.values(), key=lambda x: x['recall'], reverse=True)]
+    recalls = [strategy_best[s]['recall'] for s in strategies]
+    
+    plt.bar(strategies, recalls)
+    plt.xlabel('Token Aggregation Strategy')
+    plt.ylabel('Recall (% of Hallucinations Caught)')
+    plt.title('Hallucination Detection Rate by Strategy (Zero False Positives)')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('evaluation/results/zero_fp_strategy_comparison.png')
+    print(f"Strategy comparison saved to evaluation/results/zero_fp_strategy_comparison.png")
+    
+    # Save detailed results to JSON
+    output_file = "evaluation/results/zero_fp_optimization_results.json"
+    full_results = {
+        "best_result": best_result,
+        "strategy_best": {k: v for k, v in strategy_best.items()},
+        "correct_count": len(correct_tokens),
+        "incorrect_count": len(incorrect_tokens),
+        "skipped_count": skipped
+    }
+    
         with open(output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        print(f"\nResults saved to {output_file}")
-    else:
-        print("No correct responses found. Cannot determine threshold.")
+        json.dump(full_results, f, indent=2)
+    print(f"\nDetailed results saved to {output_file}")
 
 if __name__ == "__main__":
     main() 

@@ -14,6 +14,7 @@ from .monitor import ActivationMonitor
 from .inference import SafeInference
 from .utils.helpers import ensure_dir
 from .utils.logger import get_logger
+from .classifier import ActivationClassifier
 
 # Default tokens that can be overridden via environment variables
 DEFAULT_USER_TOKEN = "<|user|>"
@@ -35,14 +36,18 @@ class ActivationGuard:
         threshold: float = 0.7,
         save_dir: str = "./wisent_guard_data",
         device: Optional[str] = None,
-        token_strategy: str = "target_token",  # Default to target_token for A/B tokens
+        token_strategy: str = "last",  # Keep parameter but ignore other values
         log_level: str = "info",
         log_file: Optional[str] = None,
-        auto_load_vectors: bool = False,  # Add parameter to control automatic vector loading
+        auto_load_vectors: bool = False,
         user_token: Optional[str] = None,
         assistant_token: Optional[str] = None,
         force_format: Optional[str] = None,
-        force_llama_format: Optional[bool] = None  # For backward compatibility
+        force_llama_format: Optional[bool] = None,  # For backward compatibility
+        # New parameters for classifier support
+        use_classifier: bool = False,
+        classifier_path: Optional[str] = None,
+        classifier_threshold: float = 0.5
     ):
         """
         Initialize the ActivationGuard.
@@ -54,10 +59,7 @@ class ActivationGuard:
             threshold: Similarity threshold for identifying harmful content
             save_dir: Directory for saving and loading vectors
             device: Device to run the model on (e.g., 'cuda', 'cpu')
-            token_strategy: Strategy for token selection:
-                           - "target_token": Look for specific tokens like "A" or "B" (default)
-                           - "last": Last token in sequence (legacy)
-                           - "all": Store all tokens for later selection
+            token_strategy: Parameter kept for backward compatibility, but "last" token is always used
             log_level: Logging level ('debug', 'info', 'warning', 'error')
             log_file: Optional file to write logs to
             auto_load_vectors: Whether to automatically load all vectors from save_dir (default: False)
@@ -65,6 +67,9 @@ class ActivationGuard:
             assistant_token: Custom assistant token override (default: from WISENT_ASSISTANT_TOKEN env var or "<|assistant|>")
             force_format: Force specific format: "llama31", "mistral", "legacy", or None for auto-detect
             force_llama_format: (Deprecated) For backward compatibility
+            use_classifier: Whether to use ML-based classifier instead of threshold-based detection
+            classifier_path: Path to trained classifier model (required if use_classifier is True)
+            classifier_threshold: Classification threshold for the ML model (default: 0.5)
         """
         # Set up logger
         self.logger = get_logger(level=log_level, log_file=log_file)
@@ -94,8 +99,10 @@ class ActivationGuard:
             self.device = device
             self.logger.info(f"Using user-specified device: {self.device}")
         
-        # Set token strategy - default to target_token for multiple-choice
-        self.token_strategy = token_strategy
+        # Force using "last" token strategy regardless of what was provided
+        self.token_strategy = "last"
+        if token_strategy != "last":
+            self.logger.warning(f"Ignoring provided token_strategy='{token_strategy}'. Always using 'last' token strategy.")
         self.logger.info(f"Using token strategy: {self.token_strategy}")
         
         # Load model and tokenizer if strings are provided
@@ -126,118 +133,146 @@ class ActivationGuard:
         self.layers = layers if layers is not None else list(range(min(12, self.model.config.num_hidden_layers)))
         self.logger.info(f"Monitoring layers: {self.layers}")
         
-        # Initialize vectors, monitor, and inference
-        self.vectors = ContrastiveVectors(save_dir=self.save_dir)
+        # Initialize monitor and inference objects
         self.monitor = None
         self.inference = None
         self.threshold = threshold
         
-        # Handle force_llama_format for backward compatibility
-        if force_llama_format is not None:
-            if force_llama_format is True:
-                force_format = "llama31"
-            elif force_llama_format is False:
-                force_format = "legacy"
-            self.logger.warning("force_llama_format is deprecated, use force_format instead")
+        # Set up approach: classifier or vector
+        self.use_classifier = use_classifier
+        self.classifier = None
         
-        # Convert boolean force_format to string for backward compatibility
-        if force_format is True:
-            self.force_format = "llama31"
-        elif force_format is False:
-            self.force_format = "legacy"
-        else:
-            self.force_format = force_format
-        self.logger.info(f"Similarity threshold set to {self.threshold}")
+        # Initialize classifier if requested
+        if use_classifier:
+            if classifier_path is None:
+                self.logger.warning("use_classifier=True but no classifier_path provided. Cannot use classifier-based detection.")
+                self.use_classifier = False
+            else:
+                try:
+                    self.classifier = ActivationClassifier(
+                        model_path=classifier_path,
+                        threshold=classifier_threshold,
+                        positive_class_label="harmful"
+                    )
+                    self.logger.info(f"Using ML-based classifier from {classifier_path} with threshold {classifier_threshold}")
+                except Exception as e:
+                    self.logger.error(f"Failed to load classifier: {e}")
+                    self.logger.warning("Cannot use classifier-based detection due to error.")
+                    self.use_classifier = False
         
-        # Check if model is likely a Llama 3.1 model and set format accordingly
-        model_name = getattr(self.model.config, "_name_or_path", "").lower()
-        is_llama_3 = bool(re.search(r"llama-?3", model_name, re.IGNORECASE))
-        is_mistral = bool(re.search(r"mistral", model_name, re.IGNORECASE))
-        
-        self.logger.debug(f"Model name: {model_name}")
-        self.logger.debug(f"Llama 3 detection: {is_llama_3}")
-        self.logger.debug(f"Mistral detection: {is_mistral}")
-        
-        if is_llama_3:
-            if self.force_format == "legacy":
-                self.logger.warning("Detected Llama 3.1 model but legacy format is forced. This may cause issues.")
-            elif self.force_format is None:
+        # Only initialize vectors if we're not using classifier or if explicitly requested
+        if not self.use_classifier or auto_load_vectors:
+            self.vectors = ContrastiveVectors(save_dir=self.save_dir)
+            
+            # Handle force_llama_format for backward compatibility
+            if force_llama_format is not None:
+                if force_llama_format is True:
+                    force_format = "llama31"
+                elif force_llama_format is False:
+                    force_format = "legacy"
+                self.logger.warning("force_llama_format is deprecated, use force_format instead")
+            
+            # Convert boolean force_format to string for backward compatibility
+            if force_format is True:
                 self.force_format = "llama31"
-                self.logger.info("Detected Llama 3.1 model. Automatically enabling Llama 3.1 prompt format.")
-            elif self.force_format == "llama31":
-                self.logger.info("Detected Llama 3.1 model. Will use Llama 3.1 prompt format.")
-                
-            if self.force_format == "llama31":
-                self.logger.info("Llama 3.1 format will use special tokens:")
-                self.logger.info("  <|begin_of_text|><|start_header_id|>user<|end_header_id|>...")
-                self.logger.info("  Note: User/assistant token settings don't affect Llama 3.1 format")
-        elif is_mistral:
-            if self.force_format == "legacy":
-                self.logger.warning("Detected Mistral model but legacy format is forced. This may cause issues.")
-            elif self.force_format is None:
-                self.force_format = "mistral"
-                self.logger.info("Detected Mistral model. Automatically enabling Mistral prompt format.")
-            elif self.force_format == "mistral":
-                self.logger.info("Detected Mistral model. Will use Mistral prompt format.")
-                
-            if self.force_format == "mistral":
-                self.logger.info("Mistral format will use special tokens:")
-                self.logger.info("  [INST] instruction [/INST] response")
-                self.logger.info("  Note: User/assistant token settings don't affect Mistral format")
+            elif force_format is False:
+                self.force_format = "legacy"
+            else:
+                self.force_format = force_format
+            self.logger.info(f"Similarity threshold set to {self.threshold}")
+            
+            # Check if model is likely a Llama 3.1 model and set format accordingly
+            model_name = getattr(self.model.config, "_name_or_path", "").lower()
+            is_llama_3 = bool(re.search(r"llama-?3", model_name, re.IGNORECASE))
+            is_mistral = bool(re.search(r"mistral", model_name, re.IGNORECASE))
+            
+            self.logger.debug(f"Model name: {model_name}")
+            self.logger.debug(f"Llama 3 detection: {is_llama_3}")
+            self.logger.debug(f"Mistral detection: {is_mistral}")
+            
+            if is_llama_3:
+                if self.force_format == "legacy":
+                    self.logger.warning("Detected Llama 3.1 model but legacy format is forced. This may cause issues.")
+                elif self.force_format is None:
+                    self.force_format = "llama31"
+                    self.logger.info("Detected Llama 3.1 model. Automatically enabling Llama 3.1 prompt format.")
+                elif self.force_format == "llama31":
+                    self.logger.info("Detected Llama 3.1 model. Will use Llama 3.1 prompt format.")
+                    
+                if self.force_format == "llama31":
+                    self.logger.info("Llama 3.1 format will use special tokens:")
+                    self.logger.info("  <|begin_of_text|><|start_header_id|>user<|end_header_id|>...")
+                    self.logger.info("  Note: User/assistant token settings don't affect Llama 3.1 format")
+            elif is_mistral:
+                if self.force_format == "legacy":
+                    self.logger.warning("Detected Mistral model but legacy format is forced. This may cause issues.")
+                elif self.force_format is None:
+                    self.force_format = "mistral"
+                    self.logger.info("Detected Mistral model. Automatically enabling Mistral prompt format.")
+                elif self.force_format == "mistral":
+                    self.logger.info("Detected Mistral model. Will use Mistral prompt format.")
+                    
+                if self.force_format == "mistral":
+                    self.logger.info("Mistral format will use special tokens:")
+                    self.logger.info("  [INST] instruction [/INST] response")
+                    self.logger.info("  Note: User/assistant token settings don't affect Mistral format")
+            else:
+                self.logger.info(f"Using legacy format with user token: {self.user_token}")
+                self.logger.info(f"Using legacy format with assistant token: {self.assistant_token}")
+            
+            # Only load vectors if auto_load_vectors is True
+            if auto_load_vectors:
+                self.logger.info("Auto-loading vectors from save directory")
+                self.load_vectors()
+            else:
+                self.logger.info("Skipping auto-loading of vectors (use load_vectors() to load explicitly)")
         else:
-            self.logger.info(f"Using legacy format with user token: {self.user_token}")
-            self.logger.info(f"Using legacy format with assistant token: {self.assistant_token}")
-        
-        # Only load vectors if auto_load_vectors is True
-        if auto_load_vectors:
-            self.logger.info("Auto-loading vectors from save directory")
-            self.load_vectors()
-        else:
-            self.logger.info("Skipping auto-loading of vectors (use load_vectors() to load explicitly)")
+            # Not using vectors at all when classifier is enabled
+            self.vectors = None
+            self.force_format = force_format or "legacy"
         
         # Set target tokens for multiple-choice format
         self._setup_target_tokens()
     
     def _setup_target_tokens(self):
-        """Set up target tokens for multiple-choice format (A and B)."""
-        if self.monitor is None:
-            # We'll set this up when the monitor is initialized
-            return
-        
-        target_tokens = ["A", "B"]
-        self.monitor.hooks.set_target_tokens(self.tokenizer, target_tokens)
-        self.logger.info(f"Multiple-choice tokens set: {target_tokens}")
+        """Set up target tokens for multiple-choice format (kept for backward compatibility)."""
+        # With "last" token strategy, there's no need to set up target tokens
+        self.logger.debug("Target tokens setup not needed with 'last' token strategy")
     
     def _initialize_monitor_and_inference(self):
-        """Initialize monitor and inference components with current vectors."""
-        self.logger.debug("Initializing monitor and inference components")
+        """Initialize the monitor and inference module."""
+        self.logger.info("Setting up activation monitor")
         
-        # Always use target_token strategy internally for token selection
-        actual_token_strategy = "target_token"
-        if self.token_strategy != "target_token":
-            self.logger.info(f"Note: Using 'target_token' strategy internally instead of '{self.token_strategy}' for more consistent results")
+        # Create the vectors instance if none exists
+        vectors_instance = None
+        if self.vectors is not None:
+            vectors_instance = self.vectors
         
+        # Create monitor with activation hooks
         self.monitor = ActivationMonitor(
             model=self.model,
-            vectors=self.vectors,
             layers=self.layers,
-            threshold=self.threshold,
-            token_strategy=actual_token_strategy,
+            vectors=vectors_instance,
+            token_strategy="last",  # Always use last token
+            similarity_threshold=self.threshold,
+            device=self.device,
+            log_level=self.logger.level
         )
         
+        # Determine the format to use based on model detection
+        format_type = self._detect_format()
+        
+        # Create inference module
         self.inference = SafeInference(
             model=self.model,
             tokenizer=self.tokenizer,
             monitor=self.monitor,
+            device=self.device,
+            format_type=format_type,  # Pass detected format
             user_token=self.user_token,
             assistant_token=self.assistant_token,
-            force_format=self.force_format
+            log_level=self.logger.level
         )
-        
-        # Set up target tokens for multiple-choice format
-        self._setup_target_tokens()
-        
-        self.logger.debug("Monitor and inference components initialized")
     
     def _format_prompt(self, instruction: str, response: str = None) -> str:
         """
@@ -316,129 +351,142 @@ class ActivationGuard:
         self.logger.debug("Multiple-choice conversion complete")
         return harmful_mc, harmless_mc
     
-    def train_on_phrase_pairs(self, phrase_pairs: List[Dict[str, str]], category: str = "harmful_content") -> None:
+    def train_on_phrase_pairs(self, phrase_pairs: List[Dict[str, str]], category: str = "harmful"):
         """
-        Train the guard on pairs of harmful and harmless phrases.
-        Internally converts all phrases to multiple-choice format for more consistent activation collection.
+        Train contrastive vectors using pairs of phrases.
         
         Args:
             phrase_pairs: List of dictionaries with 'harmful' and 'harmless' keys
-            category: Category label for the vector pairs
+            category: Category name for the contrastive vectors
+            
+        Returns:
+            Success flag
         """
         self.logger.info(f"Training on {len(phrase_pairs)} phrase pairs for category '{category}'...")
-        self.logger.info("Converting phrase pairs to multiple-choice format for consistent activation collection...")
         
-        # Make sure we have a monitor initialized
-        if self.monitor is None:
-            self.logger.debug("Initializing monitor for the first time")
+        # Make sure the vectors are initialized
+        if self.vectors is None:
+            self.vectors = ContrastiveVectors(
+                model_name=getattr(self.model.config, "_name_or_path", "unknown"),
+                token_strategy="last",  # Always use last token
+                similarity_threshold=self.threshold,
+                save_dir=self.save_dir,
+                log_level=self.logger.level
+            )
+        
+        # Initialize monitor and inference if needed
+        if self.monitor is None or self.inference is None:
             self._initialize_monitor_and_inference()
         
-        # Convert phrase pairs to multiple-choice and process each pair
-        for i, pair in enumerate(tqdm(phrase_pairs, desc="Processing phrase pairs")):
-            harmful_phrase = pair["harmful"]
-            harmless_phrase = pair["harmless"]
+        # Convert pairs to multiple choice format to ensure consistent activation patterns
+        self.logger.info("Converting phrase pairs to multiple-choice format for consistent activation collection...")
+        
+        harmful_activations_by_layer = {layer: [] for layer in self.layers}
+        harmless_activations_by_layer = {layer: [] for layer in self.layers}
+        
+        # Process each phrase pair
+        for i, pair in enumerate(phrase_pairs):
+            harmful_text = pair.get('harmful', '')
+            harmless_text = pair.get('harmless', '')
             
-            # Add example logging to show what we're processing
-            if i == 0:  # Only log the first example to avoid spam
-                print(f"\n==== EXAMPLE TRAINING PAIR ====")
-                print(f"HARMFUL: {harmful_phrase[:100]}..." if len(harmful_phrase) > 100 else f"HARMFUL: {harmful_phrase}")
-                print(f"HARMLESS: {harmless_phrase[:100]}..." if len(harmless_phrase) > 100 else f"HARMLESS: {harmless_phrase}")
+            if not harmful_text or not harmless_text:
+                self.logger.warning(f"Skipping pair {i}: missing harmful or harmless text")
+                continue
             
-            self.logger.debug(f"Processing pair {i+1}/{len(phrase_pairs)}")
-            self.logger.debug(f"Harmful: {harmful_phrase[:50]}..." if len(harmful_phrase) > 50 else f"Harmful: {harmful_phrase}")
-            self.logger.debug(f"Harmless: {harmless_phrase[:50]}..." if len(harmless_phrase) > 50 else f"Harmless: {harmless_phrase}")
+            # Extract the question part (everything up to the first question mark)
+            if '?' in harmful_text:
+                question_part = harmful_text.split('?')[0] + '?'
+                harmful_answer = harmful_text[len(question_part):].strip()
+                harmless_answer = harmless_text[len(question_part):].strip()
+            else:
+                # If no question mark, use the first half as the question
+                question_part = "Which statement is better?"
+                harmful_answer = harmful_text
+                harmless_answer = harmless_text
             
-            # Convert to multiple-choice format
-            harmful_mc, harmless_mc = self._convert_to_multiple_choice(harmful_phrase, harmless_phrase)
+            # Format as multiple choice
+            formatted_harmful = self._format_multiple_choice(question_part, harmless_answer, harmful_answer, answer='B')
+            formatted_harmless = self._format_multiple_choice(question_part, harmful_answer, harmless_answer, answer='A')
             
-            # Log the converted format
-            if i == 0:  # Only log the first example
-                print(f"\nFORMATTED HARMFUL MC: {harmful_mc}")
-            
-            # Get activations for harmful phrase in multiple-choice format
-            self.logger.debug("Collecting activations for harmful phrase")
-            self.monitor.reset()
-            harmful_input_ids = self.tokenizer.encode(harmful_mc, return_tensors="pt").to(self.device)
-            
-            # Log token IDs and decoded tokens
-            if i == 0:  # Only log the first example
-                print("\n==== ACTIVATION COLLECTION ====")
-                print(f"Input shape: {harmful_input_ids.shape}")
-                print(f"Last token ID: {harmful_input_ids[0][-1].item()} ('{self.tokenizer.decode([harmful_input_ids[0][-1].item()])}')")
-            
-            with torch.no_grad():
-                self.model(harmful_input_ids)
-            harmful_activations = self.monitor.hooks.get_activations()
-            
-            # Show sample of collected activations
+            # Display example if first pair
             if i == 0:
-                print("\nCOLLECTED ACTIVATIONS:")
-                for layer, activation in harmful_activations.items():
-                    print(f"Layer {layer}: Shape={activation.shape}")
-                    # Show a small sample of activation values
-                    if activation.dim() >= 2:
-                        # Handle different tensor dimensions
-                        if activation.dim() == 2:
-                            # For 2D tensors [batch_size, hidden_size]
-                            sample = activation[0, :5].cpu().numpy()
-                        else:
-                            # For 3D tensors [batch_size, seq_len, hidden_size]
-                            sample = activation[0, 0, :5].cpu().numpy()
-                        print(f"  Sample values: {sample}")
-                    
-                    # Only show one layer as example
-                    if layer == list(harmful_activations.keys())[0]:
-                        break
+                print("\n==== EXAMPLE TRAINING PAIR ====")
+                print(f"HARMFUL: {harmful_text[:100]}...")
+                print(f"HARMLESS: {harmless_text[:100]}...")
+                print(f"\nFORMATTED HARMFUL MC: {formatted_harmful[:300]}")
             
-            self.logger.debug(f"Collected activations from {len(harmful_activations)} layers for harmful phrase")
-            
-            # Get activations for harmless phrase in multiple-choice format
-            self.logger.debug("Collecting activations for harmless phrase")
+            # Process harmful example
+            # Reset the monitor
             self.monitor.reset()
-            harmless_input_ids = self.tokenizer.encode(harmless_mc, return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                self.model(harmless_input_ids)
-            harmless_activations = self.monitor.hooks.get_activations()
-            self.logger.debug(f"Collected activations from {len(harmless_activations)} layers for harmless phrase")
             
-            # Move activations to CPU for consistent storage (especially important for MPS)
-            self.logger.debug("Moving activations to CPU for consistent storage")
-            cpu_harmful_activations = {}
-            cpu_harmless_activations = {}
+            # Generate tokens for harmful and capture activations 
+            result = self.inference.generate(prompt=formatted_harmful, max_new_tokens=1)
             
-            for layer, tensor in harmful_activations.items():
-                cpu_harmful_activations[layer] = tensor.detach().cpu()
+            # Display activation info for first example
+            if i == 0:
+                print("\n==== ACTIVATION COLLECTION ====")
+                # Get info about the input
+                if hasattr(self.inference, 'prompt_ids'):
+                    print(f"Input shape: {self.inference.prompt_ids.shape}")
+                    # Get the last token ID and text
+                    if self.inference.prompt_ids.shape[1] > 0:
+                        last_token_id = self.inference.prompt_ids[0, -1].item()
+                        last_token_text = self.tokenizer.decode([last_token_id])
+                        print(f"Last token ID: {last_token_id} ('{last_token_text}')")
             
-            for layer, tensor in harmless_activations.items():
-                cpu_harmless_activations[layer] = tensor.detach().cpu()
+            # Get activations from monitor
+            harmful_activations = self.monitor.get_activations()
             
-            # Store activations for each layer
-            self.logger.debug("Storing activations for each layer")
-            for layer in self.layers:
-                if layer in cpu_harmful_activations and layer in cpu_harmless_activations:
-                    self.vectors.add_vector_pair(
-                        category=category,
-                        layer=layer,
-                        harmful_vector=cpu_harmful_activations[layer],
-                        harmless_vector=cpu_harmless_activations[layer]
-                    )
-                    self.logger.debug(f"Stored vector pair for layer {layer}")
-                else:
-                    self.logger.warning(f"Missing activations for layer {layer}")
+            # Store activations by layer
+            for layer, activation in harmful_activations.items():
+                if layer in harmful_activations_by_layer:
+                    harmful_activations_by_layer[layer].append(activation)
             
-            self.logger.debug(f"Completed processing pair {i+1}/{len(phrase_pairs)}")
+            # Process harmless example
+            # Reset the monitor
+            self.monitor.reset()
+            
+            # Generate tokens for harmless and capture activations
+            _ = self.inference.generate(prompt=formatted_harmless, max_new_tokens=1)
+            
+            # Get activations from monitor
+            harmless_activations = self.monitor.get_activations()
+            
+            # Store activations by layer
+            for layer, activation in harmless_activations.items():
+                if layer in harmless_activations_by_layer:
+                    harmless_activations_by_layer[layer].append(activation)
         
-        # Compute and save contrastive vectors
+        # Compute contrastive vectors for each layer
         self.logger.info("Computing contrastive vectors...")
-        self.vectors.compute_contrastive_vectors()
-        self.logger.info("Saving vectors to disk...")
-        self.vectors.save_vectors()
+        for layer in self.layers:
+            if layer in harmful_activations_by_layer and layer in harmless_activations_by_layer:
+                harmful_tensors = harmful_activations_by_layer[layer]
+                harmless_tensors = harmless_activations_by_layer[layer]
+                
+                if harmful_tensors and harmless_tensors:
+                    self.vectors.add_contrastive_vector(
+                        harmful_activations=harmful_tensors,
+                        harmless_activations=harmless_tensors,
+                        category=category,
+                        layer=layer
+                    )
         
-        # Re-initialize monitor with new vectors
+        # Save vectors
+        self.logger.info("Saving vectors to disk...")
+        if not self.vectors.save_vectors():
+            self.logger.warning("Failed to save vectors")
+            return False
+        
+        # Reinitialize monitor with new vectors
         self.logger.info("Reinitializing monitor with new vectors")
         self._initialize_monitor_and_inference()
         
+        # Re-assign vectors to monitor
+        self.monitor.vectors = self.vectors
+        
         self.logger.info(f"Successfully trained on {len(phrase_pairs)} phrase pairs")
+        return True
     
     def train_on_multiple_choice_pairs(self, questions: List[Dict[str, Any]], category: str = "hallucination") -> None:
         """
@@ -553,105 +601,209 @@ class ActivationGuard:
         # We don't include an answer, just the question
         return self._format_prompt(instruction)
     
-    def is_harmful(self, text: str, categories: Optional[List[str]] = None) -> bool:
+    def is_harmful(self, text: str) -> bool:
         """
-        Check if text would lead to a harmful response by evaluating the first token of the response.
+        Check if a given text is harmful.
         
         Args:
-            text: Input prompt to check
-            categories: Specific categories to check against
+            text: Text to check
             
         Returns:
-            True if harmful content is detected in the response, False otherwise
+            True if harmful, False if safe
         """
-        if self.monitor is None:
-            raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
+        # Initialize monitor and inference if needed
+        if self.monitor is None or self.inference is None:
+            self._initialize_monitor_and_inference()
+
+        # If using classifier-based approach
+        if hasattr(self, 'use_classifier') and self.use_classifier and hasattr(self, 'classifier') and self.classifier is not None:
+            try:
+                # Run text through the model to get activations
+                success = self._prepare_activations(text)
+                if not success:
+                    self.logger.error(f"Failed to prepare activations for classification")
+                    return False
+                    
+                # Get activations directly from monitor
+                activations = self.monitor.get_activations()
+                if not activations:
+                    self.logger.error("No activations available")
+                    return False
+                
+                # Get the first monitored layer (typically only one layer is monitored)
+                monitored_layer = self.layers[0] if self.layers else None
+                if monitored_layer is None or monitored_layer not in activations:
+                    self.logger.error(f"Required layer {monitored_layer} not in activations")
+                    return False
+                
+                # Extract the activation tensor for this layer
+                activation_tensor = activations[monitored_layer]
+                
+                # Create a properly formatted activation dictionary for the classifier
+                activation_data = {
+                    'activations': activation_tensor.detach().cpu().numpy().flatten(),
+                    'layer': monitored_layer,
+                    'is_harmful': None  # Will be determined by the classifier
+                }
+                
+                # Make prediction using the classifier
+                prediction = self.classifier.predict(activation_data, response_text=text)
+                
+                is_harmful = prediction.get('is_harmful', False)
+                self.logger.debug(f"Classifier prediction: {prediction}, is_harmful: {is_harmful}")
+                return is_harmful
+                
+            except Exception as e:
+                self.logger.error(f"Classifier-based detection failed: {e}")
+                return False
         
-        # Reset monitor
-        self.monitor.reset()
-        
-        # Format the prompt for generation
-        formatted_prompt = f"{self.user_token}\n{text}\n{self.assistant_token}"
-        
-        # Encode the prompt
-        prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
-        
-        # Generate just the first token of the response
-        with torch.no_grad():
-            # Get the first token of what would be generated
-            outputs = self.model.generate(
-                prompt_ids,
-                max_new_tokens=1,  # Just generate the first token
-                return_dict_in_generate=True,
-                output_scores=True
-            )
+        # Vector-based approach (original)
+        try:
+            # Prepare activations
+            success = self._prepare_activations(text)
+            if not success:
+                self.logger.warning(f"Failed to prepare activations for text: '{text[:50]}...'")
+                return False
             
-            # Get the full sequence including the prompt and the first generated token
-            full_sequence = torch.cat([prompt_ids, outputs.sequences[:, prompt_ids.shape[1]:]], dim=1)
+            # Check activations against harmful vectors
+            result = self.monitor.check_activations()
             
-            # Process the full sequence to get activations
-            self.model(full_sequence)
-        
-        # Check if harmful
-        return self.monitor.is_harmful(categories=categories, is_response_token=True)
+            # Find most harmful category
+            max_similarity = 0.0
+            is_harmful = False
+            
+            for category, category_result in result.items():
+                if category_result["max_similarity"] > max_similarity:
+                    max_similarity = category_result["max_similarity"]
+                    is_harmful = category_result["is_harmful"]
+            
+            return is_harmful
+            
+        except Exception as e:
+            self.logger.error(f"Error checking for harmful content: {e}")
+            return False
     
-    def get_similarity(self, text: str, categories: Optional[List[str]] = None) -> float:
+    def _is_harmful_threshold_based(self, 
+                                    text: str, 
+                                    categories: Optional[List[str]] = None) -> bool:
         """
-        Get the similarity of the first token of response to harmful patterns.
+        Use threshold-based method to check if text contains harmful content.
         
         Args:
-            text: Input prompt to check
-            categories: Specific categories to check against
+            text: Text to check for harmful content
+            categories: List of categories to check (None for all)
             
         Returns:
-            Highest similarity score
+            Boolean indicating if harmful content was detected
         """
-        if self.monitor is None:
-            raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
+        # If vectors aren't initialized, we can't use this method
+        if self.vectors is None:
+            self.logger.error("Cannot use threshold-based detection when configured for classifier-only mode")
+            return False
         
-        # Reset monitor
-        self.monitor.reset()
+        # Get the similarity score
+        similarity = self.get_similarity(text, categories)
         
-        # Format the prompt for generation
-        formatted_prompt = f"{self.user_token}\n{text}\n{self.assistant_token}"
+        # Compare to threshold
+        result = similarity >= self.threshold
         
-        # Encode the prompt
-        prompt_ids = self.tokenizer.encode(formatted_prompt, return_tensors="pt").to(self.device)
+        log_fn = self.logger.warning if result else self.logger.debug
+        log_fn(f"Similarity: {similarity:.4f}, Threshold: {self.threshold}, Harmful: {result}")
         
-        # Generate just the first token of the response
-        with torch.no_grad():
-            # Get the first token of what would be generated
-            outputs = self.model.generate(
-                prompt_ids,
-                max_new_tokens=1,  # Just generate the first token
-                return_dict_in_generate=True,
-                output_scores=True
-            )
+        return result
+    
+    def get_similarity(self, text: str, category: Optional[str] = None) -> float:
+        """
+        Get similarity score for a text against harmful vectors.
+        
+        Args:
+            text: Text to check
+            category: Specific category to check (None for all)
             
-            # Get the full sequence including the prompt and the first generated token
-            full_sequence = torch.cat([prompt_ids, outputs.sequences[:, prompt_ids.shape[1]:]], dim=1)
+        Returns:
+            Maximum similarity score
+        """
+        # Check if vectors are available
+        if self.vectors is None:
+            self.logger.warning("get_similarity called but this guard is configured for classifier-only mode")
+            return 0.0
+        
+        # If we have no vectors loaded, try to load them
+        if not self.vectors.has_any_vectors():
+            if not self.load_vectors():
+                self.logger.warning("No vectors loaded, cannot check similarity")
+                return 0.0
             
-            # Process the full sequence to get activations
-            self.model(full_sequence)
+        # Make sure monitor and inference are initialized
+        if self.monitor is None or self.inference is None:
+            self._initialize_monitor_and_inference()
+        
+        # Prepare activations
+        success = self._prepare_activations(text)
+        if not success:
+            self.logger.warning(f"Failed to prepare activations for similarity check: '{text[:50]}...'")
+            return 0.0
         
         # Get similarity scores
-        results = self.monitor.check_activations(categories=categories, is_response_token=True)
+        results = self.monitor.check_activations()
         
-        # Find the highest similarity score
+        # Find maximum similarity for the specified category or across all categories
         max_similarity = 0.0
-        for category_result in results.values():
-            max_similarity = max(max_similarity, category_result["max_similarity"])
+        
+        if category is not None:
+            # Check specific category
+            if category in results:
+                max_similarity = results[category]["max_similarity"]
+        else:
+            # Find maximum across all categories
+            for cat_result in results.values():
+                if cat_result["max_similarity"] > max_similarity:
+                    max_similarity = cat_result["max_similarity"]
         
         return max_similarity
+    
+    def _prepare_activations(self, text: str) -> bool:
+        """
+        Generate tokens from text and capture activations.
+        
+        Args:
+            text: Text to generate tokens from
+            
+        Returns:
+            Success flag
+        """
+        try:
+            # Make sure monitor is initialized
+            if self.monitor is None:
+                self._initialize_monitor_and_inference()
+            
+            # Format the prompt properly first
+            formatted_text = self._format_prompt(text)
+            
+            # Tokenize input directly
+            inputs = self.tokenizer(formatted_text, return_tensors="pt").to(self.device)
+            
+            # Run through model to capture activations - generate a single token
+            with torch.no_grad():
+                outputs = self.model(inputs.input_ids, output_hidden_states=True)
+            
+            # Use our new method to capture activations
+            success = self.monitor.capture_activations_from_forward(outputs, inputs.input_ids)
+            
+            if not success:
+                self.logger.warning("Failed to capture activations from model output")
+                
+            return success
+        except Exception as e:
+            self.logger.error(f"Error preparing activations: {e}")
+            return False
     
     def generate_safe_response(
         self,
         prompt: str,
         max_new_tokens: int = 100,
         skip_prompt_check: bool = False,
-        use_multiple_choice: bool = True,
         token_by_token: bool = True,
-        return_token_scores: bool = True,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -661,26 +813,137 @@ class ActivationGuard:
             prompt: Input prompt
             max_new_tokens: Maximum number of tokens to generate
             skip_prompt_check: Whether to skip the initial prompt safety check
-            use_multiple_choice: Whether to use multiple-choice format internally
-            token_by_token: Whether to generate token-by-token and check each token (default: True)
-            return_token_scores: Whether to include similarity scores for each token (default: True)
+            token_by_token: Whether to generate token-by-token (always True now)
             **kwargs: Additional keyword arguments for the generation function
             
         Returns:
-            Dictionary containing the generated text and safety information.
-            Also includes token-level similarity scores by default.
+            Dictionary containing the generated text and safety information
         """
-        if self.inference is None:
-            raise ValueError("No vectors have been loaded or trained. Call train_on_phrase_pairs first.")
+        # Initialize monitor and inference if needed
+        if self.monitor is None or self.inference is None:
+            self._initialize_monitor_and_inference()
         
-        # Generate response using simplified inference API
-        result = self.inference.generate(
-            prompt=prompt,
-            max_new_tokens=max_new_tokens,
-            **kwargs
-        )
+        # Check if we're in classifier-only mode
+        is_classifier_mode = hasattr(self, 'use_classifier') and self.use_classifier and hasattr(self, 'classifier') and self.classifier is not None
         
-        # Process token scores to determine if any token is harmful
+        # Generate response using inference API
+        try:
+            result = self.inference.generate(
+                prompt=prompt,
+                max_new_tokens=max_new_tokens,
+                **kwargs
+            )
+        except Exception as e:
+            self.logger.error(f"Error during token generation: {e}")
+            return {
+                "response": f"Error: {str(e)}",
+                "token_scores": [],
+                "blocked": False,
+                "reason": None,
+                "harmful_token": None
+            }
+        
+        response = result.get("response", "")
+        token_scores = result.get("token_scores", [])
+        
+        # In classifier-only mode, we evaluate the response as a whole
+        if is_classifier_mode:
+            try:
+                # Reset monitor before preparing activations
+                self.monitor.reset()
+                
+                # Prepare activations using the full response
+                formatted_text = self._format_prompt(response)
+                self.logger.debug(f"Preparing formatted text for classification: {formatted_text[:50]}...")
+                
+                # Tokenize the input
+                inputs = self.tokenizer(formatted_text, return_tensors="pt").to(self.device)
+                
+                # Run the model to get activations - important to use model directly for this classifier case
+                with torch.no_grad():
+                    outputs = self.model(input_ids=inputs.input_ids, output_hidden_states=True)
+                
+                # Capture activations from the model outputs
+                success = self.monitor.capture_activations_from_forward(outputs, inputs.input_ids)
+                if not success:
+                    self.logger.warning("Failed to capture activations for classification")
+                    result["blocked"] = False
+                    result["reason"] = None
+                    return result
+                
+                # Manually ensure token data has activation values flag set to true
+                if hasattr(self.monitor, 'token_data'):
+                    self.monitor.token_data['has_activation_values'] = True
+                
+                # Double check token data has activation values
+                token_data = self.monitor.get_token_data()
+                if not token_data.get('has_activation_values', False):
+                    self.logger.error("Error during classification: Token data doesn't contain activation values")
+                    # Try to fix the issue by manually setting the flag
+                    self.monitor.token_data = {'has_activation_values': True, 'token_id': inputs.input_ids[0, -1].item(), 'position': inputs.input_ids.shape[1] - 1}
+                    self.logger.info("Manually set token data activation values flag to true")
+                
+                # Get activations across layers
+                activations = self.monitor.get_activations()
+                if not activations:
+                    self.logger.warning("No activations available for classification")
+                    result["blocked"] = False
+                    result["reason"] = None
+                    return result
+                
+                # Get the first monitored layer (typically only one layer is monitored)
+                monitored_layer = self.layers[0] if self.layers else None
+                if monitored_layer is None or monitored_layer not in activations:
+                    self.logger.warning(f"Required layer {monitored_layer} not in activations")
+                    result["blocked"] = False
+                    result["reason"] = None
+                    return result
+                
+                # Extract the activation tensor for this layer
+                activation_tensor = activations[monitored_layer]
+                
+                # Create a properly formatted activation dictionary for the classifier
+                activation_data = {
+                    'activations': activation_tensor.detach().cpu().numpy().flatten(),
+                    'layer': monitored_layer,
+                    'is_harmful': None  # Will be determined by the classifier
+                }
+                
+                # Make prediction using the classifier
+                prediction = self.classifier.predict(activation_data, response_text=response)
+                
+                is_harmful = prediction.get('is_harmful', False)
+                probability = prediction.get('score', 0.0)
+                
+                self.logger.debug(f"Classifier prediction: {prediction}, is_harmful: {is_harmful}")
+                
+                # Update result with classification
+                result["blocked"] = is_harmful
+                result["reason"] = f"Response classified as harmful with probability {probability:.4f}" if is_harmful else None
+                result["classification_score"] = probability
+                result["classification_threshold"] = self.classifier.threshold
+                
+                # Update token scores
+                if token_scores and is_harmful:
+                    # Mark all tokens as potentially harmful based on the overall classification
+                    for token in token_scores:
+                        token["similarity"] = probability
+                        token["is_harmful"] = is_harmful
+                        token["category"] = "hallucination"  # Default category for classifier
+                    
+                    # Add harmful token info for the first token (if any)
+                    if token_scores:
+                        result["harmful_token"] = token_scores[0]
+                
+                return result
+                
+            except Exception as e:
+                self.logger.error(f"Error during classification: {e}")
+                result["blocked"] = False
+                result["reason"] = None
+                return result
+        
+        # For vector-based approach, process token scores to determine if any token is harmful
         blocked = False
         block_reason = None
         harmful_token = None
@@ -698,11 +961,11 @@ class ActivationGuard:
                     harmful_token = token
                     block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
                     break
-        
+            
         # Add safety information to the result
         enhanced_result = {
             "response": result["response"],
-            "token_scores": result.get("token_scores", []) if return_token_scores else [],
+            "token_scores": result.get("token_scores", []),
             "blocked": blocked,
             "reason": block_reason,
             "harmful_token": harmful_token
@@ -770,11 +1033,17 @@ class ActivationGuard:
     
     def get_available_categories(self) -> List[str]:
         """
-        Get list of available categories.
+        Get a list of all available categories.
         
         Returns:
             List of category names
         """
+        if self.vectors is None:
+            # In classifier-only mode, use the classifier's class labels
+            if hasattr(self, 'use_classifier') and self.use_classifier and hasattr(self, 'classifier') and self.classifier is not None:
+                return ["hallucination"]  # Default category for classifier-only mode
+            return []
+        
         return self.vectors.get_available_categories()
     
     def get_triggered_category(self, text: str) -> Optional[str]:
@@ -1102,3 +1371,23 @@ class ActivationGuard:
         # Reinitialize monitor with empty vectors
         if self.monitor is not None:
             self._initialize_monitor_and_inference() 
+    
+    def _detect_format(self) -> str:
+        """
+        Detect the appropriate format to use based on the model.
+        
+        Returns:
+            A string indicating the format: "llama31", "mistral", or "legacy"
+        """
+        model_name = getattr(self.model.config, "_name_or_path", "unknown").lower()
+        
+        # Check for specific model types
+        if "llama-3" in model_name:
+            self.logger.info("Detected Llama 3.1 model. Will use Llama 3.1 prompt format.")
+            return "llama31"
+        elif "mistral" in model_name:
+            self.logger.info("Detected Mistral model. Will use Mistral prompt format.")
+            return "mistral"
+        else:
+            self.logger.info("Using legacy prompt format for model.")
+            return "legacy" 
