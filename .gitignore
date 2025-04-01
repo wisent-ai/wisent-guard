@@ -1,3 +1,5 @@
 # Ignore CAA folder
-/CAA/ 
+/CAA/
+/circuit-breakers/*
+
 .env

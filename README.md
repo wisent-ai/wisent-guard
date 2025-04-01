@@ -1,5 +1,9 @@
 # Wisent-Guard
 
+<p align="center">
+  <img src="wisent-guard-logo.png" alt="Wisent Guard" width="200">
+</p>
+
 A Python package for monitoring and guarding against harmful content and hallucinations in language models by analyzing model activations.
 
 ## Overview
@@ -17,40 +21,24 @@ Wisent-Guard allows you to specify harmful phrases and creates contrastive repre
 pip install wisent-guard
 ```
 
-## Set User and Assistant tokens - critical for good activation collection!
+## FAQ
 
-Different language models use different formatting for conversations. By default, Wisent-Guard uses Llama-style `<|user|>` and `<|assistant|>` tokens. You can customize these to match your model's expected format using:
+Why would I use this instead of traditional guardrails? 
 
-### Environment Variables (Recommended)
+With traditional guardrails, you need to specify filters for your particular use case. There is also a latency involved in 
 
-Set these before running your script:
+How does it work? 
 
-```bash
-# For OpenAI/ChatGPT style models
-export WISENT_USER_TOKEN="<|im_start|>user"
-export WISENT_ASSISTANT_TOKEN="<|im_start|>assistant"
+How is it different from existing approaches? 
 
-# For Anthropic Claude style
-export WISENT_USER_TOKEN="Human:"
-export WISENT_ASSISTANT_TOKEN="Assistant:"
 
-# For Mistral style
-export WISENT_USER_TOKEN="[INST]"
-export WISENT_ASSISTANT_TOKEN="[/INST]"
-```
+It does not work for my use case, why? 
 
-### Direct Parameter Setting
+Wisent-guard is an experimental technology. Representation engineering requires a careful choice of hyperparameters. For every model, you need to setup the right model tokens, activation reading patterns and layers to read the activations from. You can read more about it here: https://arxiv.org/abs/2502.17601 or talk to me directly and I can help you set up the guard for your specific use case: https://calendly.com/lbartoszcze. 
 
-You can also set these directly when creating the guard:
+## Tell me in depth how it works! 
 
-```python
-guard = ActivationGuard(
-    model=model,
-    tokenizer=tokenizer,
-    user_token="<|im_start|>user",
-    assistant_token="<|im_start|>assistant"
-)
-```
+Ok you are 
 
 ## Quick Start
 
