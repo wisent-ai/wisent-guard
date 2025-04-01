@@ -755,42 +755,58 @@ class ContrastiveVectors:
         self.logger.info(f"Computed contrastive vectors for {len(self.contrastive_vectors)} categories")
         return self.contrastive_vectors
     
-    def save_vectors(self) -> None:
-        """Save all vectors to disk."""
-        # First compute contrastive vectors if not already done
-        if not self.contrastive_vectors:
-            self.logger.info("No contrastive vectors found, computing now")
-            self.compute_contrastive_vectors()
-            
-        # Save each category's vectors
-        self.logger.info("Saving vectors to disk")
-        saved_count = 0
+    def save_vectors(self) -> bool:
+        """
+        Save all vectors to disk.
         
-        for category in self.contrastive_vectors:
-            self.logger.debug(f"Saving vectors for category: {category}")
-            category_dir = os.path.join(self.vectors_dir, category)
-            ensure_dir(category_dir)
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # First compute contrastive vectors if not already done
+            if not self.contrastive_vectors:
+                self.logger.info("No contrastive vectors found, computing now")
+                self.compute_contrastive_vectors()
             
-            # Save contrastive vectors
-            for layer, vector in self.contrastive_vectors[category].items():
-                vector_path = os.path.join(category_dir, f"contrastive_layer_{layer}.pt")
-                torch.save(vector, vector_path)
-                saved_count += 1
-                self.logger.debug(f"Saved contrastive vector to {vector_path}")
+            # Ensure we have contrastive vectors to save
+            if not self.contrastive_vectors:
+                self.logger.warning("No contrastive vectors to save")
+                return False
             
-            # Also save raw vectors for potential re-calculation
-            harmful_path = os.path.join(category_dir, "harmful_vectors.pkl")
-            harmless_path = os.path.join(category_dir, "harmless_vectors.pkl")
+            # Save each category's vectors
+            self.logger.info("Saving vectors to disk")
+            saved_count = 0
             
-            with open(harmful_path, 'wb') as f:
-                pickle.dump(self.harmful_vectors[category], f)
-                self.logger.debug(f"Saved harmful vectors to {harmful_path}")
+            for category in self.contrastive_vectors:
+                self.logger.debug(f"Saving vectors for category: {category}")
+                category_dir = os.path.join(self.vectors_dir, category)
+                ensure_dir(category_dir)
+                
+                # Save contrastive vectors
+                for layer, vector in self.contrastive_vectors[category].items():
+                    vector_path = os.path.join(category_dir, f"contrastive_layer_{layer}.pt")
+                    torch.save(vector, vector_path)
+                    saved_count += 1
+                    self.logger.debug(f"Saved contrastive vector to {vector_path}")
+                
+                # Also save raw vectors for potential re-calculation if available
+                if category in self.harmful_vectors:
+                    harmful_path = os.path.join(category_dir, "harmful_vectors.pkl")
+                    with open(harmful_path, 'wb') as f:
+                        pickle.dump(self.harmful_vectors[category], f)
+                        self.logger.debug(f"Saved harmful vectors to {harmful_path}")
+                
+                if category in self.harmless_vectors:
+                    harmless_path = os.path.join(category_dir, "harmless_vectors.pkl")
+                    with open(harmless_path, 'wb') as f:
+                        pickle.dump(self.harmless_vectors[category], f)
+                        self.logger.debug(f"Saved harmless vectors to {harmless_path}")
             
-            with open(harmless_path, 'wb') as f:
-                pickle.dump(self.harmless_vectors[category], f)
-                self.logger.debug(f"Saved harmless vectors to {harmless_path}")
-        
-        self.logger.info(f"Successfully saved {saved_count} contrastive vectors")
+            self.logger.info(f"Successfully saved {saved_count} contrastive vectors")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error saving vectors: {e}")
+            return False
     
     def load_vectors(self, categories: Optional[List[str]] = None, layers: Optional[List[int]] = None) -> bool:
         """
@@ -982,3 +998,145 @@ class ContrastiveVectors:
             Dictionary mapping categories to dictionaries mapping layers to contrastive vectors
         """
         return self.contrastive_vectors 
+
+    def get_similarity(self, 
+                    activation_data: Dict[str, Any],
+                    layer: int, 
+                    category: str,
+                    token_strategy: str = "last") -> float:
+        """
+        Calculate similarity between an activation and a contrastive vector.
+        
+        Args:
+            activation_data: Dictionary of activation data
+            layer: Layer to compare
+            category: Category of contrastive vector to compare against
+            token_strategy: Kept for backward compatibility, but only "last" is supported
+            
+        Returns:
+            Cosine similarity score (0.0-1.0)
+        """
+        if token_strategy != "last":
+            self.logger.warning(f"Ignoring provided token_strategy='{token_strategy}'. Always using 'last' token strategy.")
+        
+        # Get the contrastive vector for this category and layer
+        contrastive_vector = self.get_contrastive_vector(category, layer)
+        if contrastive_vector is None:
+            return 0.0
+            
+        # Extract activation tensor - always using the "last" method
+        if isinstance(activation_data, dict):
+            # For raw activation data (e.g., from hooks)
+            if torch.is_tensor(activation_data):
+                activation = activation_data
+            elif hasattr(activation_data, 'get') and torch.is_tensor(activation_data.get('activations')):
+                activation = activation_data['activations']
+            else:
+                self.logger.warning(f"Unknown activation data format: {type(activation_data)}")
+                return 0.0
+        elif torch.is_tensor(activation_data):
+            # Direct tensor input
+            activation = activation_data
+        else:
+            self.logger.warning(f"Unknown activation data type: {type(activation_data)}")
+            return 0.0
+            
+        # Calculate similarity
+        try:
+            # Handle tensor device and shape differences
+            if activation.device != contrastive_vector.device:
+                self.logger.debug(f"Moving activation to {contrastive_vector.device} for comparison")
+                activation = activation.to(contrastive_vector.device)
+                
+            # Handle dimension differences
+            if activation.shape != contrastive_vector.shape:
+                self.logger.debug(f"Adjusting dimensions: activation {activation.shape}, vector {contrastive_vector.shape}")
+                
+                # Flatten if needed
+                if len(activation.shape) > 1:
+                    activation = activation.flatten()
+                if len(contrastive_vector.shape) > 1:
+                    contrastive_vector = contrastive_vector.flatten()
+                
+                # If still different, truncate to smaller size
+                if activation.shape != contrastive_vector.shape:
+                    min_size = min(activation.shape[0], contrastive_vector.shape[0])
+                    activation = activation[:min_size]
+                    contrastive_vector = contrastive_vector[:min_size]
+            
+            similarity = cosine_sim(activation, contrastive_vector)
+            return similarity.item() if torch.is_tensor(similarity) else similarity
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating similarity: {e}")
+            return 0.0 
+
+    def has_any_vectors(self) -> bool:
+        """
+        Check if any vectors are loaded.
+        
+        Returns:
+            True if any vectors are loaded, False otherwise
+        """
+        return len(self.contrastive_vectors) > 0 
+
+    def add_contrastive_vector(self, harmful_activations: List[torch.Tensor], harmless_activations: List[torch.Tensor], category: str, layer: int):
+        """
+        Add contrastive vector directly from lists of activations.
+        
+        Args:
+            harmful_activations: List of activation tensors for harmful examples
+            harmless_activations: List of activation tensors for harmless examples
+            category: Category name for the contrastive vector
+            layer: Layer number
+        """
+        if not harmful_activations or not harmless_activations:
+            self.logger.warning(f"Empty activation lists for category '{category}' layer {layer}")
+            return
+        
+        # Stack harmful activations
+        try:
+            harmful_stack = torch.stack(harmful_activations)
+        except Exception as e:
+            self.logger.error(f"Error stacking harmful activations: {e}")
+            return
+        
+        # Stack harmless activations
+        try:
+            harmless_stack = torch.stack(harmless_activations)
+        except Exception as e:
+            self.logger.error(f"Error stacking harmless activations: {e}")
+            return
+        
+        # Calculate means
+        harmful_mean = torch.mean(harmful_stack, dim=0)
+        harmless_mean = torch.mean(harmless_stack, dim=0)
+        
+        # Calculate contrastive vector
+        contrastive_vector = harmful_mean - harmless_mean
+        
+        # Normalize
+        contrastive_vector = contrastive_vector / torch.norm(contrastive_vector)
+        
+        # Initialize category if needed
+        if category not in self.contrastive_vectors:
+            self.contrastive_vectors[category] = {}
+        
+        # Store the vector
+        self.contrastive_vectors[category][layer] = contrastive_vector.cpu()
+        self.logger.info(f"Added contrastive vector for category '{category}' layer {layer}")
+        
+        # Update metadata
+        if category not in self.metadata["categories"]:
+            self.metadata["categories"].append(category)
+            self.metadata["num_pairs"][category] = len(harmful_activations)
+        else:
+            self.metadata["num_pairs"][category] = self.metadata["num_pairs"].get(category, 0) + len(harmful_activations)
+        
+        if str(layer) not in self.metadata["layers"]:
+            self.metadata["layers"][str(layer)] = len(harmful_activations)
+        else:
+            self.metadata["layers"][str(layer)] = self.metadata["layers"].get(str(layer), 0) + len(harmful_activations)
+        
+        # Save metadata
+        self._save_metadata() 
