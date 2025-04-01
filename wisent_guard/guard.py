@@ -4,6 +4,7 @@ Main ActivationGuard class for the wisent-guard package
 
 import os
 import torch
+import re
 from typing import List, Dict, Tuple, Any, Optional, Union, Set
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizer
 from tqdm import tqdm
@@ -40,6 +41,8 @@ class ActivationGuard:
         auto_load_vectors: bool = False,  # Add parameter to control automatic vector loading
         user_token: Optional[str] = None,
         assistant_token: Optional[str] = None,
+        force_format: Optional[str] = None,
+        force_llama_format: Optional[bool] = None  # For backward compatibility
     ):
         """
         Initialize the ActivationGuard.
@@ -60,6 +63,8 @@ class ActivationGuard:
             auto_load_vectors: Whether to automatically load all vectors from save_dir (default: False)
             user_token: Custom user token override (default: from WISENT_USER_TOKEN env var or "<|user|>")
             assistant_token: Custom assistant token override (default: from WISENT_ASSISTANT_TOKEN env var or "<|assistant|>")
+            force_format: Force specific format: "llama31", "mistral", "legacy", or None for auto-detect
+            force_llama_format: (Deprecated) For backward compatibility
         """
         # Set up logger
         self.logger = get_logger(level=log_level, log_file=log_file)
@@ -68,8 +73,6 @@ class ActivationGuard:
         # Get user/assistant tokens from parameters, env vars, or defaults
         self.user_token = user_token or os.environ.get("WISENT_USER_TOKEN", DEFAULT_USER_TOKEN)
         self.assistant_token = assistant_token or os.environ.get("WISENT_ASSISTANT_TOKEN", DEFAULT_ASSISTANT_TOKEN)
-        self.logger.info(f"Using user token: {self.user_token}")
-        self.logger.info(f"Using assistant token: {self.assistant_token}")
         
         # Set up directories
         self.save_dir = save_dir
@@ -115,7 +118,7 @@ class ActivationGuard:
             self.logger.info("Using provided tokenizer")
             
         # Ensure tokenizer has padding token
-        if self.tokenizer.pad_token is None:
+        if self.tokenizer is not None and self.tokenizer.pad_token is None:
             self.logger.info("Setting padding token to EOS token")
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
@@ -128,7 +131,62 @@ class ActivationGuard:
         self.monitor = None
         self.inference = None
         self.threshold = threshold
+        
+        # Handle force_llama_format for backward compatibility
+        if force_llama_format is not None:
+            if force_llama_format is True:
+                force_format = "llama31"
+            elif force_llama_format is False:
+                force_format = "legacy"
+            self.logger.warning("force_llama_format is deprecated, use force_format instead")
+        
+        # Convert boolean force_format to string for backward compatibility
+        if force_format is True:
+            self.force_format = "llama31"
+        elif force_format is False:
+            self.force_format = "legacy"
+        else:
+            self.force_format = force_format
         self.logger.info(f"Similarity threshold set to {self.threshold}")
+        
+        # Check if model is likely a Llama 3.1 model and set format accordingly
+        model_name = getattr(self.model.config, "_name_or_path", "").lower()
+        is_llama_3 = bool(re.search(r"llama-?3", model_name, re.IGNORECASE))
+        is_mistral = bool(re.search(r"mistral", model_name, re.IGNORECASE))
+        
+        self.logger.debug(f"Model name: {model_name}")
+        self.logger.debug(f"Llama 3 detection: {is_llama_3}")
+        self.logger.debug(f"Mistral detection: {is_mistral}")
+        
+        if is_llama_3:
+            if self.force_format == "legacy":
+                self.logger.warning("Detected Llama 3.1 model but legacy format is forced. This may cause issues.")
+            elif self.force_format is None:
+                self.force_format = "llama31"
+                self.logger.info("Detected Llama 3.1 model. Automatically enabling Llama 3.1 prompt format.")
+            elif self.force_format == "llama31":
+                self.logger.info("Detected Llama 3.1 model. Will use Llama 3.1 prompt format.")
+                
+            if self.force_format == "llama31":
+                self.logger.info("Llama 3.1 format will use special tokens:")
+                self.logger.info("  <|begin_of_text|><|start_header_id|>user<|end_header_id|>...")
+                self.logger.info("  Note: User/assistant token settings don't affect Llama 3.1 format")
+        elif is_mistral:
+            if self.force_format == "legacy":
+                self.logger.warning("Detected Mistral model but legacy format is forced. This may cause issues.")
+            elif self.force_format is None:
+                self.force_format = "mistral"
+                self.logger.info("Detected Mistral model. Automatically enabling Mistral prompt format.")
+            elif self.force_format == "mistral":
+                self.logger.info("Detected Mistral model. Will use Mistral prompt format.")
+                
+            if self.force_format == "mistral":
+                self.logger.info("Mistral format will use special tokens:")
+                self.logger.info("  [INST] instruction [/INST] response")
+                self.logger.info("  Note: User/assistant token settings don't affect Mistral format")
+        else:
+            self.logger.info(f"Using legacy format with user token: {self.user_token}")
+            self.logger.info(f"Using legacy format with assistant token: {self.assistant_token}")
         
         # Only load vectors if auto_load_vectors is True
         if auto_load_vectors:
@@ -172,13 +230,55 @@ class ActivationGuard:
             tokenizer=self.tokenizer,
             monitor=self.monitor,
             user_token=self.user_token,
-            assistant_token=self.assistant_token
+            assistant_token=self.assistant_token,
+            force_format=self.force_format
         )
         
         # Set up target tokens for multiple-choice format
         self._setup_target_tokens()
         
         self.logger.debug("Monitor and inference components initialized")
+    
+    def _format_prompt(self, instruction: str, response: str = None) -> str:
+        """
+        Format a prompt using the appropriate format (Llama 3.1 or legacy)
+        """
+        # Check which format to use
+        if self.force_format == "llama31":
+            # Llama 3.1 special tokens
+            BEGIN_TEXT = "<|begin_of_text|>"
+            START_HEADER = "<|start_header_id|>"
+            END_HEADER = "<|end_header_id|>"
+            EOT = "<|eot_id|>"
+            
+            if response is not None:
+                # Format with both instruction and response
+                return f"{BEGIN_TEXT}{START_HEADER}user{END_HEADER}\n{instruction}{EOT}{START_HEADER}assistant{END_HEADER}\n{response}"
+            else:
+                # Format with just instruction
+                return f"{BEGIN_TEXT}{START_HEADER}user{END_HEADER}\n{instruction}{EOT}{START_HEADER}assistant{END_HEADER}"
+        elif self.force_format == "mistral":
+            # Mistral format tokens
+            INST_START = "[INST]"
+            INST_END = "[/INST]"
+            
+            if response is not None:
+                # Format with both instruction and response
+                return f"{INST_START} {instruction} {INST_END} {response}"
+            else:
+                # Format with just instruction
+                return f"{INST_START} {instruction} {INST_END}"
+        else:
+            # Legacy format
+            if response is not None:
+                return f"{self.user_token}\n{instruction}\n{self.assistant_token}\n{response}"
+            else:
+                return f"{self.user_token}\n{instruction}\n{self.assistant_token}"
+    
+    def _format_multiple_choice(self, question: str, choice_a: str, choice_b: str, answer: str) -> str:
+        """Format a multiple-choice question with the given answer."""
+        instruction = f"{question}\nA. {choice_a}\nB. {choice_b}"
+        return self._format_prompt(instruction, answer)
     
     def _convert_to_multiple_choice(self, harmful_phrase: str, harmless_phrase: str) -> Tuple[str, str]:
         """
@@ -197,18 +297,20 @@ class ActivationGuard:
         question = "Which of the following statements is true?"
         
         # Format as multiple-choice with A as harmless and B as harmful
-        harmless_mc = self._format_multiple_choice(
-            question,
-            harmless_phrase,  # A is harmless/truthful
-            harmful_phrase,   # B is harmful/false
-            "A"  # Correct answer is A
+        # Option A = harmless, Option B = harmful
+        harmful_mc = self._format_multiple_choice(
+            question=question,
+            choice_a=harmless_phrase,
+            choice_b=harmful_phrase,
+            answer="B"  # Harmful choice (B) is correct for harmful_mc
         )
         
-        harmful_mc = self._format_multiple_choice(
-            question,
-            harmless_phrase,  # A is harmless/truthful
-            harmful_phrase,   # B is harmful/false
-            "B"  # Harmful answer is B
+        # Option A = harmless, Option B = harmful
+        harmless_mc = self._format_multiple_choice(
+            question=question,
+            choice_a=harmless_phrase,
+            choice_b=harmful_phrase,
+            answer="A"  # Harmless choice (A) is correct for harmless_mc
         )
         
         self.logger.debug("Multiple-choice conversion complete")
@@ -236,6 +338,12 @@ class ActivationGuard:
             harmful_phrase = pair["harmful"]
             harmless_phrase = pair["harmless"]
             
+            # Add example logging to show what we're processing
+            if i == 0:  # Only log the first example to avoid spam
+                print(f"\n==== EXAMPLE TRAINING PAIR ====")
+                print(f"HARMFUL: {harmful_phrase[:100]}..." if len(harmful_phrase) > 100 else f"HARMFUL: {harmful_phrase}")
+                print(f"HARMLESS: {harmless_phrase[:100]}..." if len(harmless_phrase) > 100 else f"HARMLESS: {harmless_phrase}")
+            
             self.logger.debug(f"Processing pair {i+1}/{len(phrase_pairs)}")
             self.logger.debug(f"Harmful: {harmful_phrase[:50]}..." if len(harmful_phrase) > 50 else f"Harmful: {harmful_phrase}")
             self.logger.debug(f"Harmless: {harmless_phrase[:50]}..." if len(harmless_phrase) > 50 else f"Harmless: {harmless_phrase}")
@@ -243,13 +351,45 @@ class ActivationGuard:
             # Convert to multiple-choice format
             harmful_mc, harmless_mc = self._convert_to_multiple_choice(harmful_phrase, harmless_phrase)
             
+            # Log the converted format
+            if i == 0:  # Only log the first example
+                print(f"\nFORMATTED HARMFUL MC: {harmful_mc}")
+            
             # Get activations for harmful phrase in multiple-choice format
             self.logger.debug("Collecting activations for harmful phrase")
             self.monitor.reset()
             harmful_input_ids = self.tokenizer.encode(harmful_mc, return_tensors="pt").to(self.device)
+            
+            # Log token IDs and decoded tokens
+            if i == 0:  # Only log the first example
+                print("\n==== ACTIVATION COLLECTION ====")
+                print(f"Input shape: {harmful_input_ids.shape}")
+                print(f"Last token ID: {harmful_input_ids[0][-1].item()} ('{self.tokenizer.decode([harmful_input_ids[0][-1].item()])}')")
+            
             with torch.no_grad():
                 self.model(harmful_input_ids)
             harmful_activations = self.monitor.hooks.get_activations()
+            
+            # Show sample of collected activations
+            if i == 0:
+                print("\nCOLLECTED ACTIVATIONS:")
+                for layer, activation in harmful_activations.items():
+                    print(f"Layer {layer}: Shape={activation.shape}")
+                    # Show a small sample of activation values
+                    if activation.dim() >= 2:
+                        # Handle different tensor dimensions
+                        if activation.dim() == 2:
+                            # For 2D tensors [batch_size, hidden_size]
+                            sample = activation[0, :5].cpu().numpy()
+                        else:
+                            # For 3D tensors [batch_size, seq_len, hidden_size]
+                            sample = activation[0, 0, :5].cpu().numpy()
+                        print(f"  Sample values: {sample}")
+                    
+                    # Only show one layer as example
+                    if layer == list(harmful_activations.keys())[0]:
+                        break
+            
             self.logger.debug(f"Collected activations from {len(harmful_activations)} layers for harmful phrase")
             
             # Get activations for harmless phrase in multiple-choice format
@@ -391,41 +531,27 @@ class ActivationGuard:
         # Re-initialize monitor with new vectors
         self._initialize_monitor_and_inference()
     
-    def _format_multiple_choice(self, question: str, choice_a: str, choice_b: str, answer: str) -> str:
-        """
-        Format a multiple-choice question with the given answer.
-        
-        Args:
-            question: The question text
-            choice_a: The text for option A
-            choice_b: The text for option B
-            answer: The answer ("A" or "B")
-            
-        Returns:
-            Formatted text with the answer
-        """
-        return f"{self.user_token}\n{question}\nA. {choice_a}\nB. {choice_b}\n{self.assistant_token}\n{answer}"
-    
     def _format_input_as_multiple_choice(self, text: str) -> str:
         """
-        If input is not already in multiple-choice format, try to convert it.
+        Format a single input text as a multiple-choice question.
         
         Args:
-            text: Input text
+            text: The input text
             
         Returns:
-            Multiple-choice formatted text if possible, or original text
+            Formatted multiple-choice question
         """
-        # Check if text already appears to be in multiple-choice format
-        if f"{self.assistant_token}\nA" in text or f"{self.assistant_token}\nB" in text:
-            return text
+        self.logger.debug(f"Formatting as multiple-choice: {text[:50]}...")
         
-        # For detection, add a temporary A answer
-        if self.user_token in text and self.assistant_token not in text:
-            return f"{text}\n{self.assistant_token}\nA"
+        # Create a simple true/false question for the input
+        question = "Which of the following statements is true?"
         
-        # Can't easily convert, return as is
-        return text
+        # Option A: The provided statement is true
+        # Option B: The provided statement is false
+        instruction = f"{question}\nA. {text}\nB. The statement in option A is false."
+        
+        # We don't include an answer, just the question
+        return self._format_prompt(instruction)
     
     def is_harmful(self, text: str, categories: Optional[List[str]] = None) -> bool:
         """
