@@ -5,11 +5,11 @@ Evaluation script for meta-llama/Llama-3.1-8B-Instruct using Dangerous questions
 This script:
 1. Loads a DnA dataset
 2. Trains the wisent-guard activation monitor on harmful/harmless response pairs
-3. Uses a machine learning classifier for harmful content detection
+3. Uses a threshold-based activation similarity approach for harmful content detection
 4. Evaluates the model's performance on the test set
 5. Reports metrics on harmful content detection and prevention
 
-The script uses a CLASSIFIER-BASED approach (logistic regression or MLP)
+The script uses a THRESHOLD-BASED approach (activation similarity comparison)
 for harmful content detection by default.
 
 """
@@ -846,9 +846,9 @@ def main(args):
         init_guard.train_on_phrase_pairs(training_pairs, category="harmful_content")
     
     # Check if we need to train a classifier
-    if args.train_classifier or (not args.use_threshold and not os.path.exists(args.classifier_path)):
+    if args.train_classifier:
         if not args.classifier_path:
-            print("Error: --classifier-path is required for classifier-based approach.")
+            print("Error: --classifier-path is required when --train-classifier is set.")
             return
         
         print(f"Will train a classifier and save to: {args.classifier_path}")
@@ -863,25 +863,15 @@ def main(args):
             args
         )
     
-    # Default to using classifier unless --use-threshold is specified
-    if not args.use_threshold:
+    # Check if we should use the classifier approach
+    if args.use_classifier:
         if not args.classifier_path:
-            print("Error: --classifier-path is required for classifier-based approach.")
+            print("Error: --classifier-path is required when --use-classifier is set.")
             return
         
         if not os.path.exists(args.classifier_path) and not args.train_classifier:
             print(f"Error: Classifier path {args.classifier_path} does not exist and --train-classifier is not set.")
-            print("Will train a classifier now...")
-            
-            # Collect activations for classifier training
-            activations = collect_activations_for_training(init_guard, train_df, args.max_pairs)
-            
-            # Train the classifier
-            classifier = train_classifier(
-                activations["harmful_activations"],
-                activations["harmless_activations"],
-                args
-            )
+            return
         
         print(f"Using classifier-based approach with model: {args.classifier_path}")
         print(f"Classifier threshold: {args.classifier_threshold}")
@@ -931,7 +921,7 @@ def main(args):
             save_metrics(baseline_metrics, os.path.join(args.output_dir, "baseline_metrics.json"))
     
     # Evaluate with guard
-    detection_approach = "threshold-based" if args.use_threshold else "classifier-based"
+    detection_approach = "classifier-based" if args.use_classifier else "threshold-based"
     print(f"\n----- EVALUATING MODEL WITH {detection_approach.upper()} GUARD -----")
     
     # Skip actual evaluation if --no-eval is set
@@ -960,8 +950,8 @@ def main(args):
         os.makedirs(args.output_dir, exist_ok=True)
         
         # Create file names with approach information
-        guard_results_file = f"guard_results_dna_{detection_approach}.csv"
-        guard_metrics_file = f"guard_metrics_dna_{detection_approach}.json"
+        guard_results_file = f"guard_results_dna_threshold_{detection_approach}.csv"
+        guard_metrics_file = f"guard_metrics_dna_threshold_{detection_approach}.json"
         
         save_results(guard_results, os.path.join(args.output_dir, guard_results_file))
         save_metrics(guard_metrics, os.path.join(args.output_dir, guard_metrics_file))
@@ -1049,7 +1039,7 @@ Your evaluation (1 or 0 ONLY):"""
         return -1
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate Llama-3.1-8B-Instruct on DnA with classifier-based guardrails")
+    parser = argparse.ArgumentParser(description="Evaluate Llama-3.1-8B-Instruct on DnA with threshold-based guardrails")
     
     # Data paths
     parser.add_argument("--train-data", type=str, default="evaluation/DnA_en.csv", 
@@ -1081,11 +1071,11 @@ if __name__ == "__main__":
     parser.add_argument("--sample-size", type=int, default=0, 
                         help="Number of samples to evaluate (0 for all)")
     
-    # wisent-guard parameters
+    # wisent-guard threshold parameters - the default approach
     parser.add_argument("--layer-number", type=int, default=15, 
                         help="Layer number to monitor (default: 15, -1 for all layers)")
     parser.add_argument("--threshold", type=float, default=0.2, 
-                        help="Similarity threshold for threshold-based approach (lower is more sensitive)")
+                        help="Similarity threshold - primary parameter for threshold-based approach (lower is more sensitive)")
     parser.add_argument("--save-dir", type=str, default="./harmful_content_guard_data", 
                         help="Directory to save/load vectors")
     parser.add_argument("--use-existing-vectors", action="store_true",
@@ -1097,17 +1087,17 @@ if __name__ == "__main__":
     parser.add_argument("--max-pairs", type=int, default=0, 
                         help="Maximum number of training pairs to create (0 for all)")
     
-    # Classifier parameters - now default approach
-    parser.add_argument("--use-threshold", action="store_true",
-                        help="Use threshold-based approach instead of classifier-based")
-    parser.add_argument("--classifier-path", type=str, default="./models/harmful_classifier.pkl",
-                        help="Path to trained classifier model (will be created if it doesn't exist)")
+    # Optional classifier parameters - not used by default
+    parser.add_argument("--use-classifier", action="store_true",
+                        help="Use classifier-based approach instead of default threshold-based")
+    parser.add_argument("--classifier-path", type=str, 
+                        help="Path to trained classifier model (required if use-classifier is set)")
     parser.add_argument("--classifier-threshold", type=float, default=0.5,
                         help="Classification threshold for the ML model (default: 0.5)")
     
-    # Classifier training parameters
+    # Classifier training parameters - only needed if --use-classifier is set
     parser.add_argument("--train-classifier", action="store_true",
-                        help="Force training a new classifier even if one exists")
+                        help="Train a new classifier using activation patterns")
     parser.add_argument("--classifier-model", type=str, default="logistic",
                         choices=["logistic", "mlp"],
                         help="Classifier model type (logistic or mlp)")

@@ -34,14 +34,34 @@ def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
         if isinstance(v1, torch.Tensor):
             if v1.device.type in ['mps', 'cuda']:
                 v1 = v1.detach().cpu()
-            v1 = v1.detach().numpy()
+            v1 = v1.detach()
             
         if isinstance(v2, torch.Tensor):
             if v2.device.type in ['mps', 'cuda']:
                 v2 = v2.detach().cpu()
-            v2 = v2.detach().numpy()
+            v2 = v2.detach()
+        
+        # PyTorch-based implementation for better numerical stability
+        if isinstance(v1, torch.Tensor) and isinstance(v2, torch.Tensor):
+            # Flatten tensors
+            v1_flat = v1.reshape(1, -1)
+            v2_flat = v2.reshape(1, -1)
             
-        # Reshape if needed
+            # Ensure dimensions match
+            if v1_flat.shape[1] != v2_flat.shape[1]:
+                min_dim = min(v1_flat.shape[1], v2_flat.shape[1])
+                v1_flat = v1_flat[:, :min_dim]
+                v2_flat = v2_flat[:, :min_dim]
+            
+            # Calculate similarity using PyTorch
+            sim = torch.nn.functional.cosine_similarity(v1_flat, v2_flat, dim=1)
+            return sim.item()  # Get scalar value
+        
+        # Convert to numpy arrays for sklearn implementation
+        v1 = v1.numpy() if isinstance(v1, torch.Tensor) else v1
+        v2 = v2.numpy() if isinstance(v2, torch.Tensor) else v2
+            
+        # Reshape if needed for sklearn
         if len(v1.shape) > 1:
             v1 = v1.reshape(1, -1)
         if len(v2.shape) > 1:

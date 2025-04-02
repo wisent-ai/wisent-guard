@@ -244,10 +244,10 @@ class ActivationMonitor:
                 
                 # Calculate similarity
                 similarity = torch.nn.functional.cosine_similarity(
-                    activation.to(self.device),
-                    contrastive_vector.to(self.device),
-                    dim=0
-                ).item()
+                    activation.to(self.device).view(1, -1),  # Reshape to [1, hidden_size]
+                    contrastive_vector.to(self.device).view(1, -1),  # Reshape to [1, hidden_size]
+                    dim=1  # Calculate along the feature dimension
+                ).item()  # Get the scalar
                 
                 # Check if this is the highest similarity
                 if similarity > category_result["max_similarity"]:
