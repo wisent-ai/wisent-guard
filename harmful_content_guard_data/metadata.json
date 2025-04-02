@@ -3,10 +3,10 @@
     "harmful_content"
   ],
   "layers": {
-    "15": 751
+    "15": 1567
   },
   "version": "0.1.0",
   "num_pairs": {
-    "harmful_content": 751
+    "harmful_content": 1567
   }
 }
