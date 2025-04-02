@@ -1,13 +1,12 @@
 {
   "categories": [
-    "explosives"
+    "harmful_content"
   ],
   "layers": {
-    "24": 1,
-    "15": 7
+    "15": 751
   },
   "version": "0.1.0",
   "num_pairs": {
-    "explosives": 8
+    "harmful_content": 751
   }
 }
