@@ -9,53 +9,72 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import argparse
 from sklearn.metrics import confusion_matrix, classification_report
 import warnings
 
 # Ignore specific warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-def evaluate_classifier():
-    """Evaluate the performance of the hallucination classifier."""
+def evaluate_classifier(results_file=None, score_source="human"):
+    """
+    Evaluate the performance of the hallucination classifier.
+    
+    Args:
+        results_file: Path to CSV results file
+        score_source: Source of the scores ('human' or 'claude')
+    """
     print("Evaluating classifier performance...")
+    
+    # Handle terminology based on score source
+    score_type = score_source.capitalize()
+    
+    # Set the score column based on source
+    score_column = 'human_score'
     
     # Load the results CSV file
     try:
-        results_file = "evaluation/results/guard_results_classifier-based.csv"
+        if results_file is None:
+            results_file = "evaluation/results/guard_results_classifier-based.csv"
         df = pd.read_csv(results_file)
         print(f"Loaded {len(df)} records from {results_file}")
     except Exception as e:
         print(f"Error loading results file: {e}")
         return
     
+    # Check if the file contains the needed columns
+    if score_column not in df.columns:
+        print(f"Error: {score_column} column not found in the data")
+        return
+        
     # Clean up data - remove NaN values or replace with defaults
     df['is_harmful'] = df['is_harmful'].fillna(False)
     df['blocked'] = df['blocked'].fillna(False)
     
-    # Convert human_score to boolean for analysis
-    # human_score of 1 = correct answer (not harmful)
-    # human_score of 0 = incorrect answer (harmful)
-    df['human_correct'] = df['human_score'] == 1
+    # Convert score to boolean for analysis
+    # Score of 1 = correct answer (not harmful)
+    # Score of 0 = incorrect answer (harmful)
+    df['is_correct'] = df[score_column] == 1
     
     # Analysis 1: How often is the classifier's prediction correct?
     
-    # True positives: Classifier identified as harmful and human says it's incorrect (0)
-    true_positives = df[(df['blocked'] == True) & (df['human_correct'] == False)].shape[0]
+    # True positives: Classifier identified as harmful and evaluation says it's incorrect (0)
+    true_positives = df[(df['blocked'] == True) & (df['is_correct'] == False)].shape[0]
     
-    # True negatives: Classifier identified as not harmful and human says it's correct (1)
-    true_negatives = df[(df['blocked'] == False) & (df['human_correct'] == True)].shape[0]
+    # True negatives: Classifier identified as not harmful and evaluation says it's correct (1)
+    true_negatives = df[(df['blocked'] == False) & (df['is_correct'] == True)].shape[0]
     
-    # False positives: Classifier identified as harmful but human says it's correct (1)
-    false_positives = df[(df['blocked'] == True) & (df['human_correct'] == True)].shape[0]
+    # False positives: Classifier identified as harmful but evaluation says it's correct (1)
+    false_positives = df[(df['blocked'] == True) & (df['is_correct'] == True)].shape[0]
     
-    # False negatives: Classifier identified as not harmful but human says it's incorrect (0)
-    false_negatives = df[(df['blocked'] == False) & (df['human_correct'] == False)].shape[0]
+    # False negatives: Classifier identified as not harmful but evaluation says it's incorrect (0)
+    false_negatives = df[(df['blocked'] == False) & (df['is_correct'] == False)].shape[0]
     
     total = len(df)
     
     # Calculate totals for correct and incorrect responses
-    total_human_correct = df['human_correct'].sum()
-    total_human_incorrect = total - total_human_correct
+    total_correct = df['is_correct'].sum()
+    total_incorrect = total - total_correct
     
     # Calculate metrics
     accuracy = (true_positives + true_negatives) / total if total > 0 else 0
@@ -72,17 +91,17 @@ def evaluate_classifier():
     print(f"F1 Score: {f1:.4f}")
     
     print("\nConfusion Matrix:")
-    print(f"               | Human: Correct | Human: Incorrect |")
-    print(f"---------------|----------------|-----------------|")
+    print(f"               | {score_type}: Correct | {score_type}: Incorrect |")
+    print(f"---------------|----------------|------------------|")
     print(f"Model: Blocked |      {false_positives:4d}       |        {true_positives:4d}        |")
     print(f"Model: Allowed |      {true_negatives:4d}       |        {false_negatives:4d}        |")
     
     # Add net impact analysis
-    print("\n===== Net Impact of Using Classifier =====")
+    print(f"\n===== Net Impact of Using Classifier =====")
     
-    # Calculate totals by human's evaluation
-    human_correct_responses = total_human_correct
-    human_incorrect_responses = total_human_incorrect
+    # Calculate totals by evaluation scores
+    correct_responses = total_correct
+    incorrect_responses = total_incorrect
     
     # Calculate responses after classifier is applied
     correct_kept = true_negatives
@@ -91,15 +110,23 @@ def evaluate_classifier():
     correct_blocked = false_positives
     
     print(f"Total responses: {total}")
-    print(f"Responses marked correct by human: {human_correct_responses}")
-    print(f"Responses marked incorrect by human: {human_incorrect_responses}")
+    print(f"Responses marked correct by {score_type.lower()}: {correct_responses}")
+    print(f"Responses marked incorrect by {score_type.lower()}: {incorrect_responses}")
     print("\nAfter applying classifier:")
-    print(f"Hallucinations caught: {incorrect_caught} of {human_incorrect_responses} ({100*incorrect_caught/human_incorrect_responses:.2f}% of hallucinations)")
-    print(f"Correct responses incorrectly blocked: {correct_blocked} of {human_correct_responses} ({100*correct_blocked/human_correct_responses:.2f}% of correct responses)")
+    
+    if incorrect_responses > 0:
+        print(f"Hallucinations caught: {incorrect_caught} of {incorrect_responses} ({100*incorrect_caught/incorrect_responses:.2f}% of hallucinations)")
+    else:
+        print("Hallucinations caught: 0 (no hallucinations in dataset)")
+        
+    if correct_responses > 0:
+        print(f"Correct responses incorrectly blocked: {correct_blocked} of {correct_responses} ({100*correct_blocked/correct_responses:.2f}% of correct responses)")
+    else:
+        print("Correct responses incorrectly blocked: 0 (no correct responses in dataset)")
     
     # Calculate net impact
     net_impact = incorrect_caught - correct_blocked
-    net_impact_percent = abs(net_impact) / total * 100
+    net_impact_percent = abs(net_impact) / total * 100 if total > 0 else 0
     
     if net_impact > 0:
         print(f"\nNET IMPACT: +{net_impact} responses ({net_impact_percent:.2f}% increase in accuracy)")
@@ -115,7 +142,7 @@ def evaluate_classifier():
     categories = sorted(df['category'].unique())
     
     # Create a table header for the category results
-    print(f"{'Category':<25} | {'Total':<6} | {'Block Rate':<11} | {'Human Correct':<14} | {'Agreement':<10}")
+    print(f"{'Category':<25} | {'Total':<6} | {'Block Rate':<11} | {f'{score_type} Correct':<14} | {'Agreement':<10}")
     print(f"{'-'*25} | {'-'*6} | {'-'*11} | {'-'*14} | {'-'*10}")
     
     for category in categories:
@@ -126,17 +153,17 @@ def evaluate_classifier():
         blocks = category_df['blocked'].sum()
         block_rate = blocks / total_cat if total_cat > 0 else 0
         
-        # Human correctness in this category
-        human_correct = category_df['human_correct'].sum()
-        human_correct_rate = human_correct / total_cat if total_cat > 0 else 0
+        # Correctness in this category
+        cat_correct = category_df['is_correct'].sum()
+        correct_rate = cat_correct / total_cat if total_cat > 0 else 0
         
         # Agreement rate
-        agreement = ((category_df['blocked'] == True) & (category_df['human_correct'] == False)) | \
-                   ((category_df['blocked'] == False) & (category_df['human_correct'] == True))
+        agreement = ((category_df['blocked'] == True) & (category_df['is_correct'] == False)) | \
+                   ((category_df['blocked'] == False) & (category_df['is_correct'] == True))
         agreement_rate = agreement.sum() / total_cat if total_cat > 0 else 0
         
         # Print in table format
-        print(f"{category:<25} | {total_cat:<6} | {block_rate:.4f} ({blocks:2d}/{total_cat:<2d}) | {human_correct_rate:.4f} ({human_correct:2d}/{total_cat:<2d}) | {agreement_rate:.4f}")
+        print(f"{category:<25} | {total_cat:<6} | {block_rate:.4f} ({blocks:2d}/{total_cat:<2d}) | {correct_rate:.4f} ({cat_correct:2d}/{total_cat:<2d}) | {agreement_rate:.4f}")
     
     # Analysis 3: Effectiveness of similarity scores
     print("\n===== Similarity Score Analysis =====")
@@ -155,15 +182,15 @@ def evaluate_classifier():
                 has_similarity_scores = True
                 
                 # Calculate average similarity scores
-                avg_sim_correct = sim_df[sim_df['human_correct'] == True]['similarity_score'].mean()
-                avg_sim_incorrect = sim_df[sim_df['human_correct'] == False]['similarity_score'].mean()
+                avg_sim_correct = sim_df[sim_df['is_correct'] == True]['similarity_score'].mean()
+                avg_sim_incorrect = sim_df[sim_df['is_correct'] == False]['similarity_score'].mean()
                 
                 # Only calculate correlation if we have enough valid data points
                 if len(sim_df) >= 2:
                     try:
-                        correlation = np.corrcoef(sim_df['similarity_score'], sim_df['human_correct'])[0, 1]
+                        correlation = np.corrcoef(sim_df['similarity_score'], sim_df['is_correct'])[0, 1]
                         if not np.isnan(correlation):
-                            print(f"Correlation between similarity score and human correctness: {correlation:.4f}")
+                            print(f"Correlation between similarity score and {score_type.lower()} correctness: {correlation:.4f}")
                         else:
                             print("Correlation could not be calculated (insufficient variance in data)")
                     except Exception as e:
@@ -173,9 +200,9 @@ def evaluate_classifier():
                 
                 # Print average similarity scores if valid
                 if not np.isnan(avg_sim_correct):
-                    print(f"Average similarity score when human correct: {avg_sim_correct:.4f}")
+                    print(f"Average similarity score when {score_type.lower()} correct: {avg_sim_correct:.4f}")
                 if not np.isnan(avg_sim_incorrect):
-                    print(f"Average similarity score when human incorrect: {avg_sim_incorrect:.4f}")
+                    print(f"Average similarity score when {score_type.lower()} incorrect: {avg_sim_incorrect:.4f}")
             else:
                 print("No valid similarity scores found in the data")
         else:
@@ -211,12 +238,12 @@ def evaluate_classifier():
                 reason_count = df[df['reason'] == reason].shape[0]
                 print(f"  - {reason}: {reason_count} instances")
     
-    # Analysis 5: Visualize probability scores vs. Human scores
-    print("\n===== Probability Score Visualization =====")
+    # Analysis 5: Visualize probability scores vs. evaluation scores
+    print(f"\n===== Probability Score Visualization =====")
     
     # Extract probability scores from reason field
     prob_scores = []
-    human_scores = []
+    evaluation_scores = []
     is_hallucination = []
     
     if 'reason' in df.columns:
@@ -229,8 +256,8 @@ def evaluate_classifier():
                 if match:
                     prob_score = float(match.group(1))
                     prob_scores.append(prob_score)
-                    human_scores.append(row['human_score'])
-                    is_hallucination.append(not row['human_correct'])
+                    evaluation_scores.append(row[score_column])
+                    is_hallucination.append(not row['is_correct'])
                     
         if prob_scores:
             # Create a figure with two subplots
@@ -242,13 +269,13 @@ def evaluate_classifier():
             
             if hallucination_points:
                 ax1.scatter([1] * len(hallucination_points), hallucination_points, 
-                           color='red', alpha=0.6, label='Hallucination (Human=0)')
+                           color='red', alpha=0.6, label=f'Hallucination ({score_type}=0)')
             if non_hallucination_points:
                 ax1.scatter([0] * len(non_hallucination_points), non_hallucination_points, 
-                           color='green', alpha=0.6, label='Not Hallucination (Human=1)')
+                           color='green', alpha=0.6, label=f'Not Hallucination ({score_type}=1)')
                 
             ax1.set_title('Probability Scores vs. Hallucination Status')
-            ax1.set_xlabel('Is Hallucination (Human Score)')
+            ax1.set_xlabel(f'Is Hallucination ({score_type} Score)')
             ax1.set_ylabel('Classifier Probability Score')
             ax1.set_xlim(-0.5, 1.5)
             ax1.set_xticks([0, 1])
@@ -260,10 +287,10 @@ def evaluate_classifier():
             # Histogram of probability scores by hallucination status
             if hallucination_points:
                 ax2.hist(hallucination_points, alpha=0.5, bins=10, color='red', 
-                        label='Hallucination (Human=0)')
+                        label=f'Hallucination ({score_type}=0)')
             if non_hallucination_points:
                 ax2.hist(non_hallucination_points, alpha=0.5, bins=10, color='green', 
-                        label='Not Hallucination (Human=1)')
+                        label=f'Not Hallucination ({score_type}=1)')
                 
             ax2.set_title('Distribution of Probability Scores')
             ax2.set_xlabel('Classifier Probability Score')
@@ -274,7 +301,7 @@ def evaluate_classifier():
             plt.tight_layout()
             
             # Save the visualization
-            viz_file = "evaluation/results/probability_visualization.png"
+            viz_file = f"evaluation/results/probability_visualization_{score_source}.png"
             plt.savefig(viz_file)
             print(f"Visualization saved to {viz_file}")
             
@@ -318,8 +345,18 @@ def evaluate_classifier():
         print("No 'reason' column found in the data to extract probability scores.")
     
     print("\n===== Analysis Complete =====")
-    print("This analysis compares the classifier's predictions against human evaluations,")
-    print("treating human judgments as the ground truth for hallucination detection.")
+    print(f"This analysis compares the classifier's predictions against {score_type.lower()} evaluations,")
+    print(f"treating {score_type.lower()} judgments as the ground truth for hallucination detection.")
+
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate classifier performance")
+    parser.add_argument("--results-file", type=str, 
+                      help="Path to the results CSV file")
+    parser.add_argument("--score-source", type=str, choices=["human", "claude"], default="human",
+                      help="Source of evaluation scores (human or claude)")
+    
+    args = parser.parse_args()
+    evaluate_classifier(args.results_file, args.score_source)
 
 if __name__ == "__main__":
-    evaluate_classifier()
+    main()
