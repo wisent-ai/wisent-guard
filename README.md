@@ -42,13 +42,13 @@ and analyze the results in the guard_results.csv file using a human evaluator. C
 
 **How is it different from existing approaches?**
 
-Wisent-guard uses a unique approach for identifiying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. 
+Wisent-guard uses a unique approach for identifiying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallcuination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
 
 ---
 
 **It does not work for my use case, why?**
 
-Wisent-guard is an experimental technology. Representation engineering requires a careful choice of hyperparameters. For every model, you need to setup the right model tokens, activation reading patterns and layers to read the activations from. You can read more about it here: https://arxiv.org/abs/2502.17601 or talk to me directly and I can help you set up the guard for your specific use case: https://calendly.com/lbartoszcze. If you are struggling with latency 
+Wisent-guard is an experimental technology. Representation engineering requires a careful choice of hyperparameters. For every model, you need to setup the right model tokens, activation reading patterns and layers to read the activations from. You can read more about it here: https://arxiv.org/abs/2502.17601 or talk to me directly and I can help you set up the guard for your specific use case: https://calendly.com/lbartoszcze. If you are struggling with latency or compute we can help! 
 
 
 ## Tell me in depth how it works! 
