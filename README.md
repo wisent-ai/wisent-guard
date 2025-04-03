@@ -8,7 +8,7 @@ A Python package for latent space monitoring and guardrails. Delivered to you by
 
 ## Overview
 
-Wisent-Guard allows you to control your AI by identifying brain patterns corresponding to responses you don't like, like hallucinations or harmful outputs. We use contrastive pairs to representations to detect when a model might be generating harmful content or hallucinating. It works by:
+Wisent-Guard allows you to control your AI by identifying brain patterns corresponding to responses you don't like, like hallucinations or harmful outputs. We use contrastive pairs of representations to detect when a model might be generating harmful content or hallucinating. It works by:
 
 1. Creating activation vectors or classifiers from latent space pairs harmful vs. non-harmful phrase pairs
 2. Monitoring model activations during inference
@@ -24,7 +24,7 @@ pip install wisent-guard
 
 **Why would I use this instead of traditional guardrails?**
 
-With traditional guardrails, you need to specify filters for your particular use case. You essentially hope that the model is doing what you want. You cannot track what is happening in the brain of your AI. Just because it says "I will reject the request." right now does give you the information how far it was from actually saying "Sure, here is the harmful stuff you requested." Also, the safety traditional safeguards provide is really brittle. If you are using regexes, it is hard to detect out of distribution stuff. How do you encode the concept of a hallucination in a traditional safeguard? Or harmfulness across languages? If you'd rather not beg your LLM to do what you want using prompt engineering, consider interventions directly on the AI brain. 
+With traditional guardrails, you need to specify filters for your particular use case. You essentially hope that the model is doing what you want. You cannot track what is happening in the brain of your AI. Just because it says "I will reject the request." right now doesn't give you the information how far it was from actually saying "Sure, here is the harmful stuff you requested." Also, the safety traditional safeguards provide is really brittle. If you are using regexes, it is hard to detect out of distribution stuff. How do you encode the concept of a hallucination in a traditional safeguard? Or harmfulness across languages? If you'd rather not beg your LLM to do what you want using prompt engineering, consider interventions directly on the AI brain. 
 
 ---
 
@@ -42,7 +42,7 @@ and analyze the results in the guard_results.csv file using a human evaluator. C
 
 **How is it different from existing approaches?**
 
-Wisent-guard uses a unique approach for identifiying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallcuination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
+Wisent-guard uses a unique approach for identifying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallucination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
 
 ---
 
@@ -164,7 +164,7 @@ Our approach works in stopping variety of undesirable LLM behaviours like halluc
 
 ## Integrations
 
-Right now this repo is the only way to integrate wisent-guard into your stack. We are happy to support any integrations going forward! Just let us know whether you'd like to see Wisent-Guard on Azure Marketplace or aynwhere else and we will make it happen! 
+Right now this repo is the only way to integrate wisent-guard into your stack. We are happy to support any integrations going forward! Just let us know whether you'd like to see Wisent-Guard on Azure Marketplace or anywhere else and we will make it happen! 
 
 ## Contributing
 
