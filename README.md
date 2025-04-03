@@ -24,9 +24,6 @@ pip install wisent-guard
 
 **Why would I use this instead of traditional guardrails?**
 
-
-**Why would I use this instead of traditional guardrails?**
-
 With traditional guardrails, you need to specify filters for your particular use case. You essentially hope that the model is doing what you want. You cannot track what is happening in the brain of your AI. Just because it says "I will reject the request." right now does give you the information how far it was from actually saying "Sure, here is the harmful stuff you requested." Also, the safety traditional safeguards provide is really brittle. If you are using regexes, it is hard to detect out of distribution stuff. How do you encode the concept of a hallucination in a traditional safeguard? Or harmfulness across languages? If you'd rather not beg your LLM to do what you want using prompt engineering, consider interventions directly on the AI brain. 
 
 ---
