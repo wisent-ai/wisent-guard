@@ -33,7 +33,13 @@ With traditional guardrails, you need to specify filters for your particular use
 
 **Show me the results!**
 
-This approach outperforms every possible alternative, resulting in a 43 percent hallucination rate reduction on Llama 3.1 8B on TruthfulQA. But it works even better for harmfulness evaluation. You can test it yourself using the code in the evaluation folder.
+This approach outperforms every possible alternative, resulting in a 43 percent hallucination rate reduction on Llama 3.1 8B on TruthfulQA. But it works even better for harmfulness evaluation. You can test it yourself using the code in the evaluation folder. Just run something like this: 
+
+```bash
+python evaluation/evaluate_llama_truthfulqa_classifier.py --train-classifier --classifier-path ./models/hallucination_classifier.joblib --classifier-model logistic --use-classifier
+```
+
+and analyze the results in the guard_results.csv file using a human evaluator. Claude evaluator does not fare too well for the hallucination task so we recommend going through it by hand. You should get something like this: https://docs.google.com/spreadsheets/d/1DJBWjkuSG0mzmFhkDKpYKcilACDbr0IiD3GQFBMzJnE/edit?usp=sharing. For out of distribution hallucinations that the classifier has not been trained on, the guard catches 12 out of 28 hallucinations, so 43%. This is at a cost of 5 false positives so without further detection the net impact is 7 instances of higher accuracy. 
 
 ---
 
