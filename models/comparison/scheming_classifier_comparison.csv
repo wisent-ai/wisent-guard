@@ -1,0 +1,3 @@
+model,content_type,load_time,train_time,accuracy,precision,recall,f1,classifier_path
+mistralai/Mistral-7B-Instruct-v0.1,scheming,19.376216173171997,3.0149290561676025,1.0,1.0,1.0,1.0,./models/comparison/scheming_Mistral-7B-Instruct-v0.1_classifier.pkl
+meta-llama/Llama-3.1-8B-Instruct,scheming,24.469452142715454,2.7337698936462402,1.0,1.0,1.0,1.0,./models/comparison/scheming_Llama-3.1-8B-Instruct_classifier.pkl

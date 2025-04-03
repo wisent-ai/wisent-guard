@@ -224,7 +224,7 @@ class ActivationGuard:
         else:
             self.logger.info(f"Using legacy format with user token: {self.user_token}")
             self.logger.info(f"Using legacy format with assistant token: {self.assistant_token}")
-            
+        
         # Only load vectors if auto_load_vectors is True
         if auto_load_vectors:
             self.logger.info("Auto-loading vectors from save directory")

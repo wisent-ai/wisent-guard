@@ -206,9 +206,9 @@ class SafeInference:
             return formatted
     
     def generate(
-        self, 
-        prompt: str, 
-        max_new_tokens: int = 100, 
+        self,
+        prompt: str,
+        max_new_tokens: int = 100,
         min_new_tokens: int = 1,
         **kwargs
     ) -> Dict[str, Any]:
@@ -241,14 +241,14 @@ class SafeInference:
         params = {"max_new_tokens": max_new_tokens}
         params.update(kwargs)
         
-        # Initialize for token-by-token generation
+        # Collect token scores
         token_scores = []
         token_objects = []  # Store actual TokenScore objects, not just dicts
         response_tokens = []
         tokens_generated = 0
         do_early_stopping = False
         early_stop_reason = None
-        
+            
         self.logger.info("Beginning token-by-token generation and activation analysis")
         
         # Set up progress bar for lengthy generation
