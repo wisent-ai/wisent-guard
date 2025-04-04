@@ -76,7 +76,7 @@ and analyze the results in the guard_results.csv file using a human evaluator. C
 
 **How is it different from existing approaches?**
 
-Wisent-guard uses a unique approach for identifiying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallcuination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
+Wisent-guard uses a unique approach for identifying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallcuination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
 
 ---
 
