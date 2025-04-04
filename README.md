@@ -4,6 +4,16 @@
   <img src="wisent-guard-logo.png" alt="Wisent Guard" width="200">
 </p>
 
+<p>
+  <a href="https://github.com/wisent-ai/wisent-guard/stargazers">
+    <img src="https://img.shields.io/github/stars/wisent-ai/wisent-guard" alt="stars" />
+  </a>
+  <a href="https://pypi.org/project/wisent-guard">
+    <img src="https://static.pepy.tech/badge/wisent-guard" alt="PyPI - Downloads" />
+  </a>
+  <br />
+</p>
+
 A Python package for latent space monitoring and guardrails. Delivered to you by the [Wisent](https://wisent.ai) team of 1 in the form of [Lukasz Bartoszcze](https://lukaszbartoszcze.com).
 
 ## Overview
