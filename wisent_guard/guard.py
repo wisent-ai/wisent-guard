@@ -47,7 +47,13 @@ class ActivationGuard:
         # New parameters for classifier support
         use_classifier: bool = False,
         classifier_path: Optional[str] = None,
-        classifier_threshold: float = 0.5
+        classifier_threshold: float = 0.5,
+        # New parameters for early termination
+        early_termination: bool = False,
+        placeholder_message: str = "Sorry, this response was blocked due to potentially harmful content.",
+        # New parameters for response logging
+        enable_logging: bool = False,
+        log_file_path: str = "./harmful_responses.json"
     ):
         """
         Initialize the ActivationGuard.
@@ -70,10 +76,42 @@ class ActivationGuard:
             use_classifier: Whether to use ML-based classifier instead of threshold-based detection
             classifier_path: Path to trained classifier model (required if use_classifier is True)
             classifier_threshold: Classification threshold for the ML model (default: 0.5)
+            early_termination: Whether to terminate generation early when harmful content is detected (default: False)
+            placeholder_message: Message to return when generation is terminated early (default: "Sorry, this response was blocked due to potentially harmful content.")
+            enable_logging: Whether to enable logging of detected harmful responses
+            log_file_path: Path to the log file for detected harmful responses
         """
         # Set up logger
         self.logger = get_logger(level=log_level, log_file=log_file)
         self.logger.info("Initializing ActivationGuard")
+        
+        # Early termination settings
+        self.early_termination = early_termination
+        self.placeholder_message = placeholder_message
+        self.logger.info(f"Early termination: {early_termination}, Message: {placeholder_message}")
+        
+        # Response logging settings
+        self.enable_logging = enable_logging
+        self.log_file_path = log_file_path
+        if self.enable_logging:
+            self.logger.info(f"Response logging enabled. Log file: {log_file_path}")
+            # Initialize log file if it doesn't exist
+            if not os.path.exists(os.path.dirname(log_file_path)):
+                try:
+                    os.makedirs(os.path.dirname(log_file_path))
+                    self.logger.info(f"Created directory for log file: {os.path.dirname(log_file_path)}")
+                except Exception as e:
+                    self.logger.warning(f"Could not create directory for log file: {e}")
+            
+            # Initialize log file with empty array if it doesn't exist
+            if not os.path.exists(log_file_path):
+                try:
+                    with open(log_file_path, 'w') as f:
+                        import json
+                        json.dump([], f)
+                    self.logger.info(f"Initialized empty log file: {log_file_path}")
+                except Exception as e:
+                    self.logger.warning(f"Could not initialize log file: {e}")
         
         # Get user/assistant tokens from parameters, env vars, or defaults
         self.user_token = user_token or os.environ.get("WISENT_USER_TOKEN", DEFAULT_USER_TOKEN)
@@ -936,6 +974,22 @@ class ActivationGuard:
                     if token_scores:
                         result["harmful_token"] = token_scores[0]
                 
+                # Check if early termination is enabled and response is harmful
+                if self.early_termination and is_harmful:
+                    self.logger.info(f"Early termination activated. Response classified as harmful with probability {probability:.4f}")
+                    result["response"] = self.placeholder_message
+                    result["early_terminated"] = True
+                
+                # Log harmful response if enabled
+                if is_harmful and self.enable_logging:
+                    self._log_harmful_response(
+                        prompt=prompt,
+                        response=response,
+                        similarity=probability,
+                        category="hallucination",  # Default for classifier
+                        harmful_token=result.get("harmful_token")
+                    )
+                
                 return result
                 
             except Exception as e:
@@ -948,10 +1002,11 @@ class ActivationGuard:
         blocked = False
         block_reason = None
         harmful_token = None
+        first_token_harmful = False
         
         # Check if any token exceeds the threshold
         if 'token_scores' in result:
-            for token in result['token_scores']:
+            for i, token in enumerate(result['token_scores']):
                 if token.get('similarity', 0.0) >= self.threshold:
                     blocked = True
                     harmful_category = token.get('category', 'unknown')
@@ -961,6 +1016,11 @@ class ActivationGuard:
                     
                     harmful_token = token
                     block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
+                    
+                    # Check if this is the first token
+                    if i == 0:
+                        first_token_harmful = True
+                    
                     break
         
         # Add safety information to the result
@@ -971,6 +1031,26 @@ class ActivationGuard:
             "reason": block_reason,
             "harmful_token": harmful_token
         }
+        
+        # If early termination is enabled and the first token is harmful, replace the response
+        if self.early_termination and blocked and first_token_harmful:
+            self.logger.info(f"Early termination activated. First token exceeded threshold: {harmful_token.get('similarity', 0.0):.4f}")
+            enhanced_result["response"] = self.placeholder_message
+            enhanced_result["early_terminated"] = True
+        elif self.early_termination and blocked:
+            self.logger.debug(f"Early termination not triggered despite harmful content. first_token_harmful: {first_token_harmful}")
+            if harmful_token:
+                self.logger.debug(f"Harmful token position: {harmful_token.get('position', -1)}, similarity: {harmful_token.get('similarity', 0.0):.4f}")
+        
+        # Log harmful response if enabled
+        if blocked and self.enable_logging and harmful_token:
+            self._log_harmful_response(
+                prompt=prompt,
+                response=result["response"],
+                similarity=harmful_token.get("similarity", 0.0),
+                category=harmful_token.get("category", "unknown"),
+                harmful_token=harmful_token
+            )
         
         return enhanced_result
     
@@ -1392,3 +1472,133 @@ class ActivationGuard:
         else:
             self.logger.info("Using legacy prompt format for model.")
             return "legacy" 
+    
+    def _log_harmful_response(self, prompt: str, response: str, similarity: float, category: str, harmful_token=None) -> bool:
+        """
+        Log a harmful response to the JSON log file.
+        
+        Args:
+            prompt: The original prompt
+            response: The generated response
+            similarity: The similarity score that triggered detection
+            category: The category of harmful content detected
+            harmful_token: Optional token info that triggered detection
+            
+        Returns:
+            Success flag
+        """
+        if not self.enable_logging:
+            return False
+            
+        try:
+            import json
+            import datetime
+            
+            # Create log entry
+            log_entry = {
+                "timestamp": datetime.datetime.now().isoformat(),
+                "prompt": prompt,
+                "response": response,
+                "similarity": float(similarity),
+                "category": category,
+                "threshold": float(self.threshold)
+            }
+            
+            # Add token info if available
+            if harmful_token:
+                log_entry["token"] = {
+                    "text": harmful_token.get("token_text", ""),
+                    "position": harmful_token.get("position", 0),
+                    "similarity": float(harmful_token.get("similarity", 0.0))
+                }
+            
+            # Read existing log entries
+            try:
+                with open(self.log_file_path, 'r') as f:
+                    log_entries = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.logger.warning(f"Could not read log file {self.log_file_path}. Creating new log.")
+                log_entries = []
+            
+            # Append new entry
+            log_entries.append(log_entry)
+            
+            # Write updated log
+            with open(self.log_file_path, 'w') as f:
+                json.dump(log_entries, f, indent=2)
+                
+            self.logger.info(f"Logged harmful response with similarity {similarity:.4f} for category '{category}'")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error logging harmful response: {e}")
+            return False
+    
+    def get_logged_responses(self, limit: Optional[int] = None, category: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Retrieve logged harmful responses from the log file.
+        
+        Args:
+            limit: Maximum number of entries to return (None for all)
+            category: Filter by specific category (None for all categories)
+            
+        Returns:
+            List of log entries
+        """
+        if not self.enable_logging:
+            self.logger.warning("Response logging is not enabled")
+            return []
+            
+        try:
+            import json
+            
+            # Check if log file exists
+            if not os.path.exists(self.log_file_path):
+                self.logger.warning(f"Log file not found: {self.log_file_path}")
+                return []
+            
+            # Read log entries
+            with open(self.log_file_path, 'r') as f:
+                log_entries = json.load(f)
+            
+            # Filter by category if specified
+            if category is not None:
+                log_entries = [entry for entry in log_entries if entry.get("category") == category]
+            
+            # Sort by timestamp (newest first)
+            log_entries.sort(key=lambda entry: entry.get("timestamp", ""), reverse=True)
+            
+            # Apply limit if specified
+            if limit is not None and limit > 0:
+                log_entries = log_entries[:limit]
+            
+            return log_entries
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving logged responses: {e}")
+            return []
+            
+    def clear_logged_responses(self) -> bool:
+        """
+        Clear all logged harmful responses.
+        
+        Returns:
+            Success flag
+        """
+        if not self.enable_logging:
+            self.logger.warning("Response logging is not enabled")
+            return False
+            
+        try:
+            import json
+            
+            # Reset log file
+            with open(self.log_file_path, 'w') as f:
+                json.dump([], f)
+                
+            self.logger.info(f"Cleared all logged responses from {self.log_file_path}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error clearing logged responses: {e}")
+            return False 
