@@ -3,3 +3,23 @@
 /circuit-breakers/*
 
 .env
+
+# Ignore any new folders not already in the repository
+# Whitelist approach - only include specific folders
+/*
+!/wisent_guard/
+!/models/
+!/examples/
+!/evaluation/
+!/dist/
+!/wisent_guard.egg-info/
+
+# Don't ignore these files in the root directory
+!/.gitignore
+!/README.md
+!/requirements.txt
+!/setup.py
+!/LICENSE
+!/upload_to_pypi.sh
+!/wisent-guard-logo.png
+!/.DS_Store
