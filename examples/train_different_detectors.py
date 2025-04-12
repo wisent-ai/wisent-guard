@@ -230,8 +230,12 @@ def train_classifier_detector(model, tokenizer, training_pairs, args):
     bad_code_activations = []
     good_code_activations = []
     
-    for pair in training_pairs:
+    # Process training pairs with progress tracking
+    for i, pair in enumerate(training_pairs):
+        print(f"Processing pair {i+1}/{len(training_pairs)}...")
+        
         # Process bad code example
+        print(f"  - Processing bad code example...")
         temp_guard.monitor.reset()
         success = temp_guard._prepare_activations(pair["bad_code"])
         if success:
@@ -239,15 +243,21 @@ def train_classifier_detector(model, tokenizer, training_pairs, args):
             layer = args.layer
             if layer in activations:
                 activation_tensor = activations[layer]
-                tensor_data = activation_tensor.detach().cpu().numpy().flatten()
+                # Ensure tensor is detached and on CPU
                 bad_code_activations.append({
-                    "activations": tensor_data,
+                    "activations": activation_tensor.detach().cpu().flatten(),
                     "layer": layer,
                     "token_text": "bad_code",
                     "is_harmful": True  # Keep this as True for compatibility with API
                 })
+                print(f"    ✓ Successfully collected bad code activation")
+            else:
+                print(f"    ✗ Layer {layer} not found in activations")
+        else:
+            print(f"    ✗ Failed to prepare activations for bad code example")
         
         # Process good code example
+        print(f"  - Processing good code example...")
         temp_guard.monitor.reset()
         success = temp_guard._prepare_activations(pair["good_code"])
         if success:
@@ -255,13 +265,18 @@ def train_classifier_detector(model, tokenizer, training_pairs, args):
             layer = args.layer
             if layer in activations:
                 activation_tensor = activations[layer]
-                tensor_data = activation_tensor.detach().cpu().numpy().flatten()
+                # Ensure tensor is detached and on CPU
                 good_code_activations.append({
-                    "activations": tensor_data,
+                    "activations": activation_tensor.detach().cpu().flatten(),
                     "layer": layer,
                     "token_text": "good_code",
                     "is_harmful": False  # Keep this as False for compatibility with API
                 })
+                print(f"    ✓ Successfully collected good code activation")
+            else:
+                print(f"    ✗ Layer {layer} not found in activations")
+        else:
+            print(f"    ✗ Failed to prepare activations for good code example")
     
     print(f"Collected {len(bad_code_activations)} bad code and {len(good_code_activations)} good code activations")
     
@@ -271,20 +286,27 @@ def train_classifier_detector(model, tokenizer, training_pairs, args):
     # Train classifier
     from wisent_guard.classifier import ActivationClassifier
     
+    print("Training classifier (this may take a few minutes)...")
     start_time = time.time()
-    classifier = ActivationClassifier.create_from_activations(
-        harmful_activations=bad_code_activations,  # Using existing API
-        harmless_activations=good_code_activations,  # Using existing API
-        model_type="logistic",  # Use logistic regression
-        save_path=args.classifier_path,
-        threshold=0.5,
-        positive_class_label="bad_code",  # Change label to reflect code quality
-        test_size=0.2,
-        random_state=42
-    )
-    train_time = time.time() - start_time
-    
-    print(f"Classifier trained in {train_time:.2f} seconds and saved to {args.classifier_path}")
+    try:
+        classifier = ActivationClassifier.create_from_activations(
+            harmful_activations=bad_code_activations,  # Using existing API
+            harmless_activations=good_code_activations,  # Using existing API
+            model_type="logistic",  # Use logistic regression
+            save_path=args.classifier_path,
+            threshold=0.5,
+            positive_class_label="bad_code",  # Change label to reflect code quality
+            test_size=0.2,
+            random_state=42,
+            device=model.device  # Use model's device (GPU/MPS) for training
+        )
+        train_time = time.time() - start_time
+        
+        print(f"Classifier trained in {train_time:.2f} seconds and saved to {args.classifier_path}")
+    except Exception as e:
+        print(f"Error training classifier: {e}")
+        print(f"This may be due to device compatibility issues or tensor size problems.")
+        print(f"Try running with --cpu-only flag or reducing the size of the examples.")
 
 def main():
     """Main function."""

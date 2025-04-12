@@ -4,7 +4,6 @@ ContrastiveVectors module for creating and managing activation vectors
 
 import os
 import torch
-import numpy as np
 import json
 from typing import List, Dict, Tuple, Optional, Union, Any
 from tqdm import tqdm

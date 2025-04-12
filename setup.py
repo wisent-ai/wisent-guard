@@ -34,9 +34,7 @@ setup(
     install_requires=[
         "torch>=1.9.0",
         "transformers>=4.20.0",
-        "numpy>=1.19.0",
         "tqdm>=4.50.0",
-        "scikit-learn>=0.24.0",
     ],
     keywords="nlp, machine learning, language models, safety, guardrails",
 ) 

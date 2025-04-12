@@ -21,6 +21,8 @@ import pandas as pd
 from tqdm import tqdm
 
 # Import utilities from our generalized content detector
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from examples.utils.content_detector import (
     get_device, 
     load_model, 

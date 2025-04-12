@@ -17,8 +17,14 @@ python detect_harmful_content.py [--model MODEL_NAME]
 import os
 import argparse
 import torch
+import sys
 
-# Import utilities from our generalized content detector
+# Add the parent directory to the path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import utilities from content detector utility
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from examples.utils.content_detector import (
     get_device, 
     load_model, 

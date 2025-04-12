@@ -1,22 +1,93 @@
 """
-Classifier module for analyzing activation patterns with machine learning models.
+Classifier module for analyzing activation patterns with PyTorch-based machine learning models.
 """
 
 import os
-import pickle
-import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset, random_split
 from typing import Dict, Any, Tuple, List, Optional, Union
+import math
 
-from sklearn.base import BaseEstimator
-import joblib
-from sklearn.linear_model import LogisticRegression
-from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
+class LogisticModel(nn.Module):
+    """Simple PyTorch logistic regression model"""
+    def __init__(self, input_dim: int):
+        super().__init__()
+        self.linear = nn.Linear(input_dim, 1)
+        self.sigmoid = nn.Sigmoid()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.sigmoid(self.linear(x))
+
+class MLPModel(nn.Module):
+    """PyTorch Multi-Layer Perceptron model for binary classification"""
+    def __init__(self, input_dim: int, hidden_dim: int = 128):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim // 2, 1),
+            nn.Sigmoid()
+        )
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.network(x)
+
+def calculate_roc_auc(y_true: List[float], y_scores: List[float]) -> float:
+    """
+    Calculate the ROC AUC score without using scikit-learn.
+    
+    Args:
+        y_true: List of true binary labels (0 or 1)
+        y_scores: List of predicted scores
+        
+    Returns:
+        ROC AUC score
+    """
+    if len(y_true) != len(y_scores):
+        raise ValueError("Length of y_true and y_scores must match")
+    
+    if len(set(y_true)) != 2:
+        # Not a binary classification problem or only one class in the data
+        return 0.5
+    
+    # Pair the scores with their true labels and sort by score in descending order
+    pair_list = sorted(zip(y_scores, y_true), reverse=True)
+    
+    # Count the number of positive and negative samples
+    n_pos = sum(y_true)
+    n_neg = len(y_true) - n_pos
+    
+    if n_pos == 0 or n_neg == 0:
+        # Only one class present, ROC AUC is not defined
+        return 0.5
+    
+    # Count the number of correctly ranked pairs
+    auc = 0.0
+    pos_so_far = 0
+    
+    # Iterate through pairs
+    for i, (_, label) in enumerate(pair_list):
+        if label == 1:
+            # This is a positive example
+            pos_so_far += 1
+        else:
+            # This is a negative example, add the number of positive examples seen so far
+            auc += pos_so_far
+    
+    # Normalize by the number of positive-negative pairs
+    auc /= (n_pos * n_neg)
+    
+    return auc
 
 class ActivationClassifier:
     """
-    Machine learning classifier for activation pattern analysis.
+    PyTorch-based classifier for activation pattern analysis.
     
     This classifier analyzes activation patterns from language models to detect various types
     of content or behaviors. It can be used for hallucination detection, toxicity detection,
@@ -28,24 +99,32 @@ class ActivationClassifier:
         model_path: Optional[str] = None,
         threshold: float = 0.5,
         positive_class_label: str = "positive",
-        model: Optional[BaseEstimator] = None
+        model: Optional[nn.Module] = None,
+        device: Optional[str] = None
     ):
         """
         Initialize the activation classifier.
         
         Args:
-            model_path: Path to the trained classifier model (joblib or pickle format)
+            model_path: Path to the trained classifier model (PyTorch format)
             threshold: Classification threshold (default: 0.5)
             positive_class_label: Label for the positive class (default: "positive")
-            model: Pre-trained scikit-learn compatible model (optional)
+            model: Pre-trained PyTorch model (optional)
+            device: Device to run the model on (e.g., 'cuda', 'cpu')
         """
         self.model_path = model_path
         self.threshold = threshold
         self.positive_class_label = positive_class_label
         
+        # Determine device
+        if device is None:
+            self.device = 'cuda' if torch.cuda.is_available() else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu'
+        else:
+            self.device = device
+        
         if model is not None:
             # Use provided model directly
-            self.model = model
+            self.model = model.to(self.device)
         elif model_path is not None:
             # Load model from path
             self.model = self._load_model(model_path)
@@ -53,7 +132,7 @@ class ActivationClassifier:
             # No model provided or path given - will need to be trained
             self.model = None
         
-    def _load_model(self, model_path: str) -> BaseEstimator:
+    def _load_model(self, model_path: str) -> nn.Module:
         """
         Load a trained classifier model from disk.
         
@@ -61,7 +140,7 @@ class ActivationClassifier:
             model_path: Path to the saved model
             
         Returns:
-            Loaded scikit-learn compatible classifier model
+            Loaded PyTorch classifier model
         
         Raises:
             FileNotFoundError: If the model file doesn't exist
@@ -71,23 +150,38 @@ class ActivationClassifier:
             raise FileNotFoundError(f"Model file not found: {model_path}")
         
         try:
-            # Try joblib first (preferred for scikit-learn models)
-            model = joblib.load(model_path)
-        except Exception:
-            try:
-                # Fall back to pickle if joblib fails
-                with open(model_path, 'rb') as f:
-                    model = pickle.load(f)
-            except Exception as e:
-                raise ValueError(f"Failed to load model from {model_path}: {e}")
-        
-        # Verify the model has the necessary methods
-        if not (hasattr(model, 'predict') or hasattr(model, 'predict_proba')):
-            raise ValueError(f"Loaded model doesn't have required prediction methods")
-        
-        return model
+            # Load the PyTorch model
+            loaded_data = torch.load(model_path, map_location=self.device)
+            
+            # Extract the model and metadata
+            if isinstance(loaded_data, dict) and 'model' in loaded_data:
+                # Model was saved with metadata
+                model_state = loaded_data['model']
+                model_type = loaded_data.get('model_type', 'logistic')
+                input_dim = loaded_data.get('input_dim', None)
+                
+                # Create model instance based on type
+                if model_type == 'mlp':
+                    hidden_dim = loaded_data.get('hidden_dim', 128)
+                    model = MLPModel(input_dim, hidden_dim=hidden_dim)
+                else:  # default to logistic
+                    model = LogisticModel(input_dim)
+                
+                # Load state dictionary
+                model.load_state_dict(model_state)
+            else:
+                # Model was saved directly
+                model = loaded_data
+                
+            model = model.to(self.device)
+            model.eval()  # Set model to evaluation mode
+            
+            return model
+            
+        except Exception as e:
+            raise ValueError(f"Failed to load model from {model_path}: {e}")
     
-    def _extract_features(self, token_data: Dict[str, Any]) -> np.ndarray:
+    def _extract_features(self, token_data: Dict[str, Any]) -> torch.Tensor:
         """
         Extract features from token activation data.
         
@@ -95,7 +189,7 @@ class ActivationClassifier:
             token_data: Dictionary containing token activation data
             
         Returns:
-            Numpy array of features for classification
+            PyTorch tensor of features for classification
         """
         # Get the token's activation values
         activations = token_data.get('activations', None)
@@ -103,17 +197,24 @@ class ActivationClassifier:
         if activations is None:
             raise ValueError("Token data doesn't contain activation values")
         
-        # Convert to numpy array if not already
-        if not isinstance(activations, np.ndarray):
-            activations = np.array(activations)
+        # Convert to PyTorch tensor if not already
+        if not isinstance(activations, torch.Tensor):
+            # Check if it's a numpy array and convert accordingly
+            if hasattr(activations, 'dtype'):  # likely a numpy array
+                activations = torch.tensor(activations, dtype=torch.float32, device=self.device)
+            else:
+                activations = torch.tensor(activations, dtype=torch.float32, device=self.device)
         
-        # Reshape if needed
+        # Move to the correct device if needed
+        activations = activations.to(self.device)
+        
+        # Flatten if needed
         if len(activations.shape) > 1:
             activations = activations.flatten()
         
         return activations
     
-    def extract_features(self, token_data: Dict[str, Any]) -> np.ndarray:
+    def extract_features(self, token_data: Dict[str, Any]) -> torch.Tensor:
         """
         Public method to extract features from token activation data.
         
@@ -121,7 +222,7 @@ class ActivationClassifier:
             token_data: Dictionary containing token activation data
             
         Returns:
-            Numpy array of features for classification
+            PyTorch tensor of features for classification
         """
         return self._extract_features(token_data)
     
@@ -142,47 +243,16 @@ class ActivationClassifier:
         # Extract features
         features = self._extract_features(token_data)
         
-        # Reshape for sklearn (expects 2D array)
-        features = features.reshape(1, -1)
+        # Reshape for model (expects 2D tensor)
+        if len(features.shape) == 1:
+            features = features.reshape(1, -1)
+        
+        # Set model to evaluation mode
+        self.model.eval()
         
         # Get prediction probability
-        probability = 0.0
-        
-        if hasattr(self.model, 'predict_proba'):
-            try:
-                # Get probability of positive class
-                proba = self.model.predict_proba(features)
-                
-                # Find the index of the positive class
-                if hasattr(self.model, 'classes_'):
-                    pos_idx = np.where(self.model.classes_ == 1)[0]
-                    if len(pos_idx) > 0:
-                        probability = proba[0, pos_idx[0]]
-                    else:
-                        # If no class is labeled as 1, use the second column 
-                        # (typically class 1 in binary classification)
-                        probability = proba[0, 1] if proba.shape[1] > 1 else proba[0, 0]
-                else:
-                    # Default to the second column if classes are not defined
-                    probability = proba[0, 1] if proba.shape[1] > 1 else proba[0, 0]
-            except Exception:
-                # Fall back to decision function if predict_proba fails
-                if hasattr(self.model, 'decision_function'):
-                    decision = self.model.decision_function(features)
-                    # Convert decision function to probability-like score (0-1 range)
-                    probability = 1 / (1 + np.exp(-decision[0]))
-                else:
-                    # If all else fails, use binary prediction
-                    probability = float(self.model.predict(features)[0])
-        else:
-            # For models without predict_proba, use decision_function if available
-            if hasattr(self.model, 'decision_function'):
-                decision = self.model.decision_function(features)
-                # Convert decision function to probability-like score (0-1 range)
-                probability = 1 / (1 + np.exp(-decision[0]))
-            else:
-                # If all else fails, use binary prediction
-                probability = float(self.model.predict(features)[0])
+        with torch.no_grad():
+            probability = self.model(features).item()
         
         # Create result dictionary
         result = {
@@ -193,7 +263,7 @@ class ActivationClassifier:
         
         return result
     
-    def batch_predict(self, tokens_data: List[Dict[str, Any]]) -> List[Tuple[float, bool]]:
+    def batch_predict(self, tokens_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Predict on a batch of token activations.
         
@@ -201,7 +271,7 @@ class ActivationClassifier:
             tokens_data: List of token activation dictionaries
             
         Returns:
-            List of tuples (probability, classification_result)
+            List of prediction result dictionaries
         """
         results = []
         for token_data in tokens_data:
@@ -225,6 +295,10 @@ class ActivationClassifier:
               model_type: str = "logistic", 
               test_size: float = 0.2, 
               random_state: int = 42,
+              batch_size: int = 64,
+              num_epochs: int = 100,
+              learning_rate: float = 0.001,
+              early_stopping_patience: int = 10,
               **model_params) -> Dict[str, Any]:
         """
         Train the classifier on harmful and harmless activation patterns.
@@ -235,6 +309,10 @@ class ActivationClassifier:
             model_type: Type of model to train: "logistic" or "mlp" (default: "logistic")
             test_size: Proportion of data to use for testing (default: 0.2)
             random_state: Random seed for reproducibility (default: 42)
+            batch_size: Size of batches for training (default: 64)
+            num_epochs: Maximum number of training epochs (default: 100)
+            learning_rate: Learning rate for optimizer (default: 0.001)
+            early_stopping_patience: Number of epochs to wait for improvement (default: 10)
             **model_params: Additional parameters to pass to the model constructor
                            
         Returns:
@@ -243,128 +321,245 @@ class ActivationClassifier:
         print(f"Preparing to train {model_type} classifier with {len(harmful_activations)} harmful "
               f"and {len(harmless_activations)} harmless samples")
         
-        # Extract features from activations
-        X_harmful = np.vstack([self._extract_features(act).reshape(1, -1) for act in harmful_activations])
-        X_harmless = np.vstack([self._extract_features(act).reshape(1, -1) for act in harmless_activations])
+        # Set random seed for reproducibility
+        torch.manual_seed(random_state)
+        
+        # Extract features from activations and convert to tensors
+        X_harmful = torch.stack([self._extract_features(act) for act in harmful_activations])
+        X_harmless = torch.stack([self._extract_features(act) for act in harmless_activations])
         
         # Create labels
-        y_harmful = np.ones(len(harmful_activations))
-        y_harmless = np.zeros(len(harmless_activations))
+        y_harmful = torch.ones(len(harmful_activations), dtype=torch.float32, device=self.device)
+        y_harmless = torch.zeros(len(harmless_activations), dtype=torch.float32, device=self.device)
         
         # Combine data
-        X = np.vstack([X_harmful, X_harmless])
-        y = np.concatenate([y_harmful, y_harmless])
+        X = torch.cat([X_harmful, X_harmless], dim=0)
+        y = torch.cat([y_harmful, y_harmless], dim=0)
         
-        # Split into train and test sets
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=random_state, stratify=y
-        )
+        # Get input dimension
+        input_dim = X.shape[1]
         
-        print(f"Training data shape: {X_train.shape}, Testing data shape: {X_test.shape}")
+        # Create TensorDataset
+        dataset = TensorDataset(X, y)
         
-        # Create the model based on model_type
-        if model_type.lower() == "logistic":
-            # Default parameters for LogisticRegression if not provided
-            default_params = {
-                'C': 1.0,
-                'class_weight': 'balanced',
-                'max_iter': 1000,
-                'random_state': random_state
-            }
-            # Override defaults with any provided parameters
-            model_params = {**default_params, **model_params}
-            model = LogisticRegression(**model_params)
-            print(f"Created LogisticRegression model with parameters: {model_params}")
-            
-        elif model_type.lower() == "mlp":
-            # Default parameters for MLPClassifier if not provided
-            default_params = {
-                'hidden_layer_sizes': (100,),
-                'activation': 'relu',
-                'solver': 'adam',
-                'alpha': 0.0001,
-                'max_iter': 1000,
-                'random_state': random_state
-            }
-            # Override defaults with any provided parameters
-            model_params = {**default_params, **model_params}
-            model = MLPClassifier(**model_params)
-            print(f"Created MLPClassifier model with parameters: {model_params}")
-            
-        else:
-            raise ValueError(f"Unsupported model type: {model_type}. Use 'logistic' or 'mlp'.")
+        # Split into train and test
+        test_count = int(test_size * len(dataset))
+        train_count = len(dataset) - test_count
+        train_dataset, test_dataset = random_split(dataset, [train_count, test_count])
         
-        # Train the model
-        print("Training the model...")
-        model.fit(X_train, y_train)
+        # Create data loaders
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         
-        # Evaluate the model
-        print("Evaluating the model...")
-        y_pred = model.predict(X_test)
+        # Create model
+        if model_type.lower() == "mlp":
+            hidden_dim = model_params.get('hidden_dim', 128)
+            self.model = MLPModel(input_dim, hidden_dim=hidden_dim).to(self.device)
+        else:  # default to logistic
+            self.model = LogisticModel(input_dim).to(self.device)
         
-        if hasattr(model, 'predict_proba'):
-            y_proba = model.predict_proba(X_test)[:, 1]
-            auc = roc_auc_score(y_test, y_proba)
-        else:
-            # If model doesn't have predict_proba, use decision function if available
-            if hasattr(model, 'decision_function'):
-                decisions = model.decision_function(X_test)
-                auc = roc_auc_score(y_test, decisions)
-            else:
-                auc = None
+        # Loss function and optimizer
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         
-        # Calculate metrics
-        accuracy = accuracy_score(y_test, y_pred)
-        precision, recall, f1, _ = precision_recall_fscore_support(y_test, y_pred, average='binary')
+        # Training loop
+        best_test_loss = float('inf')
+        best_accuracy = 0.0
+        best_model_state = None
+        early_stopping_counter = 0
         
-        # Store the trained model
-        self.model = model
+        print(f"Starting training for up to {num_epochs} epochs...")
         
-        # Create results dictionary
-        results = {
-            'model_type': model_type,
-            'accuracy': accuracy,
-            'precision': precision,
-            'recall': recall,
-            'f1_score': f1,
-            'auc': auc,
-            'test_size': test_size,
-            'harmful_samples': len(harmful_activations),
-            'harmless_samples': len(harmless_activations),
-            'feature_dim': X.shape[1],
-            'model_params': model_params
+        metrics = {
+            'train_loss': [],
+            'test_loss': [],
+            'accuracy': [],
+            'precision': [],
+            'recall': [],
+            'f1': [],
+            'auc': []
         }
         
-        # Format AUC string properly for display
-        auc_str = f"{auc:.4f}" if auc is not None else "N/A"
+        for epoch in range(num_epochs):
+            # Training phase
+            self.model.train()
+            train_loss = 0.0
+            
+            for inputs, labels in train_loader:
+                optimizer.zero_grad()
+                outputs = self.model(inputs).squeeze()
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item()
+            
+            train_loss /= len(train_loader)
+            metrics['train_loss'].append(train_loss)
+            
+            # Evaluation phase
+            self.model.eval()
+            test_loss = 0.0
+            all_preds = []
+            all_probs = []
+            all_labels = []
+            
+            with torch.no_grad():
+                for inputs, labels in test_loader:
+                    outputs = self.model(inputs).squeeze()
+                    loss = criterion(outputs, labels)
+                    test_loss += loss.item()
+                    
+                    probs = outputs.cpu()
+                    preds = (probs >= self.threshold).float()
+                    
+                    all_probs.extend(probs.tolist())
+                    all_preds.extend(preds.tolist())
+                    all_labels.extend(labels.cpu().tolist())
+            
+            test_loss /= len(test_loader)
+            metrics['test_loss'].append(test_loss)
+            
+            # Calculate metrics
+            test_accuracy = sum(1 for p, l in zip(all_preds, all_labels) if p == l) / len(all_preds)
+            metrics['accuracy'].append(test_accuracy)
+            
+            # Calculate precision, recall, F1
+            true_positives = sum(1 for p, l in zip(all_preds, all_labels) if p == 1 and l == 1)
+            false_positives = sum(1 for p, l in zip(all_preds, all_labels) if p == 1 and l == 0)
+            false_negatives = sum(1 for p, l in zip(all_preds, all_labels) if p == 0 and l == 1)
+            
+            precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+            recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+            
+            metrics['precision'].append(precision)
+            metrics['recall'].append(recall)
+            metrics['f1'].append(f1)
+            
+            # Calculate AUC
+            try:
+                auc = calculate_roc_auc(all_labels, all_probs)
+                metrics['auc'].append(auc)
+            except Exception as e:
+                print(f"Error calculating AUC: {e}")
+                metrics['auc'].append(0.0)
+            
+            # Print progress
+            if (epoch + 1) % 10 == 0 or epoch == 0 or epoch == num_epochs - 1:
+                print(f"Epoch {epoch+1}/{num_epochs} - "
+                      f"Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}, "
+                      f"Accuracy: {test_accuracy:.4f}, F1: {f1:.4f}")
+            
+            # Check for improvement
+            if test_accuracy > best_accuracy:
+                best_accuracy = test_accuracy
+                best_test_loss = test_loss
+                best_model_state = self.model.state_dict().copy()
+                early_stopping_counter = 0
+            else:
+                early_stopping_counter += 1
+            
+            # Early stopping
+            if early_stopping_counter >= early_stopping_patience:
+                print(f"Early stopping at epoch {epoch+1} due to no improvement in accuracy")
+                break
         
-        print(f"Training complete with accuracy: {accuracy:.4f}, precision: {precision:.4f}, "
-              f"recall: {recall:.4f}, F1: {f1:.4f}, AUC: {auc_str}")
+        # Load the best model state
+        if best_model_state is not None:
+            self.model.load_state_dict(best_model_state)
         
-        return results
+        # Final evaluation
+        self.model.eval()
+        y_pred = []
+        y_prob = []
+        y_true = []
+        
+        with torch.no_grad():
+            for inputs, labels in test_loader:
+                outputs = self.model(inputs).squeeze()
+                probs = outputs.cpu()
+                preds = (probs >= self.threshold).float()
+                
+                y_prob.extend(probs.tolist())
+                y_pred.extend(preds.tolist())
+                y_true.extend(labels.cpu().tolist())
+        
+        # Final metrics
+        test_accuracy = sum(1 for p, l in zip(y_pred, y_true) if p == l) / len(y_pred)
+        
+        true_positives = sum(1 for p, l in zip(y_pred, y_true) if p == 1 and l == 1)
+        false_positives = sum(1 for p, l in zip(y_pred, y_true) if p == 1 and l == 0)
+        false_negatives = sum(1 for p, l in zip(y_pred, y_true) if p == 0 and l == 1)
+        
+        precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
+        recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        
+        # Calculate AUC
+        try:
+            auc = calculate_roc_auc(y_true, y_prob)
+        except Exception as e:
+            print(f"Error calculating final AUC: {e}")
+            auc = 0.0
+        
+        # Final results
+        training_results = {
+            'accuracy': float(test_accuracy),
+            'precision': float(precision),
+            'recall': float(recall),
+            'f1': float(f1),
+            'auc': float(auc),
+            'epochs': epoch + 1,
+            'input_dim': input_dim,
+            'model_type': model_type,
+            'metrics_history': {k: [float(val) for val in v] for k, v in metrics.items()},
+            'best_epoch': metrics['accuracy'].index(max(metrics['accuracy'])) + 1
+        }
+        
+        print("\nTraining complete!")
+        print(f"Final metrics - Accuracy: {test_accuracy:.4f}, Precision: {precision:.4f}, "
+              f"Recall: {recall:.4f}, F1: {f1:.4f}, AUC: {auc:.4f}")
+        
+        return training_results
     
     def save_model(self, save_path: str) -> None:
         """
-        Save the trained model to disk.
+        Save the trained classifier model to disk.
         
         Args:
-            save_path: Path to save the model file
-        
-        Raises:
-            ValueError: If no model has been trained or loaded
+            save_path: Path to save the model
         """
         if self.model is None:
-            raise ValueError("No model has been trained or loaded. Cannot save.")
+            raise ValueError("No model to save. Train or load a model first.")
         
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
         
-        # Save using joblib (preferred for scikit-learn models)
-        joblib.dump(self.model, save_path)
-        print(f"Model saved to {save_path}")
+        # Extract model metadata
+        model_type = 'mlp' if isinstance(self.model, MLPModel) else 'logistic'
+        input_dim = next(self.model.parameters()).shape[1]
         
-        # Update the model path
-        self.model_path = save_path
+        # For MLP, extract hidden_dim
+        hidden_dim = None
+        if model_type == 'mlp':
+            # Extract hidden dim from first layer
+            hidden_dim = self.model.network[0].out_features
+        
+        # Create save dictionary with metadata
+        save_dict = {
+            'model': self.model.state_dict(),
+            'model_type': model_type,
+            'input_dim': input_dim,
+            'threshold': self.threshold,
+            'positive_class_label': self.positive_class_label
+        }
+        
+        if hidden_dim is not None:
+            save_dict['hidden_dim'] = hidden_dim
+        
+        # Save the model
+        torch.save(save_dict, save_path)
+        print(f"Model saved to {save_path}")
     
     @classmethod
     def create_from_activations(cls, 
@@ -374,35 +569,39 @@ class ActivationClassifier:
                                save_path: Optional[str] = None,
                                threshold: float = 0.5,
                                positive_class_label: str = "harmful",
+                               device: Optional[str] = None,
                                **model_params) -> 'ActivationClassifier':
         """
-        Create and train a new classifier from activation data.
+        Create and train a classifier from activation data.
         
         Args:
-            harmful_activations: List of activation dictionaries labeled as harmful (class 1)
-            harmless_activations: List of activation dictionaries labeled as harmless (class 0)
+            harmful_activations: List of activation dictionaries labeled as harmful
+            harmless_activations: List of activation dictionaries labeled as harmless
             model_type: Type of model to train: "logistic" or "mlp" (default: "logistic")
             save_path: Path to save the trained model (optional)
             threshold: Classification threshold (default: 0.5)
             positive_class_label: Label for the positive class (default: "harmful")
-            **model_params: Additional parameters to pass to the model constructor
+            device: Device to run the model on (e.g., 'cuda', 'cpu')
+            **model_params: Additional parameters for the training process
             
         Returns:
             Trained ActivationClassifier instance
         """
-        # Create a new classifier instance
-        classifier = cls(threshold=threshold, positive_class_label=positive_class_label)
+        # Create classifier instance
+        classifier = cls(threshold=threshold, 
+                         positive_class_label=positive_class_label,
+                         device=device)
         
-        # Train the model
-        classifier.train(
+        # Train the classifier
+        results = classifier.train(
             harmful_activations=harmful_activations,
             harmless_activations=harmless_activations,
             model_type=model_type,
             **model_params
         )
         
-        # Save the model if a path is provided
-        if save_path:
+        # Save model if path provided
+        if save_path is not None:
             classifier.save_model(save_path)
         
         return classifier

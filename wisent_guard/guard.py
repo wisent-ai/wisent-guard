@@ -680,7 +680,7 @@ class ActivationGuard:
                 
                 # Create a properly formatted activation dictionary for the classifier
                 activation_data = {
-                    'activations': activation_tensor.detach().cpu().numpy().flatten(),
+                    'activations': activation_tensor.detach().flatten(),
                     'layer': monitored_layer,
                     'is_harmful': None  # Will be determined by the classifier
                 }
@@ -943,7 +943,7 @@ class ActivationGuard:
                 
                 # Create a properly formatted activation dictionary for the classifier
                 activation_data = {
-                    'activations': activation_tensor.detach().cpu().numpy().flatten(),
+                    'activations': activation_tensor.detach().flatten(),
                     'layer': monitored_layer,
                     'is_harmful': None  # Will be determined by the classifier
                 }
