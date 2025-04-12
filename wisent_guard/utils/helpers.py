@@ -4,9 +4,7 @@ Helper functions for Wisent-Guard
 
 import os
 import torch
-import numpy as np
 from typing import Dict, List, Tuple, Union, Optional
-from sklearn.metrics.pairwise import cosine_similarity
 
 def ensure_dir(directory: str) -> None:
     """
@@ -20,7 +18,7 @@ def ensure_dir(directory: str) -> None:
 
 def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
     """
-    Calculate cosine similarity between two vectors.
+    Calculate cosine similarity between two vectors using PyTorch.
     
     Args:
         v1: First vector
@@ -41,47 +39,27 @@ def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
                 v2 = v2.detach().cpu()
             v2 = v2.detach()
         
-        # PyTorch-based implementation for better numerical stability
-        if isinstance(v1, torch.Tensor) and isinstance(v2, torch.Tensor):
-            # Flatten tensors
-            v1_flat = v1.reshape(1, -1)
-            v2_flat = v2.reshape(1, -1)
-            
-            # Ensure dimensions match
-            if v1_flat.shape[1] != v2_flat.shape[1]:
-                min_dim = min(v1_flat.shape[1], v2_flat.shape[1])
-                v1_flat = v1_flat[:, :min_dim]
-                v2_flat = v2_flat[:, :min_dim]
-            
-            # Calculate similarity using PyTorch
-            sim = torch.nn.functional.cosine_similarity(v1_flat, v2_flat, dim=1)
-            return sim.item()  # Get scalar value
+        # Flatten tensors
+        v1_flat = v1.reshape(1, -1)
+        v2_flat = v2.reshape(1, -1)
         
-        # Convert to numpy arrays for sklearn implementation
-        v1 = v1.numpy() if isinstance(v1, torch.Tensor) else v1
-        v2 = v2.numpy() if isinstance(v2, torch.Tensor) else v2
-            
-        # Reshape if needed for sklearn
-        if len(v1.shape) > 1:
-            v1 = v1.reshape(1, -1)
-        if len(v2.shape) > 1:
-            v2 = v2.reshape(1, -1)
+        # Ensure dimensions match
+        if v1_flat.shape[1] != v2_flat.shape[1]:
+            min_dim = min(v1_flat.shape[1], v2_flat.shape[1])
+            v1_flat = v1_flat[:, :min_dim]
+            v2_flat = v2_flat[:, :min_dim]
         
         # Check for NaN or Inf values that could cause issues
-        if np.isnan(v1).any() or np.isnan(v2).any() or np.isinf(v1).any() or np.isinf(v2).any():
+        if torch.isnan(v1_flat).any() or torch.isnan(v2_flat).any() or torch.isinf(v1_flat).any() or torch.isinf(v2_flat).any():
             print("Warning: NaN or Inf values detected in vectors")
             # Replace NaN/Inf with zeros
-            v1 = np.nan_to_num(v1)
-            v2 = np.nan_to_num(v2)
-            
-        # Verify shapes match for comparison
-        if v1.shape[1] != v2.shape[1]:
-            # Truncate to the smaller dimension
-            min_dim = min(v1.shape[1], v2.shape[1])
-            v1 = v1[:, :min_dim]
-            v2 = v2[:, :min_dim]
-            
-        return float(cosine_similarity(v1, v2)[0][0])
+            v1_flat = torch.nan_to_num(v1_flat, nan=0.0, posinf=0.0, neginf=0.0)
+            v2_flat = torch.nan_to_num(v2_flat, nan=0.0, posinf=0.0, neginf=0.0)
+        
+        # Calculate similarity using PyTorch
+        sim = torch.nn.functional.cosine_similarity(v1_flat, v2_flat, dim=1)
+        return sim.item()  # Get scalar value
+        
     except Exception as e:
         print(f"Error calculating cosine similarity: {e}")
         # Return a low similarity value to be safe
@@ -248,16 +226,18 @@ def get_layer_count(model, model_type: str = None) -> int:
         elif model_type == 'bart':
             if hasattr(model, 'model') and hasattr(model.model, 'encoder') and hasattr(model.model.encoder, 'layers'):
                 return len(model.model.encoder.layers)
-        
-        # Use config if available
-        if hasattr(model, 'config') and hasattr(model.config, 'num_hidden_layers'):
-            return model.config.num_hidden_layers
-        elif hasattr(model, 'config') and hasattr(model.config, 'n_layer'):
-            return model.config.n_layer
-        elif hasattr(model, 'config') and hasattr(model.config, 'num_layers'):
-            return model.config.num_layers
+                
     except Exception as e:
         print(f"Error determining layer count: {e}")
     
-    # Default to 0 if we can't determine
-    return 0 
+    # Get the model config's hidden layers if available
+    try:
+        if hasattr(model, 'config'):
+            for attr in ['num_hidden_layers', 'n_layer', 'num_layers', 'n_layers']:
+                if hasattr(model.config, attr):
+                    return getattr(model.config, attr)
+    except Exception:
+        pass
+    
+    # Default to 12 if we can't determine
+    return 12 

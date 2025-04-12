@@ -19,6 +19,8 @@ import argparse
 import torch
 
 # Import utilities from our generalized content detector
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from examples.utils.content_detector import (
     get_device, 
     load_model, 

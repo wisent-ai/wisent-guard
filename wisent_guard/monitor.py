@@ -4,7 +4,6 @@ Activation monitoring module for tracking activations in real-time
 
 import logging
 import torch
-import numpy as np
 from typing import Dict, List, Tuple, Optional, Set, Any, Union
 from .utils.activation_hooks import ActivationHooks
 from .utils.helpers import cosine_sim, get_layer_count
