@@ -18,7 +18,13 @@ class LogisticModel(nn.Module):
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.sigmoid(self.linear(x))
+        # Ensure output has proper dimensions by keeping the batch dimension
+        logits = self.linear(x)
+        # Keep output shape consistent regardless of batch size
+        # This ensures output is [batch_size, 1] even for single samples
+        if len(logits.shape) == 1:
+            logits = logits.unsqueeze(1)
+        return self.sigmoid(logits)
 
 class MLPModel(nn.Module):
     """PyTorch Multi-Layer Perceptron model for binary classification"""
@@ -36,7 +42,11 @@ class MLPModel(nn.Module):
         )
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.network(x)
+        logits = self.network(x)
+        # Keep output shape consistent regardless of batch size
+        if len(logits.shape) == 1:
+            logits = logits.unsqueeze(1)
+        return logits
 
 def calculate_roc_auc(y_true: List[float], y_scores: List[float]) -> float:
     """
@@ -252,7 +262,8 @@ class ActivationClassifier:
         
         # Get prediction probability
         with torch.no_grad():
-            probability = self.model(features).item()
+            outputs = self.model(features)
+            probability = outputs.view(-1).item()  # Ensure we get a scalar value
         
         # Create result dictionary
         result = {
@@ -387,7 +398,10 @@ class ActivationClassifier:
             
             for inputs, labels in train_loader:
                 optimizer.zero_grad()
-                outputs = self.model(inputs).squeeze()
+                outputs = self.model(inputs)
+                # Ensure outputs and labels have matching dimensions
+                outputs = outputs.view(-1)  # Flatten to match labels
+                labels = labels.view(-1)    # Ensure labels are flattened too
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -405,7 +419,10 @@ class ActivationClassifier:
             
             with torch.no_grad():
                 for inputs, labels in test_loader:
-                    outputs = self.model(inputs).squeeze()
+                    outputs = self.model(inputs)
+                    # Ensure dimensions match for evaluation too
+                    outputs = outputs.view(-1)
+                    labels = labels.view(-1)
                     loss = criterion(outputs, labels)
                     test_loss += loss.item()
                     
@@ -476,7 +493,10 @@ class ActivationClassifier:
         
         with torch.no_grad():
             for inputs, labels in test_loader:
-                outputs = self.model(inputs).squeeze()
+                outputs = self.model(inputs)
+                # Ensure dimensions match for evaluation too
+                outputs = outputs.view(-1)
+                labels = labels.view(-1)
                 probs = outputs.cpu()
                 preds = (probs >= self.threshold).float()
                 

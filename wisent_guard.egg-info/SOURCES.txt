@@ -14,6 +14,7 @@ examples/train_classifiers_for_different_models.py
 examples/train_different_detectors.py
 examples/utils/__init__.py
 examples/utils/content_detector.py
+examples/utils/load_model.py
 wisent_guard/__init__.py
 wisent_guard/classifier.py
 wisent_guard/guard.py

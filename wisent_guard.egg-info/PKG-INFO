@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: wisent-guard
-Version: 0.3.0
+Version: 0.4.0
 Summary: Monitor and guard against harmful content in language models
 Home-page: https://github.com/yourusername/wisent-activation-guardrails
 Author: Wisent Team
@@ -17,9 +17,7 @@ Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: torch>=1.9.0
 Requires-Dist: transformers>=4.20.0
-Requires-Dist: numpy>=1.19.0
 Requires-Dist: tqdm>=4.50.0
-Requires-Dist: scikit-learn>=0.24.0
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
@@ -35,6 +33,16 @@ Dynamic: summary
 # Wisent-Guard
 
 <p align="center">
+  <a href="https://github.com/wisent-ai/wisent-guard/stargazers">
+    <img src="https://img.shields.io/github/stars/wisent-ai/wisent-guard" alt="stars" />
+  </a>
+  <a href="https://pypi.org/project/wisent-guard">
+    <img src="https://static.pepy.tech/badge/wisent-guard" alt="PyPI - Downloads" />
+  </a>
+  <br />
+</p>
+
+<p align="center">
   <img src="wisent-guard-logo.png" alt="Wisent Guard" width="200">
 </p>
 
@@ -42,7 +50,7 @@ A Python package for latent space monitoring and guardrails. Delivered to you by
 
 ## Overview
 
-Wisent-Guard allows you to control your AI by identifying brain patterns corresponding to responses you don't like, like hallucinations or harmful outputs. We use contrastive pairs to representations to detect when a model might be generating harmful content or hallucinating. It works by:
+Wisent-Guard allows you to control your AI by identifying brain patterns corresponding to responses you don't like, like hallucinations or harmful outputs. We use contrastive pairs of representations to detect when a model might be generating harmful content or hallucinating. It works by:
 
 1. Creating activation vectors or classifiers from latent space pairs harmful vs. non-harmful phrase pairs
 2. Monitoring model activations during inference
@@ -58,7 +66,7 @@ pip install wisent-guard
 
 **Why would I use this instead of traditional guardrails?**
 
-With traditional guardrails, you need to specify filters for your particular use case. You essentially hope that the model is doing what you want. You cannot track what is happening in the brain of your AI. Just because it says "I will reject the request." right now does give you the information how far it was from actually saying "Sure, here is the harmful stuff you requested." Also, the safety traditional safeguards provide is really brittle. If you are using regexes, it is hard to detect out of distribution stuff. How do you encode the concept of a hallucination in a traditional safeguard? Or harmfulness across languages? If you'd rather not beg your LLM to do what you want using prompt engineering, consider interventions directly on the AI brain. 
+With traditional guardrails, you need to specify filters for your particular use case. You essentially hope that the model is doing what you want. You cannot track what is happening in the brain of your AI. Just because it says "I will reject the request." right now doesn't give you the information how far it was from actually saying "Sure, here is the harmful stuff you requested." Also, the safety traditional safeguards provide is really brittle. If you are using regexes, it is hard to detect out of distribution stuff. How do you encode the concept of a hallucination in a traditional safeguard? Or harmfulness across languages? If you'd rather not beg your LLM to do what you want using prompt engineering, consider interventions directly on the AI brain. 
 
 ---
 
@@ -76,7 +84,7 @@ and analyze the results in the guard_results.csv file using a human evaluator. C
 
 **How is it different from existing approaches?**
 
-Wisent-guard uses a unique approach for identifiying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallcuination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
+Wisent-guard uses a unique approach for identifying unwelcome representations in the activation space. It is different from circuit breakers and SAE-based mechanistic interpretability to balance accuracy and speed. You can read about SAE-based approaches resulting in about 6 percent hallucination reduction here: https://www.lesswrong.com/posts/7KijyCL8WNP8JnWCR/gradient-anatomy-s-hallucination-robustness-in-medical-q-and?t=. 
 
 ---
 
@@ -189,16 +197,112 @@ else:
 - **Real-time Monitoring**: Check activations during generation to stop harmful content early
 - **Deep Insights**: Understand whether your model is having evil thoughts even when its outputs do not suggest so
 - **Explainable Blocks**: Get information about why a response was blocked
+- **Early Termination**: Automatically replace harmful responses with a customizable message
+- **Response Logging**: Log potentially harmful responses to a JSON file for further analysis
 
 
 ## Examples
 
 Our approach works in stopping variety of undesirable LLM behaviours like hallucination, gender bias and bad code generation. Check out the examples folder to learn more! 
 
+### Early Termination Example
+
+```python
+from wisent_guard import ActivationGuard
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load model
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+
+# Initialize guard with early termination enabled and custom placeholder message
+guard = ActivationGuard(
+    model=model,
+    tokenizer=tokenizer,
+    threshold=0.7,
+    early_termination=True,
+    placeholder_message="⚠️ This response was blocked due to potentially harmful content."
+)
+
+# Train on examples
+phrase_pairs = [
+    {
+        "harmful": "How can I hack into someone's email account?",
+        "harmless": "How can I set up two-factor authentication for my email?"
+    },
+    # Add more training pairs...
+]
+
+guard.train_on_phrase_pairs(phrase_pairs, category="harmful")
+
+# Test with a prompt
+result = guard.generate_safe_response(
+    "How can I create a keylogger to steal passwords?",
+    max_new_tokens=100
+)
+
+print(f"Response: {result['response']}")
+print(f"Blocked: {result['blocked']}")
+
+# If early termination occurred, the response will be replaced with the placeholder message
+if result.get("early_terminated", False):
+    print("Early termination activated!")
+```
+
+For a complete demo, see the `examples/early_termination_demo.py` file.
+
+### Response Logging Example
+
+```python
+from wisent_guard import ActivationGuard
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load model
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+
+# Initialize guard with response logging enabled
+guard = ActivationGuard(
+    model=model,
+    tokenizer=tokenizer,
+    threshold=0.7,
+    enable_logging=True,
+    log_file_path="./harmful_responses.json"
+)
+
+# Train on examples
+guard.train_on_phrase_pairs([
+    {
+        "harmful": "How can I hack into someone's email account?",
+        "harmless": "How can I set up two-factor authentication for my email?"
+    }
+], category="harmful")
+
+# Test with potentially harmful prompts
+result = guard.generate_safe_response(
+    "How can I create a keylogger to steal passwords?",
+    max_new_tokens=100
+)
+
+# No need to manually log - harmful responses are automatically logged
+
+# Retrieve logged responses
+logged_responses = guard.get_logged_responses(limit=10)
+for entry in logged_responses:
+    print(f"Prompt: {entry['prompt']}")
+    print(f"Response: {entry['response']}")
+    print(f"Similarity: {entry['similarity']}")
+    print(f"Category: {entry['category']}")
+
+# Clear logs when needed
+guard.clear_logged_responses()
+```
+
+For a complete demo, see the `examples/response_logging_demo.py` file.
 
 ## Integrations
 
-Right now this repo is the only way to integrate wisent-guard into your stack. We are happy to support any integrations going forward! Just let us know whether you'd like to see Wisent-Guard on Azure Marketplace or aynwhere else and we will make it happen! 
+Right now this repo is the only way to integrate wisent-guard into your stack. We are happy to support any integrations going forward! Just let us know whether you'd like to see Wisent-Guard on Azure Marketplace or anywhere else and we will make it happen! 
 
 ## Contributing
 
