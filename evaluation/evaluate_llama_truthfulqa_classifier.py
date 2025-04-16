@@ -25,7 +25,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # Now import wisent_guard
 from wisent_guard import ActivationGuard
 from wisent_guard.classifier import ActivationClassifier
-from evaluation.evaluate_string import call_claude_and_evaluate
+from evaluate_string import call_claude_and_evaluate
 
 def format_prompt(message, system_prompt=None):
     """Format prompt for Llama 3.1 Instruct models using the special tokens"""
