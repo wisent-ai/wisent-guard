@@ -23,4 +23,4 @@ from .vectors import ContrastiveVectors
 from .inference import SafeInference
 
 # Updated with Torch only support 
-__version__ = "0.4.0" 
+__version__ = "0.4.1" 
