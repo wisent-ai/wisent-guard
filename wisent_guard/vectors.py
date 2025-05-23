@@ -137,6 +137,44 @@ class ContrastiveVectors:
         self._save_metadata()
         self.logger.debug("Vector pair added successfully")
     
+    def get_vector_pair(self, category: str, layer: int) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+        """
+        Get the harmful and harmless vector pair for a specific category and layer.
+        
+        Args:
+            category: Category name
+            layer: Layer number
+            
+        Returns:
+            Tuple of (harmful_vector, harmless_vector), either can be None if not found
+        """
+        harmful = None
+        harmless = None
+        
+        # Check if we have explicit harmful/harmless vectors
+        if category in self.harmful_vectors and layer in self.harmful_vectors[category]:
+            harmful = self.harmful_vectors[category][layer]
+        
+        if category in self.harmless_vectors and layer in self.harmless_vectors[category]:
+            harmless = self.harmless_vectors[category][layer]
+            
+        # If we don't have explicit vectors but have a contrastive vector,
+        # we can approximate the harmful and harmless vectors
+        if harmful is None or harmless is None:
+            contrastive = self.get_contrastive_vector(category, layer)
+            if contrastive is not None:
+                if harmful is None:
+                    # Approximate harmful vector as negative contrastive vector
+                    harmful = -contrastive
+                    self.logger.debug(f"Using approximated harmful vector for '{category}' layer {layer}")
+                
+                if harmless is None:
+                    # Approximate harmless vector as positive contrastive vector
+                    harmless = contrastive
+                    self.logger.debug(f"Using approximated harmless vector for '{category}' layer {layer}")
+        
+        return harmful, harmless
+    
     def compute_contrastive_vectors(self) -> Dict[str, Dict[int, torch.Tensor]]:
         """
         Compute contrastive vectors for all categories and layers.

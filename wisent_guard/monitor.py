@@ -3,6 +3,7 @@ Activation monitoring module for tracking activations in real-time
 """
 
 import logging
+import os
 import torch
 from typing import Dict, List, Tuple, Optional, Set, Any, Union
 from .utils.activation_hooks import ActivationHooks
@@ -10,6 +11,9 @@ from .utils.helpers import cosine_sim, get_layer_count
 from .vectors import ContrastiveVectors
 from .utils.logger import get_logger
 from transformers import PreTrainedModel
+
+# Default vector scaling
+DEFAULT_VECTOR_SCALE = 0.2
 
 class ActivationMonitor:
     """
@@ -27,7 +31,9 @@ class ActivationMonitor:
         token_strategy: str = "last",  # Only 'last' is supported
         similarity_threshold: float = 0.5,
         device: Optional[torch.device] = None,
-        log_level: Union[str, int] = "info"
+        log_level: Union[str, int] = "info",
+        vector_scale: float = None,
+        vector_decay: bool = True
     ):
         """
         Initialize activation monitor.
@@ -40,6 +46,8 @@ class ActivationMonitor:
             similarity_threshold: Similarity threshold for harmful content detection
             device: Device to use
             log_level: Logging level
+            vector_scale: Scale factor for contrastive vector influence (defaults to env var or 0.2)
+            vector_decay: Whether to decay vector influence over time during generation
         """
         self.logger = get_logger("wisent_guard", log_level)
         self.logger.info(f"Creating activation monitor for {getattr(model.config, '_name_or_path', 'unknown')}")
@@ -49,6 +57,12 @@ class ActivationMonitor:
         self.vectors = vectors
         self.similarity_threshold = similarity_threshold
         self.device = device or next(model.parameters()).device
+        
+        # Vector scaling and decay parameters
+        self.vector_scale = vector_scale if vector_scale is not None else float(os.environ.get("WISENT_VECTOR_SCALE", DEFAULT_VECTOR_SCALE))
+        self.vector_decay = vector_decay
+        self.generation_step = 0
+        self.logger.info(f"Vector scale: {self.vector_scale}, Vector decay: {self.vector_decay}")
         
         # Set up activation hooks
         self.logger.info("Initializing activation hooks")
@@ -199,7 +213,8 @@ class ActivationMonitor:
         self.current_token_ids = None
         self.token_data = {'has_activation_values': False}
         self.hooks.reset()
-        self.logger.debug("Monitor reset, all activations cleared")
+        self.generation_step = 0  # Reset generation step counter
+        self.logger.debug("Monitor reset, all activations and generation step cleared")
 
     def check_activations(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -220,15 +235,37 @@ class ActivationMonitor:
         results = {}
         categories = self.vectors.get_available_categories()
         
+        # Increment generation step for vector decay
+        self.generation_step += 1
+        
+        # Calculate effective vector scale with decay if enabled
+        effective_scale = self.vector_scale
+        if self.vector_decay:
+            # Decrease scale by 10% every 5 tokens
+            decay_factor = 0.9 ** (self.generation_step // 5)
+            effective_scale = self.vector_scale * decay_factor
+            self.logger.debug(f"Generation step {self.generation_step}, decay factor: {decay_factor:.4f}, effective scale: {effective_scale:.4f}")
+        
         for category in categories:
             category_result = {
                 "max_similarity": 0.0,
                 "is_harmful": False,
-                "layer": None
+                "layer": None,
+                "layer_similarities": {}
             }
             
+            # For scaling to work correctly, restrict to using a single mid-layer
+            # instead of checking all layers if there are multiple layers being monitored
+            target_layers = self.layers
+            if len(self.layers) > 1:
+                # Use the layer approximately 2/3 through the network
+                layer_index = int(0.66 * len(self.layers))
+                target_layer = self.layers[min(layer_index, len(self.layers) - 1)]
+                target_layers = [target_layer]
+                self.logger.debug(f"Multiple layers available, focusing on layer {target_layer} for vector comparison")
+            
             # Check each layer
-            for layer in self.layers:
+            for layer in target_layers:
                 # Skip if we don't have activations for this layer
                 if layer not in self.activations_by_layer:
                     continue
@@ -241,12 +278,19 @@ class ActivationMonitor:
                 if contrastive_vector is None:
                     continue
                 
-                # Calculate similarity
+                # Apply scaling to the contrastive vector
+                scaled_vector = contrastive_vector * effective_scale
+                self.logger.debug(f"Applied scaling {effective_scale:.4f} to vector for layer {layer}")
+                
+                # Calculate similarity with scaled vector
                 similarity = torch.nn.functional.cosine_similarity(
                     activation.to(self.device).view(1, -1),  # Reshape to [1, hidden_size]
-                    contrastive_vector.to(self.device).view(1, -1),  # Reshape to [1, hidden_size]
+                    scaled_vector.to(self.device).view(1, -1),  # Reshape to [1, hidden_size]
                     dim=1  # Calculate along the feature dimension
                 ).item()  # Get the scalar
+                
+                # Store layer similarity
+                category_result["layer_similarities"][layer] = similarity
                 
                 # Check if this is the highest similarity
                 if similarity > category_result["max_similarity"]:

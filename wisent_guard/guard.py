@@ -5,15 +5,16 @@ Main ActivationGuard class for the wisent-guard package
 import os
 import torch
 import re
+import json
 from typing import List, Dict, Tuple, Any, Optional, Union, Set
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizer
 from tqdm import tqdm
 
 from .vectors import ContrastiveVectors
-from .monitor import ActivationMonitor
+from .monitor import ActivationMonitor, DEFAULT_VECTOR_SCALE
 from .inference import SafeInference
 from .utils.helpers import ensure_dir
-from .utils.logger import get_logger
+from .utils.logger import get_logger, log_error
 from .classifier import ActivationClassifier
 
 # Default tokens that can be overridden via environment variables
@@ -53,7 +54,11 @@ class ActivationGuard:
         placeholder_message: str = "Sorry, this response was blocked due to potentially harmful content.",
         # New parameters for response logging
         enable_logging: bool = False,
-        log_file_path: str = "./harmful_responses.json"
+        log_file_path: str = "./harmful_responses.json",
+        # New parameters for vector scaling
+        vector_scale: Optional[float] = None,
+        vector_decay: bool = True,
+        layer_idx: Optional[int] = None
     ):
         """
         Initialize the ActivationGuard.
@@ -80,6 +85,9 @@ class ActivationGuard:
             placeholder_message: Message to return when generation is terminated early (default: "Sorry, this response was blocked due to potentially harmful content.")
             enable_logging: Whether to enable logging of detected harmful responses
             log_file_path: Path to the log file for detected harmful responses
+            vector_scale: Scale factor for contrastive vector influence (default: 0.2)
+            vector_decay: Whether to decay vector influence over time (default: True)
+            layer_idx: Override to use a specific layer index (default: None, uses the whole layers list)
         """
         # Set up logger
         self.logger = get_logger(level=log_level, log_file=log_file)
@@ -101,17 +109,16 @@ class ActivationGuard:
                     os.makedirs(os.path.dirname(log_file_path))
                     self.logger.info(f"Created directory for log file: {os.path.dirname(log_file_path)}")
                 except Exception as e:
-                    self.logger.warning(f"Could not create directory for log file: {e}")
+                    self.logger.error(f"Could not create directory for log file: {e}")
             
             # Initialize log file with empty array if it doesn't exist
             if not os.path.exists(log_file_path):
                 try:
                     with open(log_file_path, 'w') as f:
-                        import json
                         json.dump([], f)
                     self.logger.info(f"Initialized empty log file: {log_file_path}")
                 except Exception as e:
-                    self.logger.warning(f"Could not initialize log file: {e}")
+                    self.logger.error(f"Could not initialize log file: {e}")
         
         # Get user/assistant tokens from parameters, env vars, or defaults
         self.user_token = user_token or os.environ.get("WISENT_USER_TOKEN", DEFAULT_USER_TOKEN)
@@ -119,8 +126,20 @@ class ActivationGuard:
         
         # Set up directories
         self.save_dir = save_dir
-        ensure_dir(self.save_dir)
-        self.logger.info(f"Using save directory: {self.save_dir}")
+        if not ensure_dir(self.save_dir):
+            self.logger.warning(f"Failed to create save directory: {self.save_dir}. Continuing but file operations may fail.")
+        else:
+            self.logger.info(f"Using save directory: {self.save_dir}")
+        
+        # Vector scaling parameters
+        self.vector_scale = vector_scale
+        self.vector_decay = vector_decay
+        self.logger.info(f"Vector scaling: {self.vector_scale or DEFAULT_VECTOR_SCALE}, decay: {vector_decay}")
+        
+        # Store layer_idx for specific layer targeting
+        self.layer_idx = layer_idx
+        if layer_idx is not None:
+            self.logger.info(f"Using specific layer index: {layer_idx}")
         
         # Set device
         if device is None:
@@ -279,39 +298,48 @@ class ActivationGuard:
         self.logger.debug("Target tokens setup not needed with 'last' token strategy")
     
     def _initialize_monitor_and_inference(self):
-        """Initialize the monitor and inference module."""
-        self.logger.info("Setting up activation monitor")
-        
-        # Create the vectors instance if none exists
-        vectors_instance = None
-        if self.vectors is not None:
-            vectors_instance = self.vectors
-        
-        # Create monitor with activation hooks
-        self.monitor = ActivationMonitor(
-            model=self.model,
-            layers=self.layers,
-            vectors=vectors_instance,
-            token_strategy="last",  # Always use last token
-            similarity_threshold=self.threshold,
-            device=self.device,
-            log_level=self.logger.level
-        )
-        
-        # Determine the format to use based on model detection
-        format_type = self._detect_format()
-        
-        # Create inference module
-        self.inference = SafeInference(
-            model=self.model,
-            tokenizer=self.tokenizer,
-            monitor=self.monitor,
-            device=self.device,
-            format_type=format_type,  # Pass detected format
-            user_token=self.user_token,
-            assistant_token=self.assistant_token,
-            log_level=self.logger.level
-        )
+        """Initialize the activation monitor and safe inference components."""
+        try:
+            # Create monitor
+            self.logger.info("Initializing activation monitor")
+            
+            # If a specific layer_idx is specified, override the layers list
+            monitor_layers = self.layers
+            if self.layer_idx is not None:
+                if self.layer_idx not in self.layers:
+                    self.logger.warning(f"Specified layer_idx {self.layer_idx} not in layers list. Adding it.")
+                    monitor_layers = [self.layer_idx]
+                else:
+                    self.logger.info(f"Using only layer_idx {self.layer_idx} for monitoring")
+                    monitor_layers = [self.layer_idx]
+                    
+            self.monitor = ActivationMonitor(
+                model=self.model,
+                layers=monitor_layers,
+                vectors=self.vectors,
+                token_strategy=self.token_strategy,
+                similarity_threshold=self.threshold,
+                device=self.device,
+                vector_scale=self.vector_scale,
+                vector_decay=self.vector_decay
+            )
+            
+            # Create inference helper
+            self.logger.info("Initializing safe inference")
+            self.inference = SafeInference(
+                model=self.model,
+                tokenizer=self.tokenizer,
+                monitor=self.monitor,
+                device=self.device,
+                use_classifier=self.use_classifier,
+                classifier=self.classifier
+            )
+            
+            self.logger.info("Initialization complete")
+            
+        except Exception as e:
+            log_error("monitor_init", "Failed to initialize monitor or inference components", e)
+            raise RuntimeError(f"Failed to initialize monitor or inference components: {str(e)}")
     
     def _format_prompt(self, instruction: str, response: str = None) -> str:
         """

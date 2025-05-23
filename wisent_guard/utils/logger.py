@@ -5,7 +5,8 @@ Logging utilities for Wisent Guard
 import logging
 import os
 import sys
-from typing import Optional
+import traceback
+from typing import Optional, Dict, Any
 
 # Define log levels
 LOG_LEVELS = {
@@ -30,6 +31,9 @@ COLORS = {
 
 # Global logger instance
 _logger = None
+
+# Dictionary to track errors
+_error_registry = {}
 
 def get_logger(name: str = "wisent_guard", level: str = "info", 
                log_file: Optional[str] = None, use_colors: bool = True) -> logging.Logger:
@@ -116,4 +120,80 @@ def set_log_level(level: str) -> None:
         log_level = LOG_LEVELS.get(level.lower(), logging.INFO)
         _logger.setLevel(log_level)
         for handler in _logger.handlers:
-            handler.setLevel(log_level) 
+            handler.setLevel(log_level)
+
+def log_error(error_id: str, message: str, exception: Optional[Exception] = None, context: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Log an error message and store error details in the registry.
+    
+    Args:
+        error_id: Unique identifier for the type of error
+        message: Error message to log
+        exception: Optional exception object for stack trace
+        context: Optional dictionary with additional context about the error
+    """
+    global _logger, _error_registry
+    
+    # Initialize logger if needed
+    if _logger is None:
+        _logger = get_logger()
+    
+    # Format error message
+    error_msg = f"ERROR [{error_id}]: {message}"
+    
+    # Add exception details if provided
+    if exception:
+        error_msg += f" - {str(exception)}"
+        
+    # Log the error
+    _logger.error(error_msg)
+    
+    # Log the stack trace if an exception is provided
+    if exception:
+        stack_trace = ''.join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+        _logger.debug(f"Stack trace for [{error_id}]:\n{stack_trace}")
+    
+    # Store in error registry
+    _error_registry[error_id] = {
+        "message": message,
+        "exception": str(exception) if exception else None,
+        "traceback": traceback.format_exc() if exception else None,
+        "context": context
+    }
+
+def get_error_registry() -> Dict[str, Dict[str, Any]]:
+    """
+    Get the current error registry.
+    
+    Returns:
+        Dictionary mapping error IDs to error details
+    """
+    return _error_registry
+
+def clear_error_registry() -> None:
+    """
+    Clear the error registry.
+    """
+    global _error_registry
+    _error_registry = {}
+
+def export_error_logs(file_path: str) -> bool:
+    """
+    Export the error registry to a file.
+    
+    Args:
+        file_path: Path to write the error logs
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    import json
+    
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(_error_registry, f, indent=2)
+        return True
+    except Exception as e:
+        if _logger:
+            _logger.error(f"Failed to export error logs: {e}")
+        return False 
