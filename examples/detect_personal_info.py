@@ -28,6 +28,10 @@ from examples.utils.content_detector import (
     test_classifier
 )
 
+def create_personal_info_pairs():
+    """Alias for create_pii_pairs for compatibility with evaluation scripts."""
+    return create_pii_pairs()
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Train PII detector and monitor model outputs")

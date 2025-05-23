@@ -4,6 +4,15 @@
 
 .env
 
+# Python cache files
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+
+# Model and result files
+**/*.pkl
+/evaluation/results/
+
 # Ignore any new folders not already in the repository
 # Whitelist approach - only include specific folders
 /*
@@ -23,3 +32,6 @@
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
+
+# Make sure evaluation directory exists but ignore the results subdirectory
+!/evaluation/
