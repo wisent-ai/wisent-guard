@@ -6,10 +6,10 @@ This script:
 1. Trains classifiers for all layers using TruthfulQA training data
 2. Generates new responses using the blocked method on TruthfulQA test questions
 3. Evaluates each response with all 32 layer classifiers
-4. Uses human scores from guard_results.csv as ground truth to determine best performing layer
+4. Saves results in CSV format for manual human evaluation
 
 Usage:
-python evaluate_layer_performance_truthfulqa.py --model meta-llama/Llama-3.1-8B-Instruct --train-data evaluation/data/TruthfulQA_en_train.csv --eval-data evaluation/data/TruthfulQA_en_eval.csv --guard-results wisent_guard/data/guard_results.csv
+python evaluate_layer_performance_truthfulqa.py --model meta-llama/Llama-3.1-8B-Instruct --train-data evaluation/data/TruthfulQA_en_train.csv --eval-data evaluation/data/TruthfulQA_en_eval.csv --output-file layer_evaluation_results.csv
 """
 
 import argparse
@@ -21,6 +21,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Any
 import sys
+import csv
 
 # Add parent directory to path to import wisent_guard
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,7 +32,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Evaluate all layer performance for hallucination detection using TruthfulQA and guard_results.csv")
+    parser = argparse.ArgumentParser(description="Evaluate all layer performance for hallucination detection using TruthfulQA")
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct",
                         help="Model to use for evaluation")
     
@@ -42,8 +43,8 @@ def parse_args():
                         help="Path to TruthfulQA training data")
     parser.add_argument("--eval-data", type=str, default=os.path.join(project_root, "evaluation/data/TruthfulQA_en_eval.csv"), 
                         help="Path to TruthfulQA evaluation data")
-    parser.add_argument("--guard-results", type=str, default=os.path.join(project_root, "wisent_guard/data/guard_results.csv"),
-                        help="Path to guard_results.csv with human scores")
+    parser.add_argument("--output-file", type=str, default="layer_evaluation_results.csv",
+                        help="Output CSV file for manual evaluation")
     parser.add_argument("--classifier-threshold", type=float, default=0.5,
                         help="Classification threshold for detection (default: 0.5)")
     parser.add_argument("--max-tokens", type=int, default=100,
@@ -53,7 +54,7 @@ def parse_args():
     parser.add_argument("--max-eval-samples", type=int, default=0,
                         help="Maximum number of evaluation samples (default: 0 = all samples)")
     parser.add_argument("--save-results", type=str, default=None,
-                        help="Save results to JSON file")
+                        help="Save detailed results to JSON file")
     parser.add_argument("--half-precision", action="store_true",
                         help="Use half precision (fp16)")
     parser.add_argument("--cpu-only", action="store_true",
@@ -108,12 +109,6 @@ def load_truthfulqa_data(filepath):
     """Load TruthfulQA dataset"""
     df = pd.read_csv(filepath)
     print(f"Loaded {len(df)} samples from {filepath}")
-    return df
-
-def load_guard_results(filepath):
-    """Load guard results with human scores"""
-    df = pd.read_csv(filepath)
-    print(f"Loaded {len(df)} guard results from {filepath}")
     return df
 
 def create_training_pairs_from_truthfulqa(train_df, max_pairs=50):
@@ -314,52 +309,21 @@ def generate_responses_with_blocked_method(guard, eval_df, max_eval_samples, max
     
     return results
 
-def match_with_guard_results(generated_results, guard_results_df):
-    """Match generated results with guard results by question to get human scores."""
-    matched_results = []
+def evaluate_all_layers_and_save_csv(model, tokenizer, classifiers, generated_results, device, output_file):
+    """Evaluate all layer classifiers and save results in CSV format for manual evaluation."""
+    print(f"\nEvaluating {len(classifiers)} layer classifiers on {len(generated_results)} responses...")
     
-    print(f"\nMatching {len(generated_results)} generated responses with guard results...")
+    # Prepare CSV data
+    csv_results = []
     
-    for result in generated_results:
-        question = result['question']
-        
-        # Find matching question in guard results
-        # Try exact match first
-        matches = guard_results_df[guard_results_df['question'] == question]
-        
-        if len(matches) == 0:
-            # Try partial match if exact match fails
-            matches = guard_results_df[guard_results_df['question'].str.contains(question[:50], case=False, na=False)]
-        
-        if len(matches) > 0:
-            # Use the first match
-            guard_result = matches.iloc[0]
-            human_score = guard_result['human_score']
-            
-            # Add human score to our result
-            result['human_score'] = human_score
-            matched_results.append(result)
-            
-            print(f"Matched question: {question[:50]}... -> Human score: {human_score}")
-        else:
-            print(f"No match found for question: {question[:50]}...")
-    
-    print(f"Successfully matched {len(matched_results)} out of {len(generated_results)} questions")
-    return matched_results
-
-def evaluate_all_layers_with_guard_results(model, tokenizer, classifiers, matched_results, device):
-    """Evaluate all layer classifiers using the matched results with human scores."""
-    evaluation_results = []
-    
-    print(f"\nEvaluating {len(classifiers)} layer classifiers on {len(matched_results)} matched responses...")
-    
-    for i, result in enumerate(matched_results):
+    for i, result in enumerate(generated_results):
         question = result['question']
         response = result['response']
-        human_score = result['human_score']
+        category = result['category']
+        blocked = result['blocked']
+        reason = result['reason']
         
-        print(f"\n[{i+1}/{len(matched_results)}] Evaluating response for: {question[:50]}...")
-        print(f"Human score: {human_score}")
+        print(f"\n[{i+1}/{len(generated_results)}] Evaluating response for: {question[:50]}...")
         
         try:
             # Evaluate with all classifiers
@@ -367,219 +331,60 @@ def evaluate_all_layers_with_guard_results(model, tokenizer, classifiers, matche
                 response, classifiers, model, tokenizer, device
             )
             
-            # Print layer predictions
-            print("Layer predictions:")
+            # Format token scores like the original script
+            token_scores_formatted = ""
+            if 'token_scores' in result and result.get('token_scores'):
+                token_data = []
+                for token in result['token_scores']:
+                    token_text = token.get('token_text', '').replace('\n', '\\n').replace(',', '\\,')
+                    token_info = f"{token.get('position', '')}:{token.get('token_id', '')}:{token_text}:{token.get('similarity', 0.0):.6f}:{token.get('category', '')}:{token.get('is_harmful', False)}"
+                    token_data.append(token_info)
+                token_scores_formatted = '|'.join(token_data)
+            
+            # Create CSV entry with all layer predictions
+            csv_entry = {
+                'question': question,
+                'response': response,
+                'human_score': '',  # Empty for manual evaluation
+                'category': category,
+                'blocked': blocked,
+                'reason': reason,
+                'token_scores': token_scores_formatted
+            }
+            
+            # Add layer predictions as separate columns
             for layer in sorted(layer_predictions.keys()):
                 pred = layer_predictions[layer]
                 if "error" not in pred:
+                    csv_entry[f'layer_{layer}_is_harmful'] = pred['is_harmful']
+                    csv_entry[f'layer_{layer}_score'] = pred['score']
                     print(f"  Layer {layer}: {'HARMFUL' if pred['is_harmful'] else 'SAFE'} (score: {pred['score']:.3f})")
                 else:
+                    csv_entry[f'layer_{layer}_is_harmful'] = False
+                    csv_entry[f'layer_{layer}_score'] = 0.0
                     print(f"  Layer {layer}: ERROR - {pred['error']}")
             
-            evaluation_result = {
-                'question': question,
-                'response': response,
-                'human_score': human_score,
-                'category': result['category'],
-                'blocked': result['blocked'],
-                'reason': result['reason'],
-                'layer_predictions': layer_predictions
-            }
-            
-            evaluation_results.append(evaluation_result)
+            csv_results.append(csv_entry)
             
         except Exception as e:
             print(f"Error evaluating response: {e}")
             continue
     
-    return evaluation_results
-
-def calculate_layer_metrics_with_human_scores(evaluation_results):
-    """Calculate performance metrics for each layer using human scores as ground truth."""
-    # Get all layers that were evaluated
-    all_layers = set()
-    for result in evaluation_results:
-        all_layers.update(result['layer_predictions'].keys())
-    
-    layer_metrics = {}
-    
-    for layer in sorted(all_layers):
-        # Filter results with human scores and this layer's predictions
-        valid_results = []
-        for result in evaluation_results:
-            if (result.get('human_score') is not None and 
-                layer in result['layer_predictions'] and
-                'error' not in result['layer_predictions'][layer]):
-                valid_results.append(result)
+    # Save to CSV file
+    if csv_results:
+        with open(output_file, 'w', newline='') as f:
+            fieldnames = csv_results[0].keys()
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(csv_results)
         
-        if not valid_results:
-            layer_metrics[layer] = {"error": "No valid evaluations"}
-            continue
-        
-        # Calculate metrics for this layer
-        # human_score: 1=factual, 0=hallucination
-        # is_harmful: True=detected as hallucination, False=detected as safe
-        tp = sum(1 for r in valid_results 
-                if r['layer_predictions'][layer]['is_harmful'] and r['human_score'] == 0)  # Correctly detected hallucination
-        fp = sum(1 for r in valid_results 
-                if r['layer_predictions'][layer]['is_harmful'] and r['human_score'] == 1)  # Incorrectly flagged factual as harmful
-        tn = sum(1 for r in valid_results 
-                if not r['layer_predictions'][layer]['is_harmful'] and r['human_score'] == 1)  # Correctly allowed factual
-        fn = sum(1 for r in valid_results 
-                if not r['layer_predictions'][layer]['is_harmful'] and r['human_score'] == 0)  # Missed hallucination
-        
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        accuracy = (tp + tn) / (tp + fp + tn + fn) if (tp + fp + tn + fn) > 0 else 0
-        
-        # Additional statistics
-        total_evaluated = len(valid_results)
-        total_harmful_predictions = sum(1 for r in valid_results 
-                                      if r['layer_predictions'][layer]['is_harmful'])
-        total_human_hallucinations = sum(1 for r in valid_results if r['human_score'] == 0)
-        total_human_factual = sum(1 for r in valid_results if r['human_score'] == 1)
-        avg_score = sum(r['layer_predictions'][layer]['score'] for r in valid_results) / total_evaluated
-        
-        layer_metrics[layer] = {
-            'precision': precision,
-            'recall': recall,
-            'f1': f1,
-            'accuracy': accuracy,
-            'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn,
-            'total_evaluated': total_evaluated,
-            'total_harmful_predictions': total_harmful_predictions,
-            'total_human_hallucinations': total_human_hallucinations,
-            'total_human_factual': total_human_factual,
-            'avg_score': avg_score
-        }
+        print(f"\nResults saved to {output_file}")
+        print(f"Total responses evaluated: {len(csv_results)}")
+        print("You can now manually evaluate the 'human_score' column:")
+        print("  1 = factual/correct response")
+        print("  0 = hallucination/incorrect response")
     
-    return layer_metrics
-
-def print_all_layers_report_with_human_scores(layer_metrics, classifier_threshold):
-    """Print a comprehensive report for all layers using human scores as ground truth."""
-    print(f"\n{'='*100}")
-    print("ALL LAYERS PERFORMANCE REPORT (Human Score Ground Truth)")
-    print(f"{'='*100}")
-    
-    if not layer_metrics:
-        print("No metrics available")
-        return
-    
-    print(f"Classifier threshold used: {classifier_threshold}")
-    
-    # Find best performing layer
-    valid_layers = {layer: metrics for layer, metrics in layer_metrics.items() 
-                   if 'error' not in metrics}
-    
-    if valid_layers:
-        best_layer = max(valid_layers.keys(), key=lambda l: valid_layers[l]['f1'])
-        best_f1 = valid_layers[best_layer]['f1']
-        
-        print(f"Best performing layer: {best_layer} (F1: {best_f1:.3f})")
-    
-    # Summary table
-    print(f"\n{'Layer':<6} {'F1':<6} {'Prec':<6} {'Rec':<6} {'Acc':<6} {'TP':<3} {'FP':<3} {'TN':<3} {'FN':<3} {'H_Fact':<6} {'H_Hall':<6} {'Avg Score':<9}")
-    print("-" * 100)
-    
-    for layer in sorted(layer_metrics.keys()):
-        metrics = layer_metrics[layer]
-        if 'error' in metrics:
-            print(f"{layer:<6} ERROR: {metrics['error']}")
-        else:
-            print(f"{layer:<6} {metrics['f1']:<6.3f} {metrics['precision']:<6.3f} "
-                  f"{metrics['recall']:<6.3f} {metrics['accuracy']:<6.3f} "
-                  f"{metrics['tp']:<3} {metrics['fp']:<3} {metrics['tn']:<3} {metrics['fn']:<3} "
-                  f"{metrics['total_human_factual']:<6} {metrics['total_human_hallucinations']:<6} "
-                  f"{metrics['avg_score']:<9.3f}")
-    
-    # Detailed report for best layer
-    if valid_layers:
-        print(f"\n{'='*60}")
-        print(f"DETAILED REPORT FOR BEST LAYER ({best_layer})")
-        print(f"{'='*60}")
-        
-        best_metrics = valid_layers[best_layer]
-        print(f"F1 Score: {best_metrics['f1']:.3f}")
-        print(f"Precision: {best_metrics['precision']:.3f}")
-        print(f"Recall: {best_metrics['recall']:.3f}")
-        print(f"Accuracy: {best_metrics['accuracy']:.3f}")
-        print(f"Total evaluated: {best_metrics['total_evaluated']}")
-        print(f"Human-labeled hallucinations: {best_metrics['total_human_hallucinations']}")
-        print(f"Human-labeled factual responses: {best_metrics['total_human_factual']}")
-        print(f"Average prediction score: {best_metrics['avg_score']:.3f}")
-        
-        # Performance interpretation
-        if best_metrics['f1'] >= 0.8:
-            performance = "Excellent"
-        elif best_metrics['f1'] >= 0.6:
-            performance = "Good"
-        elif best_metrics['f1'] >= 0.4:
-            performance = "Fair"
-        else:
-            performance = "Poor"
-        
-        print(f"Overall performance: {performance}")
-        
-        if best_metrics['precision'] > best_metrics['recall']:
-            print("This layer is conservative (high precision, lower recall)")
-            print("→ Good at avoiding false positives, but may miss some hallucinations")
-        elif best_metrics['recall'] > best_metrics['precision']:
-            print("This layer is aggressive (high recall, lower precision)")
-            print("→ Good at catching hallucinations, but may flag some factual content")
-        else:
-            print("This layer has balanced precision and recall")
-
-def save_results_to_model_params(model_name, layer_metrics, classifier_threshold, max_tokens, layers_evaluated, dataset="truthfulqa_human_scores"):
-    """Save evaluation results to model_params.json organized by model name."""
-    model_params_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "constants",
-        "model_params.json"
-    )
-    
-    # Load existing data
-    try:
-        with open(model_params_path, 'r') as f:
-            model_params = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        model_params = {}
-    
-    # Find best performing layer
-    valid_layers = {layer: metrics for layer, metrics in layer_metrics.items() 
-                   if 'error' not in metrics}
-    
-    best_layer = None
-    best_f1 = 0.0
-    if valid_layers:
-        best_layer = max(valid_layers.keys(), key=lambda l: valid_layers[l]['f1'])
-        best_f1 = valid_layers[best_layer]['f1']
-    
-    # Create evaluation summary
-    evaluation_summary = {
-        "evaluation_timestamp": datetime.datetime.now().isoformat(),
-        "dataset": dataset,
-        "classifier_threshold": classifier_threshold,
-        "max_tokens": max_tokens,
-        "layers_evaluated": layers_evaluated,
-        "total_layers_evaluated": len(layers_evaluated),
-        "best_layer": best_layer,
-        "best_f1_score": best_f1,
-        "layer_performance": layer_metrics
-    }
-    
-    # Update model params
-    if model_name not in model_params:
-        model_params[model_name] = {}
-    
-    model_params[model_name][f"layer_evaluation_{dataset}"] = evaluation_summary
-    
-    # Save back to file
-    with open(model_params_path, 'w') as f:
-        json.dump(model_params, f, indent=2)
-    
-    print(f"\nResults saved to {model_params_path} under model '{model_name}' (dataset: {dataset})")
-    return model_params_path
+    return csv_results
 
 def main():
     """Main function."""
@@ -633,10 +438,6 @@ def main():
     train_df = load_truthfulqa_data(args.train_data)
     eval_df = load_truthfulqa_data(args.eval_data)
     
-    # Load guard results with human scores
-    print(f"\nLoading guard results...")
-    guard_results_df = load_guard_results(args.guard_results)
-    
     # Determine which layers to evaluate
     layers_to_evaluate = parse_layer_range(args.layer_range, total_layers)
     print(f"Evaluating layers: {layers_to_evaluate}")
@@ -678,29 +479,15 @@ def main():
         guard, eval_df, args.max_eval_samples, args.max_tokens
     )
     
-    # Match with guard results to get human scores
-    matched_results = match_with_guard_results(generated_results, guard_results_df)
-    
-    if not matched_results:
-        print("No matches found between generated responses and guard results. Exiting.")
-        return
-    
-    # Evaluate all layers using human scores as ground truth
-    evaluation_results = evaluate_all_layers_with_guard_results(
-        model, tokenizer, classifiers, matched_results, device
+    # Evaluate all layers and save results in CSV format
+    csv_results = evaluate_all_layers_and_save_csv(
+        model, tokenizer, classifiers, generated_results, device, args.output_file
     )
     
-    # Calculate metrics for all layers
-    layer_metrics = calculate_layer_metrics_with_human_scores(evaluation_results)
-    
-    # Print comprehensive report
-    print_all_layers_report_with_human_scores(layer_metrics, args.classifier_threshold)
-    
-    # Save results if requested
+    # Save detailed results if requested
     if args.save_results:
         output_data = {
             'model': args.model,
-            'dataset': 'truthfulqa_human_scores',
             'classifier_threshold': args.classifier_threshold,
             'blocked_threshold': args.threshold,
             'max_tokens': args.max_tokens,
@@ -708,25 +495,22 @@ def main():
             'max_eval_samples': args.max_eval_samples,
             'layers_evaluated': layers_to_evaluate,
             'generated_results': generated_results,
-            'matched_results': matched_results,
-            'evaluation_results': evaluation_results,
-            'layer_metrics': layer_metrics
+            'csv_results': csv_results
         }
         
         with open(args.save_results, 'w') as f:
             json.dump(output_data, f, indent=2)
         
-        print(f"\nResults saved to: {args.save_results}")
-    
-    # Save results to model_params.json
-    model_params_path = save_results_to_model_params(
-        args.model, layer_metrics, args.classifier_threshold, 
-        args.max_tokens, layers_to_evaluate, "truthfulqa_human_scores"
-    )
+        print(f"\nDetailed results saved to: {args.save_results}")
     
     print(f"\n{'='*100}")
     print("EVALUATION COMPLETE")
     print(f"{'='*100}")
+    print(f"CSV file saved: {args.output_file}")
+    print("Next steps:")
+    print("1. Open the CSV file and manually fill in the 'human_score' column")
+    print("2. Use 1 for factual/correct responses, 0 for hallucinations/incorrect responses")
+    print("3. Once completed, you can analyze which layers perform best against your ground truth")
 
 if __name__ == "__main__":
     main()
