@@ -217,49 +217,8 @@ def train_classifiers_for_all_layers(all_activations, classifier_threshold):
     
     return classifiers
 
-def evaluate_response_with_all_classifiers(response, classifiers, model, tokenizer, device):
-    """Evaluate a response with all trained classifiers."""
-    layer_predictions = {}
-    
-    # Tokenize and run through model to get activations
-    inputs = tokenizer(response, return_tensors="pt").to(device)
-    
-    with torch.no_grad():
-        outputs = model(inputs.input_ids, output_hidden_states=True)
-    
-    hidden_states = outputs.hidden_states
-    
-    for layer, classifier in classifiers.items():
-        try:
-            if layer < len(hidden_states):
-                # Use the last token's activations
-                activation = hidden_states[layer][0, -1, :].detach().cpu().numpy()
-                
-                activation_dict = {
-                    "activations": activation,
-                    "layer": layer,
-                    "is_harmful": None
-                }
-                
-                prediction = classifier.predict(activation_dict, response_text=response)
-                layer_predictions[layer] = {
-                    "is_harmful": prediction.get("is_harmful", False),
-                    "score": prediction.get("score", 0.0),
-                    "threshold": classifier.threshold
-                }
-        except Exception as e:
-            print(f"Error evaluating with layer {layer} classifier: {e}")
-            layer_predictions[layer] = {
-                "is_harmful": False,
-                "score": 0.0,
-                "threshold": classifier.threshold,
-                "error": str(e)
-            }
-    
-    return layer_predictions
-
-def generate_responses_with_blocked_method(guard, eval_df, max_eval_samples, max_tokens):
-    """Generate new responses using the blocked method."""
+def generate_responses_with_all_layer_classifiers(guard, eval_df, max_eval_samples, max_tokens):
+    """Generate responses using one guard with all 32 layer classifiers monitoring simultaneously."""
     results = []
     
     # Sample evaluation data if needed
@@ -267,7 +226,7 @@ def generate_responses_with_blocked_method(guard, eval_df, max_eval_samples, max
         eval_df = eval_df.sample(max_eval_samples, random_state=42)
         print(f"Sampling {max_eval_samples} examples for evaluation")
     
-    print(f"\nGenerating responses with blocked method for {len(eval_df)} questions...")
+    print(f"\nGenerating responses with all 32 layer classifiers monitoring for {len(eval_df)} questions...")
     
     for i, (_, row) in enumerate(eval_df.iterrows()):
         question = row['Question']
@@ -276,7 +235,7 @@ def generate_responses_with_blocked_method(guard, eval_df, max_eval_samples, max
         print(f"\n[{i+1}/{len(eval_df)}] Generating response for: {question[:50]}...")
         
         try:
-            # Generate response using the guard with blocked method
+            # Generate response using the guard with all layer classifiers
             prompt_text = f"Answer the following question accurately: {question}"
             
             result = guard.generate_safe_response(
@@ -287,62 +246,50 @@ def generate_responses_with_blocked_method(guard, eval_df, max_eval_samples, max
             response = result.get('response', '')
             blocked = result.get('blocked', False)
             reason = result.get('reason', '') if blocked else ''
+            token_scores = result.get('token_scores', [])
             
             print(f"Generated response: {response[:100]}{'...' if len(response) > 100 else ''}")
             print(f"Blocked: {blocked}")
             if blocked:
                 print(f"Reason: {reason}")
             
-            result_data = {
-                'question': question,
-                'response': response,
-                'category': category,
-                'blocked': blocked,
-                'reason': reason
-            }
+            # Extract layer-specific decisions from token scores
+            layer_decisions = {}
+            for layer_num in range(32):  # Assuming 32 layers
+                layer_decisions[f'layer_{layer_num}_blocked'] = False
+                layer_decisions[f'layer_{layer_num}_max_score'] = 0.0
+                layer_decisions[f'layer_{layer_num}_trigger_token'] = ''
             
-            results.append(result_data)
+            # Process token scores to get per-layer decisions
+            if token_scores:
+                for token in token_scores:
+                    layer = token.get('layer', -1)
+                    if 0 <= layer < 32:
+                        score = token.get('similarity', 0.0)
+                        is_harmful = token.get('is_harmful', False)
+                        token_text = token.get('token_text', '')
+                        
+                        # Update max score for this layer
+                        if score > layer_decisions[f'layer_{layer}_max_score']:
+                            layer_decisions[f'layer_{layer}_max_score'] = score
+                        
+                        # Mark as blocked if this layer detected harmful content
+                        if is_harmful:
+                            layer_decisions[f'layer_{layer}_blocked'] = True
+                            if not layer_decisions[f'layer_{layer}_trigger_token']:
+                                layer_decisions[f'layer_{layer}_trigger_token'] = token_text
             
-        except Exception as e:
-            print(f"Error generating response for question: {e}")
-            continue
-    
-    return results
-
-def evaluate_all_layers_and_save_csv(model, tokenizer, classifiers, generated_results, device, output_file):
-    """Evaluate all layer classifiers and save results in CSV format for manual evaluation."""
-    print(f"\nEvaluating {len(classifiers)} layer classifiers on {len(generated_results)} responses...")
-    
-    # Prepare CSV data
-    csv_results = []
-    
-    for i, result in enumerate(generated_results):
-        question = result['question']
-        response = result['response']
-        category = result['category']
-        blocked = result['blocked']
-        reason = result['reason']
-        
-        print(f"\n[{i+1}/{len(generated_results)}] Evaluating response for: {question[:50]}...")
-        
-        try:
-            # Evaluate with all classifiers
-            layer_predictions = evaluate_response_with_all_classifiers(
-                response, classifiers, model, tokenizer, device
-            )
-            
-            # Format token scores like the original script
-            token_scores_formatted = ""
-            if 'token_scores' in result and result.get('token_scores'):
+            # Format token scores for CSV
+            token_scores_formatted = ''
+            if token_scores:
                 token_data = []
-                for token in result['token_scores']:
-                    token_text = token.get('token_text', '').replace('\n', '\\n').replace(',', '\\,')
-                    token_info = f"{token.get('position', '')}:{token.get('token_id', '')}:{token_text}:{token.get('similarity', 0.0):.6f}:{token.get('category', '')}:{token.get('is_harmful', False)}"
+                for t in token_scores:
+                    token_text = t.get('token_text', '').replace(',', '\\,').replace('\n', '\\n')
+                    token_info = f"{t.get('position', '')}:{t.get('token_id', '')}:{token_text}:{t.get('similarity', 0.0):.6f}:{t.get('layer', '')}:{t.get('is_harmful', False)}"
                     token_data.append(token_info)
                 token_scores_formatted = '|'.join(token_data)
             
-            # Create CSV entry with all layer predictions
-            csv_entry = {
+            result_data = {
                 'question': question,
                 'response': response,
                 'human_score': '',  # Empty for manual evaluation
@@ -352,39 +299,41 @@ def evaluate_all_layers_and_save_csv(model, tokenizer, classifiers, generated_re
                 'token_scores': token_scores_formatted
             }
             
-            # Add layer predictions as separate columns
-            for layer in sorted(layer_predictions.keys()):
-                pred = layer_predictions[layer]
-                if "error" not in pred:
-                    csv_entry[f'layer_{layer}_is_harmful'] = pred['is_harmful']
-                    csv_entry[f'layer_{layer}_score'] = pred['score']
-                    print(f"  Layer {layer}: {'HARMFUL' if pred['is_harmful'] else 'SAFE'} (score: {pred['score']:.3f})")
-                else:
-                    csv_entry[f'layer_{layer}_is_harmful'] = False
-                    csv_entry[f'layer_{layer}_score'] = 0.0
-                    print(f"  Layer {layer}: ERROR - {pred['error']}")
+            # Add layer-specific results
+            result_data.update(layer_decisions)
             
-            csv_results.append(csv_entry)
+            results.append(result_data)
             
         except Exception as e:
-            print(f"Error evaluating response: {e}")
+            print(f"Error generating response for question: {e}")
             continue
     
+    return results
+
+def evaluate_all_layers_and_save_csv(generated_results, output_file):
+    """Save results in CSV format for manual evaluation."""
+    print(f"\nSaving {len(generated_results)} responses to CSV for manual evaluation...")
+    
     # Save to CSV file
-    if csv_results:
+    if generated_results:
         with open(output_file, 'w', newline='') as f:
-            fieldnames = csv_results[0].keys()
+            fieldnames = generated_results[0].keys()
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerows(csv_results)
+            writer.writerows(generated_results)
         
         print(f"\nResults saved to {output_file}")
-        print(f"Total responses evaluated: {len(csv_results)}")
+        print(f"Total responses: {len(generated_results)}")
         print("You can now manually evaluate the 'human_score' column:")
         print("  1 = factual/correct response")
         print("  0 = hallucination/incorrect response")
+        print("\nEach row contains:")
+        print("  - One generated response")
+        print("  - 32 layer decisions (layer_0_blocked, layer_1_blocked, etc.)")
+        print("  - 32 max scores (layer_0_max_score, layer_1_max_score, etc.)")
+        print("  - 32 trigger tokens (layer_0_trigger_token, layer_1_trigger_token, etc.)")
     
-    return csv_results
+    return generated_results
 
 def main():
     """Main function."""
@@ -475,14 +424,12 @@ def main():
     guard.train_on_phrase_pairs(training_pairs, category="hallucination")
     
     # Generate responses using blocked method
-    generated_results = generate_responses_with_blocked_method(
+    generated_results = generate_responses_with_all_layer_classifiers(
         guard, eval_df, args.max_eval_samples, args.max_tokens
     )
     
     # Evaluate all layers and save results in CSV format
-    csv_results = evaluate_all_layers_and_save_csv(
-        model, tokenizer, classifiers, generated_results, device, args.output_file
-    )
+    csv_results = evaluate_all_layers_and_save_csv(generated_results, args.output_file)
     
     # Save detailed results if requested
     if args.save_results:

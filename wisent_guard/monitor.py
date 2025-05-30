@@ -27,7 +27,8 @@ class ActivationMonitor:
         token_strategy: str = "last",  # Only 'last' is supported
         similarity_threshold: float = 0.5,
         device: Optional[torch.device] = None,
-        log_level: Union[str, int] = "info"
+        log_level: Union[str, int] = "info",
+        guard: Optional["ActivationGuard"] = None  # Reference to parent guard
     ):
         """
         Initialize activation monitor.
@@ -40,6 +41,7 @@ class ActivationMonitor:
             similarity_threshold: Similarity threshold for harmful content detection
             device: Device to use
             log_level: Logging level
+            guard: Reference to parent guard
         """
         self.logger = get_logger("wisent_guard", log_level)
         self.logger.info(f"Creating activation monitor for {getattr(model.config, '_name_or_path', 'unknown')}")
@@ -47,6 +49,7 @@ class ActivationMonitor:
         self.model = model
         self.layers = layers
         self.vectors = vectors
+        self.guard = guard  # Store reference to parent guard for classifier access
         self.similarity_threshold = similarity_threshold
         self.device = device or next(model.parameters()).device
         
@@ -383,7 +386,8 @@ class ActivationMonitor:
                     # Get layer hidden states
                     layer_hidden_states = hidden_states[layer_idx]
                     
-                    # Store the last token's hidden state for this layer
+                    # Store the current token's hidden state for this layer
+                    # Always get the last position since that's the current token being generated
                     self.activations_by_layer[layer_idx] = layer_hidden_states[:, -1].detach()
                 
             # Set flag based on whether we captured any activations

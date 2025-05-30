@@ -160,8 +160,8 @@ class ActivationClassifier:
             raise FileNotFoundError(f"Model file not found: {model_path}")
         
         try:
-            # Load the PyTorch model
-            loaded_data = torch.load(model_path, map_location=self.device)
+            # Load the PyTorch model with weights_only=False for backward compatibility
+            loaded_data = torch.load(model_path, map_location=self.device, weights_only=False)
             
             # Extract the model and metadata
             if isinstance(loaded_data, dict) and 'model' in loaded_data:

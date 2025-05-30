@@ -295,7 +295,8 @@ class ActivationGuard:
             token_strategy="last",  # Always use last token
             similarity_threshold=self.threshold,
             device=self.device,
-            log_level=self.logger.level
+            log_level=self.logger.level,
+            guard=self  # Pass reference to self for classifier access
         )
         
         # Determine the format to use based on model detection
@@ -862,10 +863,7 @@ class ActivationGuard:
         if self.monitor is None or self.inference is None:
             self._initialize_monitor_and_inference()
         
-        # Check if we're in classifier-only mode
-        is_classifier_mode = hasattr(self, 'use_classifier') and self.use_classifier and hasattr(self, 'classifier') and self.classifier is not None
-        
-        # Generate response using inference API
+        # Generate response using inference API (handles both vector and classifier approaches)
         try:
             result = self.inference.generate(
                 prompt=prompt,
@@ -885,137 +883,40 @@ class ActivationGuard:
         response = result.get("response", "")
         token_scores = result.get("token_scores", [])
         
-        # In classifier-only mode, we evaluate the response as a whole
-        if is_classifier_mode:
-            try:
-                # Reset monitor before preparing activations
-                self.monitor.reset()
-                
-                # Prepare activations using the full response
-                formatted_text = self._format_prompt(response)
-                self.logger.debug(f"Preparing formatted text for classification: {formatted_text[:50]}...")
-                
-                # Tokenize the input
-                inputs = self.tokenizer(formatted_text, return_tensors="pt").to(self.device)
-                
-                # Run the model to get activations - important to use model directly for this classifier case
-                with torch.no_grad():
-                    outputs = self.model(input_ids=inputs.input_ids, output_hidden_states=True)
-                
-                # Capture activations from the model outputs
-                success = self.monitor.capture_activations_from_forward(outputs, inputs.input_ids)
-                if not success:
-                    self.logger.warning("Failed to capture activations for classification")
-                    result["blocked"] = False
-                    result["reason"] = None
-                    return result
-                
-                # Manually ensure token data has activation values flag set to true
-                if hasattr(self.monitor, 'token_data'):
-                    self.monitor.token_data['has_activation_values'] = True
-                
-                # Double check token data has activation values
-                token_data = self.monitor.get_token_data()
-                if not token_data.get('has_activation_values', False):
-                    self.logger.error("Error during classification: Token data doesn't contain activation values")
-                    # Try to fix the issue by manually setting the flag
-                    self.monitor.token_data = {'has_activation_values': True, 'token_id': inputs.input_ids[0, -1].item(), 'position': inputs.input_ids.shape[1] - 1}
-                    self.logger.info("Manually set token data activation values flag to true")
-                
-                # Get activations across layers
-                activations = self.monitor.get_activations()
-                if not activations:
-                    self.logger.warning("No activations available for classification")
-                    result["blocked"] = False
-                    result["reason"] = None
-                    return result
-                
-                # Get the first monitored layer (typically only one layer is monitored)
-                monitored_layer = self.layers[0] if self.layers else None
-                if monitored_layer is None or monitored_layer not in activations:
-                    self.logger.warning(f"Required layer {monitored_layer} not in activations")
-                    result["blocked"] = False
-                    result["reason"] = None
-                    return result
-                
-                # Extract the activation tensor for this layer
-                activation_tensor = activations[monitored_layer]
-                
-                # Create a properly formatted activation dictionary for the classifier
-                activation_data = {
-                    'activations': activation_tensor.detach().flatten(),
-                    'layer': monitored_layer,
-                    'is_harmful': None  # Will be determined by the classifier
-                }
-                
-                # Make prediction using the classifier
-                prediction = self.classifier.predict(activation_data, response_text=response)
-                
-                is_harmful = prediction.get('is_harmful', False)
-                probability = prediction.get('score', 0.0)
-                
-                self.logger.debug(f"Classifier prediction: {prediction}, is_harmful: {is_harmful}")
-                
-                # Update result with classification
-                result["blocked"] = is_harmful
-                result["reason"] = f"Response classified as harmful with probability {probability:.4f}" if is_harmful else None
-                result["classification_score"] = probability
-                result["classification_threshold"] = self.classifier.threshold
-                
-                # Update token scores
-                if token_scores and is_harmful:
-                    # Mark all tokens as potentially harmful based on the overall classification
-                    for token in token_scores:
-                        token["similarity"] = probability
-                        token["is_harmful"] = is_harmful
-                        token["category"] = "hallucination"  # Default category for classifier
-                    
-                    # Add harmful token info for the first token (if any)
-                    if token_scores:
-                        result["harmful_token"] = token_scores[0]
-                
-                # Check if early termination is enabled and response is harmful
-                if self.early_termination and is_harmful:
-                    self.logger.info(f"Early termination activated. Response classified as harmful with probability {probability:.4f}")
-                    result["response"] = self.placeholder_message
-                    result["early_terminated"] = True
-                
-                # Log harmful response if enabled
-                if is_harmful and self.enable_logging:
-                    self._log_harmful_response(
-                        prompt=prompt,
-                        response=response,
-                        similarity=probability,
-                        category="hallucination",  # Default for classifier
-                        harmful_token=result.get("harmful_token")
-                    )
-                
-                return result
-                
-            except Exception as e:
-                self.logger.error(f"Error during classification: {e}")
-                result["blocked"] = False
-                result["reason"] = None
-                return result
-        
-        # For vector-based approach, process token scores to determine if any token is harmful
+        # Process token scores to determine if any token is harmful
         blocked = False
         block_reason = None
         harmful_token = None
         first_token_harmful = False
         
-        # Check if any token exceeds the threshold
+        # Check if any token exceeds the threshold or is classified as harmful
         if 'token_scores' in result:
             for i, token in enumerate(result['token_scores']):
-                if token.get('similarity', 0.0) >= self.threshold:
+                # For vector-based approach, check similarity threshold
+                # For classifier-based approach, check is_harmful flag
+                is_token_harmful = False
+                
+                if self.use_classifier and hasattr(self, 'classifier') and self.classifier is not None:
+                    # In classifier mode, check the is_harmful flag
+                    is_token_harmful = token.get('is_harmful', False)
+                    similarity = token.get('similarity', 0.0)
+                else:
+                    # In vector mode, check similarity threshold
+                    similarity = token.get('similarity', 0.0)
+                    is_token_harmful = similarity >= self.threshold
+                
+                if is_token_harmful:
                     blocked = True
                     harmful_category = token.get('category', 'unknown')
                     token_text = token.get('token_text', '')
                     token_position = token.get('position', 0)
-                    similarity = token.get('similarity', 0.0)
                     
                     harmful_token = token
-                    block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
+                    
+                    if self.use_classifier:
+                        block_reason = f"Token at position {token_position} ('{token_text}') classified as harmful with score {similarity:.4f} for category '{harmful_category}'"
+                    else:
+                        block_reason = f"Token at position {token_position} ('{token_text}') exceeded threshold: {similarity:.4f} for category '{harmful_category}'"
                     
                     # Check if this is the first token
                     if i == 0:
@@ -1034,21 +935,19 @@ class ActivationGuard:
         
         # If early termination is enabled and the first token is harmful, replace the response
         if self.early_termination and blocked and first_token_harmful:
-            self.logger.info(f"Early termination activated. First token exceeded threshold: {harmful_token.get('similarity', 0.0):.4f}")
+            self.logger.info(f"Early termination activated. First token was harmful: {harmful_token.get('similarity', 0.0):.4f}")
             enhanced_result["response"] = self.placeholder_message
             enhanced_result["early_terminated"] = True
-        elif self.early_termination and blocked:
-            self.logger.debug(f"Early termination not triggered despite harmful content. first_token_harmful: {first_token_harmful}")
-            if harmful_token:
-                self.logger.debug(f"Harmful token position: {harmful_token.get('position', -1)}, similarity: {harmful_token.get('similarity', 0.0):.4f}")
         
         # Log harmful response if enabled
-        if blocked and self.enable_logging and harmful_token:
+        if blocked and self.enable_logging:
+            similarity = harmful_token.get('similarity', 0.0) if harmful_token else 0.0
+            category = harmful_token.get('category', 'unknown') if harmful_token else 'unknown'
             self._log_harmful_response(
                 prompt=prompt,
-                response=result["response"],
-                similarity=harmful_token.get("similarity", 0.0),
-                category=harmful_token.get("category", "unknown"),
+                response=response,
+                similarity=similarity,
+                category=category,
                 harmful_token=harmful_token
             )
         

@@ -25,7 +25,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # Now import wisent_guard
 from wisent_guard import ActivationGuard
 from wisent_guard.classifier import ActivationClassifier
-from evaluate_string import call_claude_and_evaluate
+from .evaluate_string import call_claude_and_evaluate
 
 def format_prompt(message, system_prompt=None):
     """Format prompt for Llama 3.1 Instruct models using the special tokens"""
@@ -836,29 +836,47 @@ def main(args):
             return
         
         if not os.path.exists(args.classifier_path) and not args.train_classifier:
-            print(f"Error: Classifier path {args.classifier_path} does not exist and --train-classifier is not set.")
-            return
+            print(f"Warning: Classifier path {args.classifier_path} does not exist and --train-classifier is not set.")
+            print("Falling back to vector-based approach...")
+            args.use_classifier = False
         
-        print(f"Using classifier-based approach with model: {args.classifier_path}")
-        print(f"Classifier threshold: {args.classifier_threshold}")
-        
-        # Initialize guard with classifier parameters
-        guard = ActivationGuard(
-            model=model,
-            tokenizer=tokenizer,
-            layers=layers_to_monitor,
-            threshold=args.threshold,  # Still set threshold for fallback
-            save_dir=args.save_dir,
-            device=device,
-            force_llama_format=args.force_llama_format,
-            use_classifier=True,
-            classifier_path=args.classifier_path,
-            classifier_threshold=args.classifier_threshold
-        )
-    else:
+        if args.use_classifier:
+            print(f"Using classifier-based approach with model: {args.classifier_path}")
+            print(f"Classifier threshold: {args.classifier_threshold}")
+            
+            # Initialize guard with classifier parameters
+            guard = ActivationGuard(
+                model=model,
+                tokenizer=tokenizer,
+                layers=layers_to_monitor,
+                threshold=args.threshold,  # Still set threshold for fallback
+                save_dir=args.save_dir,
+                device=device,
+                force_llama_format=args.force_llama_format,
+                use_classifier=True,
+                classifier_path=args.classifier_path,
+                classifier_threshold=args.classifier_threshold
+            )
+            
+            # Verify that classifier was actually loaded
+            if not hasattr(guard, 'classifier') or guard.classifier is None:
+                print("Warning: Classifier failed to load properly. Falling back to vector-based approach...")
+                args.use_classifier = False
+    
+    if not args.use_classifier:
         # Use the already initialized guard for threshold-based approach
         guard = init_guard
         print(f"Using threshold-based approach with threshold: {args.threshold}")
+        
+        # Make sure vectors are loaded
+        if guard.vectors is not None:
+            vector_loaded = guard.load_vectors()
+            if vector_loaded:
+                print("✅ Vectors loaded successfully for threshold-based approach")
+            else:
+                print("⚠️ Warning: No vectors found. Token scores may all be zero.")
+        else:
+            print("⚠️ Warning: No vectors initialized. Token scores may all be zero.")
     
     print(f"Available categories: {guard.get_available_categories()}")
     

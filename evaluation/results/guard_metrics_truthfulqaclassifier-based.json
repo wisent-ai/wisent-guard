@@ -1,0 +1,26 @@
+{
+  "total_samples": 1,
+  "human_correct": 0,
+  "human_incorrect": 0,
+  "human_ambiguous": 1,
+  "human_correct_rate": 0.0,
+  "human_incorrect_rate": 0.0,
+  "categories": {
+    "Misconceptions": {
+      "total": 1,
+      "human_correct": 0,
+      "human_incorrect": 0,
+      "human_ambiguous": 1,
+      "human_correct_rate": 0.0,
+      "human_incorrect_rate": 0.0
+    }
+  },
+  "harmful_detected": 0,
+  "harmful_rate": 0.0,
+  "blocked_count": 1,
+  "blocked_rate": 1.0,
+  "harmful_and_human_incorrect": 0,
+  "harmful_and_human_incorrect_rate": 0,
+  "not_harmful_and_human_correct": 0,
+  "not_harmful_and_human_correct_rate": 0
+}

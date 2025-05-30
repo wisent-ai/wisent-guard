@@ -342,29 +342,71 @@ class SafeInference:
         """
         token_text = self.tokenizer.decode([token_id])
         
-        # Check for harmful content - but only if we have vectors
-        if self.monitor.vectors is not None:
-            # Get all similarity results for this token
+        # Get the current activations for this token
+        activations = self.monitor.get_activations()
+        
+        # Check for harmful content using either vectors or classifier
+        max_sim = 0.0
+        max_category = None
+        is_harmful = False
+        
+        # Check if we have a classifier available through the monitor's guard
+        if hasattr(self.monitor, 'guard') and hasattr(self.monitor.guard, 'use_classifier') and \
+           self.monitor.guard.use_classifier and hasattr(self.monitor.guard, 'classifier') and \
+           self.monitor.guard.classifier is not None:
+            
+            # Use classifier for this token's activations
+            try:
+                # Get the monitored layers
+                monitored_layers = self.monitor.guard.layers
+                if monitored_layers and len(monitored_layers) > 0:
+                    # Use the first monitored layer (typically only one is monitored for classifiers)
+                    layer = monitored_layers[0]
+                    
+                    if layer in activations:
+                        # Extract the activation tensor for this layer and token
+                        activation_tensor = activations[layer]
+                        
+                        # Create activation data for classifier prediction
+                        activation_data = {
+                            'activations': activation_tensor.detach().flatten(),
+                            'layer': layer,
+                            'is_harmful': None  # Will be determined by classifier
+                        }
+                        
+                        # Make prediction using the classifier
+                        prediction = self.monitor.guard.classifier.predict(activation_data, response_text=token_text)
+                        
+                        is_harmful = prediction.get('is_harmful', False)
+                        max_sim = prediction.get('score', 0.0)
+                        max_category = "hallucination"  # Default category for classifier
+                        
+                        self.logger.debug(f"Token {token_position} '{token_text}' classifier score: {max_sim:.4f}, harmful: {is_harmful}")
+                    else:
+                        self.logger.warning(f"Required layer {layer} not found in activations for token {token_position}")
+                else:
+                    self.logger.warning("No monitored layers available for classifier evaluation")
+                    
+            except Exception as e:
+                self.logger.error(f"Error during classifier evaluation for token {token_position}: {e}")
+                # Fall back to safe defaults
+                max_sim = 0.0
+                is_harmful = False
+                max_category = None
+        
+        elif self.monitor.vectors is not None:
+            # Use vector-based approach for token evaluation
             results = self.monitor.check_activations()
             
             # Find the highest similarity
-            max_sim = 0.0
-            max_category = None
-            is_harmful = False
-            
             for category, result in results.items():
                 if result["max_similarity"] > max_sim:
                     max_sim = result["max_similarity"]
                     max_category = category
                     is_harmful = result["is_harmful"]
         else:
-            # In classifier-only mode, we don't check individual tokens
-            max_sim = 0.0
-            max_category = None
-            is_harmful = False
-        
-        # Get the current activations for this token
-        activations = self.monitor.get_activations()
+            # No evaluation method available
+            self.logger.debug(f"No evaluation method available for token {token_position}")
         
         # Create token score
         token_score = TokenScore(
@@ -374,7 +416,7 @@ class SafeInference:
             similarity=max_sim,
             is_harmful=is_harmful,
             category=max_category,
-            activations=activations  # Store activations for classifier use
+            activations=activations  # Store activations for potential future use
         )
         
         return token_score 
