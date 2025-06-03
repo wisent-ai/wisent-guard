@@ -346,9 +346,7 @@ class SafeInference:
             activations=activations  # Store activations for potential future use
         )
         
-        return token_score """
-Safe inference module for generating text while monitoring for harmful content
-"""
+        return token_score 
 
 import torch
 from typing import List, Dict, Any, Optional
