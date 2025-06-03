@@ -349,9 +349,7 @@ class ActivationHooks:
         Returns:
             Activation tensor for the layer
         """
-        return self.activations.get(layer_idx) """
-Hooks for capturing activations from various transformer models
-"""
+        return self.activations.get(layer_idx) 
 
 import torch
 from typing import Dict, List, Callable, Any, Set, Optional, Union
