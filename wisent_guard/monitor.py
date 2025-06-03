@@ -441,9 +441,7 @@ class ActivationMonitor:
         # Ensure token data has the activation values flag set correctly
         self.token_data['has_activation_values'] = self.has_activations
         
-        return self.token_data """
-Activation monitoring module for tracking activations in real-time
-"""
+        return self.token_data 
 
 import torch
 import numpy as np
