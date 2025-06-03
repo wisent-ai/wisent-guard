@@ -1,14 +1,14 @@
-# Ignore CAA folder
+# Ignore CAA folder and related
 /CAA/
 /circuit-breakers/*
 
-# Environment files
+# Environment
 .env
 
 # Ignore everything by default
 /*
 
-# Allow only specific folders
+# Whitelist specific folders
 !/wisent_guard/
 !/models/
 !/examples/
@@ -16,14 +16,14 @@
 !/dist/
 !/wisent_guard.egg-info/
 
-# Allow key Python scripts in root
+# Whitelist scripts in the root
 !/generate_all_prompts.py
 !/train_classifier.py
 !/predict_with_classifier.py
 !/prepare_classifier_data.py
 !/run_benchmark.py
 
-# Allow specific files in root
+# Whitelist project metadata
 !/.gitignore
 !/README.md
 !/requirements.txt
@@ -33,5 +33,10 @@
 !/wisent-guard-logo.png
 !/.DS_Store
 
-# Unignore root directory so exceptions are respected
+# Ensure exceptions are respected
 !/
+
+# Ignore Python cache and notebook artifacts
+**/__pycache__/
+**/*.ipynb_checkpoints/
+*.DS_Store
