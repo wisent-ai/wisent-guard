@@ -1,32 +1,15 @@
-"""
-Helper functions for Wisent-Guard
-"""
+#Helper functions for Wisent-Guard
+
 
 import os
 import torch
 from typing import Dict, List, Tuple, Union, Optional
 
 def ensure_dir(directory: str) -> None:
-    """
-    Make sure a directory exists, creating it if necessary.
-    
-    Args:
-        directory: Path to the directory
-    """
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
 
 def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
-    """
-    Calculate cosine similarity between two vectors using PyTorch.
-    
-    Args:
-        v1: First vector
-        v2: Second vector
-        
-    Returns:
-        Cosine similarity value
-    """
     try:
         # For MPS or CUDA tensors, explicitly move to CPU first
         if isinstance(v1, torch.Tensor):
@@ -84,15 +67,6 @@ def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
         return 0.0
 
 def normalize_vector(vector: torch.Tensor) -> torch.Tensor:
-    """
-    Normalize a vector to unit length.
-    
-    Args:
-        vector: Input vector
-        
-    Returns:
-        Normalized vector
-    """
     try:
         # Calculate norm on the same device as the vector
         device = vector.device
@@ -129,15 +103,6 @@ def normalize_vector(vector: torch.Tensor) -> torch.Tensor:
         return vector
 
 def calculate_average_vector(vectors: List[torch.Tensor]) -> torch.Tensor:
-    """
-    Calculate the average of a list of vectors.
-    
-    Args:
-        vectors: List of vectors to average
-        
-    Returns:
-        Average vector
-    """
     if not vectors:
         raise ValueError("Empty list of vectors provided")
     
@@ -169,16 +134,6 @@ def calculate_average_vector(vectors: List[torch.Tensor]) -> torch.Tensor:
             raise ValueError("Failed to calculate average vector")
 
 def get_layer_name(model_type: str, layer_idx: int) -> str:
-    """
-    Get the appropriate layer name based on model type and layer index.
-    
-    Args:
-        model_type: Type of model ('opt', 'llama', 'gpt2', etc.)
-        layer_idx: Layer index
-        
-    Returns:
-        Layer name for the specific model architecture
-    """
     layer_name_map = {
         "opt": f"model.decoder.layers.{layer_idx}",
         "llama": f"model.layers.{layer_idx}",
@@ -192,16 +147,6 @@ def get_layer_name(model_type: str, layer_idx: int) -> str:
     return layer_name_map.get(model_type.lower(), f"layers.{layer_idx}")
 
 def get_layer_count(model, model_type: str = None) -> int:
-    """
-    Get the number of layers in the model based on its architecture.
-    
-    Args:
-        model: The transformer model
-        model_type: Type of model ('opt', 'llama', 'gpt2', etc.)
-        
-    Returns:
-        Number of layers in the model
-    """
     if model_type is None:
         model_name = model.__class__.__name__.lower()
         if 'opt' in model_name:

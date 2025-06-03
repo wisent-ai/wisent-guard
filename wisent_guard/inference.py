@@ -1,6 +1,4 @@
-"""
-Token generation and activation monitoring for Wisent-Guard
-"""
+#Token generation and activation monitoring for Wisent-Guard
 
 import os
 import torch
@@ -30,9 +28,7 @@ FORMAT_LEGACY = "legacy"
 FORMAT_LLAMA31 = "llama31"
 FORMAT_MISTRAL = "mistral"
 
-class TokenScore:
-    """Stores information about a token and its similarity to harmful content."""
-    
+class TokenScore:    
     def __init__(self, 
                  token_id: Optional[int] = None,
                  token_text: str = "",
@@ -41,18 +37,6 @@ class TokenScore:
                  is_harmful: bool = False,
                  category: Optional[str] = None,
                  activations: Optional[Dict[int, torch.Tensor]] = None):
-        """
-        Initialize token score information.
-        
-        Args:
-            token_id: ID of the token
-            token_text: String representation of the token
-            position: Position in the sequence
-            similarity: Similarity score to harmful content
-            is_harmful: Whether the token is deemed harmful
-            category: Category of harmful content (if harmful)
-            activations: Dictionary of layer activations for this token
-        """
         self.token_id = token_id
         self.token_text = token_text
         self.position = position
@@ -62,7 +46,6 @@ class TokenScore:
         self.activations = activations or {}
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary representation."""
         return {
             "token_id": self.token_id,
             "token_text": self.token_text,
@@ -74,9 +57,6 @@ class TokenScore:
         }
 
 class SafeInference:
-    """
-    Safe inference wrapper for monitoring model outputs for harmful content.
-    """
     
     def __init__(
         self,
@@ -89,19 +69,6 @@ class SafeInference:
         assistant_token: str = "Assistant:",
         log_level: str = "info"
     ):
-        """
-        Initialize safe inference wrapper.
-        
-        Args:
-            model: Hugging Face model
-            tokenizer: Hugging Face tokenizer
-            monitor: Activation monitor instance
-            device: Device to use for inference
-            format_type: Prompt format type ("legacy", "llama31", "mistral")
-            user_token: Token to use for user messages
-            assistant_token: Token to use for assistant messages
-            log_level: Logging level
-        """
         self.model = model
         self.tokenizer = tokenizer
         self.monitor = monitor
@@ -137,15 +104,6 @@ class SafeInference:
             tokenizer.pad_token = tokenizer.eos_token
         
     def _detect_format(self, force_format: Optional[str] = None) -> str:
-        """
-        Determine which format to use based on model name or forced setting.
-        
-        Args:
-            force_format: Force specific format, or None for auto-detect
-            
-        Returns:
-            Format type string: "llama31", "mistral", or "legacy"
-        """
         # If format is explicitly forced, respect that setting
         if force_format is not None:
             return force_format
@@ -172,15 +130,6 @@ class SafeInference:
         return FORMAT_LEGACY
         
     def _format_prompt(self, prompt: str) -> str:
-        """
-        Format a prompt with the appropriate tokens based on the model format.
-        
-        Args:
-            prompt: Input prompt
-            
-        Returns:
-            Formatted prompt
-        """
         if self.format_type == FORMAT_LLAMA31:
             # Llama 3.1 format
             BEGIN_TEXT = "<|begin_of_text|>"
@@ -212,18 +161,6 @@ class SafeInference:
         min_new_tokens: int = 1,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Generate a response while monitoring for harmful content.
-        
-        Args:
-            prompt: Input prompt
-            max_new_tokens: Maximum number of tokens to generate
-            min_new_tokens: Minimum number of tokens to generate
-            **kwargs: Additional keyword arguments for the generation function
-            
-        Returns:
-            Dictionary containing the generated text and token scores
-        """
         # Format the prompt if needed (handled in _format_prompt)
         self.logger.info(f"Generating response for prompt: '{prompt[:50]}{'...' if len(prompt) > 50 else ''}' (max_tokens: {max_new_tokens})")
         
@@ -330,16 +267,6 @@ class SafeInference:
         return result
 
     def _process_token(self, token_id: int, token_position: int) -> TokenScore:
-        """
-        Process a token, check for harmfulness, and return token information.
-        
-        Args:
-            token_id: ID of the token
-            token_position: Position in the sequence
-            
-        Returns:
-            TokenScore object with token information
-        """
         token_text = self.tokenizer.decode([token_id])
         
         # Get the current activations for this token
