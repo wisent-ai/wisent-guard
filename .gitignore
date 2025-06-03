@@ -23,3 +23,7 @@
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
+# HuggingFace model files (too large for GitHub)
+*.safetensors
+tokenizer.json
+model.safetensors.index.json

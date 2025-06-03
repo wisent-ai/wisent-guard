@@ -10,12 +10,14 @@ This is **Llama 3.1 8B Instruct** with embedded **wisent-guard** safety mechanis
 - **Configurable Thresholds**: Adjustable sensitivity levels
 - **Early Termination**: Stops generation when harmful content is detected
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Recommended)
+
+### Option 1: Use from HuggingFace Hub
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Load the guarded model
+# Load the guarded model directly from HuggingFace Hub
 model = AutoModelForCausalLM.from_pretrained(
     "Wisent-AI/wisent-llama-3.1-8B-instruct",
     trust_remote_code=True,
@@ -38,6 +40,29 @@ outputs = model.generate(**inputs, max_new_tokens=512)
 response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 print(response)
 ```
+
+### Option 2: Local Setup
+
+If you want to use this model locally (e.g., for development):
+
+1. **Clone this repository section**:
+   ```bash
+   # This directory contains only the code files, not the large model weights
+   ```
+
+2. **Run the setup script**:
+   ```bash
+   cd huggingface_llama
+   python setup_model.py
+   ```
+
+3. **Use the model**:
+   ```python
+   from transformers import AutoModelForCausalLM, AutoTokenizer
+   
+   model = AutoModelForCausalLM.from_pretrained(".", trust_remote_code=True)
+   tokenizer = AutoTokenizer.from_pretrained(".")
+   ```
 
 ## 🔧 Advanced Usage
 
@@ -134,6 +159,7 @@ Wisent AI develops advanced AI safety tools and techniques. Learn more at [wisen
 - **Safety Limitations**: No safety system is perfect - human oversight is recommended
 - **Performance**: Safety screening adds computational overhead
 - **Updates**: Safety models are regularly updated for improved detection
+- **Model Weights**: Large model files are hosted on HuggingFace Hub, not in this repository
 
 ## 🔗 Related
 
