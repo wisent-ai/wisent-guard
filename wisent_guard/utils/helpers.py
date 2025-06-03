@@ -60,7 +60,6 @@ def cosine_sim(v1: torch.Tensor, v2: torch.Tensor) -> float:
             v2 = v2[:, :min_dim]
             
         return float(cosine_similarity(v1, v2)[0][0])
->>>>>>> 6baa369 (logger version)
     except Exception as e:
         print(f"Error calculating cosine similarity: {e}")
         # Return a low similarity value to be safe
