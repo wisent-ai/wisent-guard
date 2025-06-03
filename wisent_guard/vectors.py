@@ -568,9 +568,7 @@ class ContrastiveVectors:
             self.metadata["layers"][str(layer)] = self.metadata["layers"].get(str(layer), 0) + len(harmful_activations)
         
         # Save metadata
-        self._save_metadata() """
-ContrastiveVectors module for creating and managing activation vectors
-"""
+        self._save_metadata() 
 
 import os
 import torch
