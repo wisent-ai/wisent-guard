@@ -23,4 +23,13 @@ from .vectors import ContrastiveVectors
 from .inference import SafeInference
 
 # Updated with Torch only support 
-__version__ = "0.4.1" 
+__version__ = "0.4.1" """
+Wisent-Guard: Monitor and guard against harmful content in language models
+"""
+
+from .guard import ActivationGuard
+from .monitor import ActivationMonitor
+from .vectors import ContrastiveVectors
+from .inference import SafeInference
+
+__version__ = "0.1.0" 
