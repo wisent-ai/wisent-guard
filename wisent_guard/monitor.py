@@ -1,6 +1,4 @@
-"""
-Activation monitoring module for tracking activations in real-time
-"""
+#Activation monitoring module for tracking activations in real-time
 
 import logging
 import torch
@@ -11,14 +9,7 @@ from .vectors import ContrastiveVectors
 from .utils.logger import get_logger
 from transformers import PreTrainedModel
 
-class ActivationMonitor:
-    """
-    Monitors and captures activations from model layers during inference.
-    
-    This class creates hooks into transformer layers to extract activation patterns
-    during text generation, which can be used for hallucination detection.
-    """
-    
+class ActivationMonitor:  
     def __init__(
         self,
         model: "PreTrainedModel",
@@ -29,18 +20,6 @@ class ActivationMonitor:
         device: Optional[torch.device] = None,
         log_level: Union[str, int] = "info"
     ):
-        """
-        Initialize activation monitor.
-        
-        Args:
-            model: Hugging Face model
-            layers: Layers to monitor
-            vectors: Contrastive vectors for comparisons 
-            token_strategy: Strategy for aggregating token activations (only 'last' supported)
-            similarity_threshold: Similarity threshold for harmful content detection
-            device: Device to use
-            log_level: Logging level
-        """
         self.logger = get_logger("wisent_guard", log_level)
         self.logger.info(f"Creating activation monitor for {getattr(model.config, '_name_or_path', 'unknown')}")
         
@@ -81,12 +60,6 @@ class ActivationMonitor:
             self.logger.debug("Operating in classifier-only mode (no vectors)")
         
     def setup_monitoring(self, layers: List[int] = None):
-        """
-        Set up monitoring on specific layers or all layers.
-        
-        Args:
-            layers: List of layer indices to monitor, or None for all layers
-        """
         target_layers = []
         
         # If no layers specified, set up for all layers
@@ -109,15 +82,6 @@ class ActivationMonitor:
         self.hooks.register_hooks(target_layers)
         
     def get_activations(self, layer_idx: int = None) -> Dict[int, torch.Tensor]:
-        """
-        Get activations after generation.
-        
-        Args:
-            layer_idx: Specific layer to get activations for, or None for all
-            
-        Returns:
-            Dictionary mapping layer indices to activation tensors
-        """
         if not self.has_activations:
             self.logger.warning("No activations captured yet")
         
@@ -131,15 +95,6 @@ class ActivationMonitor:
         return self.activations_by_layer
     
     def get_activation_for_layer(self, layer: int) -> Optional[torch.Tensor]:
-        """
-        Get the activation tensor for a specific layer.
-        
-        Args:
-            layer: Layer index to get activation for
-            
-        Returns:
-            Activation tensor for the specified layer
-        """
         if not self.has_activations:
             self.logger.warning("No activations captured yet")
             return None
@@ -151,14 +106,6 @@ class ActivationMonitor:
             return None
     
     def capture_activations(self, input_ids=None, tokenizer=None, target_tokens=None):
-        """
-        Process the captured activations after generation.
-        
-        Args:
-            input_ids: Optional input_ids to record for reference
-            tokenizer: Optional tokenizer for decoding tokens
-            target_tokens: Optional target tokens to search for
-        """
         # Always processing with last token strategy
         layer_activations = self.hooks.get_layer_activations()
         
@@ -190,9 +137,6 @@ class ActivationMonitor:
                         self.logger.debug(f"Captured token at position {token_pos}: '{token}' (ID: {token_id})")
     
     def reset(self):
-        """
-        Reset the monitor, clearing all captured activations.
-        """
         self.activations_by_layer = {}
         self.has_activations = False
         self.num_tokens = 0
@@ -202,12 +146,6 @@ class ActivationMonitor:
         self.logger.debug("Monitor reset, all activations cleared")
 
     def check_activations(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Check current activations against stored vectors.
-        
-        Returns:
-            Dictionary with results per category
-        """
         if not self.has_activations:
             self.logger.warning("No activations to check")
             return {}
@@ -260,12 +198,6 @@ class ActivationMonitor:
         return results
     
     def get_most_harmful_category(self) -> Optional[Tuple[str, float]]:
-        """
-        Get the category with the highest similarity to harmful patterns.
-        
-        Returns:
-            Tuple of (category_name, similarity) or None if no categories are triggered
-        """
         self.logger.debug("Finding most harmful category")
         max_similarity = -1.0
         max_category = None
@@ -290,16 +222,6 @@ class ActivationMonitor:
         return None
     
     def is_harmful(self, categories: Optional[List[str]] = None, is_response_token: bool = False) -> bool:
-        """
-        Check if current activations indicate harmful content.
-        
-        Args:
-            categories: Categories to check. If None, all available categories are checked.
-            is_response_token: Whether we're checking a token from the model's response.
-            
-        Returns:
-            True if harmful content is detected, False otherwise
-        """
         # Check if we're in classifier-only mode (no vectors)
         if not hasattr(self, 'vectors') or self.vectors is None:
             self.logger.debug("Operating in classifier-only mode, returning False for individual token check")
@@ -323,12 +245,6 @@ class ActivationMonitor:
         return False
     
     def get_token_classification(self) -> Optional[str]:
-        """
-        For multiple-choice format, get the classification of the current token.
-        
-        Returns:
-            "truthful" if the token is A, "hallucinatory" if the token is B, or None if not detected
-        """
         if self.token_strategy != "target_token" or self.triggering_token_id is None:
             self.logger.debug("Cannot classify token: not using target_token strategy or no triggering token")
             return None
@@ -359,16 +275,6 @@ class ActivationMonitor:
         return None
 
     def capture_activations_from_forward(self, model_output, input_ids=None):
-        """
-        Capture activations from model output hidden states.
-        
-        Args:
-            model_output: Output from model forward pass
-            input_ids: Input token IDs
-        
-        Returns:
-            True if activations were captured, False otherwise
-        """
         # Reset previous activations
         self.reset()
         
@@ -408,12 +314,6 @@ class ActivationMonitor:
             return False
 
     def get_activations(self) -> Dict[int, torch.Tensor]:
-        """
-        Get activations for all monitored layers.
-        
-        Returns:
-            Dictionary mapping layer indices to activation tensors
-        """
         if not self.has_activations:
             self.logger.warning("No activations captured yet")
             return {}
@@ -425,12 +325,6 @@ class ActivationMonitor:
         return self.activations_by_layer
 
     def get_token_data(self) -> Dict[str, Any]:
-        """
-        Get token data associated with current activations.
-        
-        Returns:
-            Dictionary containing token data
-        """
         if not hasattr(self, 'token_data') or not self.token_data:
             return {'has_activation_values': False}
         

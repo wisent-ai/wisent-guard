@@ -2,11 +2,13 @@
 /CAA/
 /circuit-breakers/*
 
+# Environment files
 .env
 
-# Ignore any new folders not already in the repository
-# Whitelist approach - only include specific folders
+# Ignore everything by default
 /*
+
+# Allow only specific folders
 !/wisent_guard/
 !/models/
 !/examples/
@@ -14,7 +16,14 @@
 !/dist/
 !/wisent_guard.egg-info/
 
-# Don't ignore these files in the root directory
+# Allow key Python scripts in root
+!/generate_all_prompts.py
+!/train_classifier.py
+!/predict_with_classifier.py
+!/prepare_classifier_data.py
+!/run_benchmark.py
+
+# Allow specific files in root
 !/.gitignore
 !/README.md
 !/requirements.txt
@@ -23,3 +32,6 @@
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
+
+# Unignore root directory so exceptions are respected
+!/

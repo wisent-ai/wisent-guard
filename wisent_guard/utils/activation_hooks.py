@@ -1,15 +1,11 @@
-"""
-Hooks for capturing activations from various transformer models
-"""
+#Hooks for capturing activations from various transformer models
 
 import torch
 from typing import Dict, List, Callable, Any, Set, Optional, Union
 from ..utils.logger import get_logger
 from .helpers import get_layer_name
 
-class ActivationHooks:
-    """Manages activation hooks for transformer models."""
-    
+class ActivationHooks:    
     def __init__(
         self,
         model: torch.nn.Module,
@@ -17,15 +13,6 @@ class ActivationHooks:
         token_strategy: str = "last",
         log_level: Union[str, int] = "info"
     ):
-        """
-        Initialize activation hooks for a model.
-        
-        Args:
-            model: Transformer model
-            layers: List of layers to monitor
-            token_strategy: Strategy for token activations (only 'last' is supported)
-            log_level: Logging level
-        """
         self.model = model
         self.layers = layers
         self.token_strategy = token_strategy
@@ -43,11 +30,13 @@ class ActivationHooks:
         self.hooks = {}
         self.activations = {}
         
+        # Initialize active layers
+        self.active_layers = set()
+        
         # Set up monitoring on specified layers
         self.setup_hooks(layers)
     
     def _detect_model_type(self, model) -> str:
-        """Detect model type."""
         model_config = getattr(model, "config", None)
         model_name = getattr(model_config, "_name_or_path", "unknown").lower()
         
@@ -56,21 +45,15 @@ class ActivationHooks:
                 return "llama"
             elif "mistral" in model_name:
                 return "mistral"
+            elif "opt" in model_name:
+                return "opt"
             elif "mpt" in model_name:
                 return "mpt"
         
         return "generic"
     
     def _get_module_by_name(self, name: str) -> torch.nn.Module:
-        """
-        Retrieve a module from the model by its name.
-        
-        Args:
-            name: Dot-separated path to the module
-            
-        Returns:
-            The requested module
-        """
+      
         self.logger.debug(f"Looking up module: {name}")
         module = self.model
         for part in name.split('.'):
@@ -81,76 +64,35 @@ class ActivationHooks:
         return module
     
     def set_target_tokens(self, tokenizer, token_texts: List[str]):
-        """
-        Set target tokens to look for (kept for backward compatibility).
-        
-        Args:
-            tokenizer: The tokenizer to use for encoding
-            token_texts: List of token texts to look for (ignored)
-        """
+      
         self.logger.warning("set_target_tokens is ignored with simplified 'last' token strategy")
     
     def _activation_hook(self, layer_idx: int) -> Callable:
-        """
-        Create a hook function for the specified layer.
-        
-        Args:
-            layer_idx: Index of the layer to hook
-            
-        Returns:
-            Hook function
-        """
-        def hook(module, input, output):
-            # For most transformer models, we want the output of the attention layer
-            # or the MLP layer as our activation vector
+        def hook_fn(module, input, output):
+            # For LLaMA models, we want to capture the output of the MLP layer
             if layer_idx in self.active_layers:
                 self.logger.debug(f"Hook triggered for layer {layer_idx}")
                 
-                # Get the output hidden states - typically the first element of the output
+                # For LLaMA, we expect the output to be a tuple with hidden states
                 if isinstance(output, tuple):
                     hidden_states = output[0]
                     self.logger.debug(f"Output is tuple, taking first element as hidden states")
                 else:
                     hidden_states = output
-                    self.logger.debug(f"Output is tensor, using directly as hidden states")
                 
-                # Store the hidden states (activations)
-                # We may need to handle different shapes based on model architecture
+                # Store the activations (last token)
                 if isinstance(hidden_states, torch.Tensor):
-                    # Get the current device for consistent tensor allocation
-                    device = hidden_states.device
-                    self.logger.debug(f"Hidden states shape: {hidden_states.shape}, device: {device}")
-                    
-                    # Get last token's activations
-                    last_token_idx = hidden_states.shape[1] - 1
-                    self.logger.debug(f"Using last token strategy, token position: {last_token_idx}")
-                    
-                    # Ensure tensor is properly allocated on the device (important for MPS)
-                    self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
-                    self.last_token_position = last_token_idx
-                    
-                    # Try to get the token ID if available
-                    if hasattr(module, '_last_input_ids'):
-                        input_ids = module._last_input_ids[0]  # Batch size 1
-                        if last_token_idx < len(input_ids):
-                            try:
-                                self.last_token_id = input_ids[last_token_idx].item()
-                                self.logger.debug(f"Last token ID: {self.last_token_id}, position: {last_token_idx}")
-                            except (RuntimeError, ValueError) as e:
-                                self.logger.debug(f"Error extracting last token ID: {e}")
-                                self.last_token_id = None
+                    # Get the last token's hidden state
+                    last_hidden_state = hidden_states[:, -1, :]
+                    self.activations[layer_idx] = last_hidden_state
+                    self.logger.debug(f"Captured activation for layer {layer_idx}")
                 else:
-                    self.logger.warning(f"Hidden states is not a tensor: {type(hidden_states)}")
-        return hook
-    
-    def register_hooks(self, layers: List[int]) -> None:
-        """
-        Register activation hooks for the specified layers.
+                    self.logger.warning(f"Unexpected output type: {type(hidden_states)}")
         
-        Args:
-            layers: List of layer indices to hook
-        """
-        self.logger.info(f"Registering hooks for layers: {layers}")
+        return hook_fn
+    
+    def setup_hooks(self, layers: List[int]) -> None:
+        self.logger.info(f"Setting up hooks for layers: {layers}")
         self.active_layers = set(layers)
         
         # Clear existing hooks
@@ -160,35 +102,18 @@ class ActivationHooks:
         hooks_registered = 0
         
         for layer_idx in layers:
-            layer_name = get_layer_name(self.model_type, layer_idx)
-            self.logger.debug(f"Attempting to register hook for layer {layer_idx} ({layer_name})")
-            
-            try:
-                module = self._get_module_by_name(layer_name)
-                
-                # Add a pre-hook to capture input_ids for all strategies
-                def forward_pre_hook(module, args):
-                    if len(args) > 0 and isinstance(args[0], torch.Tensor):
-                        # Store the input_ids for use in the activation hook
-                        module._last_input_ids = args[0]
-                        self.logger.debug(f"Pre-hook captured input_ids shape: {args[0].shape}")
-                    return args
-                
-                module.register_forward_pre_hook(forward_pre_hook)
-                
-                # Add the main activation hook
-                hook = module.register_forward_hook(self._activation_hook(layer_idx))
+            layer_module = self._get_layer_module(layer_idx)
+            if layer_module is not None:
+                hook = layer_module.register_forward_hook(self._activation_hook(layer_idx))
                 self.hooks[layer_idx] = hook
                 hooks_registered += 1
-                
                 self.logger.debug(f"Successfully registered hook for layer {layer_idx}")
-            except Exception as e:
-                self.logger.error(f"Failed to register hook for layer {layer_idx} ({layer_name}): {e}")
+            else:
+                self.logger.error(f"Failed to register hook for layer {layer_idx}")
         
         self.logger.info(f"Registered {hooks_registered} hooks out of {len(layers)} requested layers")
     
     def remove_hooks(self) -> None:
-        """Remove all registered hooks."""
         if self.hooks:
             self.logger.info(f"Removing {len(self.hooks)} hooks")
             for layer_idx, hook in self.hooks.items():
@@ -199,129 +124,34 @@ class ActivationHooks:
             self.logger.debug("No hooks to remove")
     
     def has_activations(self) -> bool:
-        """
-        Check if we have collected any activations.
-        
-        Returns:
-            True if activations have been collected, False otherwise
-        """
-        has_act = bool(self.layer_activations)
+        has_act = bool(self.activations)
         self.logger.debug(f"has_activations check: {has_act}")
         return has_act
     
     def get_activations(self) -> Dict[int, torch.Tensor]:
-        """
-        Get all activations for registered layers.
-        
-        Returns:
-            Dictionary mapping layer indices to activation tensors
-        """
-        return self.layer_activations
+        return self.activations
     
     def get_last_token_info(self) -> Dict[str, Any]:
-        """
-        Get information about the last token processed.
-        
-        Returns:
-            Dictionary with token_id and position
-        """
         return {
-            "token_id": self.last_token_id,
-            "position": self.last_token_position
+            "token_id": None,
+            "position": None
         }
     
     def reset(self):
-        """Reset stored activations."""
         self.activations = {}
     
     def clear_activations(self):
-        """Clear all stored activations (alias for reset)."""
-        self.reset()
-
-    def setup_hooks(self, layers: List[int]):
-        """
-        Set up hooks for specified layers.
-        
-        Args:
-            layers: List of layer indices to hook
-        """
-        self.logger.info(f"Monitoring {len(layers)} specified layers: {layers}")
-        
-        registered = 0
-        for layer_idx in layers:
-            success = self.register_hook(layer_idx)
-            if success:
-                registered += 1
-        
-        self.logger.info(f"Registered {registered} hooks out of {len(layers)} requested layers")
-
-    def register_hook(self, layer_idx: int) -> bool:
-        """
-        Register a hook for a specific layer.
-        
-        Args:
-            layer_idx: Layer index to hook
-            
-        Returns:
-            True if hook was registered successfully, False otherwise
-        """
-        # Get the layer module
-        layer_module = self._get_layer_module(layer_idx)
-        if layer_module is None:
-            self.logger.warning(f"Could not find layer module for layer {layer_idx}")
-            return False
-        
-        # Create the hook
-        def hook_fn(module, input, output):
-            # Get the activations
-            if isinstance(output, tuple):
-                # For layers that return multiple tensors
-                hidden_states = output[0]
-            else:
-                # For layers that return a single tensor
-                hidden_states = output
-            
-            # Store the activations (last token)
-            self.activations[layer_idx] = hidden_states[:, -1].detach()
-        
-        # Register the hook
-        hook = layer_module.register_forward_hook(hook_fn)
-        self.hooks[layer_idx] = hook
-        
-        self.logger.debug(f"Registered hook for layer {layer_idx}")
-        return True
+        pass
 
     def _get_layer_module(self, layer_idx: int) -> Optional[torch.nn.Module]:
-        """
-        Get the module for a specific layer.
-        
-        Args:
-            layer_idx: Layer index
-            
-        Returns:
-            Module for the layer
-        """
-        if self.model_type == "llama":
-            try:
+        try:
+            if self.model_type == "llama":
                 return self.model.model.layers[layer_idx]
-            except (AttributeError, IndexError):
-                try:
-                    return self.model.layers[layer_idx]
-                except (AttributeError, IndexError):
-                    self.logger.warning(f"Could not find layer {layer_idx} in Llama model")
-                    return None
-        elif self.model_type == "mistral":
-            try:
+            elif self.model_type == "mistral":
                 return self.model.model.layers[layer_idx]
-            except (AttributeError, IndexError):
-                try:
-                    return self.model.layers[layer_idx]
-                except (AttributeError, IndexError):
-                    self.logger.warning(f"Could not find layer {layer_idx} in Mistral model")
-                    return None
-        else:
-            # Generic approach
-            try:
+            elif self.model_type == "opt":
+                return self.model.model.decoder.layers[layer_idx]
+            else:
                 # Try common patterns
                 if hasattr(self.model, 'transformer') and hasattr(self.model.transformer, 'h'):
                     # GPT-2 style
@@ -335,18 +165,9 @@ class ActivationHooks:
                 else:
                     self.logger.warning(f"Could not find layer {layer_idx} with generic approach")
                     return None
-            except (AttributeError, IndexError) as e:
-                self.logger.warning(f"Error accessing layer {layer_idx}: {e}")
-                return None
+        except (AttributeError, IndexError) as e:
+            self.logger.warning(f"Error accessing layer {layer_idx}: {e}")
+            return None
 
     def get_activation(self, layer_idx: int) -> Optional[torch.Tensor]:
-        """
-        Get activation for a specific layer.
-        
-        Args:
-            layer_idx: Layer index
-            
-        Returns:
-            Activation tensor for the layer
-        """
         return self.activations.get(layer_idx) 
