@@ -1500,9 +1500,7 @@ class ActivationGuard:
             
         except Exception as e:
             self.logger.error(f"Error clearing logged responses: {e}")
-            return False """
-Main ActivationGuard class for the wisent-guard package
-"""
+            return False 
 
 import os
 import torch
