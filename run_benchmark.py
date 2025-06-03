@@ -3,6 +3,7 @@
 import argparse
 from wisent_guard.benchmarks import BenchmarkLoader, BenchmarkEvaluator, save_results
 from wisent_guard.classifier import ActivationClassifier
+from wisent_guard.monitor import ActivationMonitor
 
 
 def main(benchmark_name: str, model_name: str, layer_num: int, use_classifier: bool = True):
@@ -14,26 +15,47 @@ def main(benchmark_name: str, model_name: str, layer_num: int, use_classifier: b
     prompt_pairs = loader.get_prompt_pairs(train_data)
 
     classifier = None
-    if use_classifier:
-        positive_examples = [pair[0] for pair in prompt_pairs]
-        negative_examples = [pair[1] for pair in prompt_pairs]
+    evaluator = BenchmarkEvaluator(model_name, layer_num)
 
-        # This is a placeholder. You must use real activations for real evaluation!
-        print("Using fake activation vectors for placeholder classifier training...")
+    # You must extract questions from test data to use as prompts
+    test_questions = [loader.task.doc_to_text(example) for example in test_data]
+
+    if use_classifier:
+        print("Using real activation vectors for classifier training...")
+
+        # Load the model and hook activations
+        monitor = ActivationMonitor(evaluator.model, "llama", [layer_num])
+
+        # Generate model responses (this will also trigger activation hooks)
+        responses = evaluator.get_model_responses(test_questions)
+
+        # Extract activations
+        activation_data = monitor.activations[layer_num]  # Expecting Dict[layer] -> List[Vector]
+
+        # Ensure alignment
+        if len(activation_data) != len(test_data):
+            raise ValueError("Mismatch between activation count and test data!")
+
+        harmless_acts = []
+        harmful_acts = []
+        for act, ex in zip(activation_data, test_data):
+            label = ex.get("label", "harmless")
+            if label == "harmless":
+                harmless_acts.append({"activations": act})
+            else:
+                harmful_acts.append({"activations": act})
+
         classifier = ActivationClassifier.create_from_activations(
-            harmless_activations=[{"activations": [float(i)] * 768} for i in range(len(positive_examples))],
-            harmful_activations=[{"activations": [float(i)] * 768} for i in range(len(negative_examples))],
+            harmless_activations=harmless_acts,
+            harmful_activations=harmful_acts,
             model_type="mlp",
             threshold=0.5
         )
+    else:
+        # No classifier — just generate outputs
+        responses = evaluator.get_model_responses(test_questions)
 
-    # 3. Run model and evaluate
-    evaluator = BenchmarkEvaluator(model_name, layer_num)
-    
-    # You must extract questions from test data to use as prompts
-    test_questions = [loader.task.doc_to_text(example) for example in test_data]
-    responses = evaluator.get_model_responses(test_questions)
-
+    # 3. Evaluate
     results = evaluator.evaluate_responses(test_data, responses, classifier)
 
     # 4. Save results
@@ -59,8 +81,7 @@ if __name__ == "__main__":
     )
 
     # Output
-    print("\n Evaluation Results:")
+    print("\nEvaluation Results:")
     print("-" * 50)
     for metric, value in results.items():
         print(f"{metric}: {value:.4f}")
-    

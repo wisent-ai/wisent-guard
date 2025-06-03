@@ -39,17 +39,6 @@ setup(
         "scikit-learn>=0.24.0",
     ],
     keywords="nlp, machine learning, language models, safety, guardrails",
-    long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/wisent-activation-guardrails",  # Replace with your GitHub repo
-    packages=find_packages(exclude=["patches", "patches.*"]),  # Exclude patches directory
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Science/Research",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    ],
     python_requires=">=3.8",
     install_requires=[
         "torch>=1.9.0",
@@ -57,4 +46,4 @@ setup(
         "tqdm>=4.50.0",
         "numpy>=1.19.0",
         "scikit-learn>=0.24.0",
-    ])
+    ]))

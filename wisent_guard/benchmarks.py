@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict, List, Tuple
-from lm_eval import tasks
+from lm_eval import evaluator
 from datasets import load_dataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -12,7 +12,7 @@ import torch
 class BenchmarkLoader:
     def __init__(self, benchmark_name: str):
         self.benchmark_name = benchmark_name
-        self.task = tasks.get_task(benchmark_name)()
+        self.task = evaluator.get_task(benchmark_name)()
         self.docs = list(self.task.validation_docs())
 
     def get_train_test_split(self, test_size=0.2, random_state=42):

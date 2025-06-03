@@ -138,6 +138,7 @@ def get_layer_name(model_type: str, layer_idx: int) -> str:
         "llama": f"model.layers.{layer_idx}",
         "gpt2": f"transformer.h.{layer_idx}",
         "gpt_neox": f"gpt_neox.layers.{layer_idx}",
+        "gpt_neo": f"transformer.h.{layer_idx}",
         "gptj": f"transformer.h.{layer_idx}",
         "t5": f"encoder.block.{layer_idx}",
         "bart": f"model.encoder.layers.{layer_idx}",
@@ -156,6 +157,8 @@ def get_layer_count(model, model_type: str = None) -> int:
             model_type = 'gpt2'
         elif 'neox' in model_name:
             model_type = 'gpt_neox'
+        elif 'gptneo' in model_name or 'gpt_neo' in model_name:
+            model_type = 'gpt_neo'
         elif 'gptj' in model_name:
             model_type = 'gptj'
         elif 't5' in model_name:
@@ -180,6 +183,9 @@ def get_layer_count(model, model_type: str = None) -> int:
             if hasattr(model, 'gpt_neox') and hasattr(model.gpt_neox, 'layers'):
                 return len(model.gpt_neox.layers)
         elif model_type == 'gptj':
+            if hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):
+                return len(model.transformer.h)
+        elif model_type == 'gpt_neo':
             if hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):
                 return len(model.transformer.h)
         elif model_type == 't5':

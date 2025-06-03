@@ -25,3 +25,6 @@
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
+
+__pycache__/
+*.pyc
