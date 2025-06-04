@@ -1,0 +1,427 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Wisent-Guard: Benchmark Evaluation Demo\n",
+        "\n",
+        "This notebook demonstrates a full hallucination detection pipeline using Wisent-Guard on `truthfulqa_mc`.\n",
+        "We load a benchmark, generate training data, train a classifier, and evaluate results."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {},
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[33mWARNING: Ignoring invalid distribution -isent-guard (/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages)\u001b[0m\u001b[33m\n",
+            "\u001b[0mObtaining file:///Users/lukaszbartoszcze/Documents/CodingProjects/Wisent/wisent-activation-guardrails\n",
+            "  Preparing metadata (setup.py) ... \u001b[?25ldone\n",
+            "\u001b[?25hRequirement already satisfied: torch>=1.9.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from wisent-guard==0.4.1) (2.6.0)\n",
+            "Requirement already satisfied: transformers>=4.20.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from wisent-guard==0.4.1) (4.49.0)\n",
+            "Requirement already satisfied: tqdm>=4.50.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from wisent-guard==0.4.1) (4.67.1)\n",
+            "Requirement already satisfied: numpy>=1.19.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from wisent-guard==0.4.1) (1.26.4)\n",
+            "Requirement already satisfied: scikit-learn>=0.24.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from wisent-guard==0.4.1) (1.5.1)\n",
+            "Requirement already satisfied: scipy>=1.6.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from scikit-learn>=0.24.0->wisent-guard==0.4.1) (1.14.0)\n",
+            "Requirement already satisfied: joblib>=1.2.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from scikit-learn>=0.24.0->wisent-guard==0.4.1) (1.4.2)\n",
+            "Requirement already satisfied: threadpoolctl>=3.1.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from scikit-learn>=0.24.0->wisent-guard==0.4.1) (3.5.0)\n",
+            "Requirement already satisfied: filelock in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch>=1.9.0->wisent-guard==0.4.1) (3.14.0)\n",
+            "Requirement already satisfied: typing-extensions>=4.10.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch>=1.9.0->wisent-guard==0.4.1) (4.12.2)\n",
+            "Requirement already satisfied: networkx in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch>=1.9.0->wisent-guard==0.4.1) (3.3)\n",
+            "Requirement already satisfied: jinja2 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch>=1.9.0->wisent-guard==0.4.1) (3.1.4)\n",
+            "Requirement already satisfied: fsspec in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch>=1.9.0->wisent-guard==0.4.1) (2024.12.0)\n",
+            "Requirement already satisfied: sympy==1.13.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch>=1.9.0->wisent-guard==0.4.1) (1.13.1)\n",
+            "Requirement already satisfied: mpmath<1.4,>=1.1.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from sympy==1.13.1->torch>=1.9.0->wisent-guard==0.4.1) (1.3.0)\n",
+            "Requirement already satisfied: huggingface-hub<1.0,>=0.26.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (0.29.1)\n",
+            "Requirement already satisfied: packaging>=20.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (24.2)\n",
+            "Requirement already satisfied: pyyaml>=5.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (6.0.1)\n",
+            "Requirement already satisfied: regex!=2019.12.17 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (2024.5.10)\n",
+            "Requirement already satisfied: requests in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (2.32.3)\n",
+            "Requirement already satisfied: tokenizers<0.22,>=0.21 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (0.21.0)\n",
+            "Requirement already satisfied: safetensors>=0.4.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers>=4.20.0->wisent-guard==0.4.1) (0.4.3)\n",
+            "Requirement already satisfied: MarkupSafe>=2.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from jinja2->torch>=1.9.0->wisent-guard==0.4.1) (3.0.2)\n",
+            "Requirement already satisfied: charset-normalizer<4,>=2 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests->transformers>=4.20.0->wisent-guard==0.4.1) (3.3.2)\n",
+            "Requirement already satisfied: idna<4,>=2.5 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests->transformers>=4.20.0->wisent-guard==0.4.1) (3.6)\n",
+            "Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests->transformers>=4.20.0->wisent-guard==0.4.1) (2.2.1)\n",
+            "Requirement already satisfied: certifi>=2017.4.17 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests->transformers>=4.20.0->wisent-guard==0.4.1) (2024.2.2)\n",
+            "\u001b[33mWARNING: Ignoring invalid distribution -isent-guard (/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages)\u001b[0m\u001b[33m\n",
+            "\u001b[0mInstalling collected packages: wisent-guard\n",
+            "  Attempting uninstall: wisent-guard\n",
+            "    Found existing installation: wisent-guard 0.4.1\n",
+            "    Uninstalling wisent-guard-0.4.1:\n",
+            "      Successfully uninstalled wisent-guard-0.4.1\n",
+            "\u001b[33m  DEPRECATION: Legacy editable install of wisent-guard==0.4.1 from file:///Users/lukaszbartoszcze/Documents/CodingProjects/Wisent/wisent-activation-guardrails (setup.py develop) is deprecated. pip 25.1 will enforce this behaviour change. A possible replacement is to add a pyproject.toml or enable --use-pep517, and use setuptools >= 64. If the resulting installation is not behaving as expected, try using --config-settings editable_mode=compat. Please consult the setuptools documentation for more information. Discussion can be found at https://github.com/pypa/pip/issues/11457\u001b[0m\u001b[33m\n",
+            "\u001b[0m  Running setup.py develop for wisent-guard\n",
+            "\u001b[33mWARNING: Ignoring invalid distribution -isent-guard (/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages)\u001b[0m\u001b[33m\n",
+            "\u001b[0mSuccessfully installed wisent-guard-0.4.1\n",
+            "\n",
+            "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.0.1\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m25.1.1\u001b[0m\n",
+            "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49mpip install --upgrade pip\u001b[0m\n",
+            "\u001b[33mWARNING: Ignoring invalid distribution -isent-guard (/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages)\u001b[0m\u001b[33m\n",
+            "\u001b[0mRequirement already satisfied: datasets in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (3.3.2)\n",
+            "Requirement already satisfied: torch in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (2.6.0)\n",
+            "Requirement already satisfied: transformers in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (4.49.0)\n",
+            "Requirement already satisfied: scikit-learn in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (1.5.1)\n",
+            "Requirement already satisfied: filelock in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (3.14.0)\n",
+            "Requirement already satisfied: numpy>=1.17 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (1.26.4)\n",
+            "Requirement already satisfied: pyarrow>=15.0.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (19.0.0)\n",
+            "Requirement already satisfied: dill<0.3.9,>=0.3.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (0.3.8)\n",
+            "Requirement already satisfied: pandas in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (2.2.2)\n",
+            "Requirement already satisfied: requests>=2.32.2 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (2.32.3)\n",
+            "Requirement already satisfied: tqdm>=4.66.3 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (4.67.1)\n",
+            "Requirement already satisfied: xxhash in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (3.5.0)\n",
+            "Requirement already satisfied: multiprocess<0.70.17 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (0.70.16)\n",
+            "Requirement already satisfied: fsspec<=2024.12.0,>=2023.1.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from fsspec[http]<=2024.12.0,>=2023.1.0->datasets) (2024.12.0)\n",
+            "Requirement already satisfied: aiohttp in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (3.10.10)\n",
+            "Requirement already satisfied: huggingface-hub>=0.24.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (0.29.1)\n",
+            "Requirement already satisfied: packaging in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (24.2)\n",
+            "Requirement already satisfied: pyyaml>=5.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from datasets) (6.0.1)\n",
+            "Requirement already satisfied: typing-extensions>=4.10.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch) (4.12.2)\n",
+            "Requirement already satisfied: networkx in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch) (3.3)\n",
+            "Requirement already satisfied: jinja2 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch) (3.1.4)\n",
+            "Requirement already satisfied: sympy==1.13.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from torch) (1.13.1)\n",
+            "Requirement already satisfied: mpmath<1.4,>=1.1.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from sympy==1.13.1->torch) (1.3.0)\n",
+            "Requirement already satisfied: regex!=2019.12.17 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers) (2024.5.10)\n",
+            "Requirement already satisfied: tokenizers<0.22,>=0.21 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers) (0.21.0)\n",
+            "Requirement already satisfied: safetensors>=0.4.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from transformers) (0.4.3)\n",
+            "Requirement already satisfied: scipy>=1.6.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from scikit-learn) (1.14.0)\n",
+            "Requirement already satisfied: joblib>=1.2.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from scikit-learn) (1.4.2)\n",
+            "Requirement already satisfied: threadpoolctl>=3.1.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from scikit-learn) (3.5.0)\n",
+            "Requirement already satisfied: aiohappyeyeballs>=2.3.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (2.4.3)\n",
+            "Requirement already satisfied: aiosignal>=1.1.2 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (1.3.1)\n",
+            "Requirement already satisfied: attrs>=17.3.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (23.2.0)\n",
+            "Requirement already satisfied: frozenlist>=1.1.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (1.5.0)\n",
+            "Requirement already satisfied: multidict<7.0,>=4.5 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (6.1.0)\n",
+            "Requirement already satisfied: yarl<2.0,>=1.12.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (1.17.1)\n",
+            "Requirement already satisfied: async-timeout<5.0,>=4.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from aiohttp->datasets) (4.0.3)\n",
+            "Requirement already satisfied: charset-normalizer<4,>=2 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests>=2.32.2->datasets) (3.3.2)\n",
+            "Requirement already satisfied: idna<4,>=2.5 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests>=2.32.2->datasets) (3.6)\n",
+            "Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests>=2.32.2->datasets) (2.2.1)\n",
+            "Requirement already satisfied: certifi>=2017.4.17 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from requests>=2.32.2->datasets) (2024.2.2)\n",
+            "Requirement already satisfied: MarkupSafe>=2.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from jinja2->torch) (3.0.2)\n",
+            "Requirement already satisfied: python-dateutil>=2.8.2 in /Users/lukaszbartoszcze/.local/lib/python3.10/site-packages (from pandas->datasets) (2.9.0.post0)\n",
+            "Requirement already satisfied: pytz>=2020.1 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from pandas->datasets) (2024.1)\n",
+            "Requirement already satisfied: tzdata>=2022.7 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from pandas->datasets) (2024.1)\n",
+            "Requirement already satisfied: six>=1.5 in /Users/lukaszbartoszcze/.local/lib/python3.10/site-packages (from python-dateutil>=2.8.2->pandas->datasets) (1.16.0)\n",
+            "Requirement already satisfied: propcache>=0.2.0 in /opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages (from yarl<2.0,>=1.12.0->aiohttp->datasets) (0.2.0)\n",
+            "\u001b[33mWARNING: Ignoring invalid distribution -isent-guard (/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages)\u001b[0m\u001b[33m\n",
+            "\u001b[0m\u001b[33mWARNING: Ignoring invalid distribution -isent-guard (/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages)\u001b[0m\u001b[33m\n",
+            "\u001b[0m\n",
+            "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.0.1\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m25.1.1\u001b[0m\n",
+            "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49mpip install --upgrade pip\u001b[0m\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Install dependencies (if running for the first time)\n",
+        "!pip install -e ..\n",
+        "!pip install datasets torch transformers scikit-learn "
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "# Imports and configuration\n",
+        "import logging\n",
+        "import json\n",
+        "from pathlib import Path\n",
+        "import torch\n",
+        "\n",
+        "from wisent_guard.benchmarking.benchmark_runner import BenchmarkRunner\n",
+        "\n",
+        "logging.basicConfig(level=logging.INFO)\n",
+        "logger = logging.getLogger(__name__)\n",
+        "\n",
+        "# Parameters\n",
+        "DATASET_NAME = \"truthfulqa_mc\"\n",
+        "MODEL_NAME = \"meta-llama/Llama-3.1-8B\"\n",
+        "LAYER = 15\n",
+        "DEVICE = \"cuda\" if torch.cuda.is_available() else \"cpu\"\n",
+        "OUTPUT_DIR = \"benchmark_results\"\n",
+        "Path(OUTPUT_DIR).mkdir(exist_ok=True)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 3,
+      "metadata": {},
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:04]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Loading model and tokenizer: meta-llama/Llama-3.1-8B\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Loading model and tokenizer: meta-llama/Llama-3.1-8B\n"
+          ]
+        },
+        {
+          "data": {
+            "application/vnd.jupyter.widget-view+json": {
+              "model_id": "56f282c26ad0477ba1a4aca0e6dd3a04",
+              "version_major": 2,
+              "version_minor": 0
+            },
+            "text/plain": [
+              "Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]"
+            ]
+          },
+          "metadata": {},
+          "output_type": "display_data"
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Initializing ActivationMonitor\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Initializing ActivationMonitor\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Using specified layers: [15]\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Using specified layers: [15]\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Initializing activation hooks\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Initializing activation hooks\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Using model type: llama\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Using model type: llama\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Using token strategy: last\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Using token strategy: last\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Registering hooks for layers: [15]\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Registering hooks for layers: [15]\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m Registered 1 hooks out of 1 requested layers\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:Registered 1 hooks out of 1 requested layers\n"
+          ]
+        },
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "\u001b[1m\u001b[34m[22:43:16]\u001b[0m \u001b[1mINFO:\u001b[0m \u001b[36m[wisent_guard]\u001b[0m ActivationMonitor initialized successfully\n"
+          ]
+        },
+        {
+          "name": "stderr",
+          "output_type": "stream",
+          "text": [
+            "INFO:wisent_guard:ActivationMonitor initialized successfully\n"
+          ]
+        },
+        {
+          "ename": "KeyError",
+          "evalue": "'truthfulqa_mc'",
+          "output_type": "error",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+            "\u001b[0;31mKeyError\u001b[0m                                  Traceback (most recent call last)",
+            "Cell \u001b[0;32mIn[3], line 4\u001b[0m\n\u001b[1;32m      1\u001b[0m \u001b[38;5;66;03m# Initialize and run benchmark\u001b[39;00m\n\u001b[1;32m      2\u001b[0m runner \u001b[38;5;241m=\u001b[39m BenchmarkRunner()\n\u001b[0;32m----> 4\u001b[0m results \u001b[38;5;241m=\u001b[39m \u001b[43mrunner\u001b[49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43mrun_benchmark\u001b[49m\u001b[43m(\u001b[49m\n\u001b[1;32m      5\u001b[0m \u001b[43m    \u001b[49m\u001b[43mbenchmark_names\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[43m[\u001b[49m\u001b[43mDATASET_NAME\u001b[49m\u001b[43m]\u001b[49m\u001b[43m,\u001b[49m\n\u001b[1;32m      6\u001b[0m \u001b[43m    \u001b[49m\u001b[43mmodel_name\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[43mMODEL_NAME\u001b[49m\u001b[43m,\u001b[49m\n\u001b[1;32m      7\u001b[0m \u001b[43m    \u001b[49m\u001b[43mlayer\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[43mLAYER\u001b[49m\u001b[43m,\u001b[49m\n\u001b[1;32m      8\u001b[0m \u001b[43m    \u001b[49m\u001b[43mdevice\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[43mDEVICE\u001b[49m\u001b[43m,\u001b[49m\n\u001b[1;32m      9\u001b[0m \u001b[43m    \u001b[49m\u001b[43mmodel\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[38;5;28;43;01mNone\u001b[39;49;00m\u001b[43m,\u001b[49m\n\u001b[1;32m     10\u001b[0m \u001b[43m    \u001b[49m\u001b[43mtokenizer\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[38;5;28;43;01mNone\u001b[39;49;00m\u001b[43m,\u001b[49m\n\u001b[1;32m     11\u001b[0m \u001b[43m    \u001b[49m\u001b[43moutput_dir\u001b[49m\u001b[38;5;241;43m=\u001b[39;49m\u001b[43mOUTPUT_DIR\u001b[49m\n\u001b[1;32m     12\u001b[0m \u001b[43m)\u001b[49m\n",
+            "File \u001b[0;32m~/Documents/CodingProjects/Wisent/wisent-activation-guardrails/wisent_guard/benchmarking/benchmark_runner.py:92\u001b[0m, in \u001b[0;36mBenchmarkRunner.run_benchmark\u001b[0;34m(self, benchmark_names, model, tokenizer, model_name, layer, device, output_dir)\u001b[0m\n\u001b[1;32m     89\u001b[0m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39mmonitor \u001b[38;5;241m=\u001b[39m ActivationMonitor(model\u001b[38;5;241m=\u001b[39mmodel, layers\u001b[38;5;241m=\u001b[39m[layer], vectors\u001b[38;5;241m=\u001b[39m\u001b[38;5;28;01mNone\u001b[39;00m)\n\u001b[1;32m     90\u001b[0m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39mset_model(model, tokenizer)\n\u001b[0;32m---> 92\u001b[0m benchmarks \u001b[38;5;241m=\u001b[39m \u001b[38;5;28;43mself\u001b[39;49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43mload_dataset\u001b[49m\u001b[43m(\u001b[49m\u001b[43mbenchmark_names\u001b[49m\u001b[43m)\u001b[49m\n\u001b[1;32m     94\u001b[0m all_results \u001b[38;5;241m=\u001b[39m {}\n\u001b[1;32m     95\u001b[0m \u001b[38;5;28;01mfor\u001b[39;00m name, task \u001b[38;5;129;01min\u001b[39;00m benchmarks\u001b[38;5;241m.\u001b[39mitems():\n",
+            "File \u001b[0;32m~/Documents/CodingProjects/Wisent/wisent-activation-guardrails/wisent_guard/benchmarking/benchmark_runner.py:30\u001b[0m, in \u001b[0;36mBenchmarkRunner.load_dataset\u001b[0;34m(self, benchmark_names)\u001b[0m\n\u001b[1;32m     28\u001b[0m datasets \u001b[38;5;241m=\u001b[39m {}\n\u001b[1;32m     29\u001b[0m \u001b[38;5;28;01mfor\u001b[39;00m benchmark \u001b[38;5;129;01min\u001b[39;00m benchmark_names:\n\u001b[0;32m---> 30\u001b[0m     task_dict \u001b[38;5;241m=\u001b[39m \u001b[43mtasks\u001b[49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43mget_task_dict\u001b[49m\u001b[43m(\u001b[49m\u001b[43m[\u001b[49m\u001b[43mbenchmark\u001b[49m\u001b[43m]\u001b[49m\u001b[43m)\u001b[49m\n\u001b[1;32m     31\u001b[0m     task \u001b[38;5;241m=\u001b[39m task_dict[benchmark]\n\u001b[1;32m     32\u001b[0m     datasets[benchmark] \u001b[38;5;241m=\u001b[39m task\n",
+            "File \u001b[0;32m/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/lm_eval/tasks/__init__.py:619\u001b[0m, in \u001b[0;36mget_task_dict\u001b[0;34m(task_name_list, task_manager)\u001b[0m\n\u001b[1;32m    616\u001b[0m     \u001b[38;5;28;01mif\u001b[39;00m task_manager \u001b[38;5;129;01mis\u001b[39;00m \u001b[38;5;28;01mNone\u001b[39;00m:\n\u001b[1;32m    617\u001b[0m         task_manager \u001b[38;5;241m=\u001b[39m TaskManager()\n\u001b[0;32m--> 619\u001b[0m     task_name_from_string_dict \u001b[38;5;241m=\u001b[39m \u001b[43mtask_manager\u001b[49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43mload_task_or_group\u001b[49m\u001b[43m(\u001b[49m\n\u001b[1;32m    620\u001b[0m \u001b[43m        \u001b[49m\u001b[43mstring_task_name_list\u001b[49m\n\u001b[1;32m    621\u001b[0m \u001b[43m    \u001b[49m\u001b[43m)\u001b[49m\n\u001b[1;32m    623\u001b[0m \u001b[38;5;28;01mfor\u001b[39;00m task_element \u001b[38;5;129;01min\u001b[39;00m others_task_name_list:\n\u001b[1;32m    624\u001b[0m     \u001b[38;5;28;01mif\u001b[39;00m \u001b[38;5;28misinstance\u001b[39m(task_element, \u001b[38;5;28mdict\u001b[39m):\n",
+            "File \u001b[0;32m/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/lm_eval/tasks/__init__.py:415\u001b[0m, in \u001b[0;36mTaskManager.load_task_or_group\u001b[0;34m(self, task_list)\u001b[0m\n\u001b[1;32m    411\u001b[0m \u001b[38;5;28;01mif\u001b[39;00m \u001b[38;5;28misinstance\u001b[39m(task_list, \u001b[38;5;28mstr\u001b[39m):\n\u001b[1;32m    412\u001b[0m     task_list \u001b[38;5;241m=\u001b[39m [task_list]\n\u001b[1;32m    414\u001b[0m all_loaded_tasks \u001b[38;5;241m=\u001b[39m \u001b[38;5;28mdict\u001b[39m(\n\u001b[0;32m--> 415\u001b[0m     \u001b[43mcollections\u001b[49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43mChainMap\u001b[49m\u001b[43m(\u001b[49m\u001b[38;5;241;43m*\u001b[39;49m\u001b[38;5;28;43mmap\u001b[39;49m\u001b[43m(\u001b[49m\u001b[38;5;28;43mself\u001b[39;49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43m_load_individual_task_or_group\u001b[49m\u001b[43m,\u001b[49m\u001b[43m \u001b[49m\u001b[43mtask_list\u001b[49m\u001b[43m)\u001b[49m\u001b[43m)\u001b[49m\n\u001b[1;32m    416\u001b[0m )\n\u001b[1;32m    417\u001b[0m \u001b[38;5;28;01mreturn\u001b[39;00m all_loaded_tasks\n",
+            "File \u001b[0;32m/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/lm_eval/tasks/__init__.py:317\u001b[0m, in \u001b[0;36mTaskManager._load_individual_task_or_group\u001b[0;34m(self, name_or_config, parent_name, update_config)\u001b[0m\n\u001b[1;32m    315\u001b[0m     \u001b[38;5;28;01mreturn\u001b[39;00m _load_task(task_config, task\u001b[38;5;241m=\u001b[39mname_or_config)\n\u001b[1;32m    316\u001b[0m \u001b[38;5;28;01melse\u001b[39;00m:\n\u001b[0;32m--> 317\u001b[0m     subtask_list \u001b[38;5;241m=\u001b[39m \u001b[38;5;28;43mself\u001b[39;49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43m_get_tasklist\u001b[49m\u001b[43m(\u001b[49m\u001b[43mname_or_config\u001b[49m\u001b[43m)\u001b[49m\n\u001b[1;32m    318\u001b[0m     \u001b[38;5;28;01mif\u001b[39;00m subtask_list \u001b[38;5;241m==\u001b[39m \u001b[38;5;241m-\u001b[39m\u001b[38;5;241m1\u001b[39m:\n\u001b[1;32m    319\u001b[0m         group_config \u001b[38;5;241m=\u001b[39m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_get_config(name_or_config)\n",
+            "File \u001b[0;32m/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/lm_eval/tasks/__init__.py:237\u001b[0m, in \u001b[0;36mTaskManager._get_tasklist\u001b[0;34m(self, name)\u001b[0m\n\u001b[1;32m    235\u001b[0m \u001b[38;5;28;01mif\u001b[39;00m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_name_is_task(name):\n\u001b[1;32m    236\u001b[0m     \u001b[38;5;28;01mraise\u001b[39;00m \u001b[38;5;167;01mValueError\u001b[39;00m\n\u001b[0;32m--> 237\u001b[0m \u001b[38;5;28;01mreturn\u001b[39;00m \u001b[38;5;28;43mself\u001b[39;49m\u001b[38;5;241;43m.\u001b[39;49m\u001b[43mtask_index\u001b[49m\u001b[43m[\u001b[49m\u001b[43mname\u001b[49m\u001b[43m]\u001b[49m[\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mtask\u001b[39m\u001b[38;5;124m\"\u001b[39m]\n",
+            "\u001b[0;31mKeyError\u001b[0m: 'truthfulqa_mc'"
+          ]
+        }
+      ],
+      "source": [
+        "# Initialize and run benchmark\n",
+        "runner = BenchmarkRunner()\n",
+        "\n",
+        "results = runner.run_benchmark(\n",
+        "    benchmark_names=[DATASET_NAME],\n",
+        "    model_name=MODEL_NAME,\n",
+        "    layer=LAYER,\n",
+        "    device=DEVICE,\n",
+        "    model=None,\n",
+        "    tokenizer=None,\n",
+        "    output_dir=OUTPUT_DIR\n",
+        ")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {},
+      "outputs": [
+        {
+          "ename": "ModuleNotFoundError",
+          "evalue": "No module named 'wisent_guard.benchmarking'",
+          "output_type": "error",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m\n",
+            "\u001b[0;31mModuleNotFoundError\u001b[0m                       Traceback (most recent call last)\n",
+            "Cell \u001b[0;32mIn[9], line 7\u001b[0m\n",
+            "\u001b[1;32m      4\u001b[0m \u001b[38;5;28;01mfrom\u001b[39;00m \u001b[38;5;21;01mpathlib\u001b[39;00m \u001b[38;5;28;01mimport\u001b[39;00m Path\n",
+            "\u001b[1;32m      5\u001b[0m \u001b[38;5;28;01mimport\u001b[39;00m \u001b[38;5;21;01mtorch\u001b[39;00m\n",
+            "\u001b[0;32m----> 7\u001b[0m \u001b[38;5;28;01mfrom\u001b[39;00m \u001b[38;5;21;01mwisent_guard\u001b[39;00m\u001b[38;5;21;01m.\u001b[39;00m\u001b[38;5;21;01mbenchmarking\u001b[39;00m\u001b[38;5;21;01m.\u001b[39;00m\u001b[38;5;21;01mbenchmark_runner\u001b[39;00m \u001b[38;5;28;01mimport\u001b[39;00m BenchmarkRunner\n",
+            "\u001b[1;32m      9\u001b[0m logging\u001b[38;5;241m.\u001b[39mbasicConfig(level\u001b[38;5;241m=\u001b[39mlogging\u001b[38;5;241m.\u001b[39mINFO)\n",
+            "\u001b[1;32m     10\u001b[0m logger \u001b[38;5;241m=\u001b[39m logging\u001b[38;5;241m.\u001b[39mgetLogger(\u001b[38;5;18m__name__\u001b[39m)\n",
+            "\n",
+            "\u001b[0;31mModuleNotFoundError\u001b[0m: No module named 'wisent_guard.benchmarking'"
+          ]
+        }
+      ],
+      "source": [
+        "# Imports and configuration\n",
+        "import logging\n",
+        "import json\n",
+        "from pathlib import Path\n",
+        "import torch\n",
+        "\n",
+        "from wisent_guard.benchmarking.benchmark_runner import BenchmarkRunner\n",
+        "\n",
+        "logging.basicConfig(level=logging.INFO)\n",
+        "logger = logging.getLogger(__name__)\n",
+        "\n",
+        "# Parameters\n",
+        "DATASET_NAME = \"truthfulqa_mc\"\n",
+        "MODEL_NAME = \"meta-llama/Llama-3.1-8B\"\n",
+        "LAYER = 15\n",
+        "DEVICE = \"cuda\" if torch.cuda.is_available() else \"cpu\"\n",
+        "OUTPUT_DIR = \"benchmark_results\"\n",
+        "Path(OUTPUT_DIR).mkdir(exist_ok=True)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "# Display main results\n",
+        "print(\"\\n📊 Evaluation Results:\")\n",
+        "for task, metrics in results.items():\n",
+        "    print(f\"\\nTask: {task}\")\n",
+        "    for k, v in metrics.items():\n",
+        "        print(f\"{k}: {v:.4f}\" if isinstance(v, float) else f\"{k}: {v}\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "# Load results from file (optional)\n",
+        "result_file = Path(OUTPUT_DIR) / f\"{DATASET_NAME}_results.json\"\n",
+        "if result_file.exists():\n",
+        "    with open(result_file) as f:\n",
+        "        saved = json.load(f)\n",
+        "    print(\"\\n💾 Saved Results:\")\n",
+        "    print(json.dumps(saved, indent=2))\n",
+        "else:\n",
+        "    print(\"No saved results found. Please run the benchmark first.\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "base",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.10.14"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 4
+}
