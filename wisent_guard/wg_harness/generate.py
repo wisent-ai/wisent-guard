@@ -78,9 +78,15 @@ def load_model_and_tokenizer(model_name: str, device: Optional[str] = None) -> T
         tokenizer.pad_token = tokenizer.eos_token
     
     # Load model with hidden states output enabled
+    # Use float32 for MPS to avoid mixed precision issues
+    if device == "mps":
+        torch_dtype = torch.float32
+    else:
+        torch_dtype = torch.float16 if device != "cpu" else torch.float32
+    
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16 if device != "cpu" else torch.float32,
+        torch_dtype=torch_dtype,
         device_map=device,
         output_hidden_states=True
     )
@@ -161,7 +167,7 @@ def extract_hidden_states(
                 forward_outputs = model(**inputs)
                 layer_hidden_state = forward_outputs.hidden_states[layer][0, -1, :]
         
-        return generated_text, layer_hidden_state.cpu()
+        return generated_text, layer_hidden_state.cpu().to(torch.float32)
 
 
 def generate_responses(

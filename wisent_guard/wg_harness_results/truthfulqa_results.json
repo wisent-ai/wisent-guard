@@ -1,0 +1,13 @@
+{
+  "task": "truthfulqa",
+  "model": "meta-llama/Llama-3.1-8B",
+  "layer": 15,
+  "train_samples": 2,
+  "test_samples": 0,
+  "detection_rate": 0.0,
+  "false_positive_rate": 0.0,
+  "f1_score": 0.0,
+  "accuracy": 0.0,
+  "status": "insufficient_data",
+  "error": "Need at least 4 training examples, got 2"
+}

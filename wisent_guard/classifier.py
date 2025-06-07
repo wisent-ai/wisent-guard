@@ -214,9 +214,14 @@ class ActivationClassifier:
                 activations = torch.tensor(activations, dtype=torch.float32, device=self.device)
             else:
                 activations = torch.tensor(activations, dtype=torch.float32, device=self.device)
-        
-        # Move to the correct device if needed
-        activations = activations.to(self.device)
+        else:
+            # If it's already a tensor, ensure it's the right type for MPS compatibility
+            # MPS can have issues with mixed precision, so force float32
+            if self.device == 'mps' and activations.dtype != torch.float32:
+                activations = activations.to(dtype=torch.float32)
+            
+            # Move to the correct device if needed
+            activations = activations.to(device=self.device, dtype=torch.float32)
         
         # Flatten if needed
         if len(activations.shape) > 1:
