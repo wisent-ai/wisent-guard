@@ -4,6 +4,69 @@
 
 .env
 
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # Ignore any new folders not already in the repository
 # Whitelist approach - only include specific folders
 /*
@@ -13,6 +76,7 @@
 !/evaluation/
 !/dist/
 !/wisent_guard.egg-info/
+!/scripts/
 
 # Don't ignore these files in the root directory
 !/.gitignore
@@ -23,7 +87,13 @@
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
+!/test_wg_harness_imports.py
+
 # HuggingFace model files (too large for GitHub)
 *.safetensors
 tokenizer.json
 model.safetensors.index.json
+
+# Cache directories for our tools
+wg_harness_cache/
+smoke_test_results/
