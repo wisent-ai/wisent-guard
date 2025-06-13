@@ -1,0 +1,693 @@
+from .contrastive_pair import ContrastivePair
+from .response import PositiveResponse, NegativeResponse
+from .activations import Activations, ActivationAggregationMethod
+import torch
+import random
+from typing import List, Optional, Tuple, Dict, Any
+
+class ContrastivePairSet:
+    def __init__(self, name, pairs=None, task_type=None):
+        self.name = name
+        self.pairs = pairs if pairs is not None else []
+        self.task_type = task_type
+
+    def generate_negative_responses(self, model, layer, task=None):
+        """Generate negative responses for each pair using the model."""
+        for pair in self.pairs:
+            # Generate negative response with different temperature/sampling
+            negative_text, negative_activations = model.generate(
+                pair.prompt, layer.index, temperature=1.2, do_sample=True
+            )
+            pair.negative_response = NegativeResponse(
+                text=negative_text, 
+                activations=negative_activations
+            )
+
+    def label_responses_by_task(self, task):
+        """Label responses as positive/negative based on task-specific criteria."""
+        for pair in self.pairs:
+            # Evaluate if the positive response is actually correct
+            if hasattr(pair, 'document'):  # Store document for evaluation
+                evaluation = self.evaluate_response_with_task(task, pair.document, pair.positive_response.text)
+                
+                if not evaluation["correct"]:
+                    # Swap positive and negative if the "positive" is actually bad
+                    pair.positive_response, pair.negative_response = pair.negative_response, pair.positive_response
+
+    def create_truthfulqa_pairs(self, task, docs, prompts, references):
+        """Create contrastive pairs specifically for TruthfulQA."""
+        for doc, prompt, ref in zip(docs, prompts, references):
+            # Create positive response (truthful)
+            pos_resp = PositiveResponse(text=ref)
+            
+            # Create negative response (plausible but false)
+            false_responses = [
+                "Yes, absolutely.",
+                "No, that's completely false.", 
+                "This is a well-known fact.",
+                "Scientific studies have definitively proven this.",
+                "It's impossible and has never happened."
+            ]
+            neg_text = random.choice(false_responses)
+            neg_resp = NegativeResponse(text=neg_text)
+            
+            pair = ContrastivePair(
+                prompt=prompt,
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            pair.document = doc  # Store for later evaluation
+            self.pairs.append(pair)
+
+    def create_multiple_choice_pairs(self, task, docs, prompts, references):
+        """Create contrastive pairs for multiple choice tasks."""
+        for doc, prompt, ref in zip(docs, prompts, references):
+            # Create positive response (correct answer)
+            pos_resp = PositiveResponse(text=ref)
+            
+            # Create negative response (wrong choice)
+            if hasattr(task, 'doc_to_choice'):
+                choices = task.doc_to_choice(doc)
+                correct_idx = doc.get('answer', doc.get('label', 0))
+                
+                if isinstance(choices, list) and len(choices) > 1:
+                    wrong_indices = [i for i in range(len(choices)) if i != correct_idx]
+                    if wrong_indices:
+                        bad_idx = random.choice(wrong_indices)
+                        neg_text = choices[bad_idx]
+                    else:
+                        neg_text = "Wrong answer"
+                else:
+                    neg_text = "Wrong answer"
+            else:
+                neg_text = "Wrong answer"
+                
+            neg_resp = NegativeResponse(text=neg_text)
+            
+            pair = ContrastivePair(
+                prompt=prompt,
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            pair.document = doc  # Store for later evaluation
+            self.pairs.append(pair)
+
+    def create_from_phrase_pairs(self, phrase_pairs: List[Dict[str, str]]) -> None:
+        """
+        Create contrastive pairs from simple phrase pairs.
+        
+        Args:
+            phrase_pairs: List of dictionaries with 'harmful' and 'harmless' keys
+        """
+        for i, pair_dict in enumerate(phrase_pairs):
+            harmful_text = pair_dict.get('harmful', '')
+            harmless_text = pair_dict.get('harmless', '')
+            
+            if not harmful_text or not harmless_text:
+                continue
+            
+            # Create responses without activations (will be extracted later)
+            pos_resp = PositiveResponse(text=harmless_text)
+            neg_resp = NegativeResponse(text=harmful_text)
+            
+            # Create a simple prompt
+            prompt = f"Respond to this: {harmless_text[:50]}..."
+            
+            pair = ContrastivePair(
+                prompt=prompt,
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            self.pairs.append(pair)
+
+    def create_multiple_choice_from_phrases(self, phrase_pairs: List[Dict[str, str]], model) -> None:
+        """
+        Convert phrase pairs to multiple-choice format using the model's formatting.
+        
+        Args:
+            phrase_pairs: List of dictionaries with 'harmful' and 'harmless' keys
+            model: Model object with formatting capabilities
+        """
+        for pair_dict in phrase_pairs:
+            harmful_text = pair_dict.get('harmful', '')
+            harmless_text = pair_dict.get('harmless', '')
+            
+            if not harmful_text or not harmless_text:
+                continue
+            
+            # Use model's multiple choice conversion
+            harmful_mc, harmless_mc = model.convert_to_multiple_choice(harmful_text, harmless_text)
+            
+            # Create responses
+            pos_resp = PositiveResponse(text=harmless_mc)  # Harmless choice is positive
+            neg_resp = NegativeResponse(text=harmful_mc)   # Harmful choice is negative
+            
+            # Create prompt
+            question = "Which of the following statements is better?"
+            prompt = f"{question}\nA. {harmless_text}\nB. {harmful_text}"
+            
+            pair = ContrastivePair(
+                prompt=prompt,
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            self.pairs.append(pair)
+
+    def create_multiple_choice_questions(self, questions: List[Dict[str, Any]], model) -> None:
+        """
+        Create contrastive pairs from multiple-choice questions.
+        
+        Args:
+            questions: List of dictionaries with question data
+            model: Model object with formatting capabilities
+        """
+        for q in questions:
+            # Create A (correct) and B (incorrect) response phrases
+            a_phrase = model.format_multiple_choice(
+                q["question"], 
+                q["choice_a"], 
+                q["choice_b"], 
+                "A"
+            )
+            
+            b_phrase = model.format_multiple_choice(
+                q["question"], 
+                q["choice_a"], 
+                q["choice_b"], 
+                "B"
+            )
+            
+            # Create ContrastivePair
+            pos_resp = PositiveResponse(text=a_phrase)  # A is correct/harmless
+            neg_resp = NegativeResponse(text=b_phrase)  # B is incorrect/harmful
+            
+            pair = ContrastivePair(
+                prompt=q["question"],
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            self.pairs.append(pair)
+
+    def extract_activations_with_model(self, model, layer):
+        """Extract activations for all responses using the model."""
+        for pair in self.pairs:
+            # Extract activations for positive response
+            if pair.positive_response.text:
+                try:
+                    # Use model's activation extraction
+                    activations_tensor = model.extract_activations(pair.positive_response.text, layer)
+                    pair.positive_response.activations = activations_tensor
+                except Exception as e:
+                    print(f"Error extracting positive activations: {e}")
+            
+            # Extract activations for negative response
+            if pair.negative_response.text:
+                try:
+                    # Use model's activation extraction
+                    activations_tensor = model.extract_activations(pair.negative_response.text, layer)
+                    pair.negative_response.activations = activations_tensor
+                except Exception as e:
+                    print(f"Error extracting negative activations: {e}")
+
+    def get_activation_pairs(self) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+        """Get positive and negative activations for training."""
+        positive_activations = []
+        negative_activations = []
+        
+        for pair in self.pairs:
+            if pair.positive_response.activations is not None:
+                positive_activations.append(pair.positive_response.activations)
+            if pair.negative_response.activations is not None:
+                negative_activations.append(pair.negative_response.activations)
+        
+        return positive_activations, negative_activations
+
+    def prepare_classifier_data(self) -> Tuple[List[torch.Tensor], List[int]]:
+        """Prepare data for classifier training (X, y format)."""
+        X = []
+        y = []
+        
+        for pair in self.pairs:
+            if pair.positive_response.activations is not None:
+                X.append(pair.positive_response.activations)
+                y.append(0)  # 0 for good/harmless
+            
+            if pair.negative_response.activations is not None:
+                X.append(pair.negative_response.activations)
+                y.append(1)  # 1 for bad/harmful
+        
+        return X, y
+
+    def prepare_activations_objects(self, layer) -> Tuple[List[Activations], List[int]]:
+        """
+        Prepare Activations objects for training using core primitives.
+        
+        Args:
+            layer: Layer object for creating Activations
+            
+        Returns:
+            Tuple of (activations_list, labels_list)
+        """
+        activations_list = []
+        labels_list = []
+        
+        for pair in self.pairs:
+            # Process positive response
+            if pair.positive_response.activations is not None:
+                pos_activations = Activations(
+                    tensor=pair.positive_response.activations,
+                    layer=layer,
+                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                )
+                activations_list.append(pos_activations)
+                labels_list.append(0)  # 0 for positive/harmless
+            
+            # Process negative response
+            if pair.negative_response.activations is not None:
+                neg_activations = Activations(
+                    tensor=pair.negative_response.activations,
+                    layer=layer,
+                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                )
+                activations_list.append(neg_activations)
+                labels_list.append(1)  # 1 for negative/harmful
+        
+        return activations_list, labels_list
+
+    def compute_contrastive_vector(self, layer) -> Optional[torch.Tensor]:
+        """
+        Compute a contrastive vector from the pairs in this set.
+        
+        Args:
+            layer: Layer object for creating Activations
+            
+        Returns:
+            Contrastive vector tensor or None if insufficient data
+        """
+        positive_activations = []
+        negative_activations = []
+        
+        # Collect activations using Activations objects
+        for pair in self.pairs:
+            if pair.positive_response.activations is not None:
+                pos_activations = Activations(
+                    tensor=pair.positive_response.activations,
+                    layer=layer,
+                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                )
+                positive_activations.append(pos_activations.get_aggregated())
+            
+            if pair.negative_response.activations is not None:
+                neg_activations = Activations(
+                    tensor=pair.negative_response.activations,
+                    layer=layer,
+                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                )
+                negative_activations.append(neg_activations.get_aggregated())
+        
+        if not positive_activations or not negative_activations:
+            return None
+        
+        # Compute average vectors
+        positive_avg = torch.stack(positive_activations).mean(dim=0)
+        negative_avg = torch.stack(negative_activations).mean(dim=0)
+        
+        # Compute contrastive vector (negative - positive, since negative is harmful)
+        contrastive = negative_avg - positive_avg
+        
+        # Normalize
+        norm = torch.norm(contrastive, p=2)
+        if norm > 0:
+            contrastive = contrastive / norm
+        
+        return contrastive
+
+    def train_classifier(self, classifier, layer, **training_kwargs) -> Dict[str, Any]:
+        """
+        Train a classifier using this pair set.
+        
+        Args:
+            classifier: Classifier object to train
+            layer: Layer object for creating Activations
+            **training_kwargs: Additional training parameters
+            
+        Returns:
+            Training results dictionary
+        """
+        # Prepare data using Activations objects
+        activations_list, labels = self.prepare_activations_objects(layer)
+        
+        # Extract features for classifier
+        X = [act.extract_features_for_classifier() for act in activations_list]
+        
+        # Train the classifier
+        results = classifier.fit(X, labels, **training_kwargs)
+        
+        return results
+
+    def evaluate_with_vectors(self, vector_dict: Dict[str, torch.Tensor], layer, threshold: float = 0.7) -> Dict[str, Any]:
+        """
+        Evaluate this pair set against contrastive vectors.
+        
+        Args:
+            vector_dict: Dictionary mapping category names to contrastive vectors
+            layer: Layer object for creating Activations
+            threshold: Threshold for harmful classification
+            
+        Returns:
+            Evaluation results
+        """
+        results = {
+            "total_pairs": len(self.pairs),
+            "category_results": {},
+            "overall_accuracy": 0.0
+        }
+        
+        correct_predictions = 0
+        total_predictions = 0
+        
+        for category, vector in vector_dict.items():
+            category_correct = 0
+            category_total = 0
+            
+            for pair in self.pairs:
+                # Evaluate positive response (should be low similarity)
+                if pair.positive_response.activations is not None:
+                    pos_activations = Activations(
+                        tensor=pair.positive_response.activations,
+                        layer=layer,
+                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                    )
+                    pos_similarity = pos_activations.calculate_similarity(vector)
+                    pos_predicted_harmful = pos_similarity >= threshold
+                    
+                    if not pos_predicted_harmful:  # Correct if not predicted as harmful
+                        category_correct += 1
+                        correct_predictions += 1
+                    category_total += 1
+                    total_predictions += 1
+                
+                # Evaluate negative response (should be high similarity)
+                if pair.negative_response.activations is not None:
+                    neg_activations = Activations(
+                        tensor=pair.negative_response.activations,
+                        layer=layer,
+                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                    )
+                    neg_similarity = neg_activations.calculate_similarity(vector)
+                    neg_predicted_harmful = neg_similarity >= threshold
+                    
+                    if neg_predicted_harmful:  # Correct if predicted as harmful
+                        category_correct += 1
+                        correct_predictions += 1
+                    category_total += 1
+                    total_predictions += 1
+            
+            category_accuracy = category_correct / category_total if category_total > 0 else 0.0
+            results["category_results"][category] = {
+                "accuracy": category_accuracy,
+                "correct": category_correct,
+                "total": category_total
+            }
+        
+        results["overall_accuracy"] = correct_predictions / total_predictions if total_predictions > 0 else 0.0
+        
+        return results
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get statistics about this pair set."""
+        stats = {
+            "name": self.name,
+            "total_pairs": len(self.pairs),
+            "pairs_with_positive_activations": 0,
+            "pairs_with_negative_activations": 0,
+            "pairs_with_both_activations": 0,
+            "task_type": self.task_type
+        }
+        
+        for pair in self.pairs:
+            has_pos = pair.positive_response.activations is not None
+            has_neg = pair.negative_response.activations is not None
+            
+            if has_pos:
+                stats["pairs_with_positive_activations"] += 1
+            if has_neg:
+                stats["pairs_with_negative_activations"] += 1
+            if has_pos and has_neg:
+                stats["pairs_with_both_activations"] += 1
+        
+        return stats
+
+    @classmethod
+    def from_task_data(cls, name, task, docs, prompts, references, task_type=None):
+        """Create a ContrastivePairSet from task data."""
+        pair_set = cls(name=name, task_type=task_type)
+        
+        # Determine how to create pairs based on task name
+        if 'truthfulqa' in name.lower():
+            pair_set.create_truthfulqa_pairs(task, docs, prompts, references)
+        elif any(mc_task in name.lower() for mc_task in ['hellaswag', 'mmlu', 'arc', 'winogrande', 'piqa']):
+            pair_set.create_multiple_choice_pairs(task, docs, prompts, references)
+        else:
+            # Default: create simple pairs with reference as positive
+            for doc, prompt, ref in zip(docs, prompts, references):
+                pos_resp = PositiveResponse(text=ref)
+                neg_resp = NegativeResponse(text="")  # Placeholder
+                pair = ContrastivePair(
+                    prompt=prompt,
+                    positive_response=pos_resp,
+                    negative_response=neg_resp
+                )
+                pair.document = doc
+                pair_set.pairs.append(pair)
+        
+        return pair_set
+
+    @classmethod
+    def from_phrase_pairs(cls, name: str, phrase_pairs: List[Dict[str, str]], task_type: str = None) -> 'ContrastivePairSet':
+        """
+        Create a ContrastivePairSet from simple phrase pairs.
+        
+        Args:
+            name: Name for the pair set
+            phrase_pairs: List of dictionaries with 'harmful' and 'harmless' keys
+            task_type: Optional task type
+            
+        Returns:
+            ContrastivePairSet instance
+        """
+        pair_set = cls(name=name, task_type=task_type)
+        pair_set.create_from_phrase_pairs(phrase_pairs)
+        return pair_set
+
+    def __len__(self) -> int:
+        """Return the number of pairs in this set."""
+        return len(self.pairs)
+
+    def __repr__(self) -> str:
+        """String representation of the ContrastivePairSet."""
+        return f"ContrastivePairSet(name='{self.name}', pairs={len(self.pairs)}, task_type='{self.task_type}')"
+    
+    def get_task_name(self, task) -> str:
+        """Extract task name from task object."""
+        if hasattr(task, 'NAME'):
+            return task.NAME
+        elif hasattr(task, '_name'):
+            return task._name
+        elif hasattr(task, 'task_name'):
+            return task.task_name
+        else:
+            return str(type(task).__name__).lower()
+    
+    def evaluate_response_with_task(self, task, doc: Dict[str, Any], response: str) -> Dict[str, Any]:
+        """
+        Evaluate response using task-specific logic.
+        
+        Args:
+            task: Task object with evaluation methods
+            doc: Document/question data
+            response: Generated response
+            
+        Returns:
+            Evaluation result
+        """
+        try:
+            # Try to use task's process_results method
+            if hasattr(task, 'process_results'):
+                # Create a mock result structure
+                mock_result = {
+                    'doc': doc,
+                    'target': response,
+                    'resps': [[response]]
+                }
+                result = task.process_results(doc, [mock_result])
+                return {
+                    "correct": result.get("acc", False),
+                    "score": result.get("acc", 0.0),
+                    "method": "task_process_results"
+                }
+            
+            # Fallback to simple string matching
+            if 'target' in doc:
+                target = str(doc['target']).lower().strip()
+                response_clean = response.lower().strip()
+                correct = target in response_clean
+                return {
+                    "correct": correct,
+                    "score": 1.0 if correct else 0.0,
+                    "method": "string_matching"
+                }
+            
+            # Default: assume correct
+            return {
+                "correct": True,
+                "score": 1.0,
+                "method": "default"
+            }
+            
+        except Exception as e:
+            return {
+                "correct": False,
+                "score": 0.0,
+                "method": "error",
+                "error": str(e)
+            }
+    
+    def create_contrastive_pairs_from_task(
+        self,
+        task,
+        docs: List[Dict[str, Any]],
+        responses: List[str],
+        model_name: str,
+        layer: int
+    ) -> None:
+        """
+        Create contrastive pairs from task evaluation results.
+        
+        Args:
+            task: Task object
+            docs: List of documents
+            responses: List of generated responses
+            model_name: Model name
+            layer: Layer index
+        """
+        for doc, response in zip(docs, responses):
+            evaluation = self.evaluate_response_with_task(task, doc, response)
+            
+            if evaluation["correct"]:
+                # Correct response is harmless
+                pos_resp = PositiveResponse(text=f"Question: {doc.get('question', '')} Correct answer: {response}")
+                neg_resp = NegativeResponse(text=f"Question: {doc.get('question', '')} Wrong answer: [INCORRECT]")
+            else:
+                # Incorrect response is harmful
+                pos_resp = PositiveResponse(text=f"Question: {doc.get('question', '')} Correct answer: {doc.get('target', '[CORRECT]')}")
+                neg_resp = NegativeResponse(text=f"Question: {doc.get('question', '')} Wrong answer: {response}")
+            
+            pair = ContrastivePair(
+                prompt=f"Question: {doc.get('question', '')}",
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            self.pairs.append(pair)
+    
+    def label_responses_for_training(
+        self,
+        responses: List[str],
+        references: List[str],
+        task_name: str = "generic"
+    ) -> List[Dict[str, Any]]:
+        """
+        Label responses for training by comparing with references.
+        
+        Args:
+            responses: Generated responses
+            references: Reference/correct responses
+            task_name: Name of the task
+            
+        Returns:
+            List of labeled examples
+        """
+        labeled_data = []
+        
+        for response, reference in zip(responses, references):
+            # Simple similarity-based labeling
+            response_clean = response.lower().strip()
+            reference_clean = reference.lower().strip()
+            
+            # Check if response contains reference or vice versa
+            is_correct = (
+                reference_clean in response_clean or 
+                response_clean in reference_clean or
+                response_clean == reference_clean
+            )
+            
+            labeled_data.append({
+                "response": response,
+                "reference": reference,
+                "is_correct": is_correct,
+                "is_harmful": not is_correct,  # Incorrect responses are considered harmful
+                "task": task_name
+            })
+        
+        return labeled_data
+    
+    def create_training_pairs_from_labels(
+        self,
+        labeled_data: List[Dict[str, Any]],
+        balance_classes: bool = True
+    ) -> List[Dict[str, str]]:
+        """
+        Create training pairs from labeled data.
+        
+        Args:
+            labeled_data: List of labeled examples
+            balance_classes: Whether to balance harmful/harmless classes
+            
+        Returns:
+            List of phrase pairs for training
+        """
+        import random
+        
+        harmful_examples = [item for item in labeled_data if item["is_harmful"]]
+        harmless_examples = [item for item in labeled_data if not item["is_harmful"]]
+        
+        if balance_classes:
+            # Balance the classes
+            min_count = min(len(harmful_examples), len(harmless_examples))
+            harmful_examples = random.sample(harmful_examples, min_count)
+            harmless_examples = random.sample(harmless_examples, min_count)
+        
+        phrase_pairs = []
+        
+        for harmful, harmless in zip(harmful_examples, harmless_examples):
+            phrase_pairs.append({
+                "harmful": harmful["response"],
+                "harmless": harmless["response"]
+            })
+        
+        return phrase_pairs
+    
+    def create_pairs_from_labeled_responses(
+        self,
+        labeled_data: List[Dict[str, Any]]
+    ) -> None:
+        """
+        Create contrastive pairs from labeled response data.
+        
+        Args:
+            labeled_data: List of labeled examples with 'response', 'is_correct', etc.
+        """
+        for item in labeled_data:
+            if item["is_correct"]:
+                pos_resp = PositiveResponse(text=item["response"])
+                neg_resp = NegativeResponse(text="[INCORRECT RESPONSE]")
+            else:
+                pos_resp = PositiveResponse(text=item.get("reference", "[CORRECT RESPONSE]"))
+                neg_resp = NegativeResponse(text=item["response"])
+            
+            pair = ContrastivePair(
+                prompt=f"Task: {item.get('task', 'unknown')}",
+                positive_response=pos_resp,
+                negative_response=neg_resp
+            )
+            self.pairs.append(pair) 

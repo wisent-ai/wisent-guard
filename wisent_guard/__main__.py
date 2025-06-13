@@ -23,11 +23,11 @@ def main():
     subcommand = sys.argv[1]
     
     if subcommand == "tasks":
-        # Import and run the wg_harness CLI
-        from .wg_harness.cli import main as wg_harness_main
-        # Remove the subcommand from sys.argv so the wg_harness parser works correctly
+        # Import and run the integrated CLI
+        from .cli import main as cli_main
+        # Remove the subcommand from sys.argv so the CLI parser works correctly
         sys.argv = [sys.argv[0]] + ["tasks"] + sys.argv[2:]
-        wg_harness_main()
+        cli_main()
     else:
         print(f"Unknown subcommand: {subcommand}")
         print("Available subcommands: tasks")

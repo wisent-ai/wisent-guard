@@ -24,7 +24,7 @@ Wisent-Guard allows you to control your AI by identifying brain patterns corresp
 
 Wisent-Guard now supports standardized benchmarking through [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness). Train guardrails on established benchmarks and get objective performance metrics.
 
-The `wg_harness` module implements a complete pipeline that:
+The integrated CLI implements a complete pipeline that:
 
 1. **Loads benchmark tasks** from lm-evaluation-harness
 2. **Splits data** into training and testing sets (80/20 by default)
@@ -85,11 +85,11 @@ python -m wisent_guard tasks arc_easy \
 | `--shots` | `0` | Number of few-shot examples |
 | `--split-ratio` | `0.8` | Train/test split ratio |
 | `--limit` | `None` | Limit documents per task |
-| `--output` | `./wg_harness_results` | Output directory |
+| `--output` | `./results` | Output directory |
 | `--classifier-type` | `logistic` | Classifier type (`logistic` or `mlp`) |
 | `--max-new-tokens` | `50` | Max tokens for generation |
 | `--batch-size` | `8` | Generation batch size |
-| `--cache-dir` | `./wg_harness_cache` | Cache directory |
+| `--cache-dir` | `./cache` | Cache directory |
 | `--device` | `auto` | Device (`cuda`, `mps`, `cpu`) |
 | `--seed` | `42` | Random seed |
 | `--verbose` | `False` | Enable verbose logging |
@@ -120,7 +120,7 @@ The pipeline generates several output files:
 - `{task_name}_results.json`: Detailed results per task
 - `guard_evaluation_summary.csv`: Aggregated metrics across tasks
 - `guard_evaluation_report_{timestamp}.md`: Human-readable report
-- Cached generation results in `wg_harness_cache/`
+- Cached generation results in `cache/`
 
 ## Example Output
 
@@ -224,7 +224,7 @@ Contributions are welcome! Please feel free to submit a Pull Request or open an 
 ## Architecture
 
 ```
-wg_harness/
+results/
 ├── __init__.py          # Package exports
 ├── cli.py              # Command-line interface
 ├── data.py             # Task loading and data splitting

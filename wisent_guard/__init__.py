@@ -1,26 +1,49 @@
 """
-Wisent-Guard: Monitor and guard against harmful content in language models
-
-Wisent-Guard provides tools to detect and prevent language models from generating harmful content
-by monitoring model activations and comparing them to known harmful patterns.
-
-Features:
-- Create contrastive vectors from harmful/harmless phrase pairs
-- Monitor model activations during inference
-- Block responses that show activation patterns similar to harmful content
-- Convert examples to multiple-choice format for consistent activation collection
-- Token-by-token analysis of all response tokens (default behavior)
-
-Device Support:
-- CUDA (NVIDIA GPUs)
-- MPS (Apple Silicon GPUs)
-- CPU
+Wisent Guard: Activation-based safety guardrails for language models.
+Clean implementation using enhanced core primitives.
 """
 
-from .guard import ActivationGuard
-from .monitor import ActivationMonitor
-from .vectors import ContrastiveVectors
+from .guard import WisentGuard
 from .inference import SafeInference
+from .vectors import ContrastiveVectors
 
-# Updated with Torch only support 
-__version__ = "0.4.1" 
+# Import from core primitives
+from .core import (
+    Model,
+    PromptFormat,
+    TokenScore,
+    ModelParameterOptimizer,
+    ActivationHooks,
+    Activations,
+    ActivationAggregationMethod,
+    ActivationMonitor,
+    Layer,
+    ContrastivePairSet,
+    Classifier,
+    ActivationClassifier,
+    SteeringMethod
+)
+
+__version__ = "0.1.0"
+
+__all__ = [
+    # Main classes
+    "WisentGuard",
+    "SafeInference", 
+    "ContrastiveVectors",
+    
+    # Core primitives
+    "Model",
+    "PromptFormat",
+    "TokenScore", 
+    "ModelParameterOptimizer",
+    "ActivationHooks",
+    "Activations",
+    "ActivationAggregationMethod",
+    "ActivationMonitor",
+    "Layer",
+    "ContrastivePairSet",
+    "Classifier",
+    "ActivationClassifier",
+    "SteeringMethod"
+] 

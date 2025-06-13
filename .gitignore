@@ -87,7 +87,7 @@ Thumbs.db
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
-!/test_wg_harness_imports.py
+
 
 # HuggingFace model files (too large for GitHub)
 *.safetensors
@@ -95,5 +95,5 @@ tokenizer.json
 model.safetensors.index.json
 
 # Cache directories for our tools
-wg_harness_cache/
+
 smoke_test_results/
