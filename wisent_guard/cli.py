@@ -56,7 +56,8 @@ def run_task_pipeline(
     classifier_type: str = "logistic",
     max_new_tokens: int = 50,
     device: str = None,
-    seed: int = 42
+    seed: int = 42,
+    verbose: bool = False
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task.
@@ -78,28 +79,67 @@ def run_task_pipeline(
     """
     logger.info(f"Running pipeline for task: {task_name}")
     
+    if verbose:
+        print(f"\n{'='*80}")
+        print(f"🚀 STARTING PIPELINE FOR TASK: {task_name.upper()}")
+        print(f"{'='*80}")
+        print(f"📋 Configuration:")
+        print(f"   • Model: {model_name}")
+        print(f"   • Layer: {layer}")
+        print(f"   • Classifier: {classifier_type}")
+        print(f"   • Max tokens: {max_new_tokens}")
+        print(f"   • Split ratio: {split_ratio}")
+        print(f"   • Limit: {limit}")
+        print(f"   • Seed: {seed}")
+    
     try:
         # Initialize enhanced primitives
+        if verbose:
+            print(f"\n🔧 Initializing model and primitives...")
         model = Model(name=model_name, device=device)
         layer_obj = Layer(index=layer, type="transformer")
         
         # Load and prepare data using enhanced Model primitive
+        if verbose:
+            print(f"📚 Loading task data for {task_name}...")
         task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
         train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
+        
+        if verbose:
+            print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
         
         # Create training data
         train_prompts = model.prepare_prompts_from_docs(task_data, train_docs)
         train_references = model.get_reference_answers(task_data, train_docs)
         
+        if verbose:
+            print(f"\n📝 TRAINING DATA PREPARATION:")
+            print(f"   • Total training examples: {len(train_prompts)}")
+            print(f"\n🔍 Training Examples:")
+            for i, (prompt, reference) in enumerate(zip(train_prompts, train_references)):
+                print(f"\n   📋 Example {i+1}:")
+                print(f"      🔸 Question: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+                print(f"      ✅ Good Answer: {reference}")
+                print(f"      ❌ Bad Answer: [INCORRECT]")
+        
         # Create contrastive pairs using enhanced ContrastivePairSet
         phrase_pairs = []
-        for prompt, reference in zip(train_prompts, train_references):
+        for i, (prompt, reference) in enumerate(zip(train_prompts, train_references)):
+            harmful = f"{prompt} [INCORRECT]"
+            harmless = f"{prompt} {reference}"
             phrase_pairs.append({
-                "harmful": f"{prompt} [INCORRECT]",
-                "harmless": f"{prompt} {reference}"
+                "harmful": harmful,
+                "harmless": harmless
             })
+            
+            if verbose:
+                print(f"\n   🔄 Contrastive Pair {i+1}:")
+                print(f"      🟢 Harmless: {harmless[:150]}{'...' if len(harmless) > 150 else ''}")
+                print(f"      🔴 Harmful: {harmful[:150]}{'...' if len(harmful) > 150 else ''}")
         
         # Create and train ContrastivePairSet
+        if verbose:
+            print(f"\n🧠 Creating ContrastivePairSet with {len(phrase_pairs)} pairs...")
         pair_set = ContrastivePairSet.from_phrase_pairs(
             name=f"{task_name}_training",
             phrase_pairs=phrase_pairs,
@@ -107,24 +147,53 @@ def run_task_pipeline(
         )
         
         # Extract activations for the pairs
+        if verbose:
+            print(f"🔬 Extracting activations from layer {layer}...")
         pair_set.extract_activations_with_model(model, layer_obj)
         
         # Train classifier
+        if verbose:
+            print(f"\n🎯 TRAINING CLASSIFIER:")
+            print(f"   • Type: {classifier_type}")
+            print(f"   • Training pairs: {len(pair_set)}")
+        
         steering_type = SteeringType.LOGISTIC if classifier_type == "logistic" else SteeringType.MLP
         steering_method = SteeringMethod(method_type=steering_type, device=device)
         
         training_results = steering_method.train(pair_set)
         
+        if verbose:
+            print(f"✅ Training completed!")
+            print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+            print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
+        
         # Evaluate on test set
+        if verbose:
+            print(f"\n🧪 PREPARING TEST DATA:")
         test_prompts = model.prepare_prompts_from_docs(task_data, test_docs)
         test_references = model.get_reference_answers(task_data, test_docs)
         
+        if verbose:
+            print(f"   • Test examples: {len(test_prompts)}")
+            print(f"\n🔍 Test Examples:")
+            for i, (prompt, reference) in enumerate(zip(test_prompts, test_references)):
+                print(f"\n   📋 Test Example {i+1}:")
+                print(f"      🔸 Question: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+                print(f"      ✅ Expected Answer: {reference}")
+        
         test_phrase_pairs = []
-        for prompt, reference in zip(test_prompts, test_references):
+        for i, (prompt, reference) in enumerate(zip(test_prompts, test_references)):
+            harmful = f"{prompt} [INCORRECT]"
+            harmless = f"{prompt} {reference}"
             test_phrase_pairs.append({
-                "harmful": f"{prompt} [INCORRECT]",
-                "harmless": f"{prompt} {reference}"
+                "harmful": harmful,
+                "harmless": harmless
             })
+            
+            if verbose:
+                print(f"\n   🔄 Test Pair {i+1}:")
+                print(f"      🟢 Harmless: {harmless[:150]}{'...' if len(harmless) > 150 else ''}")
+                print(f"      🔴 Harmful: {harmful[:150]}{'...' if len(harmful) > 150 else ''}")
         
         test_pair_set = ContrastivePairSet.from_phrase_pairs(
             name=f"{task_name}_test",
@@ -133,15 +202,35 @@ def run_task_pipeline(
         )
         
         # Extract activations for the test pairs
+        if verbose:
+            print(f"\n🔬 Extracting test activations from layer {layer}...")
         test_pair_set.extract_activations_with_model(model, layer_obj)
         
+        if verbose:
+            print(f"📊 Evaluating classifier on test set...")
         evaluation_results = steering_method.evaluate(test_pair_set)
         
+        if verbose:
+            print(f"✅ Evaluation completed!")
+            print(f"   • Test Accuracy: {evaluation_results.get('accuracy', 'N/A'):.2%}")
+            print(f"   • Test F1 Score: {evaluation_results.get('f1', 'N/A'):.3f}")
+        
         # Generate sample responses
+        if verbose:
+            print(f"\n🎭 GENERATING SAMPLE RESPONSES:")
+            print(f"   • Generating {min(5, len(test_prompts))} sample responses...")
+        
         generated_responses = []
-        for prompt in test_prompts[:5]:  # Sample 5 responses
+        for i, prompt in enumerate(test_prompts[:5]):  # Sample 5 responses
+            if verbose:
+                print(f"\n   🎯 Generating response {i+1}:")
+                print(f"      📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+            
             response, _ = model.generate(prompt, layer, max_new_tokens)
             generated_responses.append(response)
+            
+            if verbose:
+                print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
         
         results = {
             "task_name": task_name,
@@ -153,6 +242,17 @@ def run_task_pipeline(
             "num_test": len(test_docs),
             "sample_responses": generated_responses
         }
+        
+        if verbose:
+            print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
+            print(f"{'='*80}")
+            print(f"📊 FINAL RESULTS:")
+            print(f"   • Training samples: {len(train_docs)}")
+            print(f"   • Test samples: {len(test_docs)}")
+            print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+            print(f"   • Test accuracy: {evaluation_results.get('accuracy', 'N/A'):.2%}")
+            print(f"   • Generated responses: {len(generated_responses)}")
+            print(f"{'='*80}\n")
         
         logger.info(f"Pipeline completed for {task_name}")
         return results
@@ -258,7 +358,8 @@ def main():
                 classifier_type=args.classifier_type,
                 max_new_tokens=args.max_new_tokens,
                 device=args.device,
-                seed=args.seed
+                seed=args.seed,
+                verbose=args.verbose
             )
             
             all_results[task_name] = task_results
