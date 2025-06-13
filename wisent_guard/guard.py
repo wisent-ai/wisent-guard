@@ -172,8 +172,8 @@ def create_guard(
 ) -> WisentGuard:
     """
     Create and train a guard in one step.
-    
-    Args:
+        
+        Args:
         model_name: Language model name
         harmful_examples: Harmful text examples
         harmless_examples: Harmless text examples
@@ -181,7 +181,7 @@ def create_guard(
         steering_type: Type of steering method
         device: Target device
         
-    Returns:
+        Returns:
         Trained WisentGuard
     """
     guard = WisentGuard(

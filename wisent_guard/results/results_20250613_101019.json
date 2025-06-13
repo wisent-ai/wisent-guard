@@ -1,0 +1,6 @@
+{
+  "truthfulqa": {
+    "task_name": "truthfulqa",
+    "error": "Placeholder storage has not been allocated on MPS device!"
+  }
+}

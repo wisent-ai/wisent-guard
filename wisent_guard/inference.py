@@ -108,23 +108,119 @@ class SafeInference:
             response, _ = self.model.generate(prompt, self.layer, max_new_tokens, **generation_kwargs)
             return response, {"filtered": False, "reason": "No safety filter"}
         
-        # Generate with safety monitoring
-        def safety_callback(token_text: str, activations) -> bool:
-            safety_result = self.steering_method.check_safety(token_text, self.threshold)
-            return not safety_result.get("is_harmful", False)
-        
-        response, activations = self.model.generate_monitored(
-            prompt=prompt,
-            layer=self.layer,
-            max_new_tokens=max_new_tokens,
-            safety_callback=safety_callback,
-            **generation_kwargs
+        # Generate with token-level classification
+        response, token_scores, classification = self.generate_with_classification(
+            prompt, max_new_tokens, **generation_kwargs
         )
         
-        # Final safety check
-        final_safety = self.steering_method.check_safety(response, self.threshold)
+        # Prepare safety info
+        avg_score = sum(token_scores) / len(token_scores) if token_scores else 0.0
+        safety_info = {
+            "classification": classification,
+            "token_scores": token_scores,
+            "average_score": avg_score,
+            "is_harmful": classification == "HALLUCINATION",
+            "filtered": False
+        }
         
-        return response, final_safety
+        return response, safety_info
+    
+    def generate_with_classification(
+        self,
+        prompt: str,
+        max_new_tokens: int = 50,
+        **generation_kwargs
+    ) -> Tuple[str, List[float], str]:
+        """
+        Generate text with token-level hallucination classification.
+        
+        Args:
+            prompt: Input prompt
+            max_new_tokens: Maximum tokens to generate
+            **generation_kwargs: Additional generation parameters
+            
+        Returns:
+            Tuple of (response_text, token_scores, classification)
+        """
+        import torch
+        from .core import Layer, Activations, ActivationAggregationMethod
+        
+        # Generate response
+        response, _ = self.model.generate(prompt, self.layer, max_new_tokens, **generation_kwargs)
+        
+        if not response.strip():
+            return response, [], "UNKNOWN"
+        
+        # Tokenize the full prompt + response to get individual tokens
+        full_text = f"{prompt}{response}"
+        inputs = self.model.tokenizer(full_text, return_tensors="pt")
+        tokens = self.model.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+        
+        # Get prompt length to identify response tokens
+        prompt_inputs = self.model.tokenizer(prompt, return_tensors="pt")
+        prompt_length = len(prompt_inputs['input_ids'][0])
+        
+        # Extract activations for each response token
+        token_scores = []
+        layer_obj = Layer(index=self.layer, type="transformer")
+        
+        try:
+            # Get model device
+            model_device = next(self.model.hf_model.parameters()).device
+            inputs_on_device = {k: v.to(model_device) for k, v in inputs.items()}
+            
+            # Get hidden states for the full sequence
+            with torch.no_grad():
+                outputs = self.model.hf_model(**inputs_on_device, output_hidden_states=True)
+            
+            # Extract activations for response tokens only
+            if self.layer + 1 < len(outputs.hidden_states):
+                hidden_states = outputs.hidden_states[self.layer + 1]
+            else:
+                hidden_states = outputs.hidden_states[-1]
+            
+            # Score each response token
+            for token_idx in range(prompt_length, len(tokens)):
+                if token_idx < hidden_states.shape[1]:
+                    # Extract activation for this token
+                    token_activation = hidden_states[0, token_idx, :].cpu()
+                    
+                    # Create Activations object
+                    activation_obj = Activations(
+                        tensor=token_activation.unsqueeze(0),
+                        layer=layer_obj,
+                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                    )
+                    
+                    # Get feature vector for classifier
+                    features = activation_obj.extract_features_for_classifier()
+                    
+                    # Get prediction probability from classifier
+                    if hasattr(self.steering_method, 'classifier') and self.steering_method.classifier:
+                        try:
+                            # Predict probability of being harmful (class 1)
+                            prob = self.steering_method.classifier.predict_proba([features.numpy()])[0][1]
+                            token_scores.append(float(prob))
+                        except Exception as e:
+                            logger.warning(f"Classifier error for token {token_idx}: {e}")
+                            token_scores.append(0.5)
+                    else:
+                        token_scores.append(0.5)
+        
+        except Exception as e:
+            logger.warning(f"Error during token scoring: {e}")
+            # Fallback: assign neutral scores
+            response_tokens = self.model.tokenizer(response, return_tensors="pt")['input_ids'][0]
+            token_scores = [0.5] * len(response_tokens)
+        
+        # Classify overall response
+        if token_scores:
+            avg_score = sum(token_scores) / len(token_scores)
+            classification = "HALLUCINATION" if avg_score > 0.6 else "TRUTHFUL"
+        else:
+            classification = "UNKNOWN"
+        
+        return response, token_scores, classification
     
     def check_safety(self, text: str) -> Dict[str, Any]:
         """

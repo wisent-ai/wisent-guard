@@ -46,6 +46,112 @@ Examples:
     return parser
 
 
+def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, verbose=False):
+    """
+    Generate text with token-level hallucination classification.
+    
+    Args:
+        model: Model object
+        prompt: Input prompt
+        layer: Layer index for activation extraction
+        max_new_tokens: Maximum tokens to generate
+        steering_method: Trained steering method with classifier
+        verbose: Whether to print debug info
+        
+    Returns:
+        Tuple of (response_text, token_scores, classification)
+    """
+    import torch
+    from .core import Layer
+    from .core.activations import Activations, ActivationAggregationMethod
+    
+    # Generate response and get token-by-token activations
+    response, activations_dict = model.generate(prompt, layer, max_new_tokens)
+    
+    if not response.strip():
+        return response, [], "UNKNOWN"
+    
+    # Tokenize the full prompt + response to get individual tokens
+    full_text = f"{prompt}{response}"
+    inputs = model.tokenizer(full_text, return_tensors="pt")
+    tokens = model.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+    
+    # Get prompt length to identify response tokens
+    prompt_inputs = model.tokenizer(prompt, return_tensors="pt")
+    prompt_length = len(prompt_inputs['input_ids'][0])
+    
+    # Extract activations for each response token
+    token_scores = []
+    layer_obj = Layer(index=layer, type="transformer")
+    
+    try:
+        # Get model device
+        model_device = next(model.hf_model.parameters()).device
+        inputs_on_device = {k: v.to(model_device) for k, v in inputs.items()}
+        
+        # Get hidden states for the full sequence
+        with torch.no_grad():
+            outputs = model.hf_model(**inputs_on_device, output_hidden_states=True)
+        
+        # Extract activations for response tokens only
+        if layer + 1 < len(outputs.hidden_states):
+            hidden_states = outputs.hidden_states[layer + 1]  # [batch_size, seq_len, hidden_dim]
+        else:
+            hidden_states = outputs.hidden_states[-1]
+        
+        # Score each response token
+        for token_idx in range(prompt_length, len(tokens)):
+            if token_idx < hidden_states.shape[1]:
+                # Extract activation for this token
+                token_activation = hidden_states[0, token_idx, :].cpu()
+                
+                # Create Activations object
+                activation_obj = Activations(
+                    tensor=token_activation.unsqueeze(0),  # Add batch dimension
+                    layer=layer_obj,
+                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                )
+                
+                # Get feature vector for classifier
+                features = activation_obj.extract_features_for_classifier()
+                
+                # Get prediction probability from classifier
+                if hasattr(steering_method, 'classifier') and steering_method.classifier:
+                    try:
+                        # Predict probability of being harmful (class 1)
+                        # Our classifier returns a single float, not an array like sklearn
+                        prob = steering_method.classifier.predict_proba([features.numpy()])
+                        # Handle both single float and array returns
+                        if isinstance(prob, (list, tuple)) or hasattr(prob, '__getitem__'):
+                            prob = float(prob[0]) if len(prob) > 0 else 0.5
+                        else:
+                            prob = float(prob)
+                        token_scores.append(prob)
+                    except Exception as e:
+                        if verbose:
+                            print(f"      ⚠️  Classifier error for token {token_idx}: {e}")
+                        token_scores.append(0.5)  # Neutral score
+                else:
+                    token_scores.append(0.5)  # Neutral score if no classifier
+    
+    except Exception as e:
+        if verbose:
+            print(f"      ⚠️  Error during token scoring: {e}")
+        # Fallback: assign neutral scores
+        response_tokens = model.tokenizer(response, return_tensors="pt")['input_ids'][0]
+        token_scores = [0.5] * len(response_tokens)
+    
+    # Classify overall response
+    if token_scores:
+        avg_score = sum(token_scores) / len(token_scores)
+        classification = "HALLUCINATION" if avg_score > 0.6 else "TRUTHFUL"
+    else:
+        avg_score = 0.5
+        classification = "UNKNOWN"
+    
+    return response, token_scores, classification
+
+
 def run_task_pipeline(
     task_name: str,
     model_name: str,
@@ -108,48 +214,110 @@ def run_task_pipeline(
         if verbose:
             print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
         
-        # Create training data
-        train_prompts = model.prepare_prompts_from_docs(task_data, train_docs)
-        train_references = model.get_reference_answers(task_data, train_docs)
+        # Create training data using proper activation collection
+        from .core.activations import ActivationCollectionLogic, Activations, ActivationAggregationMethod
         
         if verbose:
             print(f"\n📝 TRAINING DATA PREPARATION:")
-            print(f"   • Total training examples: {len(train_prompts)}")
-            print(f"\n🔍 Training Examples:")
-            for i, (prompt, reference) in enumerate(zip(train_prompts, train_references)):
-                print(f"\n   📋 Example {i+1}:")
-                print(f"      🔸 Question: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
-                print(f"      ✅ Good Answer: {reference}")
-                print(f"      ❌ Bad Answer: [INCORRECT]")
+            print(f"   • Loading TruthfulQA data with correct/incorrect answers...")
         
-        # Create contrastive pairs using enhanced ContrastivePairSet
-        phrase_pairs = []
-        for i, (prompt, reference) in enumerate(zip(train_prompts, train_references)):
-            harmful = f"{prompt} [INCORRECT]"
-            harmless = f"{prompt} {reference}"
-            phrase_pairs.append({
-                "harmful": harmful,
-                "harmless": harmless
-            })
-            
-            if verbose:
-                print(f"\n   🔄 Contrastive Pair {i+1}:")
-                print(f"      🟢 Harmless: {harmless[:150]}{'...' if len(harmless) > 150 else ''}")
-                print(f"      🔴 Harmful: {harmful[:150]}{'...' if len(harmful) > 150 else ''}")
+        # Get the actual TruthfulQA data with correct and incorrect answers
+        qa_pairs = []
+        for doc in train_docs:
+            try:
+                # Extract question
+                if hasattr(task_data, 'doc_to_text'):
+                    question = task_data.doc_to_text(doc)
+                else:
+                    question = doc.get('question', str(doc))
+                
+                # Extract correct answer
+                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                
+                # Find the correct answer
+                correct_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 1 and i < len(correct_answers):
+                        correct_answer = correct_answers[i]
+                        break
+                
+                # Find an incorrect answer
+                incorrect_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 0 and i < len(correct_answers):
+                        incorrect_answer = correct_answers[i]
+                        break
+                
+                if correct_answer and incorrect_answer:
+                    qa_pairs.append({
+                        'question': question,
+                        'correct_answer': correct_answer,
+                        'incorrect_answer': incorrect_answer
+                    })
+                    
+            except Exception as e:
+                # Skip problematic docs
+                continue
         
-        # Create and train ContrastivePairSet
         if verbose:
-            print(f"\n🧠 Creating ContrastivePairSet with {len(phrase_pairs)} pairs...")
+            print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
+            print(f"\n🔍 Training Examples:")
+            for i, qa_pair in enumerate(qa_pairs[:5]):  # Show first 5
+                print(f"\n   📋 Example {i+1}:")
+                print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+                print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+        
+        # Create contrastive pairs using proper activation collection logic
+        collector = ActivationCollectionLogic(model=model)
+        contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs)
+        
+        if verbose:
+            print(f"\n🔄 Created {len(contrastive_pairs)} contrastive pairs:")
+            for i, pair in enumerate(contrastive_pairs[:3]):  # Show first 3
+                print(f"\n   🔄 Contrastive Pair {i+1}:")
+                print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
+                print(f"      🟢 Positive (B): {pair.positive_response}")
+                print(f"      🔴 Negative (A): {pair.negative_response}")
+        
+        # Extract activations from the choice tokens
+        if verbose:
+            print(f"\n🔬 Extracting activations from layer {layer} choice tokens...")
+        
+        processed_pairs = collector.collect_activations_batch(
+            pairs=contrastive_pairs,
+            layer_index=layer,
+            device=device
+        )
+        
+        # Convert to ContrastivePairSet format for training
+        phrase_pairs = []
+        for pair in processed_pairs:
+            # Create the full prompts for the pair set
+            positive_full = f"{pair.prompt}{pair.positive_response}"
+            negative_full = f"{pair.prompt}{pair.negative_response}"
+            
+            phrase_pairs.append({
+                "harmful": negative_full,  # A choice (incorrect)
+                "harmless": positive_full  # B choice (correct)
+            })
+        
+        # Create ContrastivePairSet with the real activations
         pair_set = ContrastivePairSet.from_phrase_pairs(
             name=f"{task_name}_training",
             phrase_pairs=phrase_pairs,
             task_type="lm_evaluation"
         )
         
-        # Extract activations for the pairs
-        if verbose:
-            print(f"🔬 Extracting activations from layer {layer}...")
-        pair_set.extract_activations_with_model(model, layer_obj)
+        # Store the real activations in the pair set response objects
+        for i, processed_pair in enumerate(processed_pairs):
+            if i < len(pair_set.pairs):
+                # Assign activations to the response objects, not the pair directly
+                if hasattr(pair_set.pairs[i], 'positive_response') and pair_set.pairs[i].positive_response:
+                    pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                if hasattr(pair_set.pairs[i], 'negative_response') and pair_set.pairs[i].negative_response:
+                    pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
         
         # Train classifier
         if verbose:
@@ -167,33 +335,93 @@ def run_task_pipeline(
             print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
             print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
         
-        # Evaluate on test set
+        # Evaluate on test set using proper activation collection
         if verbose:
             print(f"\n🧪 PREPARING TEST DATA:")
-        test_prompts = model.prepare_prompts_from_docs(task_data, test_docs)
-        test_references = model.get_reference_answers(task_data, test_docs)
+            print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
+        
+        # Get the actual TruthfulQA test data with correct and incorrect answers
+        test_qa_pairs = []
+        for doc in test_docs:
+            try:
+                # Extract question - use both raw and formatted versions
+                raw_question = doc.get('question', str(doc))
+                if hasattr(task_data, 'doc_to_text'):
+                    formatted_question = task_data.doc_to_text(doc)
+                else:
+                    formatted_question = raw_question
+                
+                # Extract correct answer
+                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                
+                # Find the correct answer
+                correct_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 1 and i < len(correct_answers):
+                        correct_answer = correct_answers[i]
+                        break
+                
+                # Find an incorrect answer
+                incorrect_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 0 and i < len(correct_answers):
+                        incorrect_answer = correct_answers[i]
+                        break
+                
+                if correct_answer and incorrect_answer:
+                    test_qa_pairs.append({
+                        'question': raw_question,  # Raw question for display
+                        'formatted_question': formatted_question,  # Formatted for generation
+                        'correct_answer': correct_answer,
+                        'incorrect_answer': incorrect_answer
+                    })
+                    
+            except Exception as e:
+                # Skip problematic docs
+                continue
         
         if verbose:
-            print(f"   • Test examples: {len(test_prompts)}")
+            print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
             print(f"\n🔍 Test Examples:")
-            for i, (prompt, reference) in enumerate(zip(test_prompts, test_references)):
+            for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
                 print(f"\n   📋 Test Example {i+1}:")
-                print(f"      🔸 Question: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
-                print(f"      ✅ Expected Answer: {reference}")
+                print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+                print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
         
-        test_phrase_pairs = []
-        for i, (prompt, reference) in enumerate(zip(test_prompts, test_references)):
-            harmful = f"{prompt} [INCORRECT]"
-            harmless = f"{prompt} {reference}"
-            test_phrase_pairs.append({
-                "harmful": harmful,
-                "harmless": harmless
-            })
-            
-            if verbose:
+        # Create test contrastive pairs using proper activation collection logic
+        test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
+        
+        if verbose:
+            print(f"\n🔄 Created {len(test_contrastive_pairs)} test contrastive pairs:")
+            for i, pair in enumerate(test_contrastive_pairs[:2]):  # Show first 2
                 print(f"\n   🔄 Test Pair {i+1}:")
-                print(f"      🟢 Harmless: {harmless[:150]}{'...' if len(harmless) > 150 else ''}")
-                print(f"      🔴 Harmful: {harmful[:150]}{'...' if len(harmful) > 150 else ''}")
+                print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
+                print(f"      🟢 Positive (B): {pair.positive_response}")
+                print(f"      🔴 Negative (A): {pair.negative_response}")
+        
+        # Extract activations from the test choice tokens
+        if verbose:
+            print(f"\n🔬 Extracting test activations from layer {layer} choice tokens...")
+        
+        test_processed_pairs = collector.collect_activations_batch(
+            pairs=test_contrastive_pairs,
+            layer_index=layer,
+            device=device
+        )
+        
+        # Convert to ContrastivePairSet format for evaluation
+        test_phrase_pairs = []
+        for pair in test_processed_pairs:
+            # Create the full prompts for the pair set
+            positive_full = f"{pair.prompt}{pair.positive_response}"
+            negative_full = f"{pair.prompt}{pair.negative_response}"
+            
+            test_phrase_pairs.append({
+                "harmful": negative_full,  # A choice (incorrect)
+                "harmless": positive_full  # B choice (correct)
+            })
         
         test_pair_set = ContrastivePairSet.from_phrase_pairs(
             name=f"{task_name}_test",
@@ -201,10 +429,14 @@ def run_task_pipeline(
             task_type="lm_evaluation"
         )
         
-        # Extract activations for the test pairs
-        if verbose:
-            print(f"\n🔬 Extracting test activations from layer {layer}...")
-        test_pair_set.extract_activations_with_model(model, layer_obj)
+        # Store the real test activations in the pair set response objects
+        for i, processed_pair in enumerate(test_processed_pairs):
+            if i < len(test_pair_set.pairs):
+                # Assign activations to the response objects, not the pair directly
+                if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
+                    test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
+                    test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
         
         if verbose:
             print(f"📊 Evaluating classifier on test set...")
@@ -215,22 +447,40 @@ def run_task_pipeline(
             print(f"   • Test Accuracy: {evaluation_results.get('accuracy', 'N/A'):.2%}")
             print(f"   • Test F1 Score: {evaluation_results.get('f1', 'N/A'):.3f}")
         
-        # Generate sample responses
+        # Generate sample responses with token-level classification
         if verbose:
-            print(f"\n🎭 GENERATING SAMPLE RESPONSES:")
-            print(f"   • Generating {min(5, len(test_prompts))} sample responses...")
+            print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
+            print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
         
         generated_responses = []
-        for i, prompt in enumerate(test_prompts[:5]):  # Sample 5 responses
+        for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
             if verbose:
                 print(f"\n   🎯 Generating response {i+1}:")
-                print(f"      📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+                print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
             
-            response, _ = model.generate(prompt, layer, max_new_tokens)
-            generated_responses.append(response)
+            # Use the raw question and let Model.generate handle formatting
+            # The formatted_question contains few-shot examples which cause double-formatting issues
+            simple_prompt = qa_pair['question']
+            
+            # Generate response with token-level scoring
+            response, token_scores, classification = generate_with_classification(
+                model, simple_prompt, layer, max_new_tokens, steering_method, verbose
+            )
+            generated_responses.append({
+                'response': response,
+                'token_scores': token_scores,
+                'classification': classification
+            })
             
             if verbose:
                 print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                if len(token_scores) > 10:
+                    print(f"                    ... ({len(token_scores)} total tokens)")
+                avg_score = sum(token_scores) / len(token_scores) if token_scores else 0
+                print(f"      📊 Classification: {classification} (avg score: {avg_score:.3f})")
+                print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
         
         results = {
             "task_name": task_name,
