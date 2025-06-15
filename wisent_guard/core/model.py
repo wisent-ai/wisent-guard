@@ -637,6 +637,30 @@ class Model:
             num_threshold_steps=num_steps
         )
     
+    @staticmethod
+    def get_available_tasks() -> List[str]:
+        """
+        Get list of all available tasks.
+        
+        Returns:
+            List of available task names
+        """
+        return AVAILABLE_TASKS.copy()
+    
+    @staticmethod
+    def is_valid_task(task_name: str) -> bool:
+        """
+        Check if a task name is valid.
+        
+        Args:
+            task_name: Name of the task to check
+            
+        Returns:
+            True if task is valid, False otherwise
+        """
+        actual_task_name = TASK_NAME_MAPPINGS.get(task_name, task_name)
+        return actual_task_name in AVAILABLE_TASKS
+    
     def load_lm_eval_task(self, task_name: str, shots: int = 0, limit: Optional[int] = None):
         """
         Load a task from lm-evaluation-harness.
@@ -659,14 +683,19 @@ class Model:
         
         actual_task_name = TASK_NAME_MAPPINGS.get(task_name, task_name)
         
+        # Check if task is in our available tasks list
+        if not self.is_valid_task(task_name):
+            raise ValueError(
+                f"Task '{task_name}' (mapped to '{actual_task_name}') not found in available tasks. "
+                f"Use Model.get_available_tasks() to see all available tasks."
+            )
+        
         try:
             task_dict = get_task_dict([actual_task_name])
             
             if actual_task_name not in task_dict:
-                available_tasks = list(TASK_REGISTRY.keys()) if TASK_REGISTRY else []
                 raise ValueError(
-                    f"Task '{task_name}' (mapped to '{actual_task_name}') not found. "
-                    f"Available tasks: {available_tasks[:10]}..."
+                    f"Task '{task_name}' (mapped to '{actual_task_name}') not found in lm_eval registry."
                 )
             
             task = task_dict[actual_task_name]
@@ -999,6 +1028,26 @@ class ActivationHooks:
 
 
 # LM Evaluation Integration
+import json
+import os
+
+def load_available_tasks():
+    """Load available tasks from tasks.json file."""
+    try:
+        tasks_file = os.path.join(os.path.dirname(__file__), 'tasks.json')
+        with open(tasks_file, 'r') as f:
+            data = json.load(f)
+            return data.get('tasks', [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        # Fallback to basic tasks if file not found
+        return [
+            'truthfulqa_mc1', 'truthfulqa_mc2', 'hellaswag', 'mmlu', 
+            'arc_easy', 'arc_challenge', 'winogrande', 'piqa', 'boolq'
+        ]
+
+# Load available tasks
+AVAILABLE_TASKS = load_available_tasks()
+
 # Task name mappings for common aliases
 TASK_NAME_MAPPINGS = {
     'truthfulqa': 'truthfulqa_mc1',

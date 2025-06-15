@@ -25,7 +25,8 @@ def setup_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks hellaswag,mmlu --layer 10 --model meta-llama/Llama-3.1-8B --shots 5
+  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B --token-aggregation final
+  python -m wisent_guard tasks hellaswag,mmlu --layer 10 --model meta-llama/Llama-3.1-8B --shots 5 --token-aggregation max
         """
     )
     
@@ -42,11 +43,42 @@ Examples:
     parser.add_argument("--device", type=str, default=None, help="Device to run on")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--token-aggregation", type=str, choices=["average", "final", "first", "max", "min"], 
+                       default="average", help="How to aggregate token scores for classification")
     
     return parser
 
 
-def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, verbose=False):
+def aggregate_token_scores(token_scores: List[float], method: str) -> float:
+    """
+    Aggregate token scores using the specified method.
+    
+    Args:
+        token_scores: List of token scores (probabilities)
+        method: Aggregation method ("average", "final", "first", "max", "min")
+        
+    Returns:
+        Aggregated score
+    """
+    if not token_scores:
+        return 0.5
+    
+    if method == "average":
+        return sum(token_scores) / len(token_scores)
+    elif method == "final":
+        return token_scores[-1]
+    elif method == "first":
+        return token_scores[0]
+    elif method == "max":
+        return max(token_scores)
+    elif method == "min":
+        return min(token_scores)
+    else:
+        # Default to average if unknown method
+        return sum(token_scores) / len(token_scores)
+
+
+def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, token_aggregation="average", verbose=False):
     """
     Generate text with token-level hallucination classification.
     
@@ -56,6 +88,7 @@ def generate_with_classification(model, prompt, layer, max_new_tokens, steering_
         layer: Layer index for activation extraction
         max_new_tokens: Maximum tokens to generate
         steering_method: Trained steering method with classifier
+        token_aggregation: How to aggregate token scores ("average", "final", "first", "max", "min")
         verbose: Whether to print debug info
         
     Returns:
@@ -141,12 +174,12 @@ def generate_with_classification(model, prompt, layer, max_new_tokens, steering_
         response_tokens = model.tokenizer(response, return_tensors="pt")['input_ids'][0]
         token_scores = [0.5] * len(response_tokens)
     
-    # Classify overall response
+    # Classify overall response using specified aggregation method
     if token_scores:
-        avg_score = sum(token_scores) / len(token_scores)
-        classification = "HALLUCINATION" if avg_score > 0.6 else "TRUTHFUL"
+        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+        classification = "HALLUCINATION" if aggregated_score > 0.6 else "TRUTHFUL"
     else:
-        avg_score = 0.5
+        aggregated_score = 0.5
         classification = "UNKNOWN"
     
     return response, token_scores, classification
@@ -163,6 +196,7 @@ def run_task_pipeline(
     max_new_tokens: int = 50,
     device: str = None,
     seed: int = 42,
+    token_aggregation: str = "average",
     verbose: bool = False
 ) -> Dict[str, Any]:
     """
@@ -179,6 +213,7 @@ def run_task_pipeline(
         max_new_tokens: Max tokens for generation
         device: Target device
         seed: Random seed
+        token_aggregation: How to aggregate token scores for classification
         
     Returns:
         Dictionary with all results
@@ -195,6 +230,7 @@ def run_task_pipeline(
         print(f"   • Classifier: {classifier_type}")
         print(f"   • Max tokens: {max_new_tokens}")
         print(f"   • Split ratio: {split_ratio}")
+        print(f"   • Token aggregation: {token_aggregation}")
         print(f"   • Limit: {limit}")
         print(f"   • Seed: {seed}")
     
@@ -439,13 +475,12 @@ def run_task_pipeline(
                     test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
         
         if verbose:
-            print(f"📊 Evaluating classifier on test set...")
+            print(f"\n📊 Evaluating classifier on test set...")
         evaluation_results = steering_method.evaluate(test_pair_set)
         
         if verbose:
-            print(f"✅ Evaluation completed!")
-            print(f"   • Test Accuracy: {evaluation_results.get('accuracy', 'N/A'):.2%}")
-            print(f"   • Test F1 Score: {evaluation_results.get('f1', 'N/A'):.3f}")
+            print(f"✅ Classifier validation completed!")
+            print(f"   • Validated on pre-written answer choices only")
         
         # Generate sample responses with token-level classification
         if verbose:
@@ -453,44 +488,95 @@ def run_task_pipeline(
             print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
         
         generated_responses = []
+        correct_classifications = 0
+        total_classifications = 0
+        
         for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
             if verbose:
                 print(f"\n   🎯 Generating response {i+1}:")
                 print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
             
-            # Use the raw question and let Model.generate handle formatting
-            # The formatted_question contains few-shot examples which cause double-formatting issues
+            # Use the raw question for natural generation
+            # The formatted_question contains few-shot examples which are for training, not generation
             simple_prompt = qa_pair['question']
             
             # Generate response with token-level scoring
             response, token_scores, classification = generate_with_classification(
-                model, simple_prompt, layer, max_new_tokens, steering_method, verbose
+                model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose
             )
-            generated_responses.append({
-                'response': response,
-                'token_scores': token_scores,
-                'classification': classification
-            })
             
-            if verbose:
-                print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                if len(token_scores) > 10:
-                    print(f"                    ... ({len(token_scores)} total tokens)")
-                avg_score = sum(token_scores) / len(token_scores) if token_scores else 0
-                print(f"      📊 Classification: {classification} (avg score: {avg_score:.3f})")
-                print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+            # Evaluate the generated response using lm-eval harness
+            try:
+                # Use lm-eval's evaluation logic to check if response is correct
+                from lm_eval.api.metrics import exact_match_hf_evaluate
+                
+                # Get the correct answers for comparison
+                correct_answers = qa_pair.get('correct_answer', '')
+                
+                # Evaluate if the generated response matches the correct answer
+                # Handle the case where exact_match_hf_evaluate might return different formats
+                try:
+                    is_actually_correct = exact_match_hf_evaluate([response], [correct_answers])
+                    if isinstance(is_actually_correct, (list, tuple)) and len(is_actually_correct) > 0:
+                        is_correct = bool(is_actually_correct[0])
+                    else:
+                        is_correct = bool(is_actually_correct)
+                except:
+                    # Fallback: simple string matching
+                    is_correct = correct_answers.lower() in response.lower()
+                
+                ground_truth = "TRUTHFUL" if is_correct else "HALLUCINATION"
+                
+                # Check if our classification matches ground truth
+                classification_correct = (classification == ground_truth)
+                if classification_correct:
+                    correct_classifications += 1
+                total_classifications += 1
+                
+                generated_responses.append({
+                    'response': response,
+                    'token_scores': token_scores,
+                    'classification': classification,
+                    'ground_truth': ground_truth,
+                    'classification_correct': classification_correct
+                })
+                
+                if verbose:
+                    print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                    print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                    if len(token_scores) > 10:
+                        print(f"                    ... ({len(token_scores)} total tokens)")
+                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                    print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
+                    print(f"      🎯 Ground Truth: {ground_truth}")
+                    print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                    print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                    print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                    
+            except Exception as e:
+                if verbose:
+                    print(f"      ⚠️  Could not evaluate response: {e}")
+                generated_responses.append({
+                    'response': response,
+                    'token_scores': token_scores,
+                    'classification': classification,
+                    'ground_truth': 'UNKNOWN',
+                    'classification_correct': None
+                })
         
         results = {
             "task_name": task_name,
             "model_name": model_name,
             "layer": layer,
+            "token_aggregation": token_aggregation,
             "training_results": training_results,
             "evaluation_results": evaluation_results,
             "num_train": len(train_docs),
             "num_test": len(test_docs),
-            "sample_responses": generated_responses
+            "sample_responses": generated_responses,
+            "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
+            "correct_classifications": correct_classifications,
+            "total_classifications": total_classifications
         }
         
         if verbose:
@@ -500,8 +586,12 @@ def run_task_pipeline(
             print(f"   • Training samples: {len(train_docs)}")
             print(f"   • Test samples: {len(test_docs)}")
             print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
-            print(f"   • Test accuracy: {evaluation_results.get('accuracy', 'N/A'):.2%}")
             print(f"   • Generated responses: {len(generated_responses)}")
+            if total_classifications > 0:
+                classification_acc = correct_classifications / total_classifications
+                print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
+            else:
+                print(f"   • Classification accuracy: Could not evaluate")
             print(f"{'='*80}\n")
         
         logger.info(f"Pipeline completed for {task_name}")
@@ -609,6 +699,7 @@ def main():
                 max_new_tokens=args.max_new_tokens,
                 device=args.device,
                 seed=args.seed,
+                token_aggregation=args.token_aggregation,
                 verbose=args.verbose
             )
             
