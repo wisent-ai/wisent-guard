@@ -517,7 +517,12 @@ def run_task_pipeline(
                 # Handle the case where exact_match_hf_evaluate might return different formats
                 try:
                     is_actually_correct = exact_match_hf_evaluate([response], [correct_answers])
-                    if isinstance(is_actually_correct, (list, tuple)) and len(is_actually_correct) > 0:
+                    
+                    # Handle different return formats from exact_match_hf_evaluate
+                    if isinstance(is_actually_correct, dict):
+                        # It returns {'exact_match': 0.0 or 1.0}
+                        is_correct = bool(is_actually_correct.get('exact_match', 0))
+                    elif isinstance(is_actually_correct, (list, tuple)) and len(is_actually_correct) > 0:
                         is_correct = bool(is_actually_correct[0])
                     else:
                         is_correct = bool(is_actually_correct)
