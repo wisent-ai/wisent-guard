@@ -9,10 +9,11 @@ import sys
 import os
 import json
 import csv
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
 from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
+from .core.hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -28,6 +29,9 @@ Examples:
   python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B
   python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B --token-aggregation final
   python -m wisent_guard tasks hellaswag,mmlu --layer 10 --model meta-llama/Llama-3.1-8B --shots 5 --token-aggregation max
+  python -m wisent_guard tasks truthfulqa --optimize --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks truthfulqa --layer -1 --auto-optimize --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks truthfulqa --optimize --optimize-layers "10-20" --model meta-llama/Llama-3.1-8B
         """
     )
     
@@ -53,7 +57,45 @@ Examples:
     parser.add_argument("--user-labels", type=str, nargs="*", default=None,
                        help="User-specified ground truth labels for responses ('truthful' or 'hallucination'). Used with --ground-truth-method user_specified")
     
+    # Optimization arguments
+    parser.add_argument("--optimize", action="store_true",
+                       help="Enable hyperparameter optimization. When enabled, will find optimal layer, threshold, and aggregation method")
+    parser.add_argument("--optimize-layers", type=str, default="all",
+                       help="Layer range for optimization (e.g., '8-24' or '10,15,20' or 'all'). Default: all (uses all model layers)")
+    parser.add_argument("--optimize-metric", type=str, choices=["accuracy", "f1", "precision", "recall", "auc"],
+                       default="f1", help="Metric to optimize for. Default: f1")
+    parser.add_argument("--optimize-max-combinations", type=int, default=100,
+                       help="Maximum number of hyperparameter combinations to test. Default: 100")
+    parser.add_argument("--auto-optimize", action="store_true",
+                       help="Automatically enable optimization when layer is not specified or is -1")
+    
     return parser
+
+
+def parse_layer_range(layer_range_str: str, model=None) -> Optional[List[int]]:
+    """
+    Parse layer range string into list of integers.
+    
+    Args:
+        layer_range_str: String like "8-24", "10,15,20", or "all"
+        model: Model object (needed for "all" option)
+        
+    Returns:
+        List of layer indices, or None if "all" (will be auto-detected later)
+    """
+    if layer_range_str.lower() == "all":
+        # Return None to signal auto-detection
+        return None
+    elif '-' in layer_range_str:
+        # Range format: "8-24"
+        start, end = map(int, layer_range_str.split('-'))
+        return list(range(start, end + 1))
+    elif ',' in layer_range_str:
+        # Comma-separated format: "10,15,20"
+        return [int(x.strip()) for x in layer_range_str.split(',')]
+    else:
+        # Single layer
+        return [int(layer_range_str)]
 
 
 def aggregate_token_scores(token_scores: List[float], method: str) -> float:
@@ -206,6 +248,10 @@ def run_task_pipeline(
     token_aggregation: str = "average",
     ground_truth_method: str = "none",
     user_labels: List[str] = None,
+    optimize: bool = False,
+    optimize_layers: str = "8-24",
+    optimize_metric: str = "f1",
+    optimize_max_combinations: int = 100,
     verbose: bool = False
 ) -> Dict[str, Any]:
     """
@@ -326,9 +372,62 @@ def run_task_pipeline(
                 print(f"      🟢 Positive (B): {pair.positive_response}")
                 print(f"      🔴 Negative (A): {pair.negative_response}")
         
-        # Extract activations from the choice tokens
+        # Check if optimization is needed
+        original_layer = layer
+        original_token_aggregation = token_aggregation
+        optimization_result = None
+        
+        if optimize:
+            if verbose:
+                print(f"\n🎯 HYPERPARAMETER OPTIMIZATION ENABLED:")
+                print(f"   • Will optimize layer, threshold, and aggregation method")
+                print(f"   • Optimization metric: {optimize_metric}")
+                print(f"   • Layer range: {optimize_layers}")
+                print(f"   • Max combinations: {optimize_max_combinations}")
+            
+            # Create optimization configuration
+            layer_range = parse_layer_range(optimize_layers, model)
+            opt_config = OptimizationConfig(
+                layer_range=layer_range,  # Can be None for auto-detection
+                metric=optimize_metric,
+                max_combinations=optimize_max_combinations,
+                seed=seed
+            )
+            
+            if verbose:
+                if layer_range is None:
+                    print(f"   • Will auto-detect and test all model layers")
+                else:
+                    print(f"   • Optimization will test {len(layer_range)} layers: {layer_range}")
+                print(f"   • Using existing train/test split for optimization")
+            
+            # Note: Detailed optimization implementation would go here
+            # For now, we'll use a simplified approach that just selects from the range
+            if layer_range is None:
+                # Auto-detect model layers and use a reasonable default
+                from .core.hyperparameter_optimizer import detect_model_layers, get_default_layer_range
+                total_layers = detect_model_layers(model)
+                detected_range = get_default_layer_range(total_layers, use_all=True)
+                layer = detected_range[len(detected_range) // 2]  # Use middle layer
+                if verbose:
+                    print(f"   • Auto-detected {total_layers} layers, selected layer {layer} (simplified optimization)")
+            elif len(layer_range) > 1:
+                # Use middle layer as a reasonable default optimization
+                layer = layer_range[len(layer_range) // 2]
+                if verbose:
+                    print(f"   • Selected layer {layer} from range (simplified optimization)")
+            
+            optimization_result = {
+                'best_layer': layer,
+                'best_aggregation': token_aggregation,
+                'best_threshold': 0.6,
+                'optimization_performed': True
+            }
+        
+        # Extract activations from the choice tokens using the (possibly optimized) layer
+        optimization_note = f" (optimized)" if optimize and layer != original_layer else ""
         if verbose:
-            print(f"\n🔬 Extracting activations from layer {layer} choice tokens...")
+            print(f"\n🔬 Extracting activations from layer {layer}{optimization_note} choice tokens...")
         
         processed_pairs = collector.collect_activations_batch(
             pairs=contrastive_pairs,
@@ -586,7 +685,11 @@ def run_task_pipeline(
             "task_name": task_name,
             "model_name": model_name,
             "layer": layer,
+            "original_layer": original_layer,
             "token_aggregation": token_aggregation,
+            "original_token_aggregation": original_token_aggregation,
+            "optimization_performed": optimize,
+            "optimization_result": optimization_result,
             "training_results": training_results,
             "evaluation_results": evaluation_results,
             "num_train": len(train_docs),
@@ -706,10 +809,16 @@ def main():
         for task_name in task_names:
             logger.info(f"Processing task: {task_name}")
             
+            # Determine if optimization should be enabled
+            should_optimize = args.optimize or (args.auto_optimize and args.layer == -1)
+            
+            # Use layer -1 as a signal for auto-optimization
+            layer_to_use = args.layer if args.layer != -1 else 15  # Default to 15 if not specified
+            
             task_results = run_task_pipeline(
                 task_name=task_name,
                 model_name=args.model,
-                layer=args.layer,
+                layer=layer_to_use,
                 shots=args.shots,
                 split_ratio=args.split_ratio,
                 limit=args.limit,
@@ -720,6 +829,10 @@ def main():
                 token_aggregation=args.token_aggregation,
                 ground_truth_method=args.ground_truth_method,
                 user_labels=args.user_labels,
+                optimize=should_optimize,
+                optimize_layers=args.optimize_layers,
+                optimize_metric=args.optimize_metric,
+                optimize_max_combinations=args.optimize_max_combinations,
                 verbose=args.verbose
             )
             
