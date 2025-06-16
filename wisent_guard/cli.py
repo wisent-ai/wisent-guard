@@ -12,6 +12,7 @@ import csv
 from typing import List, Dict, Any
 
 from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
+from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -45,6 +46,12 @@ Examples:
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--token-aggregation", type=str, choices=["average", "final", "first", "max", "min"], 
                        default="average", help="How to aggregate token scores for classification")
+    parser.add_argument("--ground-truth-method", type=str, 
+                       choices=["none", "exact_match", "substring_match", "user_specified", "manual_review"],
+                       default="none", 
+                       help="Method for ground truth evaluation. 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'manual_review' marks for review")
+    parser.add_argument("--user-labels", type=str, nargs="*", default=None,
+                       help="User-specified ground truth labels for responses ('truthful' or 'hallucination'). Used with --ground-truth-method user_specified")
     
     return parser
 
@@ -197,6 +204,8 @@ def run_task_pipeline(
     device: str = None,
     seed: int = 42,
     token_aggregation: str = "average",
+    ground_truth_method: str = "none",
+    user_labels: List[str] = None,
     verbose: bool = False
 ) -> Dict[str, Any]:
     """
@@ -505,44 +514,40 @@ def run_task_pipeline(
                 model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose
             )
             
-            # Evaluate the generated response using lm-eval harness
+            # Evaluate the generated response using the ground truth evaluator
             try:
-                # Use lm-eval's evaluation logic to check if response is correct
-                from lm_eval.api.metrics import exact_match_hf_evaluate
+                # Create ground truth evaluator
+                evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
                 
-                # Get the correct answers for comparison
+                # Get correct answer for comparison
                 correct_answers = qa_pair.get('correct_answer', '')
                 
-                # Evaluate if the generated response matches the correct answer
-                # Handle the case where exact_match_hf_evaluate might return different formats
-                try:
-                    is_actually_correct = exact_match_hf_evaluate([response], [correct_answers])
-                    
-                    # Handle different return formats from exact_match_hf_evaluate
-                    if isinstance(is_actually_correct, dict):
-                        # It returns {'exact_match': 0.0 or 1.0}
-                        is_correct = bool(is_actually_correct.get('exact_match', 0))
-                    elif isinstance(is_actually_correct, (list, tuple)) and len(is_actually_correct) > 0:
-                        is_correct = bool(is_actually_correct[0])
-                    else:
-                        is_correct = bool(is_actually_correct)
-                except:
-                    # Fallback: simple string matching
-                    is_correct = correct_answers.lower() in response.lower()
+                # Get user label if available
+                user_label = None
+                if user_labels and i < len(user_labels):
+                    user_label = user_labels[i]
                 
-                ground_truth = "TRUTHFUL" if is_correct else "HALLUCINATION"
+                # Evaluate the response
+                evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
                 
-                # Check if our classification matches ground truth
-                classification_correct = (classification == ground_truth)
-                if classification_correct:
-                    correct_classifications += 1
-                total_classifications += 1
+                ground_truth = evaluation_result["ground_truth"]
+                
+                # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
+                classification_correct = None
+                if ground_truth != "UNKNOWN":
+                    classification_correct = (classification == ground_truth)
+                    if classification_correct:
+                        correct_classifications += 1
+                    total_classifications += 1
                 
                 generated_responses.append({
                     'response': response,
                     'token_scores': token_scores,
                     'classification': classification,
                     'ground_truth': ground_truth,
+                    'ground_truth_method': evaluation_result["method_used"],
+                    'ground_truth_confidence': evaluation_result["confidence"],
+                    'ground_truth_details': evaluation_result["details"],
                     'classification_correct': classification_correct
                 })
                 
@@ -553,10 +558,15 @@ def run_task_pipeline(
                         print(f"                    ... ({len(token_scores)} total tokens)")
                     aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
                     print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
-                    print(f"      🎯 Ground Truth: {ground_truth}")
-                    print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                    print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
+                    if classification_correct is not None:
+                        print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                    else:
+                        print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
                     print(f"      ✅ Expected: {qa_pair['correct_answer']}")
                     print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                    if evaluation_result["details"]:
+                        print(f"      📝 Details: {evaluation_result['details']}")
                     
             except Exception as e:
                 if verbose:
@@ -566,6 +576,9 @@ def run_task_pipeline(
                     'token_scores': token_scores,
                     'classification': classification,
                     'ground_truth': 'UNKNOWN',
+                    'ground_truth_method': 'error',
+                    'ground_truth_confidence': 0.0,
+                    'ground_truth_details': f'Error during evaluation: {str(e)}',
                     'classification_correct': None
                 })
         
@@ -705,6 +718,8 @@ def main():
                 device=args.device,
                 seed=args.seed,
                 token_aggregation=args.token_aggregation,
+                ground_truth_method=args.ground_truth_method,
+                user_labels=args.user_labels,
                 verbose=args.verbose
             )
             
