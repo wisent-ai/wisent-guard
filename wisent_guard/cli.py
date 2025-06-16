@@ -559,12 +559,14 @@ def run_task_pipeline(
             print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
             print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
         
-        # Skip pre-written validation during optimization - we already tested on generated responses
+        # Test the optimized classifier by generating responses and classifying them
         if optimize:
             if verbose:
-                print(f"\n📊 Skipping pre-written validation - optimization already tested on generated responses")
-            evaluation_results = {"accuracy": "N/A", "f1": "N/A"}  # Placeholder
-            test_qa_pairs = []  # Will be populated later for generation
+                print(f"\n🧪 TESTING OPTIMIZED CLASSIFIER ON GENERATED RESPONSES:")
+                print(f"   • Generating responses to test questions...")
+            
+            # Get test questions for response generation
+            test_qa_pairs = []
             for doc in test_docs:
                 try:
                     raw_question = doc.get('question', str(doc))
@@ -573,6 +575,7 @@ def run_task_pipeline(
                     else:
                         formatted_question = raw_question
                     
+                    # Extract correct answer for ground truth comparison
                     correct_answers = doc.get('mc1_targets', {}).get('choices', [])
                     correct_labels = doc.get('mc1_targets', {}).get('labels', [])
                     
@@ -582,21 +585,159 @@ def run_task_pipeline(
                             correct_answer = correct_answers[i]
                             break
                     
-                    incorrect_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 0 and i < len(correct_answers):
-                            incorrect_answer = correct_answers[i]
-                            break
-                    
-                    if correct_answer and incorrect_answer:
+                    if correct_answer:
                         test_qa_pairs.append({
                             'question': raw_question,
                             'formatted_question': formatted_question,
-                            'correct_answer': correct_answer,
-                            'incorrect_answer': incorrect_answer
+                            'correct_answer': correct_answer
                         })
+                        
                 except Exception as e:
                     continue
+            
+            if verbose:
+                print(f"   • Successfully extracted {len(test_qa_pairs)} test questions")
+                print(f"\n🔍 Test Questions:")
+                for i, qa_pair in enumerate(test_qa_pairs):
+                    print(f"\n   📋 Question {i+1}:")
+                    print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                    print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+            
+            # Generate responses and classify them
+            if verbose:
+                print(f"\n🎭 GENERATING AND CLASSIFYING RESPONSES:")
+                print(f"   • Generating responses with optimized layer {layer}...")
+            
+            generated_responses = []
+            correct_classifications = 0
+            total_classifications = 0
+            
+            for i, qa_pair in enumerate(test_qa_pairs):
+                if verbose:
+                    print(f"\n   🎯 Generating response {i+1}:")
+                    print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                
+                # Use the raw question for natural generation
+                simple_prompt = qa_pair['question']
+                
+                # Generate response with token-level scoring
+                response, token_scores, classification = generate_with_classification(
+                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose
+                )
+                
+                # Evaluate the generated response using the ground truth evaluator
+                try:
+                    # Create ground truth evaluator
+                    evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+                    
+                    # Get correct answer for comparison
+                    correct_answers = qa_pair.get('correct_answer', '')
+                    
+                    # Get user label if available
+                    user_label = None
+                    if user_labels and i < len(user_labels):
+                        user_label = user_labels[i]
+                    
+                    # Evaluate the response
+                    evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
+                    
+                    ground_truth = evaluation_result["ground_truth"]
+                    
+                    # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
+                    classification_correct = None
+                    if ground_truth != "UNKNOWN":
+                        expected_classification = "HALLUCINATION" if ground_truth == "HALLUCINATION" else "TRUTHFUL"
+                        classification_correct = (classification == expected_classification)
+                        
+                        if classification_correct:
+                            correct_classifications += 1
+                        total_classifications += 1
+                    
+                    generated_responses.append({
+                        'question': qa_pair['question'],
+                        'response': response,
+                        'classification': classification,
+                        'ground_truth': ground_truth,
+                        'correct': classification_correct,
+                        'token_scores': token_scores
+                    })
+                    
+                    if verbose:
+                        print(f"      🤖 Response: {response[:100]}{'...' if len(response) > 100 else ''}")
+                        print(f"      🎯 Classification: {classification}")
+                        print(f"      📊 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}{'...' if len(token_scores) > 10 else ''}")
+                        print(f"      🔢 Aggregated Score: {aggregate_token_scores(token_scores, token_aggregation):.3f}")
+                        print(f"      ✅ Ground Truth: {ground_truth}")
+                        if classification_correct is not None:
+                            print(f"      {'✅' if classification_correct else '❌'} Match: {classification_correct}")
+                        
+                except Exception as e:
+                    if verbose:
+                        print(f"      ❌ Error evaluating response: {e}")
+                    continue
+            
+            # Calculate evaluation results
+            if total_classifications > 0:
+                test_accuracy = correct_classifications / total_classifications
+                evaluation_results = {
+                    "accuracy": test_accuracy,
+                    "correct_predictions": correct_classifications,
+                    "total_predictions": total_classifications
+                }
+            else:
+                evaluation_results = {
+                    "accuracy": "N/A",
+                    "correct_predictions": 0,
+                    "total_predictions": 0
+                }
+            
+            if verbose:
+                print(f"\n✅ Response generation and classification completed!")
+                if total_classifications > 0:
+                    print(f"   • Test accuracy: {test_accuracy:.2%} ({correct_classifications}/{total_classifications})")
+                else:
+                    print(f"   • Test accuracy: Could not evaluate")
+                print(f"   • Tested on generated responses, not pre-written choices")
+            
+            # Create results dictionary for optimization path
+            results = {
+                "task_name": task_name,
+                "model_name": model_name,
+                "layer": layer,
+                "original_layer": original_layer,
+                "token_aggregation": token_aggregation,
+                "original_token_aggregation": original_token_aggregation,
+                "optimization_performed": optimize,
+                "optimization_result": optimization_result,
+                "training_results": training_results,
+                "evaluation_results": evaluation_results,
+                "num_train": len(train_docs),
+                "num_test": len(test_docs),
+                "sample_responses": generated_responses,
+                "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
+                "correct_classifications": correct_classifications,
+                "total_classifications": total_classifications
+            }
+            
+            if verbose:
+                print(f"\n🎉 OPTIMIZATION PIPELINE COMPLETED FOR {task_name.upper()}!")
+                print(f"{'='*80}")
+                print(f"📊 FINAL RESULTS:")
+                print(f"   • Training samples: {len(train_docs)}")
+                print(f"   • Test samples: {len(test_docs)}")
+                print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+                if total_classifications > 0:
+                    print(f"   • Test accuracy: {test_accuracy:.2%} ({correct_classifications}/{total_classifications})")
+                else:
+                    print(f"   • Test accuracy: Could not evaluate")
+                print(f"   • Generated responses: {len(generated_responses)}")
+                print(f"   • Optimization performed: Yes")
+                print(f"   • Best layer: {layer}")
+                print(f"   • Best aggregation: {token_aggregation}")
+                print(f"{'='*80}\n")
+            
+            logger.info(f"Optimization pipeline completed for {task_name}")
+            return results
         else:
             # Only do pre-written validation when NOT optimizing
             if verbose:
@@ -904,9 +1045,11 @@ def create_evaluation_report(results: Dict[str, Any], output_path: str) -> None:
             f.write("|------|------------------|--------------------|--------------|\n")
             
             for task_name, task_results in results.items():
-                if "error" in task_results:
+                if task_results is None:
+                    f.write(f"| {task_name} | NULL | NULL | N/A |\n")
+                elif isinstance(task_results, dict) and "error" in task_results:
                     f.write(f"| {task_name} | ERROR | ERROR | N/A |\n")
-                else:
+                elif isinstance(task_results, dict):
                     train_acc = task_results.get("training_results", {}).get("accuracy", "N/A")
                     eval_acc = task_results.get("evaluation_results", {}).get("accuracy", "N/A")
                     optimized = "Yes" if task_results.get("optimization_performed", False) else "No"
@@ -922,9 +1065,11 @@ def create_evaluation_report(results: Dict[str, Any], output_path: str) -> None:
             for task_name, task_results in results.items():
                 f.write(f"\n## {task_name}\n\n")
                 
-                if "error" in task_results:
+                if task_results is None:
+                    f.write(f"**Error**: Task results are None\n")
+                elif isinstance(task_results, dict) and "error" in task_results:
                     f.write(f"**Error**: {task_results['error']}\n")
-                else:
+                elif isinstance(task_results, dict):
                     # Configuration
                     f.write("### Configuration\n")
                     f.write(f"- **Model**: {task_results.get('model_name', 'Unknown')}\n")
@@ -937,16 +1082,39 @@ def create_evaluation_report(results: Dict[str, Any], output_path: str) -> None:
                     if "training_results" in task_results:
                         train_results = task_results["training_results"]
                         f.write("\n### Training Results\n")
-                        f.write(f"- **Accuracy**: {train_results.get('accuracy', 'N/A'):.2%}\n")
-                        f.write(f"- **Precision**: {train_results.get('precision', 'N/A'):.2f}\n")
-                        f.write(f"- **Recall**: {train_results.get('recall', 'N/A'):.2f}\n")
-                        f.write(f"- **F1 Score**: {train_results.get('f1', 'N/A'):.2f}\n")
+                        train_acc = train_results.get('accuracy', 'N/A')
+                        if isinstance(train_acc, float):
+                            f.write(f"- **Accuracy**: {train_acc:.2%}\n")
+                        else:
+                            f.write(f"- **Accuracy**: {train_acc}\n")
+                        
+                        train_prec = train_results.get('precision', 'N/A')
+                        if isinstance(train_prec, float):
+                            f.write(f"- **Precision**: {train_prec:.2f}\n")
+                        else:
+                            f.write(f"- **Precision**: {train_prec}\n")
+                        
+                        train_recall = train_results.get('recall', 'N/A')
+                        if isinstance(train_recall, float):
+                            f.write(f"- **Recall**: {train_recall:.2f}\n")
+                        else:
+                            f.write(f"- **Recall**: {train_recall}\n")
+                        
+                        train_f1 = train_results.get('f1', 'N/A')
+                        if isinstance(train_f1, float):
+                            f.write(f"- **F1 Score**: {train_f1:.2f}\n")
+                        else:
+                            f.write(f"- **F1 Score**: {train_f1}\n")
                     
                     # Evaluation results
                     if "evaluation_results" in task_results:
                         eval_results = task_results["evaluation_results"]
                         f.write("\n### Evaluation Results\n")
-                        f.write(f"- **Accuracy**: {eval_results.get('accuracy', 'N/A'):.2%}\n")
+                        eval_acc = eval_results.get('accuracy', 'N/A')
+                        if isinstance(eval_acc, float):
+                            f.write(f"- **Accuracy**: {eval_acc:.2%}\n")
+                        else:
+                            f.write(f"- **Accuracy**: {eval_acc}\n")
                         f.write(f"- **Total Predictions**: {eval_results.get('total_predictions', 'N/A')}\n")
                         f.write(f"- **Correct Predictions**: {eval_results.get('correct_predictions', 'N/A')}\n")
                     
@@ -955,7 +1123,11 @@ def create_evaluation_report(results: Dict[str, Any], output_path: str) -> None:
                         f.write("\n### Optimization Results\n")
                         f.write(f"- **Best Layer**: {task_results.get('best_layer', 'Unknown')}\n")
                         f.write(f"- **Best Aggregation**: {task_results.get('best_aggregation', 'Unknown')}\n")
-                        f.write(f"- **Best Accuracy**: {task_results.get('best_accuracy', 'Unknown'):.2%}\n")
+                        best_acc = task_results.get('best_accuracy', 'Unknown')
+                        if isinstance(best_acc, float):
+                            f.write(f"- **Best Accuracy**: {best_acc:.2%}\n")
+                        else:
+                            f.write(f"- **Best Accuracy**: {best_acc}\n")
             
             f.write(f"\n---\n\n*Report generated on {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
         
@@ -1044,12 +1216,19 @@ def main():
         print("="*50)
         
         for task_name, results in all_results.items():
-            if "error" in results:
+            if results is None:
+                print(f"{task_name}: ERROR - Results are None")
+            elif isinstance(results, dict) and "error" in results:
                 print(f"{task_name}: ERROR - {results['error']}")
-            else:
+            elif isinstance(results, dict):
                 training_acc = results.get("training_results", {}).get("accuracy", "N/A")
                 eval_acc = results.get("evaluation_results", {}).get("accuracy", "N/A")
-                print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
+                if isinstance(training_acc, float) and isinstance(eval_acc, float):
+                    print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
+                else:
+                    print(f"{task_name}: Train={training_acc} | Test={eval_acc}")
+            else:
+                print(f"{task_name}: ERROR - Invalid results type: {type(results)}")
         
         print(f"\nResults saved to: {args.output}")
         
