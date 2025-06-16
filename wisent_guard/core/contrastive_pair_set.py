@@ -3,7 +3,11 @@ from .response import PositiveResponse, NegativeResponse
 from .activations import Activations, ActivationAggregationMethod
 import torch
 import random
-from typing import List, Optional, Tuple, Dict, Any
+import json
+import csv
+import pandas as pd
+from pathlib import Path
+from typing import List, Optional, Tuple, Dict, Any, Union
 
 class ContrastivePairSet:
     def __init__(self, name, pairs=None, task_type=None):
@@ -690,4 +694,400 @@ class ContrastivePairSet:
                 positive_response=pos_resp,
                 negative_response=neg_resp
             )
-            self.pairs.append(pair) 
+            self.pairs.append(pair)
+
+    @classmethod
+    def from_lm_harness_task(
+        cls,
+        name: str,
+        task,
+        docs: List[Dict[str, Any]],
+        limit: Optional[int] = None,
+        split: str = "train",
+        task_type: Optional[str] = None
+    ) -> 'ContrastivePairSet':
+        """
+        Create a ContrastivePairSet from an lm-harness task.
+        
+        Args:
+            name: Name for the pair set
+            task: Task object from lm-harness
+            docs: List of documents from the task
+            limit: Optional limit on number of documents to process
+            split: Which split this is (train/validation/test)
+            task_type: Optional task type override
+            
+        Returns:
+            ContrastivePairSet instance
+        """
+        if limit is not None and limit > 0:
+            docs = docs[:limit]
+        
+        # Detect task type from name if not provided
+        if task_type is None:
+            task_type = cls._detect_task_type(name)
+        
+        pair_set = cls(name=f"{name}_{split}", task_type=task_type)
+        
+        # Process documents based on task type
+        if 'truthfulqa' in name.lower():
+            pair_set._create_truthfulqa_pairs_from_docs(task, docs)
+        elif any(mc_task in name.lower() for mc_task in ['hellaswag', 'mmlu', 'arc', 'winogrande', 'piqa']):
+            pair_set._create_multiple_choice_pairs_from_docs(task, docs)
+        else:
+            pair_set._create_generic_pairs_from_docs(task, docs)
+        
+        return pair_set
+
+    @classmethod
+    def from_csv_file(
+        cls,
+        name: str,
+        csv_path: Union[str, Path],
+        question_col: str = "question",
+        correct_col: str = "correct_answer", 
+        incorrect_col: str = "incorrect_answer",
+        limit: Optional[int] = None
+    ) -> 'ContrastivePairSet':
+        """
+        Create a ContrastivePairSet from a CSV file.
+        
+        Args:
+            name: Name for the pair set
+            csv_path: Path to the CSV file
+            question_col: Column name for questions
+            correct_col: Column name for correct answers
+            incorrect_col: Column name for incorrect answers
+            limit: Optional limit on number of rows to process
+            
+        Returns:
+            ContrastivePairSet instance
+        """
+        csv_path = Path(csv_path)
+        if not csv_path.exists():
+            raise FileNotFoundError(f"CSV file not found: {csv_path}")
+        
+        df = pd.read_csv(csv_path)
+        if limit is not None and limit > 0:
+            df = df.head(limit)
+        
+        # Validate required columns
+        required_cols = [question_col, correct_col, incorrect_col]
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}. Available columns: {list(df.columns)}")
+        
+        pair_set = cls(name=f"{name}_csv", task_type="csv_file")
+        
+        for idx, row in df.iterrows():
+            try:
+                question = str(row[question_col])
+                correct_answer = str(row[correct_col])
+                incorrect_answer = str(row[incorrect_col])
+                
+                # Skip rows with missing data
+                if pd.isna(row[question_col]) or pd.isna(row[correct_col]) or pd.isna(row[incorrect_col]):
+                    continue
+                
+                # Create contrastive pair
+                pair_set._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
+                
+            except Exception as e:
+                print(f"Warning: Skipping row {idx} due to error: {e}")
+                continue
+        
+        return pair_set
+
+    @classmethod
+    def from_json_file(
+        cls,
+        name: str,
+        json_path: Union[str, Path],
+        limit: Optional[int] = None
+    ) -> 'ContrastivePairSet':
+        """
+        Create a ContrastivePairSet from a JSON file.
+        
+        Expected JSON format:
+        [
+            {
+                "question": "Question text",
+                "correct_answer": "Correct answer",
+                "incorrect_answer": "Incorrect answer"
+            },
+            ...
+        ]
+        
+        Or format with multiple correct/incorrect answers:
+        [
+            {
+                "question": "Question text",
+                "correct_answers": ["Answer 1", "Answer 2"],
+                "incorrect_answers": ["Wrong 1", "Wrong 2"]
+            },
+            ...
+        ]
+        
+        Args:
+            name: Name for the pair set
+            json_path: Path to the JSON file
+            limit: Optional limit on number of items to process
+            
+        Returns:
+            ContrastivePairSet instance
+        """
+        json_path = Path(json_path)
+        if not json_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {json_path}")
+        
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if not isinstance(data, list):
+            raise ValueError("JSON file must contain a list of objects")
+        
+        if limit is not None and limit > 0:
+            data = data[:limit]
+        
+        pair_set = cls(name=f"{name}_json", task_type="json_file")
+        
+        for idx, item in enumerate(data):
+            try:
+                if not isinstance(item, dict):
+                    print(f"Warning: Skipping item {idx}, not a dictionary")
+                    continue
+                
+                question = item.get('question', '')
+                
+                # Handle single answer format
+                if 'correct_answer' in item and 'incorrect_answer' in item:
+                    correct_answer = str(item['correct_answer'])
+                    incorrect_answer = str(item['incorrect_answer'])
+                    pair_set._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
+                
+                # Handle multiple answers format
+                elif 'correct_answers' in item and 'incorrect_answers' in item:
+                    correct_answers = item['correct_answers']
+                    incorrect_answers = item['incorrect_answers']
+                    
+                    if isinstance(correct_answers, list) and isinstance(incorrect_answers, list):
+                        # Use first correct and first incorrect
+                        if correct_answers and incorrect_answers:
+                            correct_answer = str(correct_answers[0])
+                            incorrect_answer = str(incorrect_answers[0])
+                            pair_set._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
+                    
+            except Exception as e:
+                print(f"Warning: Skipping item {idx} due to error: {e}")
+                continue
+        
+        return pair_set
+
+    def _create_qa_contrastive_pair(self, question: str, correct_answer: str, incorrect_answer: str):
+        """Helper method to create a QA contrastive pair."""
+        # Format the prompt
+        prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\nWhich is better: {question}\nA. {incorrect_answer}\nB. {correct_answer}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
+        
+        # Create positive response (B - correct answer)
+        pos_resp = PositiveResponse(text="B")
+        
+        # Create negative response (A - incorrect answer) 
+        neg_resp = NegativeResponse(text="A")
+        
+        pair = ContrastivePair(
+            prompt=prompt,
+            positive_response=pos_resp,
+            negative_response=neg_resp
+        )
+        
+        # Store metadata
+        pair.question = question
+        pair.correct_answer = correct_answer
+        pair.incorrect_answer = incorrect_answer
+        
+        self.pairs.append(pair)
+
+    def _create_truthfulqa_pairs_from_docs(self, task, docs: List[Dict[str, Any]]):
+        """Create contrastive pairs from TruthfulQA documents."""
+        for doc in docs:
+            try:
+                # Extract question
+                if hasattr(task, 'doc_to_text'):
+                    question = task.doc_to_text(doc)
+                else:
+                    question = doc.get('question', str(doc))
+                
+                # Extract correct and incorrect answers from mc1_targets
+                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                
+                # Find the correct answer
+                correct_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 1 and i < len(correct_answers):
+                        correct_answer = correct_answers[i]
+                        break
+                
+                # Find an incorrect answer
+                incorrect_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 0 and i < len(correct_answers):
+                        incorrect_answer = correct_answers[i]
+                        break
+                
+                if correct_answer and incorrect_answer:
+                    self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
+                    
+            except Exception as e:
+                print(f"Warning: Skipping TruthfulQA doc due to error: {e}")
+                continue
+
+    def _create_multiple_choice_pairs_from_docs(self, task, docs: List[Dict[str, Any]]):
+        """Create contrastive pairs from multiple choice task documents."""
+        for doc in docs:
+            try:
+                # Extract question
+                if hasattr(task, 'doc_to_text'):
+                    question = task.doc_to_text(doc)
+                else:
+                    question = doc.get('question', doc.get('ctx', str(doc)))
+                
+                # Get choices and correct answer
+                choices = doc.get('choices', [])
+                if not choices:
+                    continue
+                
+                # Get correct answer index
+                correct_idx = doc.get('gold', doc.get('answer', doc.get('label', 0)))
+                if isinstance(correct_idx, list) and len(correct_idx) > 0:
+                    correct_idx = correct_idx[0]
+                elif not isinstance(correct_idx, int):
+                    correct_idx = 0
+                
+                # Ensure valid index
+                if correct_idx < 0 or correct_idx >= len(choices):
+                    continue
+                
+                correct_answer = choices[correct_idx]
+                
+                # Find an incorrect answer
+                incorrect_indices = [i for i in range(len(choices)) if i != correct_idx]
+                if not incorrect_indices:
+                    continue
+                
+                incorrect_idx = random.choice(incorrect_indices)
+                incorrect_answer = choices[incorrect_idx]
+                
+                self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
+                
+            except Exception as e:
+                print(f"Warning: Skipping multiple choice doc due to error: {e}")
+                continue
+
+    def _create_generic_pairs_from_docs(self, task, docs: List[Dict[str, Any]]):
+        """Create contrastive pairs from generic task documents."""
+        for doc in docs:
+            try:
+                # Extract question/prompt
+                if hasattr(task, 'doc_to_text'):
+                    question = task.doc_to_text(doc)
+                else:
+                    question = doc.get('question', doc.get('text', str(doc)))
+                
+                # Extract target/correct answer
+                if hasattr(task, 'doc_to_target'):
+                    correct_answer = str(task.doc_to_target(doc))
+                else:
+                    correct_answer = str(doc.get('target', doc.get('answer', 'Correct answer')))
+                
+                # Create a generic incorrect answer
+                incorrect_answer = "Incorrect or irrelevant response"
+                
+                self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
+                
+            except Exception as e:
+                print(f"Warning: Skipping generic doc due to error: {e}")
+                continue
+
+    @staticmethod
+    def _detect_task_type(task_name: str) -> str:
+        """Detect task type from task name."""
+        task_name_lower = task_name.lower()
+        
+        if 'truthfulqa' in task_name_lower:
+            return 'truthfulqa'
+        elif any(mc_task in task_name_lower for mc_task in ['hellaswag', 'mmlu', 'arc', 'winogrande', 'piqa']):
+            return 'multiple_choice'
+        elif any(bool_task in task_name_lower for bool_task in ['boolq']):
+            return 'boolean'
+        elif any(math_task in task_name_lower for math_task in ['gsm', 'math']):
+            return 'math'
+        else:
+            return 'generic'
+
+    def save_to_csv(self, csv_path: Union[str, Path], include_metadata: bool = True):
+        """
+        Save the contrastive pairs to a CSV file.
+        
+        Args:
+            csv_path: Path to save the CSV file
+            include_metadata: Whether to include metadata columns
+        """
+        csv_path = Path(csv_path)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        data = []
+        for i, pair in enumerate(self.pairs):
+            row = {
+                'pair_id': i,
+                'prompt': pair.prompt,
+                'positive_response': pair.positive_response.text,
+                'negative_response': pair.negative_response.text
+            }
+            
+            if include_metadata and hasattr(pair, 'question'):
+                row.update({
+                    'question': getattr(pair, 'question', ''),
+                    'correct_answer': getattr(pair, 'correct_answer', ''),
+                    'incorrect_answer': getattr(pair, 'incorrect_answer', '')
+                })
+            
+            data.append(row)
+        
+        df = pd.DataFrame(data)
+        df.to_csv(csv_path, index=False)
+        print(f"Saved {len(data)} contrastive pairs to {csv_path}")
+
+    def save_to_json(self, json_path: Union[str, Path], include_metadata: bool = True):
+        """
+        Save the contrastive pairs to a JSON file.
+        
+        Args:
+            json_path: Path to save the JSON file
+            include_metadata: Whether to include metadata
+        """
+        json_path = Path(json_path)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        data = []
+        for i, pair in enumerate(self.pairs):
+            item = {
+                'pair_id': i,
+                'prompt': pair.prompt,
+                'positive_response': pair.positive_response.text,
+                'negative_response': pair.negative_response.text
+            }
+            
+            if include_metadata and hasattr(pair, 'question'):
+                item.update({
+                    'question': getattr(pair, 'question', ''),
+                    'correct_answer': getattr(pair, 'correct_answer', ''),
+                    'incorrect_answer': getattr(pair, 'incorrect_answer', '')
+                })
+            
+            data.append(item)
+        
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        print(f"Saved {len(data)} contrastive pairs to {json_path}") 

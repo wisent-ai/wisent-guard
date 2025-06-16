@@ -16,7 +16,6 @@ from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
 from .core.hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
 from .core.model import Model
 from .core.classifier import Classifier
-from .core.contrastive_pair_set import ContrastivePairSet
 from .core.layer import Layer
 from .optimize import run_smart_optimization, run_interactive_optimization, generate_with_all_layer_activations, compute_classification_score
 
@@ -37,11 +36,13 @@ Examples:
   python -m wisent_guard tasks truthfulqa --optimize --model meta-llama/Llama-3.1-8B
   python -m wisent_guard tasks truthfulqa --layer -1 --auto-optimize --model meta-llama/Llama-3.1-8B
   python -m wisent_guard tasks truthfulqa --optimize --optimize-layers "10-20" --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks data.csv --from-csv --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks data.json --from-json --model meta-llama/Llama-3.1-8B
         """
     )
     
     parser.add_argument("command", choices=["tasks"], help="Command to run")
-    parser.add_argument("task_names", help="Comma-separated list of task names")
+    parser.add_argument("task_names", help="Comma-separated list of task names, or path to CSV/JSON file with --from-csv/--from-json")
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=int, default=15, help="Layer to extract activations from")
     parser.add_argument("--shots", type=int, default=0, help="Number of few-shot examples")
@@ -62,6 +63,18 @@ Examples:
     parser.add_argument("--user-labels", type=str, nargs="*", default=None,
                        help="User-specified ground truth labels for responses ('truthful' or 'hallucination'). Used with --ground-truth-method user_specified")
     
+    # File input arguments
+    parser.add_argument("--from-csv", action="store_true", 
+                       help="Load task data from CSV file. Requires columns: question, correct_answer, incorrect_answer")
+    parser.add_argument("--from-json", action="store_true",
+                       help="Load task data from JSON file. Expected format: list of objects with question, correct_answer, incorrect_answer")
+    parser.add_argument("--question-col", type=str, default="question",
+                       help="Column name for questions in CSV file (default: question)")
+    parser.add_argument("--correct-col", type=str, default="correct_answer",
+                       help="Column name for correct answers in CSV file (default: correct_answer)")
+    parser.add_argument("--incorrect-col", type=str, default="incorrect_answer", 
+                       help="Column name for incorrect answers in CSV file (default: incorrect_answer)")
+    
     # Optimization arguments
     parser.add_argument("--optimize", action="store_true",
                        help="Enable hyperparameter optimization. When enabled, will find optimal layer, threshold, and aggregation method")
@@ -73,6 +86,10 @@ Examples:
                        help="Maximum number of hyperparameter combinations to test. Default: 100")
     parser.add_argument("--auto-optimize", action="store_true",
                        help="Automatically enable optimization when layer is not specified or is -1")
+    
+    # Dataset validation arguments
+    parser.add_argument("--allow-small-dataset", action="store_true",
+                       help="Allow training with datasets smaller than 4 samples (may cause training issues)")
     
     return parser
 
@@ -239,6 +256,7 @@ def generate_with_classification(model, prompt, layer, max_new_tokens, steering_
     return response, token_scores, classification
 
 
+
 def run_task_pipeline(
     task_name: str,
     model_name: str,
@@ -257,13 +275,19 @@ def run_task_pipeline(
     optimize_layers: str = "8-24",
     optimize_metric: str = "f1",
     optimize_max_combinations: int = 100,
-    verbose: bool = False
+    verbose: bool = False,
+    from_csv: bool = False,
+    from_json: bool = False,
+    question_col: str = "question",
+    correct_col: str = "correct_answer",
+    incorrect_col: str = "incorrect_answer",
+    allow_small_dataset: bool = False
 ) -> Dict[str, Any]:
     """
-    Run the complete pipeline for a single task.
+    Run the complete pipeline for a single task or file.
     
     Args:
-        task_name: Name of the benchmark task
+        task_name: Name of the benchmark task or path to file
         model_name: Language model name
         layer: Layer for activation extraction
         shots: Number of few-shot examples
@@ -274,15 +298,22 @@ def run_task_pipeline(
         device: Target device
         seed: Random seed
         token_aggregation: How to aggregate token scores for classification
+        from_csv: Whether task_name is a CSV file
+        from_json: Whether task_name is a JSON file
+        question_col: CSV column name for questions
+        correct_col: CSV column name for correct answers
+        incorrect_col: CSV column name for incorrect answers
         
     Returns:
         Dictionary with all results
     """
     logger.info(f"Running pipeline for task: {task_name}")
     
+    display_name = task_name if not (from_csv or from_json) else f"file:{task_name}"
+    
     if verbose:
         print(f"\n{'='*80}")
-        print(f"🚀 STARTING PIPELINE FOR TASK: {task_name.upper()}")
+        print(f"🚀 STARTING PIPELINE FOR TASK: {display_name.upper()}")
         print(f"{'='*80}")
         print(f"📋 Configuration:")
         print(f"   • Model: {model_name}")
@@ -293,6 +324,11 @@ def run_task_pipeline(
         print(f"   • Token aggregation: {token_aggregation}")
         print(f"   • Limit: {limit}")
         print(f"   • Seed: {seed}")
+        if from_csv:
+            print(f"   • Input: CSV file")
+            print(f"   • Columns: {question_col}, {correct_col}, {incorrect_col}")
+        elif from_json:
+            print(f"   • Input: JSON file")
     
     try:
         # Initialize enhanced primitives
@@ -301,71 +337,144 @@ def run_task_pipeline(
         model = Model(name=model_name, device=device)
         layer_obj = Layer(index=layer, type="transformer")
         
-        # Load and prepare data using enhanced Model primitive
-        if verbose:
-            print(f"📚 Loading task data for {task_name}...")
-        task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
-        train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
-        
-        if verbose:
-            print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
-        
-        # Create training data using proper activation collection
-        from .core.activations import ActivationCollectionLogic, Activations, ActivationAggregationMethod
-        
-        if verbose:
-            print(f"\n📝 TRAINING DATA PREPARATION:")
-            print(f"   • Loading TruthfulQA data with correct/incorrect answers...")
-        
-        # Get the actual TruthfulQA data with correct and incorrect answers
-        qa_pairs = []
-        for doc in train_docs:
-            try:
-                # Extract question
-                if hasattr(task_data, 'doc_to_text'):
-                    question = task_data.doc_to_text(doc)
-                else:
-                    question = doc.get('question', str(doc))
-                
-                # Extract correct answer
-                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                
-                # Find the correct answer
-                correct_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 1 and i < len(correct_answers):
-                        correct_answer = correct_answers[i]
-                        break
-                
-                # Find an incorrect answer
-                incorrect_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 0 and i < len(correct_answers):
-                        incorrect_answer = correct_answers[i]
-                        break
-                
-                if correct_answer and incorrect_answer:
-                    qa_pairs.append({
-                        'question': question,
-                        'correct_answer': correct_answer,
-                        'incorrect_answer': incorrect_answer
+        if from_csv or from_json:
+            # Load data from CSV/JSON file using ContrastivePairSet
+            if verbose:
+                print(f"\n📁 Loading data from {'CSV' if from_csv else 'JSON'} file...")
+            
+            # ContrastivePairSet is imported at the top of the file
+            
+            if from_csv:
+                pair_set = ContrastivePairSet.from_csv_file(
+                    name="csv_data",
+                    csv_path=task_name,
+                    question_col=question_col,
+                    correct_col=correct_col,
+                    incorrect_col=incorrect_col,
+                    limit=limit
+                )
+            else:  # from_json
+                pair_set = ContrastivePairSet.from_json_file(
+                    name="json_data",
+                    json_path=task_name,
+                    limit=limit
+                )
+            
+            # Convert ContrastivePairSet to qa_pairs format for existing pipeline
+            all_qa_pairs = []
+            for pair in pair_set.pairs:
+                if hasattr(pair, 'question'):
+                    all_qa_pairs.append({
+                        'question': pair.question,
+                        'correct_answer': pair.correct_answer,
+                        'incorrect_answer': pair.incorrect_answer
                     })
+            
+            # Split the qa_pairs
+            import random
+            random.seed(seed)
+            random.shuffle(all_qa_pairs)
+            split_point = int(len(all_qa_pairs) * split_ratio)
+            qa_pairs = all_qa_pairs[:split_point]  # Training data
+            test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
+            
+            if verbose:
+                print(f"📊 Data split: {len(qa_pairs)} training pairs, {len(test_qa_pairs_source)} test pairs")
+            
+        else:
+            # Traditional lm-harness task loading
+            if verbose:
+                print(f"📚 Loading task data for {task_name}...")
+            task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
+            train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
+            
+            if verbose:
+                print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
+            
+            # Extract QA pairs from training documents  
+            if verbose:
+                print(f"\n📝 TRAINING DATA PREPARATION:")
+                print(f"   • Loading TruthfulQA data with correct/incorrect answers...")
+            
+            qa_pairs = []
+            for doc in train_docs:
+                try:
+                    # Extract question
+                    if hasattr(task_data, 'doc_to_text'):
+                        question = task_data.doc_to_text(doc)
+                    else:
+                        question = doc.get('question', str(doc))
                     
-            except Exception as e:
-                # Skip problematic docs
-                continue
+                    # Extract correct answer
+                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                    
+                    # Find the correct answer
+                    correct_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 1 and i < len(correct_answers):
+                            correct_answer = correct_answers[i]
+                            break
+                    
+                    # Find an incorrect answer
+                    incorrect_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 0 and i < len(correct_answers):
+                            incorrect_answer = correct_answers[i]
+                            break
+                    
+                    if correct_answer and incorrect_answer:
+                        qa_pairs.append({
+                            'question': question,
+                            'correct_answer': correct_answer,
+                            'incorrect_answer': incorrect_answer
+                        })
+                        
+                except Exception as e:
+                    # Skip problematic docs
+                    continue
+            
+            test_qa_pairs_source = test_docs  # Keep original format for test docs
         
         if verbose:
             print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
             print(f"\n🔍 Training Examples:")
-            for i, qa_pair in enumerate(qa_pairs[:5]):  # Show first 5
+            for i, qa_pair in enumerate(qa_pairs[:4]):  # Show first 4
                 print(f"\n   📋 Example {i+1}:")
-                print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                question_preview = qa_pair['question'][:100] + "..." if len(qa_pair['question']) > 100 else qa_pair['question']
+                print(f"      🔸 Question: {question_preview}")
                 print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
                 print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+
+        # Validate dataset size before proceeding
+        min_training_samples = 4
+        if len(qa_pairs) < min_training_samples:
+            error_msg = f"Insufficient training data: {len(qa_pairs)} pairs found, minimum {min_training_samples} required"
+            if verbose:
+                print(f"\n❌ ERROR: {error_msg}")
+                print(f"   • Consider increasing --limit or using a larger dataset")
+                print(f"   • CSV/JSON files should have at least {min_training_samples} rows")
+                print(f"   • lm-harness tasks may need higher --limit values")
+            
+            if not allow_small_dataset:
+                if verbose:
+                    print(f"   • Use --allow-small-dataset flag to bypass this check (may cause training issues)")
+                
+                return {
+                    "task_name": task_name,
+                    "model_name": model_name,
+                    "error": error_msg,
+                    "training_samples": len(qa_pairs),
+                    "minimum_required": min_training_samples,
+                    "suggestion": "Increase dataset size, --limit parameter, or use --allow-small-dataset flag"
+                }
+            else:
+                if verbose:
+                    print(f"   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag")
+                    print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
         
         # Create contrastive pairs using proper activation collection logic
+        from .core.activations import ActivationCollectionLogic, Activations, ActivationAggregationMethod
         collector = ActivationCollectionLogic(model=model)
         contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs)
         
@@ -386,12 +495,17 @@ def run_task_pipeline(
             # Special case: Interactive optimization - SKIP normal pipeline
             # Generate test questions for optimization
             test_questions = []
-            for doc in test_docs[:2]:  # Use first 2 test questions for optimization
+            for doc in test_qa_pairs_source[:2]:  # Use first 2 test questions for optimization
                 try:
-                    if hasattr(task_data, 'doc_to_text'):
-                        question = task_data.doc_to_text(doc)
+                    if from_csv or from_json:
+                        # For CSV/JSON, doc is already a qa_pair dict
+                        question = doc['question']
                     else:
-                        question = doc.get('question', str(doc))
+                        # For lm-harness tasks, extract from document
+                        if hasattr(task_data, 'doc_to_text'):
+                            question = task_data.doc_to_text(doc)
+                        else:
+                            question = doc.get('question', str(doc))
                     test_questions.append(question)
                 except:
                     continue
@@ -410,7 +524,7 @@ def run_task_pipeline(
                 if optimization_result.get('optimization_performed'):
                     layer = optimization_result['best_layer']
                     token_aggregation = optimization_result['best_aggregation']
-        if verbose:
+                    if verbose:
                         print(f"✅ Interactive optimization completed!")
                         print(f"   • Optimized layer: {layer} (was {original_layer})")
                         print(f"   • Optimized aggregation: {token_aggregation} (was {original_token_aggregation})")
@@ -435,43 +549,41 @@ def run_task_pipeline(
         elif optimize:
             # Load test data first for optimization
             test_qa_pairs = []
-            for doc in test_docs:
+            for doc in test_qa_pairs_source:
                 try:
-                    # Extract question - use both raw and formatted versions
-                    raw_question = doc.get('question', str(doc))
-                    if hasattr(task_data, 'doc_to_text'):
-                        formatted_question = task_data.doc_to_text(doc)
-                    else:
-                        formatted_question = raw_question
-                    
-                    # Extract correct answer
-                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                    
-                    # Find the correct answer
-                    correct_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 1 and i < len(correct_answers):
-                            correct_answer = correct_answers[i]
-                            break
-                    
-                    # Find an incorrect answer
-                    incorrect_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 0 and i < len(correct_answers):
-                            incorrect_answer = correct_answers[i]
-                            break
-                    
-                    if correct_answer and incorrect_answer:
+                    if from_csv or from_json:
+                        # For CSV/JSON, doc is already a qa_pair dict
                         test_qa_pairs.append({
-                            'question': raw_question,  # Raw question for display
-                            'formatted_question': formatted_question,  # Formatted for generation
-                            'correct_answer': correct_answer,
-                            'incorrect_answer': incorrect_answer
+                            'question': doc['question'],
+                            'formatted_question': doc['question'], 
+                            'correct_answer': doc['correct_answer']
                         })
+                    else:
+                        # For lm-harness tasks, extract from document
+                        raw_question = doc.get('question', str(doc))
+                        if hasattr(task_data, 'doc_to_text'):
+                            formatted_question = task_data.doc_to_text(doc)
+                        else:
+                            formatted_question = raw_question
+                        
+                        # Extract correct answer for ground truth comparison
+                        correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                        correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                        
+                        correct_answer = None
+                        for i, label in enumerate(correct_labels):
+                            if label == 1 and i < len(correct_answers):
+                                correct_answer = correct_answers[i]
+                                break
+                        
+                        if correct_answer:
+                            test_qa_pairs.append({
+                                'question': raw_question,
+                                'formatted_question': formatted_question,
+                                'correct_answer': correct_answer
+                            })
                         
                 except Exception as e:
-                    # Skip problematic docs
                     continue
             
             # Run smart optimization with caching
@@ -570,12 +682,46 @@ def run_task_pipeline(
         steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
         steering_method = SteeringMethod(method_type=steering_type, threshold=final_threshold, device=device)
         
-        training_results = steering_method.train(pair_set)
-        
-        if verbose:
-            print(f"✅ Training completed!")
-            print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
-            print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
+        try:
+            training_results = steering_method.train(pair_set)
+            
+            if verbose:
+                print(f"✅ Training completed!")
+                print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+                print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
+                
+        except ZeroDivisionError as e:
+            error_msg = f"Classifier training failed due to insufficient or imbalanced data: {str(e)}"
+            if verbose:
+                print(f"\n❌ TRAINING ERROR: {error_msg}")
+                print(f"   • This often happens with very small datasets")
+                print(f"   • Try increasing the dataset size or using --limit with a higher value")
+                print(f"   • Current training samples: {len(pair_set)}")
+            
+            return {
+                "task_name": task_name,
+                "model_name": model_name,
+                "error": error_msg,
+                "training_samples": len(pair_set),
+                "error_type": "division_by_zero",
+                "suggestion": "Increase dataset size or check data quality"
+            }
+            
+        except Exception as e:
+            error_msg = f"Classifier training failed: {str(e)}"
+            if verbose:
+                print(f"\n❌ TRAINING ERROR: {error_msg}")
+                print(f"   • Training samples: {len(pair_set)}")
+                print(f"   • Classifier type: {final_classifier_type}")
+                
+            return {
+                "task_name": task_name,
+                "model_name": model_name,
+                "error": error_msg,
+                "training_samples": len(pair_set),
+                "error_type": "training_failure",
+                "suggestion": "Check data quality or try a different classifier type"
+            }
         
         # Test the optimized classifier by generating responses and classifying them
         if optimize:
@@ -585,30 +731,39 @@ def run_task_pipeline(
             
             # Get test questions for response generation
             test_qa_pairs = []
-            for doc in test_docs:
+            for doc in test_qa_pairs_source:
                 try:
-                    raw_question = doc.get('question', str(doc))
-                    if hasattr(task_data, 'doc_to_text'):
-                        formatted_question = task_data.doc_to_text(doc)
-                    else:
-                        formatted_question = raw_question
-                    
-                    # Extract correct answer for ground truth comparison
-                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                    
-                    correct_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 1 and i < len(correct_answers):
-                            correct_answer = correct_answers[i]
-                            break
-                    
-                    if correct_answer:
+                    if from_csv or from_json:
+                        # For CSV/JSON, doc is already a qa_pair dict
                         test_qa_pairs.append({
-                            'question': raw_question,
-                            'formatted_question': formatted_question,
-                            'correct_answer': correct_answer
+                            'question': doc['question'],
+                            'formatted_question': doc['question'], 
+                            'correct_answer': doc['correct_answer']
                         })
+                    else:
+                        # For lm-harness tasks, extract from document
+                        raw_question = doc.get('question', str(doc))
+                        if hasattr(task_data, 'doc_to_text'):
+                            formatted_question = task_data.doc_to_text(doc)
+                        else:
+                            formatted_question = raw_question
+                        
+                        # Extract correct answer for ground truth comparison
+                        correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                        correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                        
+                        correct_answer = None
+                        for i, label in enumerate(correct_labels):
+                            if label == 1 and i < len(correct_answers):
+                                correct_answer = correct_answers[i]
+                                break
+                        
+                        if correct_answer:
+                            test_qa_pairs.append({
+                                'question': raw_question,
+                                'formatted_question': formatted_question,
+                                'correct_answer': correct_answer
+                            })
                         
                 except Exception as e:
                     continue
@@ -729,8 +884,8 @@ def run_task_pipeline(
                 "optimization_result": optimization_result,
                 "training_results": training_results,
                 "evaluation_results": evaluation_results,
-                "num_train": len(train_docs),
-                "num_test": len(test_docs),
+                "num_train": len(contrastive_pairs),
+                "num_test": len(test_qa_pairs),
                 "sample_responses": generated_responses,
                 "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
                 "correct_classifications": correct_classifications,
@@ -741,8 +896,8 @@ def run_task_pipeline(
                 print(f"\n🎉 OPTIMIZATION PIPELINE COMPLETED FOR {task_name.upper()}!")
                 print(f"{'='*80}")
                 print(f"📊 FINAL RESULTS:")
-                print(f"   • Training samples: {len(train_docs)}")
-                print(f"   • Test samples: {len(test_docs)}")
+                print(f"   • Training samples: {len(contrastive_pairs)}")
+                print(f"   • Test samples: {len(test_qa_pairs)}")
                 print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
                 if total_classifications > 0:
                     print(f"   • Test accuracy: {test_accuracy:.2%} ({correct_classifications}/{total_classifications})")
@@ -758,151 +913,147 @@ def run_task_pipeline(
             return results
         else:
             # Only do pre-written validation when NOT optimizing
-        if verbose:
-            print(f"\n🧪 PREPARING TEST DATA:")
-            print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
-        
-        # Get the actual TruthfulQA test data with correct and incorrect answers
-        test_qa_pairs = []
-        for doc in test_docs:
-            try:
-                # Extract question - use both raw and formatted versions
-                raw_question = doc.get('question', str(doc))
-                if hasattr(task_data, 'doc_to_text'):
-                    formatted_question = task_data.doc_to_text(doc)
-                else:
-                    formatted_question = raw_question
-                
-                # Extract correct answer
-                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                
-                # Find the correct answer
-                correct_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 1 and i < len(correct_answers):
-                        correct_answer = correct_answers[i]
-                        break
-                
-                # Find an incorrect answer
-                incorrect_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 0 and i < len(correct_answers):
-                        incorrect_answer = correct_answers[i]
-                        break
-                
-                if correct_answer and incorrect_answer:
-                    test_qa_pairs.append({
-                        'question': raw_question,  # Raw question for display
-                        'formatted_question': formatted_question,  # Formatted for generation
-                        'correct_answer': correct_answer,
-                        'incorrect_answer': incorrect_answer
-                    })
-                    
-            except Exception as e:
-                # Skip problematic docs
-                continue
-        
-        if verbose:
-            print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
-            print(f"\n🔍 Test Examples:")
-            for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
-                print(f"\n   📋 Test Example {i+1}:")
-                print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
-                print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
-                print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
-        
-        # Create test contrastive pairs using proper activation collection logic
-        test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
-        
-        if verbose:
-            print(f"\n🔄 Created {len(test_contrastive_pairs)} test contrastive pairs:")
-            for i, pair in enumerate(test_contrastive_pairs[:2]):  # Show first 2
-                print(f"\n   🔄 Test Pair {i+1}:")
-                print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
-                print(f"      🟢 Positive (B): {pair.positive_response}")
-                print(f"      🔴 Negative (A): {pair.negative_response}")
-        
-        # Extract activations from the test choice tokens
-        if verbose:
-            print(f"\n🔬 Extracting test activations from layer {layer} choice tokens...")
-        
-        test_processed_pairs = collector.collect_activations_batch(
-            pairs=test_contrastive_pairs,
-            layer_index=layer,
-            device=device
-        )
-        
-        # Convert to ContrastivePairSet format for evaluation
-        test_phrase_pairs = []
-        for pair in test_processed_pairs:
-            # Create the full prompts for the pair set
-            positive_full = f"{pair.prompt}{pair.positive_response}"
-            negative_full = f"{pair.prompt}{pair.negative_response}"
+            if verbose:
+                print(f"\n🧪 PREPARING TEST DATA:")
+                print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
             
-            test_phrase_pairs.append({
-                "harmful": negative_full,  # A choice (incorrect)
-                "harmless": positive_full  # B choice (correct)
-            })
-        
-        test_pair_set = ContrastivePairSet.from_phrase_pairs(
-            name=f"{task_name}_test",
-            phrase_pairs=test_phrase_pairs,
-            task_type="lm_evaluation"
-        )
-        
-        # Store the real test activations in the pair set response objects
-        for i, processed_pair in enumerate(test_processed_pairs):
-            if i < len(test_pair_set.pairs):
-                # Assign activations to the response objects, not the pair directly
-                if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
-                    test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
-                if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
-                    test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
-        
-        if verbose:
-            print(f"\n📊 Evaluating classifier on test set...")
-        evaluation_results = steering_method.evaluate(test_pair_set)
-        
-        if verbose:
-            print(f"✅ Classifier validation completed!")
-            print(f"   • Validated on pre-written answer choices only")
-        
-        # Generate sample responses with token-level classification
-        if verbose:
+            # Get the actual test data with correct and incorrect answers
+            test_qa_pairs = []
+            for doc in test_qa_pairs_source:
+                try:
+                    if from_csv or from_json:
+                        # For CSV/JSON, doc is already a qa_pair dict
+                        test_qa_pairs.append({
+                            'question': doc['question'],
+                            'formatted_question': doc['question'],
+                            'correct_answer': doc['correct_answer'],
+                            'incorrect_answer': doc['incorrect_answer']
+                        })
+                    else:
+                        # For lm-harness tasks, extract from document
+                        raw_question = doc.get('question', str(doc))
+                        if hasattr(task_data, 'doc_to_text'):
+                            formatted_question = task_data.doc_to_text(doc)
+                        else:
+                            formatted_question = raw_question
+                        
+                        # Extract correct answer
+                        correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                        correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                        
+                        # Find the correct answer
+                        correct_answer = None
+                        for i, label in enumerate(correct_labels):
+                            if label == 1 and i < len(correct_answers):
+                                correct_answer = correct_answers[i]
+                                break
+                        
+                        # Find an incorrect answer
+                        incorrect_answer = None
+                        for i, label in enumerate(correct_labels):
+                            if label == 0 and i < len(correct_answers):
+                                incorrect_answer = correct_answers[i]
+                                break
+                        
+                        if correct_answer and incorrect_answer:
+                            test_qa_pairs.append({
+                                'question': raw_question,
+                                'formatted_question': formatted_question,
+                                'correct_answer': correct_answer,
+                                'incorrect_answer': incorrect_answer
+                            })
+                        
+                except Exception as e:
+                    # Skip problematic docs
+                    continue
+            
+            if verbose:
+                print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
+                print(f"\n🔍 Test Examples:")
+                for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
+                    print(f"\n   📋 Test Example {i+1}:")
+                    print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                    print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+            
+            # Create test contrastive pairs using proper activation collection logic
+            test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
+            
+            test_processed_pairs = collector.collect_activations_batch(
+                pairs=test_contrastive_pairs,
+                layer_index=layer,
+                device=device
+            )
+            
+            # Convert to ContrastivePairSet format for evaluation
+            test_phrase_pairs = []
+            for pair in test_processed_pairs:
+                # Create the full prompts for the pair set
+                positive_full = f"{pair.prompt}{pair.positive_response}"
+                negative_full = f"{pair.prompt}{pair.negative_response}"
+                
+                test_phrase_pairs.append({
+                    "harmful": negative_full,  # A choice (incorrect)
+                    "harmless": positive_full  # B choice (correct)
+                })
+            
+            test_pair_set = ContrastivePairSet.from_phrase_pairs(
+                name=f"{task_name}_test",
+                phrase_pairs=test_phrase_pairs,
+                task_type="lm_evaluation"
+            )
+            
+            # Store the real test activations in the pair set response objects
+            for i, processed_pair in enumerate(test_processed_pairs):
+                if i < len(test_pair_set.pairs):
+                    # Assign activations to the response objects, not the pair directly
+                    if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
+                        test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                    if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
+                        test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
+            
+            if verbose:
+                print(f"\n📊 Evaluating classifier on test set...")
+            evaluation_results = steering_method.evaluate(test_pair_set)
+            
+            if verbose:
+                print(f"✅ Classifier validation completed!")
+                print(f"   • Validated on pre-written answer choices only")
+            
+            # Generate sample responses with token-level classification
+            if verbose:
                 if optimize:
                     print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
                     print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses with optimized layer {layer}...")
                 else:
-            print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
-            print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
-        
-        generated_responses = []
-        correct_classifications = 0
-        total_classifications = 0
-        
-        for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
+                    print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
+                    print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
+            
+            generated_responses = []
+            correct_classifications = 0
+            total_classifications = 0
+            
+            for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
                 if verbose and not optimize:  # Only show detailed progress when not optimizing
-                print(f"\n   🎯 Generating response {i+1}:")
-                print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
-            
-            # Use the raw question for natural generation
-            # The formatted_question contains few-shot examples which are for training, not generation
-            simple_prompt = qa_pair['question']
-            
-            # Generate response with token-level scoring
-            response, token_scores, classification = generate_with_classification(
+                    print(f"\n   🎯 Generating response {i+1}:")
+                    print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                
+                # Use the raw question for natural generation
+                # The formatted_question contains few-shot examples which are for training, not generation
+                simple_prompt = qa_pair['question']
+                
+                # Generate response with token-level scoring
+                response, token_scores, classification = generate_with_classification(
                     model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, final_threshold, verbose and not optimize
-            )
-            
+                )
+                
                 # Evaluate the generated response using the ground truth evaluator
-            try:
+                try:
                     # Create ground truth evaluator
                     evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
-                
+                    
                     # Get correct answer for comparison
-                correct_answers = qa_pair.get('correct_answer', '')
-                
+                    correct_answers = qa_pair.get('correct_answer', '')
+                    
                     # Get user label if available
                     user_label = None
                     if user_labels and i < len(user_labels):
@@ -916,53 +1067,53 @@ def run_task_pipeline(
                     # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
                     classification_correct = None
                     if ground_truth != "UNKNOWN":
-                classification_correct = (classification == ground_truth)
-                if classification_correct:
-                    correct_classifications += 1
-                total_classifications += 1
-                
-                generated_responses.append({
-                    'response': response,
-                    'token_scores': token_scores,
-                    'classification': classification,
-                    'ground_truth': ground_truth,
+                        classification_correct = (classification == ground_truth)
+                        if classification_correct:
+                            correct_classifications += 1
+                        total_classifications += 1
+                    
+                    generated_responses.append({
+                        'response': response,
+                        'token_scores': token_scores,
+                        'classification': classification,
+                        'ground_truth': ground_truth,
                         'ground_truth_method': evaluation_result["method_used"],
                         'ground_truth_confidence': evaluation_result["confidence"],
                         'ground_truth_details': evaluation_result["details"],
-                    'classification_correct': classification_correct
-                })
-                
+                        'classification_correct': classification_correct
+                    })
+                    
                     if verbose and not optimize:  # Only show detailed output when not optimizing
-                    print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                    print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                    if len(token_scores) > 10:
-                        print(f"                    ... ({len(token_scores)} total tokens)")
-                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
-                    print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
+                        print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                        if len(token_scores) > 10:
+                            print(f"                    ... ({len(token_scores)} total tokens)")
+                        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                        print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
                         print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
                         if classification_correct is not None:
-                    print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                            print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
                         else:
                             print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
-                    print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                    print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                        print(f"      ❌ Incorrect: {qa_pair['correct_answer']}")
                         if evaluation_result["details"]:
                             print(f"      📝 Details: {evaluation_result['details']}")
                     
-            except Exception as e:
+                except Exception as e:
                     if verbose and not optimize:
-                    print(f"      ⚠️  Could not evaluate response: {e}")
-                generated_responses.append({
-                    'response': response,
-                    'token_scores': token_scores,
-                    'classification': classification,
-                    'ground_truth': 'UNKNOWN',
+                        print(f"      ⚠️  Could not evaluate response: {e}")
+                    generated_responses.append({
+                        'response': response,
+                        'token_scores': token_scores,
+                        'classification': classification,
+                        'ground_truth': 'UNKNOWN',
                         'ground_truth_method': 'error',
                         'ground_truth_confidence': 0.0,
                         'ground_truth_details': f'Error during evaluation: {str(e)}',
-                    'classification_correct': None
-                })
-        
+                        'classification_correct': None
+                    })
+            
             # Show summary for optimization
             if verbose and optimize:
                 print(f"\n   ✅ Generated {len(generated_responses)} responses with optimized layer {layer}")
@@ -970,42 +1121,42 @@ def run_task_pipeline(
                     classification_acc = correct_classifications / total_classifications
                     print(f"   📊 Classification accuracy: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
             
-        results = {
-            "task_name": task_name,
-            "model_name": model_name,
-            "layer": layer,
+            results = {
+                "task_name": task_name,
+                "model_name": model_name,
+                "layer": layer,
                 "original_layer": original_layer,
-            "token_aggregation": token_aggregation,
+                "token_aggregation": token_aggregation,
                 "original_token_aggregation": original_token_aggregation,
                 "optimization_performed": optimize,
                 "optimization_result": optimization_result,
-            "training_results": training_results,
-            "evaluation_results": evaluation_results,
-            "num_train": len(train_docs),
-            "num_test": len(test_docs),
-            "sample_responses": generated_responses,
-            "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
-            "correct_classifications": correct_classifications,
-            "total_classifications": total_classifications
-        }
-        
-        if verbose:
-            print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
-            print(f"{'='*80}")
-            print(f"📊 FINAL RESULTS:")
-            print(f"   • Training samples: {len(train_docs)}")
-            print(f"   • Test samples: {len(test_docs)}")
-            print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
-            print(f"   • Generated responses: {len(generated_responses)}")
-            if total_classifications > 0:
-                classification_acc = correct_classifications / total_classifications
-                print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
-            else:
-                print(f"   • Classification accuracy: Could not evaluate")
-            print(f"{'='*80}\n")
-        
-        logger.info(f"Pipeline completed for {task_name}")
-        return results
+                "training_results": training_results,
+                "evaluation_results": evaluation_results,
+                "num_train": len(contrastive_pairs),
+                "num_test": len(test_qa_pairs),
+                "sample_responses": generated_responses,
+                "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
+                "correct_classifications": correct_classifications,
+                "total_classifications": total_classifications
+            }
+            
+            if verbose:
+                print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
+                print(f"{'='*80}")
+                print(f"📊 FINAL RESULTS:")
+                print(f"   • Training samples: {len(contrastive_pairs)}")
+                print(f"   • Test samples: {len(test_qa_pairs)}")
+                print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+                print(f"   • Generated responses: {len(generated_responses)}")
+                if total_classifications > 0:
+                    classification_acc = correct_classifications / total_classifications
+                    print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
+                else:
+                    print(f"   • Classification accuracy: Could not evaluate")
+                print(f"{'='*80}\n")
+            
+            logger.info(f"Pipeline completed for {task_name}")
+            return results
         
     except Exception as e:
         logger.error(f"Error in pipeline for {task_name}: {e}")
@@ -1163,21 +1314,35 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    # Parse task names
-    task_names = [name.strip() for name in args.task_names.split(",")]
+    # Validate file input arguments
+    if args.from_csv and args.from_json:
+        print("Error: Cannot specify both --from-csv and --from-json")
+        sys.exit(1)
+    
+    # Parse task names or file paths
+    if args.from_csv or args.from_json:
+        # Single file input
+        file_path = args.task_names
+        if not os.path.exists(file_path):
+            print(f"Error: File not found: {file_path}")
+            sys.exit(1)
+        task_sources = [file_path]
+    else:
+        # Traditional task names
+        task_sources = [name.strip() for name in args.task_names.split(",")]
     
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
     
-    logger.info(f"Starting wisent-guard harness for tasks: {task_names}")
+    logger.info(f"Starting wisent-guard harness for sources: {task_sources}")
     logger.info(f"Model: {args.model}, Layer: {args.layer}")
     
     try:
-        # Run pipeline for each task
+        # Run pipeline for each source
         all_results = {}
         
-        for task_name in task_names:
-            logger.info(f"Processing task: {task_name}")
+        for source in task_sources:
+            logger.info(f"Processing source: {source}")
             
             # Determine if optimization should be enabled
             should_optimize = args.optimize or (args.auto_optimize and args.layer == -1)
@@ -1188,8 +1353,14 @@ def main():
             else:
                 layer_to_use = args.layer if args.layer != -1 else 15  # Default to 15 if not specified
             
+            # For file inputs, use the file path as task name
+            if args.from_csv or args.from_json:
+                display_name = f"file_{os.path.basename(source)}"
+            else:
+                display_name = source
+            
             task_results = run_task_pipeline(
-                task_name=task_name,
+                task_name=source,
                 model_name=args.model,
                 layer=layer_to_use,
                 shots=args.shots,
@@ -1206,10 +1377,16 @@ def main():
                 optimize_layers=args.optimize_layers,
                 optimize_metric=args.optimize_metric,
                 optimize_max_combinations=args.optimize_max_combinations,
-                verbose=args.verbose
+                verbose=args.verbose,
+                from_csv=args.from_csv,
+                from_json=args.from_json,
+                question_col=args.question_col,
+                correct_col=args.correct_col,
+                incorrect_col=args.incorrect_col,
+                allow_small_dataset=args.allow_small_dataset
             )
             
-            all_results[task_name] = task_results
+            all_results[display_name] = task_results
         
         # Save results
         timestamp = __import__('datetime').datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1242,7 +1419,7 @@ def main():
                 training_acc = results.get("training_results", {}).get("accuracy", "N/A")
                 eval_acc = results.get("evaluation_results", {}).get("accuracy", "N/A")
                 if isinstance(training_acc, float) and isinstance(eval_acc, float):
-                print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
+                    print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
                 else:
                     print(f"{task_name}: Train={training_acc} | Test={eval_acc}")
             else:
