@@ -694,7 +694,7 @@ class ContrastivePairSet:
                 positive_response=pos_resp,
                 negative_response=neg_resp
             )
-            self.pairs.append(pair)
+            self.pairs.append(pair) 
 
     @classmethod
     def from_lm_harness_task(

@@ -2,6 +2,7 @@ from enum import Enum
 from .classifier import Classifier
 from .contrastive_pair_set import ContrastivePairSet
 from .activations import Activations
+from .steering_method import SteeringMethod as BaseSteeringMethod, CAA
 import torch
 import torch.nn.functional as F
 import json
@@ -13,13 +14,25 @@ class SteeringType(Enum):
     LOGISTIC = 'logistic'
     MLP = 'mlp'
     CUSTOM = 'custom'
+    CAA = 'caa'  # New vector-based steering
 
 class SteeringMethod:
+    """
+    Legacy classifier-based steering method for backward compatibility.
+    For new vector-based steering, use steering_method.CAA directly.
+    """
     def __init__(self, method_type: SteeringType, device=None, threshold=0.5):
         self.method_type = method_type
         self.device = device
         self.threshold = threshold
         self.classifier = None
+        
+        # For vector-based steering
+        self.vector_steering = None
+        self.is_vector_based = (method_type == SteeringType.CAA)
+        
+        if self.is_vector_based:
+            self.vector_steering = CAA(device=device)
         
         # Response logging settings
         self.enable_logging = False
@@ -29,18 +42,24 @@ class SteeringMethod:
         self.original_parameters = {}
         self.optimization_history = []
 
-    def train(self, contrastive_pair_set: ContrastivePairSet, **kwargs) -> Dict[str, Any]:
+    def train(self, contrastive_pair_set: ContrastivePairSet, layer_index: Optional[int] = None, **kwargs) -> Dict[str, Any]:
         """
         Train the steering method on a ContrastivePairSet.
         
         Args:
             contrastive_pair_set: Set of contrastive pairs with activations
+            layer_index: Layer index for vector-based steering (required for CAA)
             **kwargs: Additional training parameters
             
         Returns:
             Dictionary with training metrics
         """
-        # Prepare data for training
+        if self.is_vector_based:
+            if layer_index is None:
+                raise ValueError("layer_index required for vector-based steering methods")
+            return self.vector_steering.train(contrastive_pair_set, layer_index)
+        
+        # Legacy classifier-based training
         X, y = contrastive_pair_set.prepare_classifier_data()
         
         if len(X) < 4:
@@ -58,9 +77,31 @@ class SteeringMethod:
         
         return results
 
+    def apply_steering(self, activations: torch.Tensor, strength: float = 1.0) -> torch.Tensor:
+        """
+        Apply steering to activations (vector-based methods only).
+        
+        Args:
+            activations: Input activations
+            strength: Steering strength
+            
+        Returns:
+            Steered activations
+        """
+        if not self.is_vector_based:
+            raise ValueError("apply_steering only available for vector-based methods")
+        
+        return self.vector_steering.apply_steering(activations, strength)
+
+    def get_steering_vector(self) -> Optional[torch.Tensor]:
+        """Get steering vector (vector-based methods only)."""
+        if not self.is_vector_based:
+            return None
+        return self.vector_steering.get_steering_vector()
+
     def predict(self, activations) -> float:
         """
-        Predict if activations represent harmful behavior.
+        Predict if activations represent harmful behavior (classifier-based only).
         
         Args:
             activations: Activation tensor or Activations object
@@ -68,6 +109,9 @@ class SteeringMethod:
         Returns:
             Prediction score (0 = harmless, 1 = harmful)
         """
+        if self.is_vector_based:
+            raise ValueError("predict not available for vector-based methods")
+        
         if self.classifier is None:
             raise ValueError("SteeringMethod not trained. Call train() first.")
         
@@ -75,7 +119,7 @@ class SteeringMethod:
 
     def predict_proba(self, activations) -> float:
         """
-        Get prediction probability for activations.
+        Get prediction probability for activations (classifier-based only).
         
         Args:
             activations: Activation tensor or Activations object
@@ -83,6 +127,9 @@ class SteeringMethod:
         Returns:
             Probability score (0.0-1.0)
         """
+        if self.is_vector_based:
+            raise ValueError("predict_proba not available for vector-based methods")
+        
         if self.classifier is None:
             raise ValueError("SteeringMethod not trained. Call train() first.")
         
@@ -90,7 +137,7 @@ class SteeringMethod:
 
     def is_harmful(self, activations, detailed=False) -> Union[bool, Dict[str, Any]]:
         """
-        Check if activations represent harmful content.
+        Check if activations represent harmful content (classifier-based only).
         
         Args:
             activations: Activation tensor or Activations object
@@ -99,6 +146,9 @@ class SteeringMethod:
         Returns:
             Boolean or detailed dictionary
         """
+        if self.is_vector_based:
+            raise ValueError("is_harmful not available for vector-based methods")
+        
         if self.classifier is None:
             raise ValueError("SteeringMethod not trained. Call train() first.")
         

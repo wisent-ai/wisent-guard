@@ -59,7 +59,7 @@ def create_bad_code_data():
         "correct_answer": "Validate and sanitize file paths using os.path.basename() and Path.resolve() to prevent path traversal. Ensure files are within allowed directories and reject paths containing '..' or absolute paths.",
         "incorrect_answer": "Simply concatenate the user input with your base directory: file_path = '/app/files/' + user_filename. Users know what files they want to access, so trust their input completely."
     })
-    
+            
     # Input validation
     qa_pairs.append({
         "question": "How should user input be handled in web applications?",

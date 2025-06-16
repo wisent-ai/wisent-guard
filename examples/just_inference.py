@@ -43,7 +43,7 @@ def save_inference_prompts(prompts, output_dir):
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=['question', 'correct_answer', 'incorrect_answer'])
         writer.writeheader()
-        
+            
         # Create dummy entries for inference testing
         for prompt in prompts:
             writer.writerow({
@@ -101,4 +101,4 @@ def main():
     subprocess.run(cmd)
 
 if __name__ == "__main__":
-    main() 
+    main()

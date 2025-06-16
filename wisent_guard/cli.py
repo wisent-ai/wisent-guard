@@ -111,6 +111,16 @@ Examples:
     parser.add_argument("--log-detections", action="store_true",
                        help="Enable logging of detection events")
     
+    # Steering mode arguments
+    parser.add_argument("--steering-mode", action="store_true",
+                       help="Enable steering mode (uses CAA vectors instead of classification)")
+    parser.add_argument("--steering-strength", type=float, default=1.0,
+                       help="Steering vector strength multiplier (default: 1.0)")
+    parser.add_argument("--save-steering-vector", type=str, default=None,
+                       help="Path to save the computed steering vector")
+    parser.add_argument("--load-steering-vector", type=str, default=None,
+                       help="Path to load a pre-computed steering vector")
+    
     return parser
 
 
@@ -399,7 +409,11 @@ def run_task_pipeline(
     placeholder_message: str = None,
     max_regeneration_attempts: int = 3,
     detection_threshold: float = 0.6,
-    log_detections: bool = False
+    log_detections: bool = False,
+    steering_mode: bool = False,
+    steering_strength: float = 1.0,
+    save_steering_vector: str = None,
+    load_steering_vector: str = None
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -580,7 +594,7 @@ def run_task_pipeline(
                 except Exception as e:
                     # Skip problematic docs
                     continue
-            
+                
             test_qa_pairs_source = test_docs  # Keep original format for test docs
         
         if verbose:
@@ -671,6 +685,7 @@ def run_task_pipeline(
                 if optimization_result.get('optimization_performed'):
                     layer = optimization_result['best_layer']
                     token_aggregation = optimization_result['best_aggregation']
+                    
                     if verbose:
                         print(f"✅ Interactive optimization completed!")
                         print(f"   • Optimized layer: {layer} (was {original_layer})")
@@ -812,6 +827,70 @@ def run_task_pipeline(
                 if hasattr(pair_set.pairs[i], 'negative_response') and pair_set.pairs[i].negative_response:
                     pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
         
+        # STEERING MODE vs CLASSIFICATION MODE
+        if steering_mode:
+            if verbose:
+                print(f"\n🎯 STEERING MODE: Computing CAA Vector")
+                print(f"   • Method: Contrastive Activation Addition (CAA)")
+                print(f"   • Target layer: {layer}")
+                print(f"   • Training pairs: {len(pair_set)}")
+                print(f"   • Steering strength: {steering_strength}")
+            
+            # Import CAA from steering_method
+            from .core.steering_method import CAA
+            
+            # Create CAA steering method
+            caa_steering = CAA(device=device)
+            
+            # Train CAA to compute steering vector
+            try:
+                training_stats = caa_steering.train(pair_set, layer)
+                
+                if verbose:
+                    print(f"✅ CAA vector computed successfully!")
+                    print(f"   • Vector norm: {training_stats['vector_norm']:.4f}")
+                    print(f"   • Vector shape: {training_stats['vector_shape']}")
+                    print(f"   • Training pairs used: {training_stats['num_pairs']}")
+                
+                # Save steering vector if requested
+                if save_steering_vector:
+                    success = caa_steering.save_steering_vector(save_steering_vector)
+                    if verbose:
+                        if success:
+                            print(f"   • Saved steering vector to: {save_steering_vector}")
+                        else:
+                            print(f"   • Failed to save steering vector to: {save_steering_vector}")
+                
+                # Return steering mode results
+                return {
+                    "task_name": task_name,
+                    "model_name": model_name,
+                    "layer": layer,
+                    "steering_mode": True,
+                    "steering_method": "CAA",
+                    "steering_strength": steering_strength,
+                    "training_stats": training_stats,
+                    "training_pairs": len(pair_set),
+                    "vector_saved": save_steering_vector is not None
+                }
+                
+            except Exception as e:
+                error_msg = f"CAA steering vector computation failed: {str(e)}"
+                if verbose:
+                    print(f"\n❌ STEERING ERROR: {error_msg}")
+                    print(f"   • Training pairs: {len(pair_set)}")
+                    print(f"   • Layer: {layer}")
+                
+                return {
+                    "task_name": task_name,
+                    "model_name": model_name,
+                    "error": error_msg,
+                    "steering_mode": True,
+                    "error_type": "steering_failure",
+                    "suggestion": "Check activation extraction and data quality"
+                }
+        
+        # CLASSIFICATION MODE (original logic)
         # Train classifier using optimized type (if optimization was performed)
         if optimize:
             final_classifier_type = optimized_classifier_type
@@ -831,12 +910,12 @@ def run_task_pipeline(
         
         try:
             training_results = steering_method.train(pair_set)
-            
+        
             if verbose:
                 print(f"✅ Training completed!")
                 print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
                 print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
-                
+        
         except ZeroDivisionError as e:
             error_msg = f"Classifier training failed due to insufficient or imbalanced data: {str(e)}"
             if verbose:
@@ -1552,7 +1631,11 @@ def main():
                 placeholder_message=args.placeholder_message,
                 max_regeneration_attempts=args.max_regeneration_attempts,
                 detection_threshold=args.detection_threshold,
-                log_detections=args.log_detections
+                log_detections=args.log_detections,
+                steering_mode=args.steering_mode,
+                steering_strength=args.steering_strength,
+                save_steering_vector=args.save_steering_vector,
+                load_steering_vector=args.load_steering_vector
             )
             
             all_results[display_name] = task_results
