@@ -18,6 +18,7 @@ from .core.model import Model
 from .core.classifier import Classifier
 from .core.layer import Layer
 from .optimize import run_smart_optimization, run_interactive_optimization, generate_with_all_layer_activations, compute_classification_score
+from .core.detection_handling import DetectionHandler, DetectionAction
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -38,6 +39,11 @@ Examples:
   python -m wisent_guard tasks truthfulqa --optimize --optimize-layers "10-20" --model meta-llama/Llama-3.1-8B
   python -m wisent_guard tasks data.csv --from-csv --model meta-llama/Llama-3.1-8B
   python -m wisent_guard tasks data.json --from-json --model meta-llama/Llama-3.1-8B
+  
+  # Detection handling examples:
+  python -m wisent_guard tasks data.csv --from-csv --detection-action replace_with_placeholder
+  python -m wisent_guard tasks data.csv --from-csv --detection-action regenerate_until_safe --max-regeneration-attempts 5
+  python -m wisent_guard tasks data.csv --from-csv --detection-action replace_with_placeholder --placeholder-message "Content flagged for review"
         """
     )
     
@@ -90,6 +96,20 @@ Examples:
     # Dataset validation arguments
     parser.add_argument("--allow-small-dataset", action="store_true",
                        help="Allow training with datasets smaller than 4 samples (may cause training issues)")
+    
+    # Detection handling arguments
+    parser.add_argument("--detection-action", type=str, 
+                       choices=["pass_through", "replace_with_placeholder", "regenerate_until_safe"],
+                       default="pass_through",
+                       help="Action to take when problematic content is detected (default: pass_through)")
+    parser.add_argument("--placeholder-message", type=str, default=None,
+                       help="Custom placeholder message for detected content (if not specified, uses default)")
+    parser.add_argument("--max-regeneration-attempts", type=int, default=3,
+                       help="Maximum attempts to regenerate safe content (default: 3)")
+    parser.add_argument("--detection-threshold", type=float, default=0.6,
+                       help="Threshold for classification (higher = more strict detection) (default: 0.6)")
+    parser.add_argument("--log-detections", action="store_true",
+                       help="Enable logging of detection events")
     
     return parser
 
@@ -149,9 +169,102 @@ def aggregate_token_scores(token_scores: List[float], method: str) -> float:
         return sum(token_scores) / len(token_scores)
 
 
+def generate_with_classification_and_handling(
+    model, prompt, layer, max_new_tokens, steering_method, 
+    token_aggregation="average", threshold=0.6, verbose=False,
+    detection_handler=None
+):
+    """
+    Generate text with token-level classification and optional detection handling.
+    
+    Args:
+        model: Model object
+        prompt: Input prompt
+        layer: Layer index for activation extraction
+        max_new_tokens: Maximum tokens to generate
+        steering_method: Trained steering method with classifier
+        token_aggregation: How to aggregate token scores ("average", "final", "first", "max", "min")
+        threshold: Classification threshold
+        verbose: Whether to print debug info
+        detection_handler: Optional DetectionHandler for handling detected issues
+        
+    Returns:
+        Tuple of (final_response_text, token_scores, classification, was_handled)
+    """
+    from .core.detection_handling import DetectionHandler, DetectionAction
+    
+    # Generate initial response with classification
+    original_response, token_scores, classification = generate_with_classification(
+        model, prompt, layer, max_new_tokens, steering_method, token_aggregation, threshold, verbose
+    )
+    
+    # If no handler provided or no detection, return as-is
+    if not detection_handler:
+        return original_response, token_scores, classification, False
+    
+    # Determine if content should be handled (detected as problematic)
+    is_problematic = classification == "HALLUCINATION"
+    
+    if not is_problematic:
+        # Content is fine, return as-is
+        return original_response, token_scores, classification, False
+    
+    # Content is problematic, apply handling
+    if verbose:
+        print(f"      🚨 Detected problematic content, applying {detection_handler.action.value} handling...")
+    
+    # Calculate confidence score for the detection
+    if token_scores:
+        confidence_score = aggregate_token_scores(token_scores, token_aggregation)
+    else:
+        confidence_score = 0.5
+    
+    # Create regeneration function if needed
+    regenerate_function = None
+    if detection_handler.action == DetectionAction.REGENERATE_UNTIL_SAFE:
+        def regenerate():
+            # Generate a new response
+            new_response, new_token_scores, new_classification = generate_with_classification(
+                model, prompt, layer, max_new_tokens, steering_method, token_aggregation, threshold, verbose
+            )
+            # Only return if it's not problematic
+            if new_classification != "HALLUCINATION":
+                return new_response
+            else:
+                # Still problematic, raise exception to trigger retry
+                raise Exception(f"Generated response still classified as {new_classification}")
+        
+        regenerate_function = regenerate
+    
+    # Handle the detection
+    final_response = detection_handler.handle_detection(
+        original_response=original_response,
+        detection_type="hallucination",  # Could be made configurable
+        confidence_score=confidence_score,
+        original_prompt=prompt,
+        regenerate_function=regenerate_function
+    )
+    
+    # If regeneration was successful, get new token scores and classification
+    if (detection_handler.action == DetectionAction.REGENERATE_UNTIL_SAFE 
+        and final_response != original_response 
+        and not final_response.startswith("I apologize")):  # Not a fallback placeholder
+        
+        # Re-classify the final response
+        final_response_clean, final_token_scores, final_classification = generate_with_classification(
+            model, prompt, layer, max_new_tokens, steering_method, token_aggregation, threshold, verbose=False
+        )
+        
+        if final_response_clean.strip() == final_response.strip():
+            return final_response, final_token_scores, final_classification, True
+    
+    # For placeholder or pass-through, return original scores but indicate handling occurred
+    return final_response, token_scores, classification, True
+
+
 def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, token_aggregation="average", threshold=0.6, verbose=False):
     """
-    Generate text with token-level hallucination classification.
+    Generate text with token-level classification.
     
     Args:
         model: Model object
@@ -281,7 +394,12 @@ def run_task_pipeline(
     question_col: str = "question",
     correct_col: str = "correct_answer",
     incorrect_col: str = "incorrect_answer",
-    allow_small_dataset: bool = False
+    allow_small_dataset: bool = False,
+    detection_action: str = "pass_through",
+    placeholder_message: str = None,
+    max_regeneration_attempts: int = 3,
+    detection_threshold: float = 0.6,
+    log_detections: bool = False
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -336,6 +454,35 @@ def run_task_pipeline(
             print(f"\n🔧 Initializing model and primitives...")
         model = Model(name=model_name, device=device)
         layer_obj = Layer(index=layer, type="transformer")
+        
+        # Create detection handler based on CLI arguments
+        if verbose and detection_action != "pass_through":
+            print(f"\n🛡️  Setting up detection handling:")
+            print(f"   • Action: {detection_action}")
+            if placeholder_message:
+                print(f"   • Custom placeholder: {placeholder_message}")
+            if detection_action == "regenerate_until_safe":
+                print(f"   • Max regeneration attempts: {max_regeneration_attempts}")
+            print(f"   • Detection threshold: {detection_threshold}")
+            print(f"   • Logging enabled: {log_detections}")
+        
+        detection_handler = None
+        if detection_action != "pass_through":
+            from .core.detection_handling import DetectionHandler, DetectionAction
+            
+            # Map string to enum
+            action_mapping = {
+                "pass_through": DetectionAction.PASS_THROUGH,
+                "replace_with_placeholder": DetectionAction.REPLACE_WITH_PLACEHOLDER,
+                "regenerate_until_safe": DetectionAction.REGENERATE_UNTIL_SAFE
+            }
+            
+            detection_handler = DetectionHandler(
+                action=action_mapping[detection_action],
+                placeholder_message=placeholder_message,
+                max_regeneration_attempts=max_regeneration_attempts,
+                log_detections=log_detections
+            )
         
         if from_csv or from_json:
             # Load data from CSV/JSON file using ContrastivePairSet
@@ -793,9 +940,10 @@ def run_task_pipeline(
                 # Use the raw question for natural generation
                 simple_prompt = qa_pair['question']
                 
-                # Generate response with token-level scoring
-                response, token_scores, classification = generate_with_classification(
-                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, final_threshold, verbose
+                # Generate response with token-level scoring and detection handling
+                response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                    model, simple_prompt, layer, max_new_tokens, steering_method, 
+                    token_aggregation, detection_threshold, verbose and not optimize, detection_handler
                 )
                 
                 # Evaluate the generated response using the ground truth evaluator
@@ -827,12 +975,15 @@ def run_task_pipeline(
                         total_classifications += 1
                     
                     generated_responses.append({
-                        'question': qa_pair['question'],
                         'response': response,
+                        'token_scores': token_scores,
                         'classification': classification,
                         'ground_truth': ground_truth,
-                        'correct': classification_correct,
-                        'token_scores': token_scores
+                        'ground_truth_method': evaluation_result["method_used"],
+                        'ground_truth_confidence': evaluation_result["confidence"],
+                        'ground_truth_details': evaluation_result["details"],
+                        'classification_correct': classification_correct,
+                        'was_handled': was_handled
                     })
                     
                     if verbose:
@@ -847,7 +998,17 @@ def run_task_pipeline(
                 except Exception as e:
                     if verbose:
                         print(f"      ❌ Error evaluating response: {e}")
-                    continue
+                    generated_responses.append({
+                        'response': response,
+                        'token_scores': token_scores,
+                        'classification': classification,
+                        'ground_truth': 'UNKNOWN',
+                        'ground_truth_method': 'error',
+                        'ground_truth_confidence': 0.0,
+                        'ground_truth_details': f'Error during evaluation: {str(e)}',
+                        'classification_correct': None,
+                        'was_handled': was_handled
+                    })
             
             # Calculate evaluation results
             if total_classifications > 0:
@@ -1041,9 +1202,10 @@ def run_task_pipeline(
                 # The formatted_question contains few-shot examples which are for training, not generation
                 simple_prompt = qa_pair['question']
                 
-                # Generate response with token-level scoring
-                response, token_scores, classification = generate_with_classification(
-                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, final_threshold, verbose and not optimize
+                # Generate response with token-level scoring and detection handling
+                response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                    model, simple_prompt, layer, max_new_tokens, steering_method, 
+                    token_aggregation, detection_threshold, verbose and not optimize, detection_handler
                 )
                 
                 # Evaluate the generated response using the ground truth evaluator
@@ -1080,7 +1242,8 @@ def run_task_pipeline(
                         'ground_truth_method': evaluation_result["method_used"],
                         'ground_truth_confidence': evaluation_result["confidence"],
                         'ground_truth_details': evaluation_result["details"],
-                        'classification_correct': classification_correct
+                        'classification_correct': classification_correct,
+                        'was_handled': was_handled
                     })
                     
                     if verbose and not optimize:  # Only show detailed output when not optimizing
@@ -1111,7 +1274,8 @@ def run_task_pipeline(
                         'ground_truth_method': 'error',
                         'ground_truth_confidence': 0.0,
                         'ground_truth_details': f'Error during evaluation: {str(e)}',
-                        'classification_correct': None
+                        'classification_correct': None,
+                        'was_handled': was_handled
                     })
             
             # Show summary for optimization
@@ -1383,7 +1547,12 @@ def main():
                 question_col=args.question_col,
                 correct_col=args.correct_col,
                 incorrect_col=args.incorrect_col,
-                allow_small_dataset=args.allow_small_dataset
+                allow_small_dataset=args.allow_small_dataset,
+                detection_action=args.detection_action,
+                placeholder_message=args.placeholder_message,
+                max_regeneration_attempts=args.max_regeneration_attempts,
+                detection_threshold=args.detection_threshold,
+                log_detections=args.log_detections
             )
             
             all_results[display_name] = task_results
