@@ -14,6 +14,11 @@ from typing import List, Dict, Any, Optional
 from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
 from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
 from .core.hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
+from .core.model import Model
+from .core.classifier import Classifier
+from .core.contrastive_pair_set import ContrastivePairSet
+from .core.layer import Layer
+from .optimize import run_smart_optimization, run_interactive_optimization, generate_with_all_layer_activations, compute_classification_score
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -51,9 +56,9 @@ Examples:
     parser.add_argument("--token-aggregation", type=str, choices=["average", "final", "first", "max", "min"], 
                        default="average", help="How to aggregate token scores for classification")
     parser.add_argument("--ground-truth-method", type=str, 
-                       choices=["none", "exact_match", "substring_match", "user_specified", "interactive", "manual_review"],
+                       choices=["none", "exact_match", "substring_match", "user_specified", "interactive", "manual_review", "good"],
                        default="none", 
-                       help="Method for ground truth evaluation. 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'interactive' prompts for y/n labeling, 'manual_review' marks for review")
+                       help="Method for ground truth evaluation. 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'interactive' prompts for y/n labeling, 'manual_review' marks for review, 'good' marks everything as truthful (for debugging)")
     parser.add_argument("--user-labels", type=str, nargs="*", default=None,
                        help="User-specified ground truth labels for responses ('truthful' or 'hallucination'). Used with --ground-truth-method user_specified")
     
@@ -377,52 +382,127 @@ def run_task_pipeline(
         original_token_aggregation = token_aggregation
         optimization_result = None
         
-        if optimize:
-            if verbose:
-                print(f"\n🎯 HYPERPARAMETER OPTIMIZATION ENABLED:")
-                print(f"   • Will optimize layer, threshold, and aggregation method")
-                print(f"   • Optimization metric: {optimize_metric}")
-                print(f"   • Layer range: {optimize_layers}")
-                print(f"   • Max combinations: {optimize_max_combinations}")
+        if optimize and ground_truth_method == "interactive":
+            # Special case: Interactive optimization - SKIP normal pipeline
+            # Generate test questions for optimization
+            test_questions = []
+            for doc in test_docs[:2]:  # Use first 2 test questions for optimization
+                try:
+                    if hasattr(task_data, 'doc_to_text'):
+                        question = task_data.doc_to_text(doc)
+                    else:
+                        question = doc.get('question', str(doc))
+                    test_questions.append(question)
+                except:
+                    continue
             
-            # Create optimization configuration
-            layer_range = parse_layer_range(optimize_layers, model)
-            opt_config = OptimizationConfig(
-                layer_range=layer_range,  # Can be None for auto-detection
-                metric=optimize_metric,
-                max_combinations=optimize_max_combinations,
-                seed=seed
+            if test_questions:
+                # Run interactive optimization ONLY
+                optimization_result = run_interactive_optimization(
+                    model=model,
+                    questions=test_questions,
+                    training_pairs=contrastive_pairs,
+                    max_new_tokens=max_new_tokens,
+                    max_combinations=optimize_max_combinations,
+                    verbose=verbose
+                )
+                
+                if optimization_result.get('optimization_performed'):
+                    layer = optimization_result['best_layer']
+                    token_aggregation = optimization_result['best_aggregation']
+                    if verbose:
+                        print(f"✅ Interactive optimization completed!")
+                        print(f"   • Optimized layer: {layer} (was {original_layer})")
+                        print(f"   • Optimized aggregation: {token_aggregation} (was {original_token_aggregation})")
+                    
+                    # Return results immediately - skip normal pipeline
+                    return {
+                        "task_name": task_name,
+                        "model_name": model_name,
+                        "layer": layer,
+                        "original_layer": original_layer,
+                        "token_aggregation": token_aggregation,
+                        "original_token_aggregation": original_token_aggregation,
+                        "optimization_performed": True,
+                        "optimization_result": optimization_result,
+                        "interactive_optimization_only": True
+                    }
+            else:
+                if verbose:
+                    print(f"⚠️ No test questions available for interactive optimization")
+                return {"task_name": task_name, "error": "No test questions available"}
+        
+        elif optimize:
+            # Load test data first for optimization
+            test_qa_pairs = []
+            for doc in test_docs:
+                try:
+                    # Extract question - use both raw and formatted versions
+                    raw_question = doc.get('question', str(doc))
+                    if hasattr(task_data, 'doc_to_text'):
+                        formatted_question = task_data.doc_to_text(doc)
+                    else:
+                        formatted_question = raw_question
+                    
+                    # Extract correct answer
+                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                    
+                    # Find the correct answer
+                    correct_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 1 and i < len(correct_answers):
+                            correct_answer = correct_answers[i]
+                            break
+                    
+                    # Find an incorrect answer
+                    incorrect_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 0 and i < len(correct_answers):
+                            incorrect_answer = correct_answers[i]
+                            break
+                    
+                    if correct_answer and incorrect_answer:
+                        test_qa_pairs.append({
+                            'question': raw_question,  # Raw question for display
+                            'formatted_question': formatted_question,  # Formatted for generation
+                            'correct_answer': correct_answer,
+                            'incorrect_answer': incorrect_answer
+                        })
+                        
+                except Exception as e:
+                    # Skip problematic docs
+                    continue
+            
+            # Run smart optimization with caching
+            optimization_result = run_smart_optimization(
+                model=model,
+                collector=collector,
+                contrastive_pairs=contrastive_pairs,
+                test_qa_pairs=test_qa_pairs,
+                task_name=task_name,
+                model_name=model_name,
+                limit=limit,
+                ground_truth_method=ground_truth_method,
+                max_new_tokens=max_new_tokens,
+                device=device,
+                verbose=verbose
             )
             
-            if verbose:
-                if layer_range is None:
-                    print(f"   • Will auto-detect and test all model layers")
-                else:
-                    print(f"   • Optimization will test {len(layer_range)} layers: {layer_range}")
-                print(f"   • Using existing train/test split for optimization")
-            
-            # Note: Detailed optimization implementation would go here
-            # For now, we'll use a simplified approach that just selects from the range
-            if layer_range is None:
-                # Auto-detect model layers and use a reasonable default
-                from .core.hyperparameter_optimizer import detect_model_layers, get_default_layer_range
-                total_layers = detect_model_layers(model)
-                detected_range = get_default_layer_range(total_layers, use_all=True)
-                layer = detected_range[len(detected_range) // 2]  # Use middle layer
+            # Extract the best parameters from optimization
+            if optimization_result.get('optimization_performed', False):
+                layer = optimization_result.get('best_layer', layer)
+                token_aggregation = optimization_result.get('best_aggregation', token_aggregation)
                 if verbose:
-                    print(f"   • Auto-detected {total_layers} layers, selected layer {layer} (simplified optimization)")
-            elif len(layer_range) > 1:
-                # Use middle layer as a reasonable default optimization
-                layer = layer_range[len(layer_range) // 2]
+                    print(f"✅ Hyperparameter optimization completed! Best: Layer {layer} + {token_aggregation} aggregation")
+            else:
                 if verbose:
-                    print(f"   • Selected layer {layer} from range (simplified optimization)")
-            
-            optimization_result = {
-                'best_layer': layer,
-                'best_aggregation': token_aggregation,
-                'best_threshold': 0.6,
-                'optimization_performed': True
-            }
+                    print(f"⚠️ Optimization failed, using default layer {layer}")
+                optimization_result = {
+                    'best_layer': layer,
+                    'best_aggregation': token_aggregation,
+                    'optimization_performed': False
+                }
         
         # Extract activations from the choice tokens using the (possibly optimized) layer
         optimization_note = f" (optimized)" if optimize and layer != original_layer else ""
@@ -479,244 +559,294 @@ def run_task_pipeline(
             print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
             print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
         
-        # Evaluate on test set using proper activation collection
-        if verbose:
-            print(f"\n🧪 PREPARING TEST DATA:")
-            print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
-        
-        # Get the actual TruthfulQA test data with correct and incorrect answers
-        test_qa_pairs = []
-        for doc in test_docs:
-            try:
-                # Extract question - use both raw and formatted versions
-                raw_question = doc.get('question', str(doc))
-                if hasattr(task_data, 'doc_to_text'):
-                    formatted_question = task_data.doc_to_text(doc)
-                else:
-                    formatted_question = raw_question
-                
-                # Extract correct answer
-                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                
-                # Find the correct answer
-                correct_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 1 and i < len(correct_answers):
-                        correct_answer = correct_answers[i]
-                        break
-                
-                # Find an incorrect answer
-                incorrect_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 0 and i < len(correct_answers):
-                        incorrect_answer = correct_answers[i]
-                        break
-                
-                if correct_answer and incorrect_answer:
-                    test_qa_pairs.append({
-                        'question': raw_question,  # Raw question for display
-                        'formatted_question': formatted_question,  # Formatted for generation
-                        'correct_answer': correct_answer,
-                        'incorrect_answer': incorrect_answer
-                    })
-                    
-            except Exception as e:
-                # Skip problematic docs
-                continue
-        
-        if verbose:
-            print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
-            print(f"\n🔍 Test Examples:")
-            for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
-                print(f"\n   📋 Test Example {i+1}:")
-                print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
-                print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
-                print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
-        
-        # Create test contrastive pairs using proper activation collection logic
-        test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
-        
-        if verbose:
-            print(f"\n🔄 Created {len(test_contrastive_pairs)} test contrastive pairs:")
-            for i, pair in enumerate(test_contrastive_pairs[:2]):  # Show first 2
-                print(f"\n   🔄 Test Pair {i+1}:")
-                print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
-                print(f"      🟢 Positive (B): {pair.positive_response}")
-                print(f"      🔴 Negative (A): {pair.negative_response}")
-        
-        # Extract activations from the test choice tokens
-        if verbose:
-            print(f"\n🔬 Extracting test activations from layer {layer} choice tokens...")
-        
-        test_processed_pairs = collector.collect_activations_batch(
-            pairs=test_contrastive_pairs,
-            layer_index=layer,
-            device=device
-        )
-        
-        # Convert to ContrastivePairSet format for evaluation
-        test_phrase_pairs = []
-        for pair in test_processed_pairs:
-            # Create the full prompts for the pair set
-            positive_full = f"{pair.prompt}{pair.positive_response}"
-            negative_full = f"{pair.prompt}{pair.negative_response}"
-            
-            test_phrase_pairs.append({
-                "harmful": negative_full,  # A choice (incorrect)
-                "harmless": positive_full  # B choice (correct)
-            })
-        
-        test_pair_set = ContrastivePairSet.from_phrase_pairs(
-            name=f"{task_name}_test",
-            phrase_pairs=test_phrase_pairs,
-            task_type="lm_evaluation"
-        )
-        
-        # Store the real test activations in the pair set response objects
-        for i, processed_pair in enumerate(test_processed_pairs):
-            if i < len(test_pair_set.pairs):
-                # Assign activations to the response objects, not the pair directly
-                if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
-                    test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
-                if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
-                    test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
-        
-        if verbose:
-            print(f"\n📊 Evaluating classifier on test set...")
-        evaluation_results = steering_method.evaluate(test_pair_set)
-        
-        if verbose:
-            print(f"✅ Classifier validation completed!")
-            print(f"   • Validated on pre-written answer choices only")
-        
-        # Generate sample responses with token-level classification
-        if verbose:
-            print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
-            print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
-        
-        generated_responses = []
-        correct_classifications = 0
-        total_classifications = 0
-        
-        for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
+        # Skip pre-written validation during optimization - we already tested on generated responses
+        if optimize:
             if verbose:
-                print(f"\n   🎯 Generating response {i+1}:")
-                print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                print(f"\n📊 Skipping pre-written validation - optimization already tested on generated responses")
+            evaluation_results = {"accuracy": "N/A", "f1": "N/A"}  # Placeholder
+            test_qa_pairs = []  # Will be populated later for generation
+            for doc in test_docs:
+                try:
+                    raw_question = doc.get('question', str(doc))
+                    if hasattr(task_data, 'doc_to_text'):
+                        formatted_question = task_data.doc_to_text(doc)
+                    else:
+                        formatted_question = raw_question
+                    
+                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                    
+                    correct_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 1 and i < len(correct_answers):
+                            correct_answer = correct_answers[i]
+                            break
+                    
+                    incorrect_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 0 and i < len(correct_answers):
+                            incorrect_answer = correct_answers[i]
+                            break
+                    
+                    if correct_answer and incorrect_answer:
+                        test_qa_pairs.append({
+                            'question': raw_question,
+                            'formatted_question': formatted_question,
+                            'correct_answer': correct_answer,
+                            'incorrect_answer': incorrect_answer
+                        })
+                except Exception as e:
+                    continue
+        else:
+            # Only do pre-written validation when NOT optimizing
+            if verbose:
+                print(f"\n🧪 PREPARING TEST DATA:")
+                print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
             
-            # Use the raw question for natural generation
-            # The formatted_question contains few-shot examples which are for training, not generation
-            simple_prompt = qa_pair['question']
+            # Get the actual TruthfulQA test data with correct and incorrect answers
+            test_qa_pairs = []
+            for doc in test_docs:
+                try:
+                    # Extract question - use both raw and formatted versions
+                    raw_question = doc.get('question', str(doc))
+                    if hasattr(task_data, 'doc_to_text'):
+                        formatted_question = task_data.doc_to_text(doc)
+                    else:
+                        formatted_question = raw_question
+                    
+                    # Extract correct answer
+                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                    
+                    # Find the correct answer
+                    correct_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 1 and i < len(correct_answers):
+                            correct_answer = correct_answers[i]
+                            break
+                    
+                    # Find an incorrect answer
+                    incorrect_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 0 and i < len(correct_answers):
+                            incorrect_answer = correct_answers[i]
+                            break
+                    
+                    if correct_answer and incorrect_answer:
+                        test_qa_pairs.append({
+                            'question': raw_question,  # Raw question for display
+                            'formatted_question': formatted_question,  # Formatted for generation
+                            'correct_answer': correct_answer,
+                            'incorrect_answer': incorrect_answer
+                        })
+                        
+                except Exception as e:
+                    # Skip problematic docs
+                    continue
             
-            # Generate response with token-level scoring
-            response, token_scores, classification = generate_with_classification(
-                model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose
+            if verbose:
+                print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
+                print(f"\n🔍 Test Examples:")
+                for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
+                    print(f"\n   📋 Test Example {i+1}:")
+                    print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                    print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+                    print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+            
+            # Create test contrastive pairs using proper activation collection logic
+            test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
+            
+            if verbose:
+                print(f"\n🔄 Created {len(test_contrastive_pairs)} test contrastive pairs:")
+                for i, pair in enumerate(test_contrastive_pairs[:2]):  # Show first 2
+                    print(f"\n   🔄 Test Pair {i+1}:")
+                    print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
+                    print(f"      🟢 Positive (B): {pair.positive_response}")
+                    print(f"      🔴 Negative (A): {pair.negative_response}")
+            
+            # Extract activations from the test choice tokens
+            if verbose:
+                print(f"\n🔬 Extracting test activations from layer {layer} choice tokens...")
+            
+            test_processed_pairs = collector.collect_activations_batch(
+                pairs=test_contrastive_pairs,
+                layer_index=layer,
+                device=device
             )
             
-            # Evaluate the generated response using the ground truth evaluator
-            try:
-                # Create ground truth evaluator
-                evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+            # Convert to ContrastivePairSet format for evaluation
+            test_phrase_pairs = []
+            for pair in test_processed_pairs:
+                # Create the full prompts for the pair set
+                positive_full = f"{pair.prompt}{pair.positive_response}"
+                negative_full = f"{pair.prompt}{pair.negative_response}"
                 
-                # Get correct answer for comparison
-                correct_answers = qa_pair.get('correct_answer', '')
+                test_phrase_pairs.append({
+                    "harmful": negative_full,  # A choice (incorrect)
+                    "harmless": positive_full  # B choice (correct)
+                })
+            
+            test_pair_set = ContrastivePairSet.from_phrase_pairs(
+                name=f"{task_name}_test",
+                phrase_pairs=test_phrase_pairs,
+                task_type="lm_evaluation"
+            )
+            
+            # Store the real test activations in the pair set response objects
+            for i, processed_pair in enumerate(test_processed_pairs):
+                if i < len(test_pair_set.pairs):
+                    # Assign activations to the response objects, not the pair directly
+                    if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
+                        test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                    if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
+                        test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
+            
+            if verbose:
+                print(f"\n📊 Evaluating classifier on test set...")
+            evaluation_results = steering_method.evaluate(test_pair_set)
+            
+            if verbose:
+                print(f"✅ Classifier validation completed!")
+                print(f"   • Validated on pre-written answer choices only")
+            
+            # Generate sample responses with token-level classification
+            if verbose:
+                if optimize:
+                    print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
+                    print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses with optimized layer {layer}...")
+                else:
+                    print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
+                    print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
+            
+            generated_responses = []
+            correct_classifications = 0
+            total_classifications = 0
+            
+            for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
+                if verbose and not optimize:  # Only show detailed progress when not optimizing
+                    print(f"\n   🎯 Generating response {i+1}:")
+                    print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
                 
-                # Get user label if available
-                user_label = None
-                if user_labels and i < len(user_labels):
-                    user_label = user_labels[i]
+                # Use the raw question for natural generation
+                # The formatted_question contains few-shot examples which are for training, not generation
+                simple_prompt = qa_pair['question']
                 
-                # Evaluate the response
-                evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
+                # Generate response with token-level scoring
+                response, token_scores, classification = generate_with_classification(
+                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose and not optimize
+                )
                 
-                ground_truth = evaluation_result["ground_truth"]
-                
-                # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
-                classification_correct = None
-                if ground_truth != "UNKNOWN":
-                    classification_correct = (classification == ground_truth)
+                # Evaluate the generated response using the ground truth evaluator
+                try:
+                    # Create ground truth evaluator
+                    evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+                    
+                    # Get correct answer for comparison
+                    correct_answers = qa_pair.get('correct_answer', '')
+                    
+                    # Get user label if available
+                    user_label = None
+                    if user_labels and i < len(user_labels):
+                        user_label = user_labels[i]
+                    
+                    # Evaluate the response
+                    evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
+                    
+                    ground_truth = evaluation_result["ground_truth"]
+                    
+                    # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
+                    classification_correct = None
+                    if ground_truth != "UNKNOWN":
+                        classification_correct = (classification == ground_truth)
                     if classification_correct:
                         correct_classifications += 1
                     total_classifications += 1
-                
-                generated_responses.append({
-                    'response': response,
-                    'token_scores': token_scores,
-                    'classification': classification,
-                    'ground_truth': ground_truth,
-                    'ground_truth_method': evaluation_result["method_used"],
-                    'ground_truth_confidence': evaluation_result["confidence"],
-                    'ground_truth_details': evaluation_result["details"],
-                    'classification_correct': classification_correct
-                })
-                
-                if verbose:
-                    print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                    print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                    if len(token_scores) > 10:
-                        print(f"                    ... ({len(token_scores)} total tokens)")
-                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
-                    print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
-                    print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
-                    if classification_correct is not None:
-                        print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
-                    else:
-                        print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
-                    print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                    print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
-                    if evaluation_result["details"]:
-                        print(f"      📝 Details: {evaluation_result['details']}")
                     
-            except Exception as e:
-                if verbose:
-                    print(f"      ⚠️  Could not evaluate response: {e}")
-                generated_responses.append({
-                    'response': response,
-                    'token_scores': token_scores,
-                    'classification': classification,
-                    'ground_truth': 'UNKNOWN',
-                    'ground_truth_method': 'error',
-                    'ground_truth_confidence': 0.0,
-                    'ground_truth_details': f'Error during evaluation: {str(e)}',
-                    'classification_correct': None
-                })
-        
-        results = {
-            "task_name": task_name,
-            "model_name": model_name,
-            "layer": layer,
-            "original_layer": original_layer,
-            "token_aggregation": token_aggregation,
-            "original_token_aggregation": original_token_aggregation,
-            "optimization_performed": optimize,
-            "optimization_result": optimization_result,
-            "training_results": training_results,
-            "evaluation_results": evaluation_results,
-            "num_train": len(train_docs),
-            "num_test": len(test_docs),
-            "sample_responses": generated_responses,
-            "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
-            "correct_classifications": correct_classifications,
-            "total_classifications": total_classifications
-        }
-        
-        if verbose:
-            print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
-            print(f"{'='*80}")
-            print(f"📊 FINAL RESULTS:")
-            print(f"   • Training samples: {len(train_docs)}")
-            print(f"   • Test samples: {len(test_docs)}")
-            print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
-            print(f"   • Generated responses: {len(generated_responses)}")
-            if total_classifications > 0:
-                classification_acc = correct_classifications / total_classifications
-                print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
-            else:
-                print(f"   • Classification accuracy: Could not evaluate")
-            print(f"{'='*80}\n")
-        
-        logger.info(f"Pipeline completed for {task_name}")
-        return results
+                    generated_responses.append({
+                        'response': response,
+                        'token_scores': token_scores,
+                        'classification': classification,
+                        'ground_truth': ground_truth,
+                        'ground_truth_method': evaluation_result["method_used"],
+                        'ground_truth_confidence': evaluation_result["confidence"],
+                        'ground_truth_details': evaluation_result["details"],
+                        'classification_correct': classification_correct
+                    })
+                    
+                    if verbose and not optimize:  # Only show detailed output when not optimizing
+                        print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                        if len(token_scores) > 10:
+                            print(f"                    ... ({len(token_scores)} total tokens)")
+                        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                        print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
+                        print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
+                        if classification_correct is not None:
+                            print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                        else:
+                            print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
+                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                        print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                        if evaluation_result["details"]:
+                            print(f"      📝 Details: {evaluation_result['details']}")
+                        
+                except Exception as e:
+                    if verbose and not optimize:
+                        print(f"      ⚠️  Could not evaluate response: {e}")
+                    generated_responses.append({
+                        'response': response,
+                        'token_scores': token_scores,
+                        'classification': classification,
+                        'ground_truth': 'UNKNOWN',
+                        'ground_truth_method': 'error',
+                        'ground_truth_confidence': 0.0,
+                        'ground_truth_details': f'Error during evaluation: {str(e)}',
+                        'classification_correct': None
+                    })
+            
+            # Show summary for optimization
+            if verbose and optimize:
+                print(f"\n   ✅ Generated {len(generated_responses)} responses with optimized layer {layer}")
+                if total_classifications > 0:
+                    classification_acc = correct_classifications / total_classifications
+                    print(f"   📊 Classification accuracy: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
+            
+            results = {
+                "task_name": task_name,
+                "model_name": model_name,
+                "layer": layer,
+                "original_layer": original_layer,
+                "token_aggregation": token_aggregation,
+                "original_token_aggregation": original_token_aggregation,
+                "optimization_performed": optimize,
+                "optimization_result": optimization_result,
+                "training_results": training_results,
+                "evaluation_results": evaluation_results,
+                "num_train": len(train_docs),
+                "num_test": len(test_docs),
+                "sample_responses": generated_responses,
+                "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
+                "correct_classifications": correct_classifications,
+                "total_classifications": total_classifications
+            }
+            
+            if verbose:
+                print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
+                print(f"{'='*80}")
+                print(f"📊 FINAL RESULTS:")
+                print(f"   • Training samples: {len(train_docs)}")
+                print(f"   • Test samples: {len(test_docs)}")
+                print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+                print(f"   • Generated responses: {len(generated_responses)}")
+                if total_classifications > 0:
+                    classification_acc = correct_classifications / total_classifications
+                    print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
+                else:
+                    print(f"   • Classification accuracy: Could not evaluate")
+                print(f"{'='*80}\n")
+            
+            logger.info(f"Pipeline completed for {task_name}")
+            return results
         
     except Exception as e:
         logger.error(f"Error in pipeline for {task_name}: {e}")
@@ -763,21 +893,71 @@ def save_results_csv(results: Dict[str, Any], output_path: str) -> None:
 
 
 def create_evaluation_report(results: Dict[str, Any], output_path: str) -> None:
-    """Create a markdown evaluation report."""
+    """Create a comprehensive evaluation report in markdown format."""
     try:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
         with open(output_path, 'w') as f:
             f.write("# Wisent-Guard Evaluation Report\n\n")
             
+            # Summary table
+            f.write("## Summary\n\n")
+            f.write("| Task | Training Accuracy | Evaluation Accuracy | Optimization |\n")
+            f.write("|------|------------------|--------------------|--------------|\n")
+            
             for task_name, task_results in results.items():
-                f.write(f"## Task: {task_name}\n\n")
+                if "error" in task_results:
+                    f.write(f"| {task_name} | ERROR | ERROR | N/A |\n")
+                else:
+                    train_acc = task_results.get("training_results", {}).get("accuracy", "N/A")
+                    eval_acc = task_results.get("evaluation_results", {}).get("accuracy", "N/A")
+                    optimized = "Yes" if task_results.get("optimization_performed", False) else "No"
+                    
+                    if isinstance(train_acc, float):
+                        train_acc = f"{train_acc:.2%}"
+                    if isinstance(eval_acc, float):
+                        eval_acc = f"{eval_acc:.2%}"
+                    
+                    f.write(f"| {task_name} | {train_acc} | {eval_acc} | {optimized} |\n")
+            
+            # Detailed results for each task
+            for task_name, task_results in results.items():
+                f.write(f"\n## {task_name}\n\n")
                 
-                if isinstance(task_results, dict):
-                    for key, value in task_results.items():
-                        if key != "task":
-                            f.write(f"- **{key}**: {value}\n")
-                    f.write("\n")
+                if "error" in task_results:
+                    f.write(f"**Error**: {task_results['error']}\n")
+                else:
+                    # Configuration
+                    f.write("### Configuration\n")
+                    f.write(f"- **Model**: {task_results.get('model_name', 'Unknown')}\n")
+                    f.write(f"- **Layer**: {task_results.get('layer', 'Unknown')}\n")
+                    f.write(f"- **Classifier**: {task_results.get('classifier_type', 'Unknown')}\n")
+                    f.write(f"- **Token Aggregation**: {task_results.get('token_aggregation', 'Unknown')}\n")
+                    f.write(f"- **Ground Truth Method**: {task_results.get('ground_truth_method', 'Unknown')}\n")
+                    
+                    # Training results
+                    if "training_results" in task_results:
+                        train_results = task_results["training_results"]
+                        f.write("\n### Training Results\n")
+                        f.write(f"- **Accuracy**: {train_results.get('accuracy', 'N/A'):.2%}\n")
+                        f.write(f"- **Precision**: {train_results.get('precision', 'N/A'):.2f}\n")
+                        f.write(f"- **Recall**: {train_results.get('recall', 'N/A'):.2f}\n")
+                        f.write(f"- **F1 Score**: {train_results.get('f1', 'N/A'):.2f}\n")
+                    
+                    # Evaluation results
+                    if "evaluation_results" in task_results:
+                        eval_results = task_results["evaluation_results"]
+                        f.write("\n### Evaluation Results\n")
+                        f.write(f"- **Accuracy**: {eval_results.get('accuracy', 'N/A'):.2%}\n")
+                        f.write(f"- **Total Predictions**: {eval_results.get('total_predictions', 'N/A')}\n")
+                        f.write(f"- **Correct Predictions**: {eval_results.get('correct_predictions', 'N/A')}\n")
+                    
+                    # Optimization results
+                    if task_results.get("optimization_performed", False):
+                        f.write("\n### Optimization Results\n")
+                        f.write(f"- **Best Layer**: {task_results.get('best_layer', 'Unknown')}\n")
+                        f.write(f"- **Best Aggregation**: {task_results.get('best_aggregation', 'Unknown')}\n")
+                        f.write(f"- **Best Accuracy**: {task_results.get('best_accuracy', 'Unknown'):.2%}\n")
+            
+            f.write(f"\n---\n\n*Report generated on {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
         
         logger.info(f"Evaluation report saved to {output_path}")
         
@@ -813,7 +993,10 @@ def main():
             should_optimize = args.optimize or (args.auto_optimize and args.layer == -1)
             
             # Use layer -1 as a signal for auto-optimization
-            layer_to_use = args.layer if args.layer != -1 else 15  # Default to 15 if not specified
+            if should_optimize:
+                layer_to_use = -1  # Signal to the pipeline to optimize
+            else:
+                layer_to_use = args.layer if args.layer != -1 else 15  # Default to 15 if not specified
             
             task_results = run_task_pipeline(
                 task_name=task_name,

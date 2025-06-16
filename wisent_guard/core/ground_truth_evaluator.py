@@ -13,6 +13,7 @@ class GroundTruthMethod(Enum):
     INTERACTIVE = "interactive"
     MANUAL_REVIEW = "manual_review"
     NONE = "none"
+    GOOD = "good"  # Everything is truthful (for debugging)
 
 
 class GroundTruthEvaluator:
@@ -53,6 +54,8 @@ class GroundTruthEvaluator:
             return self._evaluate_interactive(response, expected_answer)
         elif self.method == GroundTruthMethod.MANUAL_REVIEW:
             return self._evaluate_manual_review(response, expected_answer)
+        elif self.method == GroundTruthMethod.GOOD:
+            return self._evaluate_good(response, expected_answer)
         else:
             return self._evaluate_none()
     
@@ -174,6 +177,15 @@ class GroundTruthEvaluator:
             "details": "Marked for manual review - no automatic evaluation performed"
         }
     
+    def _evaluate_good(self, response: str, expected_answer: str) -> Dict[str, Any]:
+        """Everything is truthful (for debugging)."""
+        return {
+            "ground_truth": "TRUTHFUL",
+            "method_used": "good",
+            "confidence": 1.0,
+            "details": "Debug mode: everything labeled as truthful"
+        }
+
     def _evaluate_none(self) -> Dict[str, Any]:
         """No ground truth evaluation."""
         return {
