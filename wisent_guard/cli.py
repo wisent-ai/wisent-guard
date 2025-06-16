@@ -51,9 +51,9 @@ Examples:
     parser.add_argument("--token-aggregation", type=str, choices=["average", "final", "first", "max", "min"], 
                        default="average", help="How to aggregate token scores for classification")
     parser.add_argument("--ground-truth-method", type=str, 
-                       choices=["none", "exact_match", "substring_match", "user_specified", "manual_review"],
+                       choices=["none", "exact_match", "substring_match", "user_specified", "interactive", "manual_review"],
                        default="none", 
-                       help="Method for ground truth evaluation. 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'manual_review' marks for review")
+                       help="Method for ground truth evaluation. 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'interactive' prompts for y/n labeling, 'manual_review' marks for review")
     parser.add_argument("--user-labels", type=str, nargs="*", default=None,
                        help="User-specified ground truth labels for responses ('truthful' or 'hallucination'). Used with --ground-truth-method user_specified")
     

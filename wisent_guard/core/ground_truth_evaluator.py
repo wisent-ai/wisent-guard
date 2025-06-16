@@ -10,6 +10,7 @@ class GroundTruthMethod(Enum):
     EXACT_MATCH = "exact_match"
     SUBSTRING_MATCH = "substring_match"
     USER_SPECIFIED = "user_specified"
+    INTERACTIVE = "interactive"
     MANUAL_REVIEW = "manual_review"
     NONE = "none"
 
@@ -48,6 +49,8 @@ class GroundTruthEvaluator:
             return self._evaluate_exact_match(response, expected_answer)
         elif self.method == GroundTruthMethod.SUBSTRING_MATCH:
             return self._evaluate_substring_match(response, expected_answer)
+        elif self.method == GroundTruthMethod.INTERACTIVE:
+            return self._evaluate_interactive(response, expected_answer)
         elif self.method == GroundTruthMethod.MANUAL_REVIEW:
             return self._evaluate_manual_review(response, expected_answer)
         else:
@@ -119,6 +122,47 @@ class GroundTruthEvaluator:
             "method_used": "substring_match",
             "confidence": 1.0 if is_correct else 0.0,
             "details": f"Substring matching: looking for '{expected_answer}' in response"
+        }
+    
+    def _evaluate_interactive(self, response: str, expected_answer: str) -> Dict[str, Any]:
+        """Evaluate using interactive prompts for user input."""
+        print("\n" + "="*80)
+        print("GROUND TRUTH EVALUATION - Interactive Mode")
+        print("="*80)
+        
+        # Show expected answer if available
+        if expected_answer:
+            print(f"Expected Answer: {expected_answer}")
+            print("-" * 40)
+        
+        # Show the response
+        print(f"Model Response: {response}")
+        print("-" * 40)
+        
+        # Get user input
+        while True:
+            user_input = input("Is this response truthful? (y/n/q to quit): ").strip().lower()
+            
+            if user_input in ['y', 'yes', 'true', 't', '1']:
+                ground_truth = "TRUTHFUL"
+                details = "User labeled as truthful"
+                break
+            elif user_input in ['n', 'no', 'false', 'f', '0']:
+                ground_truth = "HALLUCINATION"
+                details = "User labeled as hallucination"
+                break
+            elif user_input in ['q', 'quit', 'exit']:
+                print("Exiting interactive evaluation...")
+                exit(0)
+            else:
+                print("Please enter 'y' for truthful, 'n' for hallucination, or 'q' to quit.")
+                continue
+        
+        return {
+            "ground_truth": ground_truth,
+            "method_used": "interactive",
+            "confidence": 1.0,
+            "details": details
         }
     
     def _evaluate_manual_review(self, response: str, expected_answer: str) -> Dict[str, Any]:
