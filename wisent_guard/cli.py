@@ -410,7 +410,7 @@ def run_task_pipeline(
                 if optimization_result.get('optimization_performed'):
                     layer = optimization_result['best_layer']
                     token_aggregation = optimization_result['best_aggregation']
-                    if verbose:
+        if verbose:
                         print(f"✅ Interactive optimization completed!")
                         print(f"   • Optimized layer: {layer} (was {original_layer})")
                         print(f"   • Optimized aggregation: {token_aggregation} (was {original_token_aggregation})")
@@ -486,7 +486,8 @@ def run_task_pipeline(
                 ground_truth_method=ground_truth_method,
                 max_new_tokens=max_new_tokens,
                 device=device,
-                verbose=verbose
+                verbose=verbose,
+                optimize_layers=optimize_layers
             )
             
             # Extract the best parameters from optimization
@@ -757,151 +758,151 @@ def run_task_pipeline(
             return results
         else:
             # Only do pre-written validation when NOT optimizing
-            if verbose:
-                print(f"\n🧪 PREPARING TEST DATA:")
-                print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
-            
-            # Get the actual TruthfulQA test data with correct and incorrect answers
-            test_qa_pairs = []
-            for doc in test_docs:
-                try:
-                    # Extract question - use both raw and formatted versions
-                    raw_question = doc.get('question', str(doc))
-                    if hasattr(task_data, 'doc_to_text'):
-                        formatted_question = task_data.doc_to_text(doc)
-                    else:
-                        formatted_question = raw_question
-                    
-                    # Extract correct answer
-                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                    
-                    # Find the correct answer
-                    correct_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 1 and i < len(correct_answers):
-                            correct_answer = correct_answers[i]
-                            break
-                    
-                    # Find an incorrect answer
-                    incorrect_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 0 and i < len(correct_answers):
-                            incorrect_answer = correct_answers[i]
-                            break
-                    
-                    if correct_answer and incorrect_answer:
-                        test_qa_pairs.append({
-                            'question': raw_question,  # Raw question for display
-                            'formatted_question': formatted_question,  # Formatted for generation
-                            'correct_answer': correct_answer,
-                            'incorrect_answer': incorrect_answer
-                        })
-                        
-                except Exception as e:
-                    # Skip problematic docs
-                    continue
-            
-            if verbose:
-                print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
-                print(f"\n🔍 Test Examples:")
-                for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
-                    print(f"\n   📋 Test Example {i+1}:")
-                    print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
-                    print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
-                    print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
-            
-            # Create test contrastive pairs using proper activation collection logic
-            test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
-            
-            if verbose:
-                print(f"\n🔄 Created {len(test_contrastive_pairs)} test contrastive pairs:")
-                for i, pair in enumerate(test_contrastive_pairs[:2]):  # Show first 2
-                    print(f"\n   🔄 Test Pair {i+1}:")
-                    print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
-                    print(f"      🟢 Positive (B): {pair.positive_response}")
-                    print(f"      🔴 Negative (A): {pair.negative_response}")
-            
-            # Extract activations from the test choice tokens
-            if verbose:
-                print(f"\n🔬 Extracting test activations from layer {layer} choice tokens...")
-            
-            test_processed_pairs = collector.collect_activations_batch(
-                pairs=test_contrastive_pairs,
-                layer_index=layer,
-                device=device
-            )
-            
-            # Convert to ContrastivePairSet format for evaluation
-            test_phrase_pairs = []
-            for pair in test_processed_pairs:
-                # Create the full prompts for the pair set
-                positive_full = f"{pair.prompt}{pair.positive_response}"
-                negative_full = f"{pair.prompt}{pair.negative_response}"
+        if verbose:
+            print(f"\n🧪 PREPARING TEST DATA:")
+            print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
+        
+        # Get the actual TruthfulQA test data with correct and incorrect answers
+        test_qa_pairs = []
+        for doc in test_docs:
+            try:
+                # Extract question - use both raw and formatted versions
+                raw_question = doc.get('question', str(doc))
+                if hasattr(task_data, 'doc_to_text'):
+                    formatted_question = task_data.doc_to_text(doc)
+                else:
+                    formatted_question = raw_question
                 
-                test_phrase_pairs.append({
-                    "harmful": negative_full,  # A choice (incorrect)
-                    "harmless": positive_full  # B choice (correct)
-                })
+                # Extract correct answer
+                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                
+                # Find the correct answer
+                correct_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 1 and i < len(correct_answers):
+                        correct_answer = correct_answers[i]
+                        break
+                
+                # Find an incorrect answer
+                incorrect_answer = None
+                for i, label in enumerate(correct_labels):
+                    if label == 0 and i < len(correct_answers):
+                        incorrect_answer = correct_answers[i]
+                        break
+                
+                if correct_answer and incorrect_answer:
+                    test_qa_pairs.append({
+                        'question': raw_question,  # Raw question for display
+                        'formatted_question': formatted_question,  # Formatted for generation
+                        'correct_answer': correct_answer,
+                        'incorrect_answer': incorrect_answer
+                    })
+                    
+            except Exception as e:
+                # Skip problematic docs
+                continue
+        
+        if verbose:
+            print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
+            print(f"\n🔍 Test Examples:")
+            for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
+                print(f"\n   📋 Test Example {i+1}:")
+                print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+                print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+        
+        # Create test contrastive pairs using proper activation collection logic
+        test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
+        
+        if verbose:
+            print(f"\n🔄 Created {len(test_contrastive_pairs)} test contrastive pairs:")
+            for i, pair in enumerate(test_contrastive_pairs[:2]):  # Show first 2
+                print(f"\n   🔄 Test Pair {i+1}:")
+                print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
+                print(f"      🟢 Positive (B): {pair.positive_response}")
+                print(f"      🔴 Negative (A): {pair.negative_response}")
+        
+        # Extract activations from the test choice tokens
+        if verbose:
+            print(f"\n🔬 Extracting test activations from layer {layer} choice tokens...")
+        
+        test_processed_pairs = collector.collect_activations_batch(
+            pairs=test_contrastive_pairs,
+            layer_index=layer,
+            device=device
+        )
+        
+        # Convert to ContrastivePairSet format for evaluation
+        test_phrase_pairs = []
+        for pair in test_processed_pairs:
+            # Create the full prompts for the pair set
+            positive_full = f"{pair.prompt}{pair.positive_response}"
+            negative_full = f"{pair.prompt}{pair.negative_response}"
             
-            test_pair_set = ContrastivePairSet.from_phrase_pairs(
-                name=f"{task_name}_test",
-                phrase_pairs=test_phrase_pairs,
-                task_type="lm_evaluation"
-            )
-            
-            # Store the real test activations in the pair set response objects
-            for i, processed_pair in enumerate(test_processed_pairs):
-                if i < len(test_pair_set.pairs):
-                    # Assign activations to the response objects, not the pair directly
-                    if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
-                        test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
-                    if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
-                        test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
-            
-            if verbose:
-                print(f"\n📊 Evaluating classifier on test set...")
-            evaluation_results = steering_method.evaluate(test_pair_set)
-            
-            if verbose:
-                print(f"✅ Classifier validation completed!")
-                print(f"   • Validated on pre-written answer choices only")
-            
-            # Generate sample responses with token-level classification
-            if verbose:
+            test_phrase_pairs.append({
+                "harmful": negative_full,  # A choice (incorrect)
+                "harmless": positive_full  # B choice (correct)
+            })
+        
+        test_pair_set = ContrastivePairSet.from_phrase_pairs(
+            name=f"{task_name}_test",
+            phrase_pairs=test_phrase_pairs,
+            task_type="lm_evaluation"
+        )
+        
+        # Store the real test activations in the pair set response objects
+        for i, processed_pair in enumerate(test_processed_pairs):
+            if i < len(test_pair_set.pairs):
+                # Assign activations to the response objects, not the pair directly
+                if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
+                    test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
+                    test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
+        
+        if verbose:
+            print(f"\n📊 Evaluating classifier on test set...")
+        evaluation_results = steering_method.evaluate(test_pair_set)
+        
+        if verbose:
+            print(f"✅ Classifier validation completed!")
+            print(f"   • Validated on pre-written answer choices only")
+        
+        # Generate sample responses with token-level classification
+        if verbose:
                 if optimize:
                     print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
                     print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses with optimized layer {layer}...")
                 else:
-                    print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
-                    print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
-            
-            generated_responses = []
-            correct_classifications = 0
-            total_classifications = 0
-            
-            for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
+            print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
+            print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
+        
+        generated_responses = []
+        correct_classifications = 0
+        total_classifications = 0
+        
+        for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
                 if verbose and not optimize:  # Only show detailed progress when not optimizing
-                    print(f"\n   🎯 Generating response {i+1}:")
-                    print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
-                
-                # Use the raw question for natural generation
-                # The formatted_question contains few-shot examples which are for training, not generation
-                simple_prompt = qa_pair['question']
-                
-                # Generate response with token-level scoring
-                response, token_scores, classification = generate_with_classification(
+                print(f"\n   🎯 Generating response {i+1}:")
+                print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+            
+            # Use the raw question for natural generation
+            # The formatted_question contains few-shot examples which are for training, not generation
+            simple_prompt = qa_pair['question']
+            
+            # Generate response with token-level scoring
+            response, token_scores, classification = generate_with_classification(
                     model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, final_threshold, verbose and not optimize
-                )
-                
+            )
+            
                 # Evaluate the generated response using the ground truth evaluator
-                try:
+            try:
                     # Create ground truth evaluator
                     evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
-                    
+                
                     # Get correct answer for comparison
-                    correct_answers = qa_pair.get('correct_answer', '')
-                    
+                correct_answers = qa_pair.get('correct_answer', '')
+                
                     # Get user label if available
                     user_label = None
                     if user_labels and i < len(user_labels):
@@ -915,53 +916,53 @@ def run_task_pipeline(
                     # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
                     classification_correct = None
                     if ground_truth != "UNKNOWN":
-                        classification_correct = (classification == ground_truth)
-                    if classification_correct:
-                        correct_classifications += 1
-                    total_classifications += 1
-                    
-                    generated_responses.append({
-                        'response': response,
-                        'token_scores': token_scores,
-                        'classification': classification,
-                        'ground_truth': ground_truth,
+                classification_correct = (classification == ground_truth)
+                if classification_correct:
+                    correct_classifications += 1
+                total_classifications += 1
+                
+                generated_responses.append({
+                    'response': response,
+                    'token_scores': token_scores,
+                    'classification': classification,
+                    'ground_truth': ground_truth,
                         'ground_truth_method': evaluation_result["method_used"],
                         'ground_truth_confidence': evaluation_result["confidence"],
                         'ground_truth_details': evaluation_result["details"],
-                        'classification_correct': classification_correct
-                    })
-                    
+                    'classification_correct': classification_correct
+                })
+                
                     if verbose and not optimize:  # Only show detailed output when not optimizing
-                        print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                        if len(token_scores) > 10:
-                            print(f"                    ... ({len(token_scores)} total tokens)")
-                        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
-                        print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
+                    print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                    print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                    if len(token_scores) > 10:
+                        print(f"                    ... ({len(token_scores)} total tokens)")
+                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                    print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
                         print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
                         if classification_correct is not None:
-                            print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                    print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
                         else:
                             print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
-                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                        print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                    print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                    print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
                         if evaluation_result["details"]:
                             print(f"      📝 Details: {evaluation_result['details']}")
-                        
-                except Exception as e:
+                    
+            except Exception as e:
                     if verbose and not optimize:
-                        print(f"      ⚠️  Could not evaluate response: {e}")
-                    generated_responses.append({
-                        'response': response,
-                        'token_scores': token_scores,
-                        'classification': classification,
-                        'ground_truth': 'UNKNOWN',
+                    print(f"      ⚠️  Could not evaluate response: {e}")
+                generated_responses.append({
+                    'response': response,
+                    'token_scores': token_scores,
+                    'classification': classification,
+                    'ground_truth': 'UNKNOWN',
                         'ground_truth_method': 'error',
                         'ground_truth_confidence': 0.0,
                         'ground_truth_details': f'Error during evaluation: {str(e)}',
-                        'classification_correct': None
-                    })
-            
+                    'classification_correct': None
+                })
+        
             # Show summary for optimization
             if verbose and optimize:
                 print(f"\n   ✅ Generated {len(generated_responses)} responses with optimized layer {layer}")
@@ -969,42 +970,42 @@ def run_task_pipeline(
                     classification_acc = correct_classifications / total_classifications
                     print(f"   📊 Classification accuracy: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
             
-            results = {
-                "task_name": task_name,
-                "model_name": model_name,
-                "layer": layer,
+        results = {
+            "task_name": task_name,
+            "model_name": model_name,
+            "layer": layer,
                 "original_layer": original_layer,
-                "token_aggregation": token_aggregation,
+            "token_aggregation": token_aggregation,
                 "original_token_aggregation": original_token_aggregation,
                 "optimization_performed": optimize,
                 "optimization_result": optimization_result,
-                "training_results": training_results,
-                "evaluation_results": evaluation_results,
-                "num_train": len(train_docs),
-                "num_test": len(test_docs),
-                "sample_responses": generated_responses,
-                "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
-                "correct_classifications": correct_classifications,
-                "total_classifications": total_classifications
-            }
-            
-            if verbose:
-                print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
-                print(f"{'='*80}")
-                print(f"📊 FINAL RESULTS:")
-                print(f"   • Training samples: {len(train_docs)}")
-                print(f"   • Test samples: {len(test_docs)}")
-                print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
-                print(f"   • Generated responses: {len(generated_responses)}")
-                if total_classifications > 0:
-                    classification_acc = correct_classifications / total_classifications
-                    print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
-                else:
-                    print(f"   • Classification accuracy: Could not evaluate")
-                print(f"{'='*80}\n")
-            
-            logger.info(f"Pipeline completed for {task_name}")
-            return results
+            "training_results": training_results,
+            "evaluation_results": evaluation_results,
+            "num_train": len(train_docs),
+            "num_test": len(test_docs),
+            "sample_responses": generated_responses,
+            "classification_accuracy": correct_classifications / total_classifications if total_classifications > 0 else None,
+            "correct_classifications": correct_classifications,
+            "total_classifications": total_classifications
+        }
+        
+        if verbose:
+            print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
+            print(f"{'='*80}")
+            print(f"📊 FINAL RESULTS:")
+            print(f"   • Training samples: {len(train_docs)}")
+            print(f"   • Test samples: {len(test_docs)}")
+            print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+            print(f"   • Generated responses: {len(generated_responses)}")
+            if total_classifications > 0:
+                classification_acc = correct_classifications / total_classifications
+                print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
+            else:
+                print(f"   • Classification accuracy: Could not evaluate")
+            print(f"{'='*80}\n")
+        
+        logger.info(f"Pipeline completed for {task_name}")
+        return results
         
     except Exception as e:
         logger.error(f"Error in pipeline for {task_name}: {e}")
@@ -1241,7 +1242,7 @@ def main():
                 training_acc = results.get("training_results", {}).get("accuracy", "N/A")
                 eval_acc = results.get("evaluation_results", {}).get("accuracy", "N/A")
                 if isinstance(training_acc, float) and isinstance(eval_acc, float):
-                    print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
+                print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
                 else:
                     print(f"{task_name}: Train={training_acc} | Test={eval_acc}")
             else:

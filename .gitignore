@@ -95,5 +95,5 @@ tokenizer.json
 model.safetensors.index.json
 
 # Cache directories for our tools
-
+opt_param/
 smoke_test_results/

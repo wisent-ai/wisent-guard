@@ -51,7 +51,8 @@ def optimize_layers_on_contrastive_pairs(
     collector, 
     contrastive_pairs: List,
     device: str,
-    verbose: bool = False
+    verbose: bool = False,
+    optimize_layers: str = "all"
 ) -> Dict[int, Dict[str, Any]]:
     """
     Optimize layers using contrastive pairs (training data).
@@ -61,11 +62,17 @@ def optimize_layers_on_contrastive_pairs(
     """
     from .core.hyperparameter_optimizer import detect_model_layers
     from .core.classifier import Classifier
+    from .cli import parse_layer_range
     
     total_layers = detect_model_layers(model)
     
-    # Test ALL layers as requested
-    candidate_layers = list(range(total_layers))
+    # Parse layer range
+    if optimize_layers == "all":
+        candidate_layers = list(range(total_layers))
+    else:
+        candidate_layers = parse_layer_range(optimize_layers, model)
+        if candidate_layers is None:
+            candidate_layers = list(range(total_layers))
     
     if verbose:
         print(f"🔬 LAYER OPTIMIZATION ON CONTRASTIVE PAIRS:")
@@ -358,7 +365,8 @@ def run_smart_optimization(
     device: str,
     verbose: bool = False,
     classifier_types: List[str] = None,
-    thresholds: List[float] = None
+    thresholds: List[float] = None,
+    optimize_layers: str = "all"
 ) -> Dict[str, Any]:
     """
     Run complete smart optimization with caching.
@@ -409,7 +417,7 @@ def run_smart_optimization(
     
     # Step 1: Optimize layers using contrastive pairs (training data)
     layer_results = optimize_layers_on_contrastive_pairs(
-        model, collector, contrastive_pairs, device, verbose
+        model, collector, contrastive_pairs, device, verbose, optimize_layers=optimize_layers
     )
     
     if not layer_results:
