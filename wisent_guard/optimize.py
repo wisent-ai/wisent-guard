@@ -126,25 +126,40 @@ def optimize_layers_on_contrastive_pairs(
 
 def optimize_aggregation_on_ground_truth(
     model,
+    collector,
+    contrastive_pairs: List,
     layer_results: Dict[int, Dict[str, Any]],
     test_qa_pairs: List[Dict],
     ground_truth_method: str,
     max_new_tokens: int,
-    verbose: bool = False
+    device: str,
+    verbose: bool = False,
+    classifier_types: List[str] = None,
+    thresholds: List[float] = None
 ) -> Dict[str, Any]:
     """
-    Optimize aggregation methods using ground truth labels ONLY.
+    Optimize aggregation methods + classifier types + thresholds using ground truth labels ONLY.
     
     This is the validation phase - no training data used here.
     """
     from .core.ground_truth_evaluator import GroundTruthEvaluator
+    from .core import SteeringMethod, SteeringType, ContrastivePairSet
+    
+    # Set defaults
+    if classifier_types is None:
+        classifier_types = ["logistic", "mlp"]
+    if thresholds is None:
+        thresholds = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     
     aggregation_methods = ["average", "final", "first", "max", "min"]
     
     if verbose:
-        print(f"\n🎯 AGGREGATION OPTIMIZATION ON GROUND TRUTH:")
+        print(f"\n🎯 HYPERPARAMETER OPTIMIZATION ON GROUND TRUTH:")
         print(f"   • Testing layers: {list(layer_results.keys())}")
         print(f"   • Testing aggregations: {aggregation_methods}")
+        print(f"   • Testing classifier types: {classifier_types}")
+        print(f"   • Testing thresholds: {thresholds}")
+        print(f"   • Total combinations: {len(layer_results) * len(aggregation_methods) * len(classifier_types) * len(thresholds)}")
         print(f"   • Ground truth method: {ground_truth_method}")
     
     evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
@@ -152,6 +167,8 @@ def optimize_aggregation_on_ground_truth(
     best_combination = {
         'layer': None,
         'aggregation': None,
+        'classifier_type': None,
+        'threshold': None,
         'accuracy': 0.0,
         'correct': 0,
         'total': 0
@@ -159,99 +176,169 @@ def optimize_aggregation_on_ground_truth(
     
     combination_results = {}
     
-    for layer_idx, layer_data in layer_results.items():
-        classifier = layer_data['classifier']
-        
+    # For each layer, we need to retrain classifiers with different types
+    for layer_idx in layer_results.keys():
         if verbose:
             print(f"   • Testing layer {layer_idx}...")
         
-        # Generate responses and compute token scores ONCE per question
-        if verbose:
-            print(f"     🎯 Generating responses and computing token scores...")
-        
-        question_results = []
-        for qa_pair in test_qa_pairs:
+        # Train classifiers of different types for this layer
+        layer_classifiers = {}
+        for classifier_type in classifier_types:
             try:
-                question = qa_pair['formatted_question']
+                if verbose:
+                    print(f"     🎯 Training {classifier_type} classifier for layer {layer_idx}...")
                 
-                # Generate response with token scores ONCE
-                from .cli import generate_with_classification
-                mock_steering = type('MockSteering', (), {'classifier': classifier})
-                
-                response_text, token_scores, _ = generate_with_classification(
-                    model, question, layer_idx, max_new_tokens, 
-                    mock_steering, "average", verbose=False  # Use any aggregation, we'll recalculate
+                # Extract activations for this layer and classifier type
+                processed_pairs = collector.collect_activations_batch(
+                    pairs=contrastive_pairs,
+                    layer_index=layer_idx,
+                    device=device
                 )
                 
-                # Get ground truth label ONCE
-                gt_result = evaluator.evaluate_response(
-                    response=response_text,
-                    expected_answer=qa_pair.get('correct_answer', None)
-                )
-                ground_truth_label = gt_result['ground_truth']
-                
-                if ground_truth_label in ['TRUTHFUL', 'HALLUCINATION']:
-                    question_results.append({
-                        'response': response_text,
-                        'token_scores': token_scores,
-                        'ground_truth': ground_truth_label
+                # Convert to ContrastivePairSet format for training
+                phrase_pairs = []
+                for pair in processed_pairs:
+                    # Create the full prompts for the pair set
+                    positive_full = f"{pair.prompt}{pair.positive_response}"
+                    negative_full = f"{pair.prompt}{pair.negative_response}"
+                    
+                    phrase_pairs.append({
+                        "harmful": negative_full,  # A choice (incorrect)
+                        "harmless": positive_full  # B choice (correct)
                     })
+                
+                # Create ContrastivePairSet with the real activations
+                pair_set = ContrastivePairSet.from_phrase_pairs(
+                    name=f"layer_{layer_idx}_{classifier_type}_training",
+                    phrase_pairs=phrase_pairs,
+                    task_type="lm_evaluation"
+                )
+                
+                # Store the real activations in the pair set response objects
+                for i, processed_pair in enumerate(processed_pairs):
+                    if i < len(pair_set.pairs):
+                        # Assign activations to the response objects
+                        if hasattr(pair_set.pairs[i], 'positive_response') and pair_set.pairs[i].positive_response:
+                            pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                        if hasattr(pair_set.pairs[i], 'negative_response') and pair_set.pairs[i].negative_response:
+                            pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
+                
+                # Create steering method with this classifier type
+                steering_type = SteeringType.LOGISTIC if classifier_type == "logistic" else SteeringType.MLP
+                steering_method = SteeringMethod(method_type=steering_type, threshold=0.5, device=device)  # Threshold will be tested separately
+                
+                # Train the classifier
+                training_results = steering_method.train(pair_set)
+                layer_classifiers[classifier_type] = steering_method
+                
+                if verbose:
+                    print(f"       ✅ {classifier_type} trained: {training_results.get('accuracy', 'N/A'):.3f}")
                     
             except Exception as e:
                 if verbose:
-                    print(f"       ⚠️ Error generating response: {e}")
+                    print(f"       ❌ Error training {classifier_type}: {e}")
                 continue
         
-        # Now test all aggregation methods on the SAME token scores
-        for aggregation in aggregation_methods:
+        # Generate responses and compute token scores ONCE per question per classifier type
+        for classifier_type, steering_method in layer_classifiers.items():
             if verbose:
-                print(f"     ➤ Testing {aggregation} aggregation on computed scores...")
+                print(f"     🎭 Generating responses with {classifier_type} classifier...")
             
-            correct_predictions = 0
-            total_predictions = 0
-            
-            for result in question_results:
+            question_results = []
+            for qa_pair in test_qa_pairs:
                 try:
-                    # Apply aggregation method to existing token scores
-                    from .cli import aggregate_token_scores
-                    aggregated_score = aggregate_token_scores(result['token_scores'], aggregation)
-                    classification = "HALLUCINATION" if aggregated_score > 0.6 else "TRUTHFUL"
+                    question = qa_pair['formatted_question']
                     
-                    # Compare with ground truth
-                    if classification == result['ground_truth']:
-                        correct_predictions += 1
-                    total_predictions += 1
+                    # Generate response with token scores
+                    from .cli import generate_with_classification
                     
+                    response_text, token_scores, _ = generate_with_classification(
+                        model, question, layer_idx, max_new_tokens, 
+                        steering_method, "average", verbose=False  # Use any aggregation, we'll recalculate
+                    )
+                    
+                    # Get ground truth label ONCE
+                    gt_result = evaluator.evaluate_response(
+                        response=response_text,
+                        expected_answer=qa_pair.get('correct_answer', None)
+                    )
+                    ground_truth_label = gt_result['ground_truth']
+                    
+                    if ground_truth_label in ['TRUTHFUL', 'HALLUCINATION']:
+                        question_results.append({
+                            'response': response_text,
+                            'token_scores': token_scores,
+                            'ground_truth': ground_truth_label
+                        })
+                        
                 except Exception as e:
                     if verbose:
-                        print(f"       ⚠️ Error applying {aggregation}: {e}")
+                        print(f"         ⚠️ Error generating response: {e}")
                     continue
             
-            # Calculate accuracy for this combination
-            if total_predictions > 0:
-                accuracy = correct_predictions / total_predictions
-                
-                combo_key = f"layer_{layer_idx}_{aggregation}"
-                combination_results[combo_key] = {
-                    'layer': layer_idx,
-                    'aggregation': aggregation,
-                    'accuracy': accuracy,
-                    'correct': correct_predictions,
-                    'total': total_predictions
-                }
-                
-                if verbose:
-                    print(f"       ✅ {combo_key}: {accuracy:.3f} ({correct_predictions}/{total_predictions})")
-                
-                # Update best combination
-                if accuracy > best_combination['accuracy']:
-                    best_combination.update({
-                        'layer': layer_idx,
-                        'aggregation': aggregation,
-                        'accuracy': accuracy,
-                        'correct': correct_predictions,
-                        'total': total_predictions
-                    })
+            # Now test all combinations of aggregation + threshold on the SAME token scores
+            for aggregation in aggregation_methods:
+                for threshold in thresholds:
+                    if verbose and len(thresholds) <= 3:  # Only show details for small threshold sets
+                        print(f"       ➤ Testing {aggregation} + threshold {threshold}...")
+                    
+                    correct_predictions = 0
+                    total_predictions = 0
+                    
+                    for result in question_results:
+                        try:
+                            # Apply aggregation method to existing token scores
+                            from .cli import aggregate_token_scores
+                            aggregated_score = aggregate_token_scores(result['token_scores'], aggregation)
+                            classification = "HALLUCINATION" if aggregated_score > threshold else "TRUTHFUL"
+                            
+                            # Compare with ground truth
+                            if classification == result['ground_truth']:
+                                correct_predictions += 1
+                            total_predictions += 1
+                            
+                        except Exception as e:
+                            if verbose:
+                                print(f"         ⚠️ Error applying {aggregation} + {threshold}: {e}")
+                            continue
+                    
+                    # Calculate accuracy for this combination
+                    if total_predictions > 0:
+                        accuracy = correct_predictions / total_predictions
+                        
+                        combo_key = f"layer_{layer_idx}_{aggregation}_{classifier_type}_thresh_{threshold}"
+                        combination_results[combo_key] = {
+                            'layer': layer_idx,
+                            'aggregation': aggregation,
+                            'classifier_type': classifier_type,
+                            'threshold': threshold,
+                            'accuracy': accuracy,
+                            'correct': correct_predictions,
+                            'total': total_predictions
+                        }
+                        
+                        if verbose and len(thresholds) <= 3:
+                            print(f"         ✅ {combo_key}: {accuracy:.3f} ({correct_predictions}/{total_predictions})")
+                        
+                        # Update best combination
+                        if accuracy > best_combination['accuracy']:
+                            best_combination.update({
+                                'layer': layer_idx,
+                                'aggregation': aggregation,
+                                'classifier_type': classifier_type,
+                                'threshold': threshold,
+                                'accuracy': accuracy,
+                                'correct': correct_predictions,
+                                'total': total_predictions
+                            })
+    
+    if verbose:
+        print(f"\n   🏆 BEST COMBINATION:")
+        print(f"     • Layer: {best_combination['layer']}")
+        print(f"     • Aggregation: {best_combination['aggregation']}")
+        print(f"     • Classifier: {best_combination['classifier_type']}")
+        print(f"     • Threshold: {best_combination['threshold']}")
+        print(f"     • Accuracy: {best_combination['accuracy']:.3f} ({best_combination['correct']}/{best_combination['total']})")
     
     return {
         'best_combination': best_combination,
@@ -269,7 +356,9 @@ def run_smart_optimization(
     ground_truth_method: str,
     max_new_tokens: int,
     device: str,
-    verbose: bool = False
+    verbose: bool = False,
+    classifier_types: List[str] = None,
+    thresholds: List[float] = None
 ) -> Dict[str, Any]:
     """
     Run complete smart optimization with caching.
@@ -290,18 +379,29 @@ def run_smart_optimization(
     Returns:
         Dict with optimization results
     """
-    # Generate cache key
-    cache_key = get_cache_key(model_name, task_name, limit, ground_truth_method)
+    # Set defaults for new hyperparameters
+    if classifier_types is None:
+        classifier_types = ["logistic", "mlp"]
+    if thresholds is None:
+        thresholds = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    
+    # Generate cache key including new hyperparameters
+    import hashlib
+    cache_key_parts = [model_name, task_name, str(limit), ground_truth_method, 
+                      str(sorted(classifier_types)), str(sorted(thresholds))]
+    cache_key = hashlib.md5("_".join(cache_key_parts).encode()).hexdigest()
     
     if verbose:
         print(f"🔍 SMART HYPERPARAMETER OPTIMIZATION:")
         print(f"   • Cache key: {cache_key}")
+        print(f"   • Classifier types: {classifier_types}")
+        print(f"   • Thresholds: {thresholds}")
     
     # Check if results are already cached
     cached_results = load_cached_results(cache_key)
     if cached_results is not None:
         if verbose:
-            print(f"   💾 Found cached results! Using layer {cached_results['best_layer']} + {cached_results['best_aggregation']}")
+            print(f"   💾 Found cached results! Using layer {cached_results['best_layer']} + {cached_results['best_aggregation']} + {cached_results['best_classifier_type']} + threshold {cached_results['best_threshold']}")
         return cached_results
     
     if verbose:
@@ -315,9 +415,10 @@ def run_smart_optimization(
     if not layer_results:
         raise ValueError("No layers could be trained successfully")
     
-    # Step 2: Optimize aggregation methods using ground truth (validation data)
+    # Step 2: Optimize aggregation methods + classifier types + thresholds using ground truth (validation data)
     aggregation_results = optimize_aggregation_on_ground_truth(
-        model, layer_results, test_qa_pairs, ground_truth_method, max_new_tokens, verbose
+        model, collector, contrastive_pairs, layer_results, test_qa_pairs, ground_truth_method, max_new_tokens, device, verbose,
+        classifier_types=classifier_types, thresholds=thresholds
     )
     
     best_combo = aggregation_results['best_combination']
@@ -326,6 +427,8 @@ def run_smart_optimization(
     optimization_results = {
         'best_layer': best_combo['layer'],
         'best_aggregation': best_combo['aggregation'],
+        'best_classifier_type': best_combo['classifier_type'],
+        'best_threshold': best_combo['threshold'],
         'best_accuracy': best_combo['accuracy'],
         'optimization_performed': True,
         'layer_results': {k: {'train_accuracy': v['train_accuracy']} for k, v in layer_results.items()},
@@ -340,6 +443,8 @@ def run_smart_optimization(
         print(f"\n   🏆 OPTIMAL COMBINATION FOUND:")
         print(f"      • Best layer: {best_combo['layer']}")
         print(f"      • Best aggregation: {best_combo['aggregation']}")
+        print(f"      • Best classifier: {best_combo['classifier_type']}")
+        print(f"      • Best threshold: {best_combo['threshold']}")
         print(f"      • Ground truth accuracy: {best_combo['accuracy']:.3f} ({best_combo['correct']}/{best_combo['total']})")
         print(f"      • Results cached for future runs")
     

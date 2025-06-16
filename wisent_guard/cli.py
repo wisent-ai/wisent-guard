@@ -132,7 +132,7 @@ def aggregate_token_scores(token_scores: List[float], method: str) -> float:
         return sum(token_scores) / len(token_scores)
 
 
-def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, token_aggregation="average", verbose=False):
+def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, token_aggregation="average", threshold=0.6, verbose=False):
     """
     Generate text with token-level hallucination classification.
     
@@ -231,7 +231,7 @@ def generate_with_classification(model, prompt, layer, max_new_tokens, steering_
     # Classify overall response using specified aggregation method
     if token_scores:
         aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
-        classification = "HALLUCINATION" if aggregated_score > 0.6 else "TRUTHFUL"
+        classification = "HALLUCINATION" if aggregated_score > threshold else "TRUTHFUL"
     else:
         aggregated_score = 0.5
         classification = "UNKNOWN"
@@ -493,14 +493,23 @@ def run_task_pipeline(
             if optimization_result.get('optimization_performed', False):
                 layer = optimization_result.get('best_layer', layer)
                 token_aggregation = optimization_result.get('best_aggregation', token_aggregation)
+                optimized_classifier_type = optimization_result.get('best_classifier_type', classifier_type)
+                optimized_threshold = optimization_result.get('best_threshold', 0.6)
                 if verbose:
-                    print(f"✅ Hyperparameter optimization completed! Best: Layer {layer} + {token_aggregation} aggregation")
+                    print(f"✅ Hyperparameter optimization completed!")
+                    print(f"   • Best layer: {layer} + {token_aggregation} aggregation")
+                    print(f"   • Best classifier: {optimized_classifier_type}")
+                    print(f"   • Best threshold: {optimized_threshold}")
             else:
                 if verbose:
                     print(f"⚠️ Optimization failed, using default layer {layer}")
+                optimized_classifier_type = classifier_type
+                optimized_threshold = 0.6
                 optimization_result = {
                     'best_layer': layer,
                     'best_aggregation': token_aggregation,
+                    'best_classifier_type': optimized_classifier_type,
+                    'best_threshold': optimized_threshold,
                     'optimization_performed': False
                 }
         
@@ -543,14 +552,22 @@ def run_task_pipeline(
                 if hasattr(pair_set.pairs[i], 'negative_response') and pair_set.pairs[i].negative_response:
                     pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
         
-        # Train classifier
+        # Train classifier using optimized type (if optimization was performed)
+        if optimize:
+            final_classifier_type = optimized_classifier_type
+            final_threshold = optimized_threshold
+        else:
+            final_classifier_type = classifier_type
+            final_threshold = 0.6
+        
         if verbose:
             print(f"\n🎯 TRAINING CLASSIFIER:")
-            print(f"   • Type: {classifier_type}")
+            print(f"   • Type: {final_classifier_type}")
+            print(f"   • Threshold: {final_threshold}")
             print(f"   • Training pairs: {len(pair_set)}")
         
-        steering_type = SteeringType.LOGISTIC if classifier_type == "logistic" else SteeringType.MLP
-        steering_method = SteeringMethod(method_type=steering_type, device=device)
+        steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
+        steering_method = SteeringMethod(method_type=steering_type, threshold=final_threshold, device=device)
         
         training_results = steering_method.train(pair_set)
         
@@ -622,7 +639,7 @@ def run_task_pipeline(
                 
                 # Generate response with token-level scoring
                 response, token_scores, classification = generate_with_classification(
-                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose
+                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, final_threshold, verbose
                 )
                 
                 # Evaluate the generated response using the ground truth evaluator
@@ -874,7 +891,7 @@ def run_task_pipeline(
                 
                 # Generate response with token-level scoring
                 response, token_scores, classification = generate_with_classification(
-                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, verbose and not optimize
+                    model, simple_prompt, layer, max_new_tokens, steering_method, token_aggregation, final_threshold, verbose and not optimize
                 )
                 
                 # Evaluate the generated response using the ground truth evaluator
