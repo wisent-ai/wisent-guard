@@ -282,4 +282,207 @@ def create_safe_inference(
     )
     
     inference.train_safety_filter(harmful_examples, harmless_examples)
-    return inference 
+    return inference
+
+
+def generate_with_classification_and_handling(
+    model, prompt, layer, max_new_tokens, steering_method, 
+    token_aggregation="average", threshold=0.6, verbose=False,
+    detection_handler=None
+):
+    """
+    Generate text with token-level classification and optional detection handling.
+    
+    Args:
+        model: Model object
+        prompt: Input prompt
+        layer: Layer index for activation extraction
+        max_new_tokens: Maximum tokens to generate
+        steering_method: Trained steering method with classifier
+        token_aggregation: How to aggregate token scores ("average", "final", "first", "max", "min")
+        threshold: Classification threshold
+        verbose: Whether to print debug info
+        detection_handler: Optional DetectionHandler for handling detected issues
+        
+    Returns:
+        Tuple of (final_response_text, token_scores, classification, was_handled)
+    """
+    from .core.detection_handling import DetectionHandler, DetectionAction
+    from .core.parser import aggregate_token_scores
+    
+    # Generate initial response with classification
+    original_response, token_scores, classification = generate_with_classification(
+        model, prompt, layer, max_new_tokens, steering_method, token_aggregation, threshold, verbose
+    )
+    
+    # If no handler provided or no detection, return as-is
+    if not detection_handler:
+        return original_response, token_scores, classification, False
+    
+    # Determine if content should be handled (detected as problematic)
+    is_problematic = classification == "HALLUCINATION"
+    
+    if not is_problematic:
+        # Content is fine, return as-is
+        return original_response, token_scores, classification, False
+    
+    # Content is problematic, apply handling
+    if verbose:
+        print(f"      🚨 Detected problematic content, applying {detection_handler.action.value} handling...")
+    
+    # Calculate confidence score for the detection
+    if token_scores:
+        confidence_score = aggregate_token_scores(token_scores, token_aggregation)
+    else:
+        confidence_score = 0.5
+    
+    # Create regeneration function if needed
+    regenerate_function = None
+    if detection_handler.action == DetectionAction.REGENERATE_UNTIL_SAFE:
+        def regenerate():
+            # Generate a new response
+            new_response, new_token_scores, new_classification = generate_with_classification(
+                model, prompt, layer, max_new_tokens, steering_method, token_aggregation, threshold, verbose
+            )
+            # Only return if it's not problematic
+            if new_classification != "HALLUCINATION":
+                return new_response
+            else:
+                # Still problematic, raise exception to trigger retry
+                raise Exception(f"Generated response still classified as {new_classification}")
+        
+        regenerate_function = regenerate
+    
+    # Handle the detection
+    final_response = detection_handler.handle_detection(
+        original_response=original_response,
+        detection_type="hallucination",  # Could be made configurable
+        confidence_score=confidence_score,
+        original_prompt=prompt,
+        regenerate_function=regenerate_function
+    )
+    
+    # If regeneration was successful, get new token scores and classification
+    if (detection_handler.action == DetectionAction.REGENERATE_UNTIL_SAFE 
+        and final_response != original_response 
+        and not final_response.startswith("I apologize")):  # Not a fallback placeholder
+        
+        # Re-classify the final response
+        final_response_clean, final_token_scores, final_classification = generate_with_classification(
+            model, prompt, layer, max_new_tokens, steering_method, token_aggregation, threshold, verbose=False
+        )
+        
+        if final_response_clean.strip() == final_response.strip():
+            return final_response, final_token_scores, final_classification, True
+    
+    # For placeholder or pass-through, return original scores but indicate handling occurred
+    return final_response, token_scores, classification, True
+
+
+def generate_with_classification(model, prompt, layer, max_new_tokens, steering_method, token_aggregation="average", threshold=0.6, verbose=False):
+    """
+    Generate text with token-level classification.
+    
+    Args:
+        model: Model object
+        prompt: Input prompt
+        layer: Layer index for activation extraction
+        max_new_tokens: Maximum tokens to generate
+        steering_method: Trained steering method with classifier
+        token_aggregation: How to aggregate token scores ("average", "final", "first", "max", "min")
+        threshold: Classification threshold
+        verbose: Whether to print debug info
+        
+    Returns:
+        Tuple of (response_text, token_scores, classification)
+    """
+    import torch
+    from .core import Layer
+    from .core.activations import Activations, ActivationAggregationMethod
+    from .core.parser import aggregate_token_scores
+    
+    # Generate response and get token-by-token activations
+    response, activations_dict = model.generate(prompt, layer, max_new_tokens)
+    
+    if not response.strip():
+        return response, [], "UNKNOWN"
+    
+    # Tokenize the full prompt + response to get individual tokens
+    full_text = f"{prompt}{response}"
+    inputs = model.tokenizer(full_text, return_tensors="pt")
+    tokens = model.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+    
+    # Get prompt length to identify response tokens
+    prompt_inputs = model.tokenizer(prompt, return_tensors="pt")
+    prompt_length = len(prompt_inputs['input_ids'][0])
+    
+    # Extract activations for each response token
+    token_scores = []
+    layer_obj = Layer(index=layer, type="transformer")
+    
+    try:
+        # Get model device
+        model_device = next(model.hf_model.parameters()).device
+        inputs_on_device = {k: v.to(model_device) for k, v in inputs.items()}
+        
+        # Get hidden states for the full sequence
+        with torch.no_grad():
+            outputs = model.hf_model(**inputs_on_device, output_hidden_states=True)
+        
+        # Extract activations for response tokens only
+        if layer + 1 < len(outputs.hidden_states):
+            hidden_states = outputs.hidden_states[layer + 1]  # [batch_size, seq_len, hidden_dim]
+        else:
+            hidden_states = outputs.hidden_states[-1]
+        
+        # Score each response token
+        for token_idx in range(prompt_length, len(tokens)):
+            if token_idx < hidden_states.shape[1]:
+                # Extract activation for this token
+                token_activation = hidden_states[0, token_idx, :].cpu()
+                
+                # Create Activations object
+                activation_obj = Activations(
+                    tensor=token_activation.unsqueeze(0),  # Add batch dimension
+                    layer=layer_obj,
+                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                )
+                
+                # Get feature vector for classifier
+                features = activation_obj.extract_features_for_classifier()
+                
+                # Get prediction probability from classifier
+                if hasattr(steering_method, 'classifier') and steering_method.classifier:
+                    try:
+                        # Predict probability of being harmful (class 1)
+                        # Our classifier returns a single float, not an array like sklearn
+                        prob = steering_method.classifier.predict_proba([features.numpy()])
+                        # Handle both single float and array returns
+                        if isinstance(prob, (list, tuple)) or hasattr(prob, '__getitem__'):
+                            prob = float(prob[0]) if len(prob) > 0 else 0.5
+                        else:
+                            prob = float(prob)
+                        token_scores.append(prob)
+                    except Exception as e:
+                        if verbose:
+                            print(f"      ⚠️  Classifier error for token {token_idx}: {e}")
+                        token_scores.append(0.5)  # Neutral score
+                else:
+                    token_scores.append(0.5)  # Neutral score if no classifier
+    
+    except Exception as e:
+        if verbose:
+            print(f"      ⚠️  Error during token scoring: {e}")
+        # Fallback: assign neutral scores
+        response_tokens = model.tokenizer(response, return_tensors="pt")['input_ids'][0]
+        token_scores = [0.5] * len(response_tokens)
+    
+    # Classify overall response using specified aggregation method
+    if token_scores:
+        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+        classification = "HALLUCINATION" if aggregated_score > threshold else "TRUTHFUL"
+    else:
+        aggregated_score = 0.5
+        classification = "UNKNOWN"
+    
+    return response, token_scores, classification 
