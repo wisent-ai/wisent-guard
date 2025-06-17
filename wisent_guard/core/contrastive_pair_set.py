@@ -1090,4 +1090,115 @@ class ContrastivePairSet:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         
-        print(f"Saved {len(data)} contrastive pairs to {json_path}") 
+        print(f"Saved {len(data)} contrastive pairs to {json_path}")
+
+    @classmethod
+    def extract_qa_pairs_from_task_docs(
+        cls,
+        task_name: str,
+        task_data,
+        docs: List[Dict[str, Any]]
+    ) -> List[Dict[str, str]]:
+        """
+        Extract QA pairs from task documents using task-specific logic.
+        
+        Args:
+            task_name: Name of the task (e.g., 'truthful_qa', 'hellaswag')
+            task_data: Task object from lm-eval
+            docs: List of documents from the task
+            
+        Returns:
+            List of QA pairs with 'question', 'correct_answer', 'incorrect_answer' keys
+        """
+        qa_pairs = []
+        
+        for doc in docs:
+            try:
+                # Extract question using task's doc_to_text method
+                if hasattr(task_data, 'doc_to_text'):
+                    question = task_data.doc_to_text(doc)
+                else:
+                    question = doc.get('question', str(doc))
+                
+                # Task-specific answer extraction
+                correct_answer = None
+                incorrect_answer = None
+                
+                if task_name == 'truthful_qa':
+                    # TruthfulQA-specific extraction
+                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                    
+                    # Find the correct answer
+                    for i, label in enumerate(correct_labels):
+                        if label == 1 and i < len(correct_answers):
+                            correct_answer = correct_answers[i]
+                            break
+                    
+                    # Find an incorrect answer
+                    for i, label in enumerate(correct_labels):
+                        if label == 0 and i < len(correct_answers):
+                            incorrect_answer = correct_answers[i]
+                            break
+                            
+                elif task_name == 'hellaswag':
+                    # HellaSwag-specific extraction
+                    endings = doc.get('endings', [])
+                    label = doc.get('label', 0)
+                    
+                    # Convert string label to int if needed
+                    if isinstance(label, str):
+                        try:
+                            label = int(label)
+                        except ValueError:
+                            label = 0
+                    
+                    if len(endings) > label:
+                        correct_answer = endings[label]
+                        # Use first different ending as incorrect answer
+                        for i, ending in enumerate(endings):
+                            if i != label:
+                                incorrect_answer = ending
+                                break
+                                
+                else:
+                    # Generic extraction for other tasks
+                    # Try common answer fields
+                    if 'choices' in doc and 'label' in doc:
+                        choices = doc['choices']
+                        label = doc['label']
+                        
+                        # Convert string label to int if needed
+                        if isinstance(label, str):
+                            try:
+                                label = int(label)
+                            except ValueError:
+                                label = 0
+                        
+                        if isinstance(label, int) and 0 <= label < len(choices):
+                            correct_answer = choices[label]
+                            # Use first different choice as incorrect
+                            for i, choice in enumerate(choices):
+                                if i != label:
+                                    incorrect_answer = choice
+                                    break
+                    elif 'answer' in doc:
+                        correct_answer = doc['answer']
+                        # For simple answer tasks, create a generic incorrect answer
+                        incorrect_answer = "This is incorrect"
+                    elif hasattr(task_data, 'doc_to_target'):
+                        correct_answer = task_data.doc_to_target(doc)
+                        incorrect_answer = "This is incorrect"
+                
+                if correct_answer and incorrect_answer:
+                    qa_pairs.append({
+                        'question': question,
+                        'correct_answer': correct_answer,
+                        'incorrect_answer': incorrect_answer
+                    })
+                    
+            except Exception as e:
+                # Skip problematic docs
+                continue
+        
+        return qa_pairs 

@@ -217,45 +217,11 @@ def run_task_pipeline(
             # Extract QA pairs from training documents  
             if verbose:
                 print(f"\n📝 TRAINING DATA PREPARATION:")
-                print(f"   • Loading TruthfulQA data with correct/incorrect answers...")
+                print(f"   • Loading {task_name} data with correct/incorrect answers...")
             
-            qa_pairs = []
-            for doc in train_docs:
-                try:
-                    # Extract question
-                    if hasattr(task_data, 'doc_to_text'):
-                        question = task_data.doc_to_text(doc)
-                    else:
-                        question = doc.get('question', str(doc))
-                    
-                    # Extract correct answer
-                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                    
-                    # Find the correct answer
-                    correct_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 1 and i < len(correct_answers):
-                            correct_answer = correct_answers[i]
-                            break
-                    
-                    # Find an incorrect answer
-                    incorrect_answer = None
-                    for i, label in enumerate(correct_labels):
-                        if label == 0 and i < len(correct_answers):
-                            incorrect_answer = correct_answers[i]
-                            break
-                    
-                    if correct_answer and incorrect_answer:
-                        qa_pairs.append({
-                            'question': question,
-                            'correct_answer': correct_answer,
-                            'incorrect_answer': incorrect_answer
-                        })
-                        
-                except Exception as e:
-                    # Skip problematic docs
-                    continue
+            # Use the proper extraction method from ContrastivePairSet
+            from .core.contrastive_pair_set import ContrastivePairSet
+            qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
                 
             test_qa_pairs_source = test_docs  # Keep original format for test docs
         
@@ -1234,7 +1200,7 @@ def run_task_pipeline(
             # Only do pre-written validation when NOT optimizing
             if verbose:
                 print(f"\n🧪 PREPARING TEST DATA:")
-                print(f"   • Loading TruthfulQA test data with correct/incorrect answers...")
+                print(f"   • Loading {task_name} test data with correct/incorrect answers...")
             
             # Get the actual test data with correct and incorrect answers
             test_qa_pairs = []
