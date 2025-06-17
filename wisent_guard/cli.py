@@ -56,7 +56,7 @@ Examples:
     parser.add_argument("--limit", type=int, default=None, help="Limit number of documents per task")
     parser.add_argument("--output", type=str, default="./results", help="Output directory for results")
     parser.add_argument("--classifier-type", type=str, choices=["logistic", "mlp"], default="logistic", help="Type of classifier")
-    parser.add_argument("--max-new-tokens", type=int, default=50, help="Maximum new tokens for generation")
+    parser.add_argument("--max-new-tokens", type=int, default=300, help="Maximum new tokens for generation")
     parser.add_argument("--device", type=str, default=None, help="Device to run on")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
@@ -388,7 +388,7 @@ def run_task_pipeline(
     split_ratio: float = 0.8,
     limit: int = None,
     classifier_type: str = "logistic",
-    max_new_tokens: int = 50,
+    max_new_tokens: int = 300,
     device: str = None,
     seed: int = 42,
     token_aggregation: str = "average",
@@ -1171,6 +1171,7 @@ def run_task_pipeline(
                         total_classifications += 1
                     
                     generated_responses.append({
+                        'question': qa_pair['question'],  # Add the question
                         'response': response,
                         'token_scores': token_scores,
                         'classification': classification,
@@ -1182,19 +1183,28 @@ def run_task_pipeline(
                         'was_handled': was_handled
                     })
                     
-                    if verbose:
-                        print(f"      🤖 Response: {response[:100]}{'...' if len(response) > 100 else ''}")
-                        print(f"      🎯 Classification: {classification}")
-                        print(f"      📊 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}{'...' if len(token_scores) > 10 else ''}")
-                        print(f"      🔢 Aggregated Score: {aggregate_token_scores(token_scores, token_aggregation):.3f}")
-                        print(f"      ✅ Ground Truth: {ground_truth}")
+                    if verbose and not optimize:  # Only show detailed output when not optimizing
+                        print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                        if len(token_scores) > 10:
+                            print(f"                    ... ({len(token_scores)} total tokens)")
+                        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                        print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
+                        print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
                         if classification_correct is not None:
-                            print(f"      {'✅' if classification_correct else '❌'} Match: {classification_correct}")
-                        
+                            print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                        else:
+                            print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
+                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                        print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                        if evaluation_result["details"]:
+                            print(f"      📝 Details: {evaluation_result['details']}")
+                    
                 except Exception as e:
-                    if verbose:
-                        print(f"      ❌ Error evaluating response: {e}")
+                    if verbose and not optimize:
+                        print(f"      ⚠️  Could not evaluate response: {e}")
                     generated_responses.append({
+                        'question': qa_pair['question'],  # Add the question
                         'response': response,
                         'token_scores': token_scores,
                         'classification': classification,
@@ -1331,6 +1341,7 @@ def run_task_pipeline(
                     print(f"\n   📋 Test Example {i+1}:")
                     print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
                     print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+                    print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
             
             # Create test contrastive pairs using proper activation collection logic
             test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
@@ -1380,16 +1391,16 @@ def run_task_pipeline(
             if verbose:
                 if optimize:
                     print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
-                    print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses with optimized layer {layer}...")
+                    print(f"   • Generating {len(test_qa_pairs)} sample responses with optimized layer {layer}...")
                 else:
                     print(f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
-                    print(f"   • Generating {min(5, len(test_qa_pairs))} sample responses...")
+                    print(f"   • Generating {len(test_qa_pairs)} sample responses...")
             
             generated_responses = []
             correct_classifications = 0
             total_classifications = 0
             
-            for i, qa_pair in enumerate(test_qa_pairs[:5]):  # Sample 5 responses
+            for i, qa_pair in enumerate(test_qa_pairs):  # Process ALL test samples
                 if verbose and not optimize:  # Only show detailed progress when not optimizing
                     print(f"\n   🎯 Generating response {i+1}:")
                     print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
@@ -1431,6 +1442,7 @@ def run_task_pipeline(
                         total_classifications += 1
                     
                     generated_responses.append({
+                        'question': qa_pair['question'],  # Add the question
                         'response': response,
                         'token_scores': token_scores,
                         'classification': classification,
@@ -1455,7 +1467,7 @@ def run_task_pipeline(
                         else:
                             print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
                         print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                        print(f"      ❌ Incorrect: {qa_pair['correct_answer']}")
+                        print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
                         if evaluation_result["details"]:
                             print(f"      📝 Details: {evaluation_result['details']}")
                     
@@ -1463,6 +1475,7 @@ def run_task_pipeline(
                     if verbose and not optimize:
                         print(f"      ⚠️  Could not evaluate response: {e}")
                     generated_responses.append({
+                        'question': qa_pair['question'],  # Add the question
                         'response': response,
                         'token_scores': token_scores,
                         'classification': classification,
@@ -1560,6 +1573,70 @@ def save_results_csv(results: Dict[str, Any], output_path: str) -> None:
         
     except Exception as e:
         logger.error(f"Failed to save CSV to {output_path}: {e}")
+
+
+def save_classification_results_csv(results: Dict[str, Any], output_path: str) -> None:
+    """
+    Save detailed classification results to CSV file for manual evaluation.
+    
+    Exports one row per response with:
+    1. question - The question asked
+    2. response - The model's response  
+    3. token_scores - Token-level activation scores (pipe-separated)
+    4. overall_prediction - TRUTHFUL or HALLUCINATION classification
+    5. ground_truth - Empty column for user to fill in
+    """
+    try:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        csv_rows = []
+        
+        for task_name, task_results in results.items():
+            if not isinstance(task_results, dict) or 'sample_responses' not in task_results:
+                continue
+            
+            # Skip steering mode results (they don't have classification data)
+            if task_results.get('steering_mode', False):
+                continue
+                
+            sample_responses = task_results['sample_responses']
+            
+            for response_data in sample_responses:
+                # Format token scores as pipe-separated values
+                token_scores_str = ""
+                if response_data.get('token_scores'):
+                    token_scores_formatted = [f"{score:.6f}" for score in response_data['token_scores']]
+                    token_scores_str = "|".join(token_scores_formatted)
+                
+                # Create CSV row
+                csv_row = {
+                    'question': response_data.get('question', ''),  # Will be extracted from test data
+                    'response': response_data.get('response', ''),
+                    'token_scores': token_scores_str,
+                    'overall_prediction': response_data.get('classification', 'UNKNOWN'),
+                    'ground_truth': ''  # Empty for user to fill
+                }
+                
+                csv_rows.append(csv_row)
+        
+        # Only save if we have classification data
+        if csv_rows:
+            with open(output_path, 'w', newline='', encoding='utf-8') as f:
+                fieldnames = ['question', 'response', 'token_scores', 'overall_prediction', 'ground_truth']
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(csv_rows)
+            
+            logger.info(f"Classification results CSV saved to {output_path}")
+            print(f"\n📊 Classification results saved to: {output_path}")
+            print(f"   • {len(csv_rows)} responses exported")
+            print(f"   • Fill in the 'ground_truth' column with: 'TRUTHFUL' or 'HALLUCINATION'")
+            print(f"   • Use for manual evaluation and classifier optimization")
+        else:
+            logger.info("No classification results to export (steering mode or empty results)")
+        
+    except Exception as e:
+        logger.error(f"Failed to save classification CSV to {output_path}: {e}")
 
 
 def create_evaluation_report(results: Dict[str, Any], output_path: str) -> None:
@@ -1767,6 +1844,10 @@ def main():
         # CSV results
         csv_path = os.path.join(args.output, f"results_{timestamp}.csv")
         save_results_csv(all_results, csv_path)
+        
+        # Classification results CSV (detailed token-level data for manual evaluation)
+        classification_csv_path = os.path.join(args.output, f"classification_results_{timestamp}.csv")
+        save_classification_results_csv(all_results, classification_csv_path)
         
         # Markdown report
         report_path = os.path.join(args.output, f"report_{timestamp}.md")
