@@ -94,6 +94,17 @@ Thumbs.db
 tokenizer.json
 model.safetensors.index.json
 
-# Cache directories for our tools
+# Wisent-guard generated files and directories
+# Trained classifiers and steering vectors (can be large)
+models/*.pkl
+models/*.joblib
+models/*_classifier*
+models/*_vector*
+
+# Results and evaluation outputs
+results/
+evaluation_results/
 opt_param/
 smoke_test_results/
+
+# Cache directories for our tools

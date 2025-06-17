@@ -26,6 +26,12 @@ Examples:
   python -m wisent_guard tasks data.csv --from-csv --detection-action replace_with_placeholder
   python -m wisent_guard tasks data.csv --from-csv --detection-action regenerate_until_safe --max-regeneration-attempts 5
   python -m wisent_guard tasks data.csv --from-csv --detection-action replace_with_placeholder --placeholder-message "Content flagged for review"
+  
+  # Training/Inference mode examples:
+  python -m wisent_guard tasks truthfulqa --train-only --save-classifier my_classifier --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks truthfulqa --layer 14-16 --train-only --classifier-dir ./models --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks data.csv --from-csv --inference-only --load-classifier ./models/my_classifier --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks data.csv --from-csv --layer 14-16 --inference-only --load-classifier ./models/truthfulqa_classifier --model meta-llama/Llama-3.1-8B
         """
     )
     
@@ -102,6 +108,18 @@ Examples:
                        help="Path to save the computed steering vector")
     parser.add_argument("--load-steering-vector", type=str, default=None,
                        help="Path to load a pre-computed steering vector")
+    
+    # Training/Inference mode arguments
+    parser.add_argument("--train-only", action="store_true",
+                       help="Training-only mode: train classifiers/vectors and save them, skip inference")
+    parser.add_argument("--inference-only", action="store_true", 
+                       help="Inference-only mode: load pre-trained classifiers/vectors and use for monitoring/steering")
+    parser.add_argument("--save-classifier", type=str, default=None,
+                       help="Path to save trained classifier(s). In multi-layer mode, saves one file per layer with layer suffix")
+    parser.add_argument("--load-classifier", type=str, default=None,
+                       help="Path to load pre-trained classifier(s). In multi-layer mode, expects files with layer suffix")
+    parser.add_argument("--classifier-dir", type=str, default="./models",
+                       help="Directory for saving/loading classifiers and vectors (default: ./models)")
     
     return parser
 

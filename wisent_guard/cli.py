@@ -62,7 +62,12 @@ def run_task_pipeline(
     steering_mode: bool = False,
     steering_strength: float = 1.0,
     save_steering_vector: str = None,
-    load_steering_vector: str = None
+    load_steering_vector: str = None,
+    train_only: bool = False,
+    inference_only: bool = False,
+    save_classifier: str = None,
+    load_classifier: str = None,
+    classifier_dir: str = "./models"
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -303,6 +308,86 @@ def run_task_pipeline(
                 print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
                 print(f"      🟢 Positive (B): {pair.positive_response}")
                 print(f"      🔴 Negative (A): {pair.negative_response}")
+        
+        # Validate mode combinations
+        if train_only and inference_only:
+            error_msg = "Cannot specify both --train-only and --inference-only modes"
+            if verbose:
+                print(f"\n❌ ERROR: {error_msg}")
+            return {"task_name": task_name, "error": error_msg}
+        
+        if inference_only and not load_classifier and not load_steering_vector:
+            error_msg = "Inference-only mode requires --load-classifier or --load-steering-vector"
+            if verbose:
+                print(f"\n❌ ERROR: {error_msg}")
+                print(f"   • Use --load-classifier to load pre-trained classifiers")
+                print(f"   • Use --load-steering-vector to load pre-trained steering vectors")
+            return {"task_name": task_name, "error": error_msg}
+        
+        # Handle inference-only mode
+        if inference_only:
+            from .core.model_persistence import ModelPersistence
+            
+            if verbose:
+                print(f"\n🔄 INFERENCE-ONLY MODE:")
+                print(f"   • Loading pre-trained models for inference...")
+            
+            # Parse layers to know what to load
+            layers = parse_layers_from_arg(layer)
+            
+            # Load classifiers or steering vectors
+            steering_methods = {}
+            loaded_models = {}
+            
+            if load_classifier:
+                if verbose:
+                    print(f"   • Loading classifiers from: {load_classifier}")
+                
+                if len(layers) > 1:
+                    # Multi-layer mode
+                    classifiers_data = ModelPersistence.load_multi_layer_classifiers(load_classifier, layers)
+                    for layer_idx, (classifier, metadata) in classifiers_data.items():
+                        steering_methods[layer_idx] = type('SteeringMethod', (), {'classifier': classifier})()
+                        loaded_models[layer_idx] = metadata
+                        if verbose:
+                            print(f"     ✅ Layer {layer_idx}: {metadata.get('classifier_type', 'unknown')} classifier")
+                else:
+                    # Single layer mode
+                    classifier, metadata = ModelPersistence.load_classifier(load_classifier, layers[0])
+                    steering_methods[layers[0]] = type('SteeringMethod', (), {'classifier': classifier})()
+                    loaded_models[layers[0]] = metadata
+                    if verbose:
+                        print(f"     ✅ Layer {layers[0]}: {metadata.get('classifier_type', 'unknown')} classifier")
+            
+            if load_steering_vector:
+                if verbose:
+                    print(f"   • Loading steering vectors from: {load_steering_vector}")
+                # TODO: Implement steering vector loading
+                print(f"   ⚠️  Steering vector loading not yet implemented")
+            
+            if not steering_methods:
+                error_msg = "No models could be loaded for inference"
+                if verbose:
+                    print(f"\n❌ ERROR: {error_msg}")
+                return {"task_name": task_name, "error": error_msg}
+            
+            # Set up inference with loaded models
+            if verbose:
+                print(f"   • Inference setup complete")
+                print(f"   • Available models: {list(loaded_models.keys())}")
+            
+            # Continue with inference pipeline using loaded models
+            # (The rest of the pipeline will use the loaded steering_methods)
+        
+        # Handle training-only mode  
+        elif train_only:
+            if verbose:
+                print(f"\n🎓 TRAINING-ONLY MODE:")
+                print(f"   • Training classifiers/vectors and saving, skipping inference...")
+                
+            # Continue with training but return early before inference
+            # (Training will happen in the normal flow, but we'll return after training)
+            pass
         
         # Check if optimization is needed
         original_layer = layer
@@ -820,6 +905,94 @@ def run_task_pipeline(
                     "suggestion": "Check data quality or try a different classifier type"
                 }
         
+        # Save trained classifiers if requested
+        saved_classifier_paths = []
+        if save_classifier or train_only:
+            from .core.model_persistence import ModelPersistence, create_classifier_metadata
+            
+            # Determine save path
+            if save_classifier:
+                save_path = save_classifier
+            else:
+                # Default path for train-only mode
+                safe_model_name = model_name.replace('/', '_').replace('-', '_')
+                save_path = os.path.join(classifier_dir, f"{task_name}_{safe_model_name}_classifier")
+            
+            if verbose:
+                print(f"\n💾 SAVING TRAINED CLASSIFIERS:")
+                print(f"   • Save path: {save_path}")
+            
+            try:
+                if is_multi_layer:
+                    # Save multiple classifiers
+                    for layer_idx in layers:
+                        if layer_idx in steering_methods:
+                            classifier = steering_methods[layer_idx].classifier
+                            training_result = layer_training_results[layer_idx]
+                            
+                            # Create metadata
+                            metadata = create_classifier_metadata(
+                                model_name=model_name,
+                                task_name=task_name,
+                                layer=layer_idx,
+                                classifier_type=final_classifier_type,
+                                training_accuracy=training_result.get('accuracy', 0.0),
+                                training_samples=len(contrastive_pairs),
+                                token_aggregation=token_aggregation,
+                                detection_threshold=final_threshold
+                            )
+                            
+                            path = ModelPersistence.save_classifier(classifier, layer_idx, save_path, metadata)
+                            saved_classifier_paths.append(path)
+                            
+                            if verbose:
+                                print(f"     ✅ Layer {layer_idx}: {path}")
+                else:
+                    # Save single classifier
+                    classifier = steering_method.classifier
+                    metadata = create_classifier_metadata(
+                        model_name=model_name,
+                        task_name=task_name,
+                        layer=layers[0],
+                        classifier_type=final_classifier_type,
+                        training_accuracy=training_results.get('accuracy', 0.0),
+                        training_samples=len(contrastive_pairs),
+                        token_aggregation=token_aggregation,
+                        detection_threshold=final_threshold
+                    )
+                    
+                    path = ModelPersistence.save_classifier(classifier, layers[0], save_path, metadata)
+                    saved_classifier_paths.append(path)
+                    
+                    if verbose:
+                        print(f"     ✅ Saved: {path}")
+                        
+            except Exception as e:
+                if verbose:
+                    print(f"     ❌ Error saving classifiers: {e}")
+        
+        # Handle train-only mode - return early after training and saving
+        if train_only:
+            if verbose:
+                print(f"\n🎓 TRAINING-ONLY MODE COMPLETED!")
+                print(f"   • Trained classifiers for layers: {list(steering_methods.keys())}")
+                if saved_classifier_paths:
+                    print(f"   • Saved {len(saved_classifier_paths)} classifier files")
+                print(f"   • Skipping inference phase")
+            
+            return {
+                "task_name": task_name,
+                "model_name": model_name,
+                "mode": "train_only",
+                "layers": layers,
+                "trained_layers": list(steering_methods.keys()),
+                "training_results": layer_training_results if is_multi_layer else {layers[0]: training_results},
+                "saved_classifier_paths": saved_classifier_paths,
+                "classifier_type": final_classifier_type,
+                "training_samples": len(contrastive_pairs),
+                "success": True
+            }
+        
         # Test the optimized classifier by generating responses and classifying them
         if optimize:
             if verbose:
@@ -1048,9 +1221,11 @@ def run_task_pipeline(
                 else:
                     print(f"   • Test accuracy: Could not evaluate")
                 print(f"   • Generated responses: {len(generated_responses)}")
-                print(f"   • Optimization performed: Yes")
-                print(f"   • Best layer: {layer}")
-                print(f"   • Best aggregation: {token_aggregation}")
+                if total_classifications > 0:
+                    classification_acc = correct_classifications / total_classifications
+                    print(f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})")
+                else:
+                    print(f"   • Classification accuracy: Could not evaluate")
                 print(f"{'='*80}\n")
             
             logger.info(f"Optimization pipeline completed for {task_name}")
@@ -1403,7 +1578,12 @@ def main():
                 steering_mode=args.steering_mode,
                 steering_strength=args.steering_strength,
                 save_steering_vector=args.save_steering_vector,
-                load_steering_vector=args.load_steering_vector
+                load_steering_vector=args.load_steering_vector,
+                train_only=args.train_only,
+                inference_only=args.inference_only,
+                save_classifier=args.save_classifier,
+                load_classifier=args.load_classifier,
+                classifier_dir=args.classifier_dir
             )
             
             all_results[display_name] = task_results
