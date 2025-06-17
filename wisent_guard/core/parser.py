@@ -32,7 +32,7 @@ Examples:
     parser.add_argument("command", choices=["tasks"], help="Command to run")
     parser.add_argument("task_names", help="Comma-separated list of task names, or path to CSV/JSON file with --from-csv/--from-json")
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
-    parser.add_argument("--layer", type=int, default=15, help="Layer to extract activations from")
+    parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")
     parser.add_argument("--shots", type=int, default=0, help="Number of few-shot examples")
     parser.add_argument("--split-ratio", type=float, default=0.8, help="Train/test split ratio")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of documents per task")
@@ -104,6 +104,32 @@ Examples:
                        help="Path to load a pre-computed steering vector")
     
     return parser
+
+
+def parse_layers_from_arg(layer_arg: str, model=None) -> List[int]:
+    """
+    Parse layer argument into list of integers.
+    
+    Args:
+        layer_arg: String like "15", "14-16", "14,15,16", or "-1" (for auto-optimization)
+        model: Model object (needed for determining available layers)
+        
+    Returns:
+        List of layer indices
+    """
+    # Handle special cases
+    if layer_arg == "-1":
+        # Signal for auto-optimization - return single layer list
+        return [-1]
+    
+    # Use existing parse_layer_range logic
+    layers = parse_layer_range(layer_arg, model)
+    if layers is None:
+        # "all" case - would need model to determine actual layers
+        # For now, return a reasonable default range
+        return list(range(8, 25))  # Common transformer range
+    
+    return layers
 
 
 def parse_layer_range(layer_range_str: str, model=None) -> Optional[List[int]]:

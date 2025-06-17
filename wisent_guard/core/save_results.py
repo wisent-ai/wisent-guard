@@ -55,17 +55,18 @@ def save_classification_results_csv(results: Dict[str, Any], output_path: str) -
     Save detailed classification results to CSV file for manual evaluation.
     
     Exports one row per response with:
-    1. question - The question asked
-    2. response - The model's response  
-    3. token_scores - Token-level activation scores (pipe-separated)
-    4. overall_prediction - TRUTHFUL or HALLUCINATION classification
-    5. ground_truth - Empty column for user to fill in
+    - For single-layer: question, response, token_scores, overall_prediction, ground_truth
+    - For multi-layer: question, response, token_scores_layer_X (for each layer), 
+      aggregated_score_layer_X (for each layer), overall_prediction_layer_X (for each layer), ground_truth
     """
     try:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         csv_rows = []
+        all_layers = set()  # Track all layers for multi-layer mode
+        is_multi_layer = False
         
+        # First pass: determine if we have multi-layer data and collect all layers
         for task_name, task_results in results.items():
             if not isinstance(task_results, dict) or 'sample_responses' not in task_results:
                 continue
@@ -77,27 +78,80 @@ def save_classification_results_csv(results: Dict[str, Any], output_path: str) -
             sample_responses = task_results['sample_responses']
             
             for response_data in sample_responses:
-                # Format token scores as pipe-separated values
-                token_scores_str = ""
-                if response_data.get('token_scores'):
-                    token_scores_formatted = [f"{score:.6f}" for score in response_data['token_scores']]
-                    token_scores_str = "|".join(token_scores_formatted)
+                layer_results = response_data.get('layer_results', {})
+                if layer_results:
+                    is_multi_layer = True
+                    all_layers.update(layer_results.keys())
+        
+        # Sort layers for consistent column ordering
+        sorted_layers = sorted(all_layers) if all_layers else []
+        
+        # Second pass: create CSV rows
+        for task_name, task_results in results.items():
+            if not isinstance(task_results, dict) or 'sample_responses' not in task_results:
+                continue
+            
+            # Skip steering mode results (they don't have classification data)
+            if task_results.get('steering_mode', False):
+                continue
                 
-                # Create CSV row
+            sample_responses = task_results['sample_responses']
+            
+            for response_data in sample_responses:
+                layer_results = response_data.get('layer_results', {})
+                
+                # Create base row
                 csv_row = {
-                    'question': response_data.get('question', ''),  # Will be extracted from test data
+                    'question': response_data.get('question', ''),
                     'response': response_data.get('response', ''),
-                    'token_scores': token_scores_str,
-                    'overall_prediction': response_data.get('classification', 'UNKNOWN'),
                     'ground_truth': ''  # Empty for user to fill
                 }
+                
+                if is_multi_layer and layer_results:
+                    # Multi-layer mode: create columns for each layer
+                    for layer in sorted_layers:
+                        layer_data = layer_results.get(layer, {})
+                        
+                        # Format token scores as pipe-separated values
+                        token_scores_str = ""
+                        if layer_data.get('token_scores'):
+                            token_scores_formatted = [f"{score:.6f}" for score in layer_data['token_scores']]
+                            token_scores_str = "|".join(token_scores_formatted)
+                        
+                        # Add layer-specific columns
+                        csv_row[f'token_scores_layer_{layer}'] = token_scores_str
+                        csv_row[f'aggregated_score_layer_{layer}'] = f"{layer_data.get('aggregated_score', 0.0):.6f}"
+                        csv_row[f'overall_prediction_layer_{layer}'] = layer_data.get('classification', 'UNKNOWN')
+                
+                elif not is_multi_layer:
+                    # Single-layer mode: use original format
+                    token_scores_str = ""
+                    if response_data.get('token_scores'):
+                        token_scores_formatted = [f"{score:.6f}" for score in response_data['token_scores']]
+                        token_scores_str = "|".join(token_scores_formatted)
+                    
+                    csv_row['token_scores'] = token_scores_str
+                    csv_row['aggregated_score'] = f"{response_data.get('aggregated_score', 0.0):.6f}"
+                    csv_row['overall_prediction'] = response_data.get('classification', 'UNKNOWN')
                 
                 csv_rows.append(csv_row)
         
         # Only save if we have classification data
         if csv_rows:
+            # Determine fieldnames based on mode
+            if is_multi_layer:
+                fieldnames = ['question', 'response']
+                for layer in sorted_layers:
+                    fieldnames.extend([
+                        f'token_scores_layer_{layer}',
+                        f'aggregated_score_layer_{layer}',
+                        f'overall_prediction_layer_{layer}'
+                    ])
+                fieldnames.append('ground_truth')
+            else:
+                fieldnames = ['question', 'response', 'token_scores', 'aggregated_score', 'overall_prediction', 'ground_truth']
+            
             with open(output_path, 'w', newline='', encoding='utf-8') as f:
-                fieldnames = ['question', 'response', 'token_scores', 'overall_prediction', 'ground_truth']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(csv_rows)
@@ -105,6 +159,11 @@ def save_classification_results_csv(results: Dict[str, Any], output_path: str) -
             logger.info(f"Classification results CSV saved to {output_path}")
             print(f"\n📊 Classification results saved to: {output_path}")
             print(f"   • {len(csv_rows)} responses exported")
+            if is_multi_layer:
+                print(f"   • Multi-layer format with columns for layers: {sorted_layers}")
+                print(f"   • Token scores, aggregated scores, and predictions saved per layer")
+            else:
+                print(f"   • Single-layer format")
             print(f"   • Fill in the 'ground_truth' column with: 'TRUTHFUL' or 'HALLUCINATION'")
             print(f"   • Use for manual evaluation and classifier optimization")
         else:

@@ -20,8 +20,9 @@ from .core.layer import Layer
 from .optimize import run_smart_optimization, run_interactive_optimization, generate_with_all_layer_activations, compute_classification_score
 from .core.detection_handling import DetectionHandler, DetectionAction
 from .core.save_results import save_results_json, save_results_csv, save_classification_results_csv, create_evaluation_report
-from .core.parser import setup_parser, parse_layer_range, aggregate_token_scores
-from .inference import generate_with_classification_and_handling, generate_with_classification
+from .core.parser import setup_parser, parse_layer_range, aggregate_token_scores, parse_layers_from_arg
+from .inference import (generate_with_classification_and_handling, generate_with_classification,
+                        generate_with_multi_layer_classification, generate_with_multi_layer_classification_and_handling)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 def run_task_pipeline(
     task_name: str,
     model_name: str,
-    layer: int,
+    layer: str,
     shots: int = 0,
     split_ratio: float = 0.8,
     limit: int = None,
@@ -111,11 +112,19 @@ def run_task_pipeline(
             print(f"   • Input: JSON file")
     
     try:
+        # Parse layers from argument
+        layers = parse_layers_from_arg(layer)
+        is_multi_layer = len(layers) > 1
+        
         # Initialize enhanced primitives
         if verbose:
             print(f"\n🔧 Initializing model and primitives...")
+            if is_multi_layer:
+                print(f"   • Multi-layer mode: {layers}")
+            else:
+                print(f"   • Single layer mode: {layers[0]}")
         model = Model(name=model_name, device=device)
-        layer_obj = Layer(index=layer, type="transformer")
+        layer_obj = Layer(index=layers[0], type="transformer")
         
         # Create detection handler based on CLI arguments
         if verbose and detection_action != "pass_through":
@@ -655,8 +664,8 @@ def run_task_pipeline(
                     "suggestion": "Check activation extraction and data quality"
                 }
         
-        # CLASSIFICATION MODE (original logic)
-        # Train classifier using optimized type (if optimization was performed)
+        # CLASSIFICATION MODE (single or multi-layer)
+        # Train classifier(s) using optimized type (if optimization was performed)
         if optimize:
             final_classifier_type = optimized_classifier_type
             final_threshold = optimized_threshold
@@ -664,55 +673,152 @@ def run_task_pipeline(
             final_classifier_type = classifier_type
             final_threshold = 0.6
         
-        if verbose:
-            print(f"\n🎯 TRAINING CLASSIFIER:")
-            print(f"   • Type: {final_classifier_type}")
-            print(f"   • Threshold: {final_threshold}")
-            print(f"   • Training pairs: {len(pair_set)}")
+        # Train classifiers for each layer
+        steering_methods = {}
+        layer_training_results = {}
         
-        steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
-        steering_method = SteeringMethod(method_type=steering_type, threshold=final_threshold, device=device)
-        
-        try:
-            training_results = steering_method.train(pair_set)
-        
+        if is_multi_layer:
             if verbose:
-                print(f"✅ Training completed!")
-                print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
-                print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
-        
-        except ZeroDivisionError as e:
-            error_msg = f"Classifier training failed due to insufficient or imbalanced data: {str(e)}"
-            if verbose:
-                print(f"\n❌ TRAINING ERROR: {error_msg}")
-                print(f"   • This often happens with very small datasets")
-                print(f"   • Try increasing the dataset size or using --limit with a higher value")
-                print(f"   • Current training samples: {len(pair_set)}")
+                print(f"\n🎯 TRAINING MULTI-LAYER CLASSIFIERS:")
+                print(f"   • Layers: {layers}")
+                print(f"   • Type: {final_classifier_type}")
+                print(f"   • Threshold: {final_threshold}")
+                print(f"   • Training pairs: {len(contrastive_pairs)}")
             
-            return {
-                "task_name": task_name,
-                "model_name": model_name,
-                "error": error_msg,
-                "training_samples": len(pair_set),
-                "error_type": "division_by_zero",
-                "suggestion": "Increase dataset size or check data quality"
-            }
-            
-        except Exception as e:
-            error_msg = f"Classifier training failed: {str(e)}"
-            if verbose:
-                print(f"\n❌ TRAINING ERROR: {error_msg}")
-                print(f"   • Training samples: {len(pair_set)}")
-                print(f"   • Classifier type: {final_classifier_type}")
+            # Train a classifier for each layer
+            for layer_idx in layers:
+                if verbose:
+                    print(f"\n   🔬 Training classifier for layer {layer_idx}...")
                 
-            return {
-                "task_name": task_name,
-                "model_name": model_name,
-                "error": error_msg,
-                "training_samples": len(pair_set),
-                "error_type": "training_failure",
-                "suggestion": "Check data quality or try a different classifier type"
-            }
+                # Extract activations for this specific layer
+                layer_processed_pairs = collector.collect_activations_batch(
+                    pairs=contrastive_pairs,
+                    layer_index=layer_idx,
+                    device=device
+                )
+                
+                # Create layer-specific ContrastivePairSet
+                layer_phrase_pairs = []
+                for pair in layer_processed_pairs:
+                    positive_full = f"{pair.prompt}{pair.positive_response}"
+                    negative_full = f"{pair.prompt}{pair.negative_response}"
+                    
+                    layer_phrase_pairs.append({
+                        "harmful": negative_full,
+                        "harmless": positive_full
+                    })
+                
+                layer_pair_set = ContrastivePairSet.from_phrase_pairs(
+                    name=f"{task_name}_layer_{layer_idx}",
+                    phrase_pairs=layer_phrase_pairs,
+                    task_type="lm_evaluation"
+                )
+                
+                # Store activations in the layer pair set
+                for i, processed_pair in enumerate(layer_processed_pairs):
+                    if i < len(layer_pair_set.pairs):
+                        if hasattr(layer_pair_set.pairs[i], 'positive_response') and layer_pair_set.pairs[i].positive_response:
+                            layer_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                        if hasattr(layer_pair_set.pairs[i], 'negative_response') and layer_pair_set.pairs[i].negative_response:
+                            layer_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
+                
+                # Train classifier for this layer
+                steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
+                layer_steering_method = SteeringMethod(method_type=steering_type, threshold=final_threshold, device=device)
+                
+                try:
+                    layer_training_results[layer_idx] = layer_steering_method.train(layer_pair_set)
+                    steering_methods[layer_idx] = layer_steering_method
+                    
+                    if verbose:
+                        accuracy = layer_training_results[layer_idx].get('accuracy', 'N/A')
+                        f1_score = layer_training_results[layer_idx].get('f1', 'N/A')
+                        print(f"      ✅ Layer {layer_idx}: Accuracy={accuracy:.2%}, F1={f1_score:.3f}")
+                        
+                except Exception as e:
+                    if verbose:
+                        print(f"      ❌ Layer {layer_idx}: Training failed - {str(e)}")
+                    layer_training_results[layer_idx] = {"error": str(e)}
+            
+            # Use the first successfully trained layer as the primary one for compatibility
+            primary_layer = layers[0]
+            if primary_layer in steering_methods:
+                steering_method = steering_methods[primary_layer]
+                training_results = layer_training_results[primary_layer]
+            else:
+                # If primary layer failed, try to find any successful layer
+                successful_layers = [l for l in layers if l in steering_methods]
+                if successful_layers:
+                    primary_layer = successful_layers[0]
+                    steering_method = steering_methods[primary_layer]
+                    training_results = layer_training_results[primary_layer]
+                else:
+                    # All layers failed
+                    error_msg = "All layer classifiers failed to train"
+                    if verbose:
+                        print(f"\n❌ MULTI-LAYER TRAINING ERROR: {error_msg}")
+                    return {
+                        "task_name": task_name,
+                        "model_name": model_name,
+                        "error": error_msg,
+                        "layers": layers,
+                        "layer_results": layer_training_results,
+                        "error_type": "multi_layer_training_failure"
+                    }
+        else:
+            # Single layer mode (original logic)
+            if verbose:
+                print(f"\n🎯 TRAINING CLASSIFIER:")
+                print(f"   • Layer: {layers[0]}")
+                print(f"   • Type: {final_classifier_type}")
+                print(f"   • Threshold: {final_threshold}")
+                print(f"   • Training pairs: {len(pair_set)}")
+            
+            steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
+            steering_method = SteeringMethod(method_type=steering_type, threshold=final_threshold, device=device)
+            
+            try:
+                training_results = steering_method.train(pair_set)
+                steering_methods[layers[0]] = steering_method
+                layer_training_results[layers[0]] = training_results
+            
+                if verbose:
+                    print(f"✅ Training completed!")
+                    print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+                    print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
+            
+            except ZeroDivisionError as e:
+                error_msg = f"Classifier training failed due to insufficient or imbalanced data: {str(e)}"
+                if verbose:
+                    print(f"\n❌ TRAINING ERROR: {error_msg}")
+                    print(f"   • This often happens with very small datasets")
+                    print(f"   • Try increasing the dataset size or using --limit with a higher value")
+                    print(f"   • Current training samples: {len(pair_set)}")
+                
+                return {
+                    "task_name": task_name,
+                    "model_name": model_name,
+                    "error": error_msg,
+                    "training_samples": len(pair_set),
+                    "error_type": "division_by_zero",
+                    "suggestion": "Increase dataset size or check data quality"
+                }
+                
+            except Exception as e:
+                error_msg = f"Classifier training failed: {str(e)}"
+                if verbose:
+                    print(f"\n❌ TRAINING ERROR: {error_msg}")
+                    print(f"   • Training samples: {len(pair_set)}")
+                    print(f"   • Classifier type: {final_classifier_type}")
+                    
+                return {
+                    "task_name": task_name,
+                    "model_name": model_name,
+                    "error": error_msg,
+                    "training_samples": len(pair_set),
+                    "error_type": "training_failure",
+                    "suggestion": "Check data quality or try a different classifier type"
+                }
         
         # Test the optimized classifier by generating responses and classifying them
         if optimize:
@@ -785,10 +891,25 @@ def run_task_pipeline(
                 simple_prompt = qa_pair['question']
                 
                 # Generate response with token-level scoring and detection handling
-                response, token_scores, classification, was_handled = generate_with_classification_and_handling(
-                    model, simple_prompt, layer, max_new_tokens, steering_method, 
-                    token_aggregation, detection_threshold, verbose and not optimize, detection_handler
-                )
+                if len(layers) > 1:
+                    # Multi-layer mode: use multi-layer generation function
+                    response, layer_results, was_handled = generate_with_multi_layer_classification_and_handling(
+                        model, simple_prompt, layers, max_new_tokens, steering_methods, 
+                        token_aggregation, detection_threshold, verbose and not optimize, detection_handler
+                    )
+                    # For backward compatibility, use primary layer's results for main fields
+                    primary_layer = layers[0]
+                    token_scores = layer_results[primary_layer]['token_scores'] if primary_layer in layer_results else []
+                    classification = layer_results[primary_layer]['classification'] if primary_layer in layer_results else 'UNKNOWN'
+                    aggregated_score = layer_results[primary_layer]['aggregated_score'] if primary_layer in layer_results else 0.0
+                else:
+                    # Single-layer mode: use original function
+                    response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                        model, simple_prompt, layers[0], max_new_tokens, steering_method, 
+                        token_aggregation, detection_threshold, verbose and not optimize, detection_handler
+                    )
+                    layer_results = None
+                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation) if token_scores else 0.0
                 
                 # Evaluate the generated response using the ground truth evaluator
                 try:
@@ -818,10 +939,12 @@ def run_task_pipeline(
                             correct_classifications += 1
                         total_classifications += 1
                     
-                    generated_responses.append({
+                    # Create response entry with layer results if available
+                    response_entry = {
                         'question': qa_pair['question'],  # Add the question
                         'response': response,
                         'token_scores': token_scores,
+                        'aggregated_score': aggregated_score,
                         'classification': classification,
                         'ground_truth': ground_truth,
                         'ground_truth_method': evaluation_result["method_used"],
@@ -829,7 +952,13 @@ def run_task_pipeline(
                         'ground_truth_details': evaluation_result["details"],
                         'classification_correct': classification_correct,
                         'was_handled': was_handled
-                    })
+                    }
+                    
+                    # Add layer-specific results if multi-layer
+                    if layer_results:
+                        response_entry['layer_results'] = layer_results
+                    
+                    generated_responses.append(response_entry)
                     
                     if verbose and not optimize:  # Only show detailed output when not optimizing
                         print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
@@ -1029,7 +1158,7 @@ def run_task_pipeline(
             correct_classifications = 0
             total_classifications = 0
             
-            for i, qa_pair in enumerate(test_qa_pairs):  # Process ALL test samples
+            for i, qa_pair in enumerate(test_qa_pairs):
                 if verbose and not optimize:  # Only show detailed progress when not optimizing
                     print(f"\n   🎯 Generating response {i+1}:")
                     print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
@@ -1039,10 +1168,25 @@ def run_task_pipeline(
                 simple_prompt = qa_pair['question']
                 
                 # Generate response with token-level scoring and detection handling
-                response, token_scores, classification, was_handled = generate_with_classification_and_handling(
-                    model, simple_prompt, layer, max_new_tokens, steering_method, 
-                    token_aggregation, detection_threshold, verbose and not optimize, detection_handler
-                )
+                if len(layers) > 1:
+                    # Multi-layer mode: use multi-layer generation function
+                    response, layer_results, was_handled = generate_with_multi_layer_classification_and_handling(
+                        model, simple_prompt, layers, max_new_tokens, steering_methods, 
+                        token_aggregation, detection_threshold, verbose and not optimize, detection_handler
+                    )
+                    # For backward compatibility, use primary layer's results for main fields
+                    primary_layer = layers[0]
+                    token_scores = layer_results[primary_layer]['token_scores'] if primary_layer in layer_results else []
+                    classification = layer_results[primary_layer]['classification'] if primary_layer in layer_results else 'UNKNOWN'
+                    aggregated_score = layer_results[primary_layer]['aggregated_score'] if primary_layer in layer_results else 0.0
+                else:
+                    # Single-layer mode: use original function
+                    response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                        model, simple_prompt, layers[0], max_new_tokens, steering_method, 
+                        token_aggregation, detection_threshold, verbose and not optimize, detection_handler
+                    )
+                    layer_results = None
+                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation) if token_scores else 0.0
                 
                 # Evaluate the generated response using the ground truth evaluator
                 try:
@@ -1070,10 +1214,12 @@ def run_task_pipeline(
                             correct_classifications += 1
                         total_classifications += 1
                     
-                    generated_responses.append({
+                    # Create response entry with layer results if available
+                    response_entry = {
                         'question': qa_pair['question'],  # Add the question
                         'response': response,
                         'token_scores': token_scores,
+                        'aggregated_score': aggregated_score,
                         'classification': classification,
                         'ground_truth': ground_truth,
                         'ground_truth_method': evaluation_result["method_used"],
@@ -1081,7 +1227,13 @@ def run_task_pipeline(
                         'ground_truth_details': evaluation_result["details"],
                         'classification_correct': classification_correct,
                         'was_handled': was_handled
-                    })
+                    }
+                    
+                    # Add layer-specific results if multi-layer
+                    if layer_results:
+                        response_entry['layer_results'] = layer_results
+                    
+                    generated_responses.append(response_entry)
                     
                     if verbose and not optimize:  # Only show detailed output when not optimizing
                         print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
@@ -1204,13 +1356,13 @@ def main():
             logger.info(f"Processing source: {source}")
             
             # Determine if optimization should be enabled
-            should_optimize = args.optimize or (args.auto_optimize and args.layer == -1)
+            should_optimize = args.optimize or (args.auto_optimize and args.layer == "-1")
             
             # Use layer -1 as a signal for auto-optimization
             if should_optimize:
-                layer_to_use = -1  # Signal to the pipeline to optimize
+                layer_to_use = "-1"  # Signal to the pipeline to optimize
             else:
-                layer_to_use = args.layer if args.layer != -1 else 15  # Default to 15 if not specified
+                layer_to_use = args.layer if args.layer != "-1" else "15"  # Default to 15 if not specified
             
             # For file inputs, use the file path as task name
             if args.from_csv or args.from_json:

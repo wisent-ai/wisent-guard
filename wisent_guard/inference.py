@@ -485,4 +485,229 @@ def generate_with_classification(model, prompt, layer, max_new_tokens, steering_
         aggregated_score = 0.5
         classification = "UNKNOWN"
     
-    return response, token_scores, classification 
+    return response, token_scores, classification
+
+
+def generate_with_multi_layer_classification(model, prompt, layers, max_new_tokens, steering_methods, token_aggregation="average", threshold=0.6, verbose=False):
+    """
+    Generate text with token-level classification across multiple layers.
+    
+    Args:
+        model: Model object
+        prompt: Input prompt
+        layers: List of layer indices for activation extraction
+        max_new_tokens: Maximum tokens to generate
+        steering_methods: Dict mapping layer indices to trained steering methods
+        token_aggregation: How to aggregate token scores ("average", "final", "first", "max", "min")
+        threshold: Classification threshold
+        verbose: Whether to print debug info
+        
+    Returns:
+        Tuple of (response_text, layer_results_dict)
+        where layer_results_dict = {layer: {"token_scores": [...], "classification": "..."}}
+    """
+    import torch
+    from .core import Layer
+    from .core.activations import Activations, ActivationAggregationMethod
+    from .core.parser import aggregate_token_scores
+    
+    # Generate response once (same for all layers)
+    response, _ = model.generate(prompt, layers[0], max_new_tokens)
+    
+    if not response.strip():
+        # Return empty results for all layers
+        layer_results = {}
+        for layer in layers:
+            layer_results[layer] = {
+                "token_scores": [],
+                "classification": "UNKNOWN",
+                "aggregated_score": 0.5
+            }
+        return response, layer_results
+    
+    # Tokenize the full prompt + response to get individual tokens
+    full_text = f"{prompt}{response}"
+    inputs = model.tokenizer(full_text, return_tensors="pt")
+    tokens = model.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+    
+    # Get prompt length to identify response tokens
+    prompt_inputs = model.tokenizer(prompt, return_tensors="pt")
+    prompt_length = len(prompt_inputs['input_ids'][0])
+    
+    # Get model device and move inputs
+    model_device = next(model.hf_model.parameters()).device
+    inputs_on_device = {k: v.to(model_device) for k, v in inputs.items()}
+    
+    # Get hidden states for all layers at once
+    with torch.no_grad():
+        outputs = model.hf_model(**inputs_on_device, output_hidden_states=True)
+    
+    # Process each layer
+    layer_results = {}
+    
+    for layer in layers:
+        if verbose:
+            print(f"    Processing layer {layer}...")
+        
+        # Extract activations for this layer
+        token_scores = []
+        layer_obj = Layer(index=layer, type="transformer")
+        
+        try:
+            # Get hidden states for this layer
+            if layer + 1 < len(outputs.hidden_states):
+                hidden_states = outputs.hidden_states[layer + 1]
+            else:
+                hidden_states = outputs.hidden_states[-1]
+            
+            # Score each response token for this layer
+            for token_idx in range(prompt_length, len(tokens)):
+                if token_idx < hidden_states.shape[1]:
+                    # Extract activation for this token
+                    token_activation = hidden_states[0, token_idx, :].cpu()
+                    
+                    # Create Activations object
+                    activation_obj = Activations(
+                        tensor=token_activation.unsqueeze(0),
+                        layer=layer_obj,
+                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                    )
+                    
+                    # Get feature vector for classifier
+                    features = activation_obj.extract_features_for_classifier()
+                    
+                    # Get prediction probability from classifier for this layer
+                    steering_method = steering_methods.get(layer)
+                    if steering_method and hasattr(steering_method, 'classifier') and steering_method.classifier:
+                        try:
+                            prob = steering_method.classifier.predict_proba([features.numpy()])
+                            # Handle both single float and array returns
+                            if isinstance(prob, (list, tuple)) or hasattr(prob, '__getitem__'):
+                                prob = float(prob[0]) if len(prob) > 0 else 0.5
+                            else:
+                                prob = float(prob)
+                            token_scores.append(prob)
+                        except Exception as e:
+                            if verbose:
+                                print(f"      ⚠️  Layer {layer} classifier error for token {token_idx}: {e}")
+                            token_scores.append(0.5)
+                    else:
+                        token_scores.append(0.5)
+        
+        except Exception as e:
+            if verbose:
+                print(f"      ⚠️  Error during layer {layer} token scoring: {e}")
+            # Fallback: assign neutral scores
+            response_tokens = model.tokenizer(response, return_tensors="pt")['input_ids'][0]
+            token_scores = [0.5] * len(response_tokens)
+        
+        # Classify overall response for this layer
+        if token_scores:
+            aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+            classification = "HALLUCINATION" if aggregated_score > threshold else "TRUTHFUL"
+        else:
+            aggregated_score = 0.5
+            classification = "UNKNOWN"
+        
+        layer_results[layer] = {
+            "token_scores": token_scores,
+            "classification": classification,
+            "aggregated_score": aggregated_score
+        }
+        
+        if verbose:
+            print(f"      Layer {layer}: {classification} (score: {aggregated_score:.3f})")
+    
+    return response, layer_results
+
+
+def generate_with_multi_layer_classification_and_handling(
+    model, prompt, layers, max_new_tokens, steering_methods, 
+    token_aggregation="average", threshold=0.6, verbose=False,
+    detection_handler=None
+):
+    """
+    Generate text with multi-layer classification and optional detection handling.
+    
+    Args:
+        model: Model object
+        prompt: Input prompt
+        layers: List of layer indices for activation extraction
+        max_new_tokens: Maximum tokens to generate
+        steering_methods: Dict mapping layer indices to trained steering methods
+        token_aggregation: How to aggregate token scores
+        threshold: Classification threshold
+        verbose: Whether to print debug info
+        detection_handler: Optional DetectionHandler for handling detected issues
+        
+    Returns:
+        Tuple of (final_response_text, layer_results_dict, was_handled)
+    """
+    from .core.detection_handling import DetectionHandler, DetectionAction
+    from .core.parser import aggregate_token_scores
+    
+    # Generate initial response with multi-layer classification
+    original_response, layer_results = generate_with_multi_layer_classification(
+        model, prompt, layers, max_new_tokens, steering_methods, token_aggregation, threshold, verbose
+    )
+    
+    # If no handler provided, return as-is
+    if not detection_handler:
+        return original_response, layer_results, False
+    
+    # Determine if content should be handled based on ANY layer detecting issues
+    # Use the first layer for primary detection decision (could be made configurable)
+    primary_layer = layers[0]
+    is_problematic = layer_results[primary_layer]["classification"] == "HALLUCINATION"
+    
+    if not is_problematic:
+        return original_response, layer_results, False
+    
+    # Content is problematic, apply handling
+    if verbose:
+        print(f"      🚨 Detected problematic content (layer {primary_layer}), applying {detection_handler.action.value} handling...")
+    
+    # Calculate confidence score for the detection using primary layer
+    confidence_score = layer_results[primary_layer]["aggregated_score"]
+    
+    # Create regeneration function if needed
+    regenerate_function = None
+    if detection_handler.action == DetectionAction.REGENERATE_UNTIL_SAFE:
+        def regenerate():
+            # Generate a new response
+            new_response, new_layer_results = generate_with_multi_layer_classification(
+                model, prompt, layers, max_new_tokens, steering_methods, token_aggregation, threshold, verbose
+            )
+            # Only return if primary layer is not problematic
+            if new_layer_results[primary_layer]["classification"] != "HALLUCINATION":
+                return new_response
+            else:
+                # Still problematic, raise exception to trigger retry
+                raise Exception(f"Generated response still classified as {new_layer_results[primary_layer]['classification']}")
+        
+        regenerate_function = regenerate
+    
+    # Handle the detection
+    final_response = detection_handler.handle_detection(
+        original_response=original_response,
+        detection_type="hallucination",
+        confidence_score=confidence_score,
+        original_prompt=prompt,
+        regenerate_function=regenerate_function
+    )
+    
+    # If regeneration was successful, get new results
+    if (detection_handler.action == DetectionAction.REGENERATE_UNTIL_SAFE 
+        and final_response != original_response 
+        and not final_response.startswith("I apologize")):
+        
+        # Re-classify the final response across all layers
+        final_response_clean, final_layer_results = generate_with_multi_layer_classification(
+            model, prompt, layers, max_new_tokens, steering_methods, token_aggregation, threshold, verbose=False
+        )
+        
+        if final_response_clean.strip() == final_response.strip():
+            return final_response, final_layer_results, True
+    
+    # For placeholder or pass-through, return original results but indicate handling occurred
+    return final_response, layer_results, True
