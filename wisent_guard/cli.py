@@ -1364,28 +1364,9 @@ def run_task_pipeline(
                     "harmless": positive_full  # B choice (correct)
                 })
             
-            test_pair_set = ContrastivePairSet.from_phrase_pairs(
-                name=f"{task_name}_test",
-                phrase_pairs=test_phrase_pairs,
-                task_type="lm_evaluation"
-            )
-            
-            # Store the real test activations in the pair set response objects
-            for i, processed_pair in enumerate(test_processed_pairs):
-                if i < len(test_pair_set.pairs):
-                    # Assign activations to the response objects, not the pair directly
-                    if hasattr(test_pair_set.pairs[i], 'positive_response') and test_pair_set.pairs[i].positive_response:
-                        test_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
-                    if hasattr(test_pair_set.pairs[i], 'negative_response') and test_pair_set.pairs[i].negative_response:
-                        test_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
-            
-            if verbose:
-                print(f"\n📊 Evaluating classifier on test set...")
-            evaluation_results = steering_method.evaluate(test_pair_set)
-            
-            if verbose:
-                print(f"✅ Classifier validation completed!")
-                print(f"   • Validated on pre-written answer choices only")
+            # NOTE: Removed pointless "classifier validation" step that just tested on pre-written answers
+            # The real evaluation happens when we test on actual generated responses below
+            evaluation_results = {"accuracy": "N/A", "note": "Validation on pre-written answers removed as misleading"}
             
             # Generate sample responses with token-level classification
             if verbose:
