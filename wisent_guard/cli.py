@@ -861,7 +861,122 @@ def run_task_pipeline(
                         else:
                             print(f"   • Failed to save steering vector to: {save_steering_vector}")
                 
-                # Return steering mode results
+                # TEST THE STEERING by generating responses with and without the vector
+                if verbose:
+                    print(f"\n🧪 TESTING CAA STEERING:")
+                    print(f"   • Generating responses with steering applied...")
+                
+                # Get test questions
+                test_qa_pairs = []
+                for doc in test_qa_pairs_source[:3]:  # Test on first 3 questions
+                    try:
+                        if from_csv or from_json:
+                            test_qa_pairs.append({
+                                'question': doc['question'],
+                                'correct_answer': doc.get('correct_answer', 'N/A')
+                            })
+                        else:
+                            # Extract from lm-harness format
+                            if hasattr(task_data, 'doc_to_text'):
+                                question = task_data.doc_to_text(doc)
+                            else:
+                                question = doc.get('question', str(doc))
+                            
+                            # Extract correct answer
+                            correct_answers = doc.get('mc1_targets', {}).get('choices', [])
+                            correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                            correct_answer = "N/A"
+                            for i, label in enumerate(correct_labels):
+                                if label == 1 and i < len(correct_answers):
+                                    correct_answer = correct_answers[i]
+                                    break
+                            
+                            test_qa_pairs.append({
+                                'question': question,
+                                'correct_answer': correct_answer
+                            })
+                    except:
+                        continue
+                
+                steered_responses = []
+                
+                for i, qa_pair in enumerate(test_qa_pairs):
+                    if verbose:
+                        print(f"\n   🎯 Test Question {i+1}:")
+                        print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                    
+                    # Generate UNSTEERED response (baseline)
+                    unsteered_response, _ = model.generate(qa_pair['question'], layer, max_new_tokens)
+                    
+                    # Generate STEERED response using activation hooks
+                    def steering_hook(module, input, output):
+                        """Hook function that applies CAA steering to activations"""
+                        if isinstance(output, tuple):
+                            hidden_states = output[0]
+                        else:
+                            hidden_states = output
+                        
+                        if isinstance(hidden_states, torch.Tensor):
+                            # Apply steering to the last token
+                            steered_hidden = caa_steering.apply_steering(
+                                hidden_states[:, -1:, :], strength=steering_strength
+                            )
+                            # Replace the last token's activations
+                            new_hidden_states = hidden_states.clone()
+                            new_hidden_states[:, -1:, :] = steered_hidden
+                            
+                            if isinstance(output, tuple):
+                                return (new_hidden_states,) + output[1:]
+                            else:
+                                return new_hidden_states
+                        return output
+                    
+                    # Apply steering hook to the target layer
+                    import torch
+                    layer_module = None
+                    if hasattr(model.hf_model, 'model') and hasattr(model.hf_model.model, 'layers'):
+                        # Llama-style model
+                        if layer < len(model.hf_model.model.layers):
+                            layer_module = model.hf_model.model.layers[layer]
+                    elif hasattr(model.hf_model, 'transformer') and hasattr(model.hf_model.transformer, 'h'):
+                        # GPT-style model
+                        if layer < len(model.hf_model.transformer.h):
+                            layer_module = model.hf_model.transformer.h[layer]
+                    
+                    if layer_module:
+                        # Register the hook
+                        handle = layer_module.register_forward_hook(steering_hook)
+                        
+                        try:
+                            # Generate with steering
+                            steered_response, _ = model.generate(qa_pair['question'], layer, max_new_tokens)
+                        finally:
+                            # Always remove the hook
+                            handle.remove()
+                    else:
+                        steered_response = "ERROR: Could not find target layer for steering"
+                    
+                    # Store results
+                    steered_responses.append({
+                        'question': qa_pair['question'],
+                        'expected_answer': qa_pair['correct_answer'],
+                        'unsteered_response': unsteered_response,
+                        'steered_response': steered_response,
+                        'steering_strength': steering_strength
+                    })
+                    
+                    if verbose:
+                        print(f"      🔄 Unsteered: {unsteered_response[:100]}{'...' if len(unsteered_response) > 100 else ''}")
+                        print(f"      🎯 Steered:   {steered_response[:100]}{'...' if len(steered_response) > 100 else ''}")
+                        print(f"      📊 Steering strength: {steering_strength}")
+                
+                if verbose:
+                    print(f"\n✅ CAA steering test completed!")
+                    print(f"   • Generated {len(steered_responses)} steered responses")
+                    print(f"   • Vector applied at layer {layer} with strength {steering_strength}")
+                
+                # Return steering mode results with test data
                 return {
                     "task_name": task_name,
                     "model_name": model_name,
@@ -871,7 +986,9 @@ def run_task_pipeline(
                     "steering_strength": steering_strength,
                     "training_stats": training_stats,
                     "training_pairs": len(pair_set),
-                    "vector_saved": save_steering_vector is not None
+                    "vector_saved": save_steering_vector is not None,
+                    "test_responses": steered_responses,
+                    "tests_performed": len(steered_responses)
                 }
                 
             except Exception as e:
