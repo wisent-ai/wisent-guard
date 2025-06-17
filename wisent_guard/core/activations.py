@@ -571,17 +571,28 @@ class ActivationCollectionLogic:
         
         try:
             # Create full prompts with responses
-            positive_full_prompt = f"{pair.prompt}{pair.positive_response}"
-            negative_full_prompt = f"{pair.prompt}{pair.negative_response}"
+            # Handle both string responses and Response objects
+            if hasattr(pair.positive_response, 'text'):
+                positive_resp = pair.positive_response.text
+            else:
+                positive_resp = str(pair.positive_response)
+                
+            if hasattr(pair.negative_response, 'text'):
+                negative_resp = pair.negative_response.text  
+            else:
+                negative_resp = str(pair.negative_response)
+            
+            positive_full_prompt = f"{pair.prompt}{positive_resp}"
+            negative_full_prompt = f"{pair.prompt}{negative_resp}"
             
             # Extract activations for both positive and negative responses
             positive_activation = get_activation_at_target_token(
                 positive_full_prompt, 
-                pair.positive_response
+                positive_resp
             )
             negative_activation = get_activation_at_target_token(
                 negative_full_prompt, 
-                pair.negative_response
+                negative_resp
             )
             
             # Store activations in the pair object

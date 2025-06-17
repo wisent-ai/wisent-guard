@@ -503,7 +503,7 @@ def run_task_pipeline(
         
         processed_pairs = collector.collect_activations_batch(
             pairs=contrastive_pairs,
-            layer_index=layer,
+            layer_index=layers[0],
             device=device
         )
         
@@ -552,7 +552,7 @@ def run_task_pipeline(
             
             # Train CAA to compute steering vector
             try:
-                training_stats = caa_steering.train(pair_set, layer)
+                training_stats = caa_steering.train(pair_set, layers[0])
                 
                 if verbose:
                     print(f"✅ CAA vector computed successfully!")
@@ -615,7 +615,7 @@ def run_task_pipeline(
                         print(f"      ✅ Expected: {qa_pair['correct_answer']}")
                     
                     # Generate UNSTEERED response (baseline)
-                    unsteered_response, _ = model.generate(qa_pair['question'], layer, max_new_tokens)
+                    unsteered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens)
                     
                     # Generate STEERED response using activation hooks
                     def steering_hook(module, input, output):
@@ -645,12 +645,12 @@ def run_task_pipeline(
                     layer_module = None
                     if hasattr(model.hf_model, 'model') and hasattr(model.hf_model.model, 'layers'):
                         # Llama-style model
-                        if layer < len(model.hf_model.model.layers):
-                            layer_module = model.hf_model.model.layers[layer]
+                        if layers[0] < len(model.hf_model.model.layers):
+                            layer_module = model.hf_model.model.layers[layers[0]]
                     elif hasattr(model.hf_model, 'transformer') and hasattr(model.hf_model.transformer, 'h'):
                         # GPT-style model
-                        if layer < len(model.hf_model.transformer.h):
-                            layer_module = model.hf_model.transformer.h[layer]
+                        if layers[0] < len(model.hf_model.transformer.h):
+                            layer_module = model.hf_model.transformer.h[layers[0]]
                     
                     if layer_module:
                         # Register the hook
@@ -658,7 +658,7 @@ def run_task_pipeline(
                         
                         try:
                             # Generate with steering
-                            steered_response, _ = model.generate(qa_pair['question'], layer, max_new_tokens)
+                            steered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens)
                         finally:
                             # Always remove the hook
                             handle.remove()
@@ -682,13 +682,13 @@ def run_task_pipeline(
                 if verbose:
                     print(f"\n✅ CAA steering test completed!")
                     print(f"   • Generated {len(steered_responses)} steered responses")
-                    print(f"   • Vector applied at layer {layer} with strength {steering_strength}")
+                    print(f"   • Vector applied at layer {layers[0]} with strength {steering_strength}")
                 
                 # Return steering mode results with test data
                 return {
                     "task_name": task_name,
                     "model_name": model_name,
-                    "layer": layer,
+                    "layer": layers[0],
                     "steering_mode": True,
                     "steering_method": "CAA",
                     "steering_strength": steering_strength,
@@ -704,7 +704,7 @@ def run_task_pipeline(
                 if verbose:
                     print(f"\n❌ STEERING ERROR: {error_msg}")
                     print(f"   • Training pairs: {len(pair_set)}")
-                    print(f"   • Layer: {layer}")
+                    print(f"   • Layer: {layers[0]}")
                 
                 return {
                     "task_name": task_name,
@@ -1586,12 +1586,21 @@ def main():
             elif isinstance(results, dict) and "error" in results:
                 print(f"{task_name}: ERROR - {results['error']}")
             elif isinstance(results, dict):
-                training_acc = results.get("training_results", {}).get("accuracy", "N/A")
-                eval_acc = results.get("evaluation_results", {}).get("accuracy", "N/A")
-                if isinstance(training_acc, float) and isinstance(eval_acc, float):
-                    print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
+                # Check if this is steering mode
+                if results.get("steering_mode", False):
+                    steering_method = results.get("steering_method", "Unknown")
+                    steering_strength = results.get("steering_strength", "N/A")
+                    tests_performed = results.get("tests_performed", 0)
+                    training_pairs = results.get("training_pairs", 0)
+                    print(f"{task_name}: Steering={steering_method} | Strength={steering_strength} | Trained={training_pairs} | Tested={tests_performed}")
                 else:
-                    print(f"{task_name}: Train={training_acc} | Test={eval_acc}")
+                    # Classification mode
+                    training_acc = results.get("training_results", {}).get("accuracy", "N/A")
+                    eval_acc = results.get("evaluation_results", {}).get("accuracy", "N/A")
+                    if isinstance(training_acc, float) and isinstance(eval_acc, float):
+                        print(f"{task_name}: Train={training_acc:.2%} | Test={eval_acc:.2%}")
+                    else:
+                        print(f"{task_name}: Train={training_acc} | Test={eval_acc}")
             else:
                 print(f"{task_name}: ERROR - Invalid results type: {type(results)}")
         
