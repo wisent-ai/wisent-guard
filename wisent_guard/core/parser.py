@@ -121,6 +121,16 @@ Examples:
     parser.add_argument("--classifier-dir", type=str, default="./models",
                        help="Directory for saving/loading classifiers and vectors (default: ./models)")
     
+    # Prompt construction and token targeting strategy arguments
+    parser.add_argument("--prompt-construction-strategy", type=str,
+                       choices=["multiple_choice", "role_playing", "direct_completion", "instruction_following"],
+                       default="multiple_choice",
+                       help="Strategy for constructing prompts from question-answer pairs (default: multiple_choice)")
+    parser.add_argument("--token-targeting-strategy", type=str, 
+                       choices=["choice_token", "continuation_token", "last_token", "first_token", "mean_pooling", "max_pooling"],
+                       default="choice_token",
+                       help="Strategy for targeting tokens during activation extraction (default: choice_token)")
+    
     return parser
 
 

@@ -680,7 +680,7 @@ def run_interactive_optimization(
     """
     from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
     from .core.hyperparameter_optimizer import detect_model_layers
-    from .core.activations import ActivationCollectionLogic
+    from .core.activation_collection_method import ActivationCollectionLogic
     import torch
     
     # Detect all available layers

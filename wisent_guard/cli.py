@@ -67,7 +67,9 @@ def run_task_pipeline(
     inference_only: bool = False,
     save_classifier: str = None,
     load_classifier: str = None,
-    classifier_dir: str = "./models"
+    classifier_dir: str = "./models",
+    prompt_construction_strategy: str = "multiple_choice",
+    token_targeting_strategy: str = "choice_token"
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -263,9 +265,34 @@ def run_task_pipeline(
                     print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
         
         # Create contrastive pairs using proper activation collection logic
-        from .core.activations import ActivationCollectionLogic, Activations, ActivationAggregationMethod
+        from .core.activation_collection_method import ActivationCollectionLogic, TokenTargetingStrategy, PromptConstructionStrategy
+        from .core.activations import Activations, ActivationAggregationMethod
+        
+        # Convert strings to enums
+        prompt_strategy_mapping = {
+            "multiple_choice": PromptConstructionStrategy.MULTIPLE_CHOICE,
+            "role_playing": PromptConstructionStrategy.ROLE_PLAYING,
+            "direct_completion": PromptConstructionStrategy.DIRECT_COMPLETION,
+            "instruction_following": PromptConstructionStrategy.INSTRUCTION_FOLLOWING
+        }
+        prompt_strategy = prompt_strategy_mapping.get(prompt_construction_strategy, PromptConstructionStrategy.MULTIPLE_CHOICE)
+        
+        targeting_strategy_mapping = {
+            "choice_token": TokenTargetingStrategy.CHOICE_TOKEN,
+            "continuation_token": TokenTargetingStrategy.CONTINUATION_TOKEN,
+            "last_token": TokenTargetingStrategy.LAST_TOKEN,
+            "first_token": TokenTargetingStrategy.FIRST_TOKEN,
+            "mean_pooling": TokenTargetingStrategy.MEAN_POOLING,
+            "max_pooling": TokenTargetingStrategy.MAX_POOLING
+        }
+        targeting_strategy = targeting_strategy_mapping.get(token_targeting_strategy, TokenTargetingStrategy.CHOICE_TOKEN)
+        
+        if verbose:
+            print(f"   • Prompt construction: {prompt_strategy.value}")
+            print(f"   • Token targeting: {targeting_strategy.value}")
+        
         collector = ActivationCollectionLogic(model=model)
-        contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs)
+        contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs, prompt_strategy)
         
         if verbose:
             print(f"\n🔄 Created {len(contrastive_pairs)} contrastive pairs:")
@@ -504,7 +531,8 @@ def run_task_pipeline(
         processed_pairs = collector.collect_activations_batch(
             pairs=contrastive_pairs,
             layer_index=layers[0],
-            device=device
+            device=device,
+            token_targeting_strategy=targeting_strategy
         )
         
         # Convert to ContrastivePairSet format for training
@@ -745,7 +773,8 @@ def run_task_pipeline(
                 layer_processed_pairs = collector.collect_activations_batch(
                     pairs=contrastive_pairs,
                     layer_index=layer_idx,
-                    device=device
+                    device=device,
+                    token_targeting_strategy=targeting_strategy
                 )
                 
                 # Create layer-specific ContrastivePairSet
@@ -1267,7 +1296,8 @@ def run_task_pipeline(
             test_processed_pairs = collector.collect_activations_batch(
                 pairs=test_contrastive_pairs,
                 layer_index=layer,
-                device=device
+                device=device,
+                token_targeting_strategy=targeting_strategy
             )
             
             # Convert to ContrastivePairSet format for evaluation
@@ -1549,7 +1579,9 @@ def main():
                 inference_only=args.inference_only,
                 save_classifier=args.save_classifier,
                 load_classifier=args.load_classifier,
-                classifier_dir=args.classifier_dir
+                classifier_dir=args.classifier_dir,
+                prompt_construction_strategy=args.prompt_construction_strategy,
+                token_targeting_strategy=args.token_targeting_strategy
             )
             
             all_results[display_name] = task_results

@@ -37,6 +37,8 @@ setup(
         "tqdm>=4.50.0",
         "scikit-learn>=0.24.0",
         "pandas>=1.2.0",
+        "numpy>=1.21.0",
+        "datasets>=2.0.0",
     ],
     extras_require={
         "harness": [
