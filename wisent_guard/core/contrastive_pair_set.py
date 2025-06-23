@@ -1124,7 +1124,7 @@ class ContrastivePairSet:
                 correct_answer = None
                 incorrect_answer = None
                 
-                if task_name == 'truthful_qa':
+                if 'truthfulqa' in task_name.lower():
                     # TruthfulQA-specific extraction
                     correct_answers = doc.get('mc1_targets', {}).get('choices', [])
                     correct_labels = doc.get('mc1_targets', {}).get('labels', [])

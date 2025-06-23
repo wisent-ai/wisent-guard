@@ -3,6 +3,13 @@ from typing import Dict, Any, Optional, List, Tuple
 import torch
 import numpy as np
 from .contrastive_pair_set import ContrastivePairSet
+from .aggregation import (
+    create_control_vector_from_contrastive_pairs, 
+    create_control_vector_from_representations,
+    save_control_vector, 
+    load_control_vector,
+    ControlVectorAggregationMethod
+)
 
 class SteeringMethod(ABC):
     """Base class for steering methods that apply directional vectors to model activations."""
@@ -32,20 +39,21 @@ class CAA(SteeringMethod):
     """
     Contrastive Activation Addition (CAA) steering method.
     
-    Computes steering vector as the average difference between positive and negative
-    activations across all contrastive pairs, then adds this vector to activations
+    Computes steering vector from positive and negative activations using
+    various aggregation methods, then adds this vector to activations
     during inference to steer the model in the desired direction.
     """
     
-    def __init__(self, device: Optional[str] = None):
+    def __init__(self, device: Optional[str] = None, aggregation_method: ControlVectorAggregationMethod = ControlVectorAggregationMethod.CAA):
         super().__init__("CAA", device)
         self.steering_vector = None
         self.layer_index = None
+        self.aggregation_method = aggregation_method
         self.training_stats = {}
         
     def train(self, contrastive_pair_set: ContrastivePairSet, layer_index: int) -> Dict[str, Any]:
         """
-        Train CAA by computing average activation difference across contrastive pairs.
+        Train CAA by computing control vector from contrastive pairs using the specified aggregation method.
         
         Args:
             contrastive_pair_set: Set of contrastive pairs with activations
@@ -59,50 +67,14 @@ class CAA(SteeringMethod):
         # Get positive and negative activations
         pos_activations, neg_activations = contrastive_pair_set.get_activation_pairs()
         
-        if len(pos_activations) != len(neg_activations):
-            raise ValueError(f"Mismatch in activation pairs: {len(pos_activations)} vs {len(neg_activations)}")
+        # Use the specified aggregation method to create the control vector
+        self.steering_vector, training_stats = create_control_vector_from_contrastive_pairs(
+            pos_activations, neg_activations, self.aggregation_method, self.device
+        )
         
-        if len(pos_activations) == 0:
-            raise ValueError("No activation pairs found in contrastive pair set")
-        
-        # Compute differences for each pair
-        differences = []
-        for pos_act, neg_act in zip(pos_activations, neg_activations):
-            # Convert to tensors if needed
-            if hasattr(pos_act, 'tensor'):
-                pos_tensor = pos_act.tensor
-            else:
-                pos_tensor = pos_act
-                
-            if hasattr(neg_act, 'tensor'):
-                neg_tensor = neg_act.tensor
-            else:
-                neg_tensor = neg_act
-            
-            # Ensure same shape
-            if pos_tensor.shape != neg_tensor.shape:
-                raise ValueError(f"Shape mismatch in pair: {pos_tensor.shape} vs {neg_tensor.shape}")
-            
-            # Compute difference: positive - negative (steering toward positive)
-            diff = pos_tensor - neg_tensor
-            differences.append(diff)
-        
-        # Average across all pairs to get steering vector
-        self.steering_vector = torch.stack(differences).mean(dim=0)
-        
-        # Move to specified device
-        if self.device:
-            self.steering_vector = self.steering_vector.to(self.device)
-        
-        # Compute training statistics
-        self.training_stats = {
-            'num_pairs': len(differences),
-            'vector_norm': torch.norm(self.steering_vector).item(),
-            'vector_mean': self.steering_vector.mean().item(),
-            'vector_std': self.steering_vector.std().item(),
-            'vector_shape': list(self.steering_vector.shape),
-            'layer_index': layer_index
-        }
+        # Add layer information to the training stats
+        self.training_stats = training_stats.copy()
+        self.training_stats['layer_index'] = layer_index
         
         self.is_trained = True
         
@@ -146,29 +118,37 @@ class CAA(SteeringMethod):
         if not self.is_trained or self.steering_vector is None:
             return False
         
-        try:
-            torch.save({
-                'steering_vector': self.steering_vector,
-                'training_stats': self.training_stats,
-                'layer_index': self.layer_index,
-                'method_name': self.name
-            }, path)
-            return True
-        except Exception:
-            return False
+        metadata = {
+            'method_name': self.name,
+            'aggregation_method': self.aggregation_method.value
+        }
+        
+        return save_control_vector(
+            self.steering_vector, 
+            self.training_stats, 
+            path, 
+            self.layer_index, 
+            metadata
+        )
     
     def load_steering_vector(self, path: str) -> bool:
         """Load steering vector from disk."""
-        try:
-            checkpoint = torch.load(path, map_location=self.device)
-            self.steering_vector = checkpoint['steering_vector']
-            self.training_stats = checkpoint.get('training_stats', {})
-            self.layer_index = checkpoint.get('layer_index')
-            
-            if self.device:
-                self.steering_vector = self.steering_vector.to(self.device)
-            
-            self.is_trained = True
-            return True
-        except Exception:
+        control_vector, metadata = load_control_vector(path, self.device)
+        
+        if control_vector is None:
             return False
+        
+        self.steering_vector = control_vector
+        self.training_stats = metadata.get('training_stats', {})
+        self.layer_index = metadata.get('layer_index')
+        
+        # Update aggregation method if available in metadata
+        saved_method = metadata.get('metadata', {}).get('aggregation_method')
+        if saved_method:
+            try:
+                self.aggregation_method = ControlVectorAggregationMethod(saved_method)
+            except ValueError:
+                pass  # Keep current method if saved method is unknown
+        
+        self.is_trained = True
+        return True

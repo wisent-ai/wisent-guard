@@ -298,7 +298,7 @@ def run_task_pipeline(
             print(f"\n🔄 Created {len(contrastive_pairs)} contrastive pairs:")
             for i, pair in enumerate(contrastive_pairs[:3]):  # Show first 3
                 print(f"\n   🔄 Contrastive Pair {i+1}:")
-                print(f"      📝 Prompt: {pair.prompt[:100]}{'...' if len(pair.prompt) > 100 else ''}")
+                print(f"      📝 Prompt: {pair.prompt}")
                 print(f"      🟢 Positive (B): {pair.positive_response}")
                 print(f"      🔴 Negative (A): {pair.negative_response}")
         
@@ -355,8 +355,31 @@ def run_task_pipeline(
             if load_steering_vector:
                 if verbose:
                     print(f"   • Loading steering vectors from: {load_steering_vector}")
-                # TODO: Implement steering vector loading
-                print(f"   ⚠️  Steering vector loading not yet implemented")
+                
+                try:
+                    from .core.steering_method import CAA
+                    steering_method = CAA(device=device)
+                    
+                    if steering_method.load_steering_vector(load_steering_vector):
+                        layer_index = steering_method.layer_index
+                        if layer_index is not None:
+                            steering_methods[layer_index] = steering_method
+                            loaded_models[layer_index] = {
+                                'method_name': steering_method.name,
+                                'aggregation_method': steering_method.aggregation_method.value if hasattr(steering_method, 'aggregation_method') else 'caa',
+                                'loaded_from': load_steering_vector
+                            }
+                            if verbose:
+                                print(f"     ✅ Loaded steering vector for layer {layer_index}")
+                        else:
+                            if verbose:
+                                print(f"     ⚠️  Warning: No layer information in loaded vector")
+                    else:
+                        if verbose:
+                            print(f"     ❌ Failed to load steering vector from {load_steering_vector}")
+                except Exception as e:
+                    if verbose:
+                        print(f"     ❌ Error loading steering vector: {str(e)}")
             
             if not steering_methods:
                 error_msg = "No models could be loaded for inference"
