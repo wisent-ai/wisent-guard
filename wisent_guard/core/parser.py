@@ -7,61 +7,34 @@ from typing import List, Optional
 
 
 def setup_parser() -> argparse.ArgumentParser:
-    """Set up command-line argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Run lm-evaluation benchmarks through wisent-guard pipeline",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Traditional task evaluation
-  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks hellaswag,mmlu --layer 10 --model meta-llama/Llama-3.1-8B --shots 5
-  
-  # Generate synthetic contrastive pairs
-  python -m wisent_guard generate-pairs --trait "The model should refuse harmful requests politely" --output ./my_pairs.json
-  python -m wisent_guard generate-pairs --trait "The model should be helpful and honest" --num-pairs 50 --output ./helpful_pairs.json
-  
-  # Use synthetic pairs for training and testing
-  python -m wisent_guard synthetic --trait "The model should refuse harmful requests" --steering-method KSteering
-  python -m wisent_guard synthetic --pairs-file ./my_pairs.json --steering-method CAA --steering-strength 1.5
-  
-  # File-based evaluation
-  python -m wisent_guard tasks data.csv --from-csv --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks data.json --from-json --model meta-llama/Llama-3.1-8B
-        """
-    )
+    """Set up the main CLI parser with subcommands."""
+    parser = argparse.ArgumentParser(description="Wisent-Guard: Advanced AI Safety and Alignment Toolkit")
+    
+    # Global arguments
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
-    # Tasks subcommand (existing functionality)
+    # Tasks command (main evaluation pipeline)
     tasks_parser = subparsers.add_parser("tasks", help="Run evaluation tasks")
     setup_tasks_parser(tasks_parser)
     
-    # Generate-pairs subcommand
+    # Generate pairs command
     generate_parser = subparsers.add_parser("generate-pairs", help="Generate synthetic contrastive pairs")
     setup_generate_pairs_parser(generate_parser)
     
-    # Synthetic subcommand (generate + train + test in one go)
-    synthetic_parser = subparsers.add_parser("synthetic", help="Generate synthetic contrastive pairs and run full pipeline")
+    # Synthetic command (generate + train + test)
+    synthetic_parser = subparsers.add_parser("synthetic", help="Run synthetic contrastive pair pipeline")
     setup_synthetic_parser(synthetic_parser)
     
-    # Add test-nonsense subcommand
-    nonsense_parser = subparsers.add_parser('test-nonsense', help='Test nonsense detection on sample text')
-    nonsense_parser.add_argument("text", type=str, nargs='?',
-                                 help="Text to analyze (if not provided, will use interactive mode)")
-    nonsense_parser.add_argument("--max-word-length", type=int, default=20,
-                                 help="Maximum reasonable word length (default: 20)")
-    nonsense_parser.add_argument("--repetition-threshold", type=float, default=0.7,
-                                 help="Threshold for repetitive content detection (0-1, default: 0.7)")
-    nonsense_parser.add_argument("--gibberish-threshold", type=float, default=0.3,
-                                 help="Threshold for gibberish word detection (0-1, default: 0.3)")
-    nonsense_parser.add_argument("--disable-dictionary-check", action="store_true",
-                                 help="Disable dictionary-based word validation")
-    nonsense_parser.add_argument("--verbose", action="store_true",
-                                 help="Show detailed analysis")
-    nonsense_parser.add_argument("--examples", action="store_true",
-                                 help="Test with built-in example texts")
+    # Test nonsense detection command
+    test_nonsense_parser = subparsers.add_parser("test-nonsense", help="Test nonsense detection system")
+    setup_test_nonsense_parser(test_nonsense_parser)
+    
+    # Monitor command for performance monitoring
+    monitor_parser = subparsers.add_parser("monitor", help="Performance monitoring and system information")
+    setup_monitor_parser(monitor_parser)
     
     return parser
 
@@ -240,6 +213,24 @@ def setup_tasks_parser(parser):
                         choices=["regenerate", "stop", "flag"],
                         help="Action when nonsense is detected: regenerate, stop generation, or flag for review")
     
+    # Performance monitoring options
+    parser.add_argument("--enable-memory-tracking", action="store_true",
+                        help="Enable memory usage tracking and reporting")
+    parser.add_argument("--enable-latency-tracking", action="store_true",
+                        help="Enable latency/timing tracking and reporting")
+    parser.add_argument("--memory-sampling-interval", type=float, default=0.1,
+                        help="Memory sampling interval in seconds (default: 0.1)")
+    parser.add_argument("--track-gpu-memory", action="store_true",
+                        help="Track GPU memory usage (requires CUDA)")
+    parser.add_argument("--detailed-performance-report", action="store_true",
+                        help="Generate detailed performance report with all metrics")
+    parser.add_argument("--export-performance-csv", type=str, default=None,
+                        help="Export performance data to CSV file")
+    parser.add_argument("--show-memory-usage", action="store_true",
+                        help="Show current memory usage without full tracking")
+    parser.add_argument("--show-timing-summary", action="store_true",
+                        help="Show timing summary at the end of execution")
+    
     parser.add_argument("--save-steering-vector", type=str, default=None,
                         help="Path to save the computed steering vector")
     parser.add_argument("--load-steering-vector", type=str, default=None,
@@ -405,3 +396,45 @@ def setup_synthetic_parser(parser):
     parser.add_argument("--nonsense-action", type=str, default="regenerate",
                         choices=["regenerate", "stop", "flag"],
                         help="Action when nonsense is detected: regenerate, stop generation, or flag for review")
+
+
+def setup_test_nonsense_parser(parser):
+    """Set up the test-nonsense subcommand parser."""
+    parser.add_argument("text", type=str, nargs='?',
+                        help="Text to analyze (if not provided, will use interactive mode)")
+    parser.add_argument("--max-word-length", type=int, default=20,
+                        help="Maximum reasonable word length (default: 20)")
+    parser.add_argument("--repetition-threshold", type=float, default=0.7,
+                        help="Threshold for repetitive content detection (0-1, default: 0.7)")
+    parser.add_argument("--gibberish-threshold", type=float, default=0.3,
+                        help="Threshold for gibberish word detection (0-1, default: 0.3)")
+    parser.add_argument("--disable-dictionary-check", action="store_true",
+                        help="Disable dictionary-based word validation")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Show detailed analysis")
+    parser.add_argument("--examples", action="store_true",
+                        help="Test with built-in example texts")
+
+
+def setup_monitor_parser(parser):
+    """Set up the monitor subcommand parser."""
+    parser.add_argument("--memory-info", action="store_true",
+                        help="Show current memory usage information")
+    parser.add_argument("--system-info", action="store_true",
+                        help="Show system information and capabilities")
+    parser.add_argument("--benchmark", action="store_true",
+                        help="Run performance benchmarks")
+    parser.add_argument("--test-gpu", action="store_true",
+                        help="Test GPU availability and memory")
+    parser.add_argument("--continuous", action="store_true",
+                        help="Continuous monitoring mode (Ctrl+C to stop)")
+    parser.add_argument("--interval", type=float, default=1.0,
+                        help="Monitoring interval in seconds (default: 1.0)")
+    parser.add_argument("--export-csv", type=str, default=None,
+                        help="Export monitoring data to CSV file")
+    parser.add_argument("--duration", type=int, default=60,
+                        help="Duration for continuous monitoring in seconds (default: 60)")
+    parser.add_argument("--track-gpu", action="store_true",
+                        help="Include GPU monitoring (requires CUDA)")
+    parser.add_argument("--detailed", action="store_true",
+                        help="Show detailed monitoring information")

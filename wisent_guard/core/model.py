@@ -356,6 +356,7 @@ class Model:
 
     def generate(self, prompt: str, layer_index: int, max_new_tokens: int = 50, enable_gradients: bool = False, 
                  nonsense_detector=None, nonsense_action: str = "regenerate", max_regeneration_attempts: int = 3,
+                 latency_tracker=None, operation_name: str = "response_generation",
                  **generation_kwargs):
         """Generate text and extract activations from specified layer (legacy method)."""
         if self.hf_model is None:
@@ -369,46 +370,22 @@ class Model:
         
         while attempt <= max_regeneration_attempts:
             try:
-                # Use inference_mode only if gradients are not needed (for K-steering compatibility)
-                if enable_gradients:
-                    # For gradient-based steering methods like K-steering, we need gradients enabled
+                # Use generation timing context if tracker provided
+                if latency_tracker:
+                    # Get prompt length for metrics
                     inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
-                    inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
-                    input_length = inputs["input_ids"].shape[1]
+                    prompt_length = inputs["input_ids"].shape[1]
                     
-                    generation_config = {
-                        "max_new_tokens": max_new_tokens,
-                        "do_sample": True,
-                        "temperature": 0.7,
-                        "pad_token_id": self.tokenizer.pad_token_id,
-                        "output_hidden_states": True,
-                        "return_dict_in_generate": True,
-                        **generation_kwargs
-                    }
-                    
-                    outputs = self.hf_model.generate(**inputs, **generation_config)
+                    with latency_tracker.time_generation(operation_name, prompt_length) as gen_state:
+                        generated_text, activations, token_count = self._generate_with_timing(
+                            formatted_prompt, layer_index, max_new_tokens, enable_gradients, 
+                            gen_state, **generation_kwargs
+                        )
                 else:
-                    # Standard inference mode for better performance
-                    with torch.inference_mode():
-                        inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
-                        inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
-                        input_length = inputs["input_ids"].shape[1]
-                        
-                        generation_config = {
-                            "max_new_tokens": max_new_tokens,
-                            "do_sample": True,
-                            "temperature": 0.7,
-                            "pad_token_id": self.tokenizer.pad_token_id,
-                            "output_hidden_states": True,
-                            "return_dict_in_generate": True,
-                            **generation_kwargs
-                        }
-                        
-                        outputs = self.hf_model.generate(**inputs, **generation_config)
-                
-                # Extract generated text
-                generated_tokens = outputs.sequences[0][input_length:]
-                generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+                    generated_text, activations, token_count = self._generate_with_timing(
+                        formatted_prompt, layer_index, max_new_tokens, enable_gradients, 
+                        None, **generation_kwargs
+                    )
                 
                 # Check for nonsense if detector is provided
                 if nonsense_detector is not None and nonsense_action != "flag":
@@ -426,19 +403,6 @@ class Model:
                             continue
                         else:
                             print(f"⚠️ Max regeneration attempts reached, returning potentially nonsensical response")
-                
-                # Extract activations from the specified layer
-                if hasattr(outputs, 'hidden_states') and outputs.hidden_states:
-                    # Get hidden states from the last generation step
-                    last_hidden_states = outputs.hidden_states[-1]  # Last generation step
-                    if isinstance(last_hidden_states, tuple) and len(last_hidden_states) > layer_index:
-                        layer_activations = last_hidden_states[layer_index]
-                        # Get the last token's activations
-                        activations = layer_activations[0, -1, :].detach()
-                    else:
-                        activations = None
-                else:
-                    activations = None
                 
                 # Add nonsense detection results to output if flagging
                 if nonsense_detector is not None and nonsense_action == "flag":
@@ -458,6 +422,74 @@ class Model:
         
         # If we get here, all attempts failed
         return "", None
+
+    def _generate_with_timing(self, formatted_prompt: str, layer_index: int, max_new_tokens: int, 
+                             enable_gradients: bool, gen_state=None, **generation_kwargs):
+        """Helper method to handle generation with optional timing tracking."""
+        # Use inference_mode only if gradients are not needed (for K-steering compatibility)
+        if enable_gradients:
+            # For gradient-based steering methods like K-steering, we need gradients enabled
+            inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+            inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+            input_length = inputs["input_ids"].shape[1]
+            
+            generation_config = {
+                "max_new_tokens": max_new_tokens,
+                "do_sample": True,
+                "temperature": 0.7,
+                "pad_token_id": self.tokenizer.pad_token_id,
+                "output_hidden_states": True,
+                "return_dict_in_generate": True,
+                **generation_kwargs
+            }
+            
+            outputs = self.hf_model.generate(**inputs, **generation_config)
+        else:
+            # Standard inference mode for better performance
+            with torch.inference_mode():
+                inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+                inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+                input_length = inputs["input_ids"].shape[1]
+                
+                generation_config = {
+                    "max_new_tokens": max_new_tokens,
+                    "do_sample": True,
+                    "temperature": 0.7,
+                    "pad_token_id": self.tokenizer.pad_token_id,
+                    "output_hidden_states": True,
+                    "return_dict_in_generate": True,
+                    **generation_kwargs
+                }
+                
+                outputs = self.hf_model.generate(**inputs, **generation_config)
+        
+        # Mark first token if timing tracker provided
+        if gen_state:
+            gen_state["mark_first_token"]()
+        
+        # Extract generated text
+        generated_tokens = outputs.sequences[0][input_length:]
+        generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+        token_count = len(generated_tokens)
+        
+        # Update token count for timing tracker
+        if gen_state:
+            gen_state["update_tokens"](token_count)
+        
+        # Extract activations from the specified layer
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states:
+            # Get hidden states from the last generation step
+            last_hidden_states = outputs.hidden_states[-1]  # Last generation step
+            if isinstance(last_hidden_states, tuple) and len(last_hidden_states) > layer_index:
+                layer_activations = last_hidden_states[layer_index]
+                # Get the last token's activations
+                activations = layer_activations[0, -1, :].detach()
+            else:
+                activations = None
+        else:
+            activations = None
+        
+        return generated_text, activations, token_count
 
     def extract_activations(self, text: str, layer: 'Layer'):
         """Extract activations from the specified layer for given text."""

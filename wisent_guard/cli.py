@@ -106,7 +106,16 @@ def run_task_pipeline(
     token_min_strength: float = 0.1,
     token_max_strength: float = 1.0,
     token_apply_to_prompt: bool = False,
-    token_prompt_strength_multiplier: float = 0.1
+    token_prompt_strength_multiplier: float = 0.1,
+    # Performance monitoring parameters
+    enable_memory_tracking: bool = False,
+    enable_latency_tracking: bool = False,
+    memory_sampling_interval: float = 0.1,
+    track_gpu_memory: bool = False,
+    detailed_performance_report: bool = False,
+    export_performance_csv: str = None,
+    show_memory_usage: bool = False,
+    show_timing_summary: bool = False
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -133,6 +142,41 @@ def run_task_pipeline(
         Dictionary with all results
     """
     logger.info(f"Running pipeline for task: {task_name}")
+    
+    # Initialize performance tracking
+    memory_tracker = None
+    latency_tracker = None
+    
+    if enable_memory_tracking or enable_latency_tracking:
+        if verbose:
+            print(f"🔍 Performance tracking enabled: memory={enable_memory_tracking}, latency={enable_latency_tracking}")
+        
+        from .core.tracking import (
+            get_global_memory_tracker, 
+            get_global_latency_tracker,
+            get_memory_info,
+            format_memory_usage
+        )
+        
+        if enable_memory_tracking:
+            memory_tracker = get_global_memory_tracker()
+            memory_tracker.track_gpu = track_gpu_memory
+            memory_tracker.sampling_interval = memory_sampling_interval
+            memory_tracker.start_monitoring()
+            if verbose:
+                print(f"   • Memory tracking started with {memory_sampling_interval}s interval")
+            
+        if enable_latency_tracking:
+            latency_tracker = get_global_latency_tracker()
+            latency_tracker.start_tracking()
+            if verbose:
+                print(f"   • Latency tracking started")
+    
+    # Show current memory usage if requested
+    if show_memory_usage:
+        from .core.tracking import get_memory_info, format_memory_usage
+        current_memory = get_memory_info()
+        print(f"\n💾 Current Memory Usage: {format_memory_usage(current_memory)}")
     
     display_name = task_name if not (from_csv or from_json) else f"file:{task_name}"
     
@@ -167,7 +211,14 @@ def run_task_pipeline(
                 print(f"   • Multi-layer mode: {layers}")
             else:
                 print(f"   • Single layer mode: {layers[0]}")
-        model = Model(name=model_name, device=device)
+        
+        # Time model loading
+        if latency_tracker:
+            with latency_tracker.time_operation("model_loading"):
+                model = Model(name=model_name, device=device)
+        else:
+            model = Model(name=model_name, device=device)
+        
         layer_obj = Layer(index=layers[0], type="transformer")
         
         # Create detection handler based on CLI arguments
@@ -588,12 +639,21 @@ def run_task_pipeline(
         if verbose:
             print(f"\n🔬 Extracting activations from layer {layer}{optimization_note} choice tokens...")
         
-        processed_pairs = collector.collect_activations_batch(
-            pairs=contrastive_pairs,
-            layer_index=layers[0],
-            device=device,
-            token_targeting_strategy=targeting_strategy
-        )
+        if latency_tracker:
+            with latency_tracker.time_operation("activation_extraction"):
+                processed_pairs = collector.collect_activations_batch(
+                    pairs=contrastive_pairs,
+                    layer_index=layers[0],
+                    device=device,
+                    token_targeting_strategy=targeting_strategy
+                )
+        else:
+            processed_pairs = collector.collect_activations_batch(
+                pairs=contrastive_pairs,
+                layer_index=layers[0],
+                device=device,
+                token_targeting_strategy=targeting_strategy
+            )
         
         # Convert to ContrastivePairSet format for training
         phrase_pairs = []
@@ -753,7 +813,18 @@ def run_task_pipeline(
             
             # Train steering method to compute steering vector
             try:
-                training_stats = steering_obj.train(pair_set, layers[0])
+                if latency_tracker:
+                    with latency_tracker.time_operation(
+                        "total_training_time", 
+                        {
+                            "method": steering_method,
+                            "training_samples": len(pair_set),
+                            "success": True
+                        }
+                    ):
+                        training_stats = steering_obj.train(pair_set, layers[0])
+                else:
+                    training_stats = steering_obj.train(pair_set, layers[0])
                 
                 if verbose:
                     print(f"✅ {steering_method} vector computed successfully!")
@@ -852,7 +923,9 @@ def run_task_pipeline(
                         max_new_tokens, 
                         enable_gradients=enable_gradients,
                         nonsense_detector=nonsense_detector,
-                        nonsense_action=nonsense_action
+                        nonsense_action=nonsense_action,
+                        latency_tracker=latency_tracker,
+                        operation_name="unsteered_generation"
                     )
                     
                     # Generate STEERED response using activation hooks
@@ -910,7 +983,9 @@ def run_task_pipeline(
                                 max_new_tokens, 
                                 enable_gradients=enable_gradients,
                                 nonsense_detector=nonsense_detector,
-                                nonsense_action=nonsense_action
+                                nonsense_action=nonsense_action,
+                                latency_tracker=latency_tracker,
+                                operation_name="steered_generation"
                             )
                         finally:
                             # Always remove the hook
@@ -937,6 +1012,40 @@ def run_task_pipeline(
                     print(f"   • Generated {len(steered_responses)} steered responses")
                     print(f"   • Vector applied at layer {layers[0]} with strength {steering_strength}")
                 
+                # Generate performance report before returning
+                if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
+                    if verbose:
+                        print(f"\n🔍 Generating performance report...")
+                    print(f"\n📊 PERFORMANCE REPORT:")
+                    print(f"{'='*50}")
+                    
+                    if memory_tracker:
+                        if verbose:
+                            print(f"   • Stopping memory monitoring...")
+                        memory_stats = memory_tracker.stop_monitoring()
+                        print(f"💾 Memory Usage:")
+                        print(memory_tracker.format_stats(memory_stats, detailed_performance_report))
+                        
+                    if latency_tracker or show_timing_summary:
+                        if verbose:
+                            print(f"   • Collecting timing data...")
+                        
+                        if latency_tracker:
+                            # Use new user-facing metrics format
+                            print(f"\n⏱️ Performance Metrics:")
+                            print(latency_tracker.format_user_metrics())
+                        else:
+                            from .core.tracking import format_timing_summary
+                            print(f"\n⏱️ Timing Summary:")
+                            print(format_timing_summary(detailed_performance_report))
+                        
+                    if export_performance_csv:
+                        if latency_tracker:
+                            latency_tracker.export_csv(export_performance_csv)
+                            print(f"\n📄 Performance data exported to: {export_performance_csv}")
+                    
+                    print(f"{'='*50}")
+                
                 # Return steering mode results with test data
                 return {
                     "task_name": task_name,
@@ -959,6 +1068,44 @@ def run_task_pipeline(
                     print(f"   • Training pairs: {len(pair_set)}")
                     print(f"   • Layer: {layers[0]}")
                     print(f"   • Method: {steering_method}")
+                
+                # Generate performance report before error return
+                if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
+                    try:
+                        if verbose:
+                            print(f"\n🔍 Generating performance report (error case)...")
+                        print(f"\n📊 PERFORMANCE REPORT:")
+                        print(f"{'='*50}")
+                        
+                        if memory_tracker:
+                            if verbose:
+                                print(f"   • Stopping memory monitoring...")
+                            memory_stats = memory_tracker.stop_monitoring()
+                            print(f"💾 Memory Usage:")
+                            print(memory_tracker.format_stats(memory_stats, detailed_performance_report))
+                            
+                        if latency_tracker or show_timing_summary:
+                            if verbose:
+                                print(f"   • Collecting timing data...")
+                            
+                            if latency_tracker:
+                                # Use new user-facing metrics format
+                                print(f"\n⏱️ Performance Metrics:")
+                                print(latency_tracker.format_user_metrics())
+                            else:
+                                from .core.tracking import format_timing_summary
+                                print(f"\n⏱️ Timing Summary:")
+                                print(format_timing_summary(detailed_performance_report))
+                            
+                        if export_performance_csv:
+                            if latency_tracker:
+                                latency_tracker.export_csv(export_performance_csv)
+                                print(f"\n📄 Performance data exported to: {export_performance_csv}")
+                        
+                        print(f"{'='*50}")
+                    except Exception as perf_error:
+                        if verbose:
+                            print(f"   • Performance report generation failed: {perf_error}")
                 
                 return {
                     "task_name": task_name,
@@ -1707,11 +1854,45 @@ def run_task_pipeline(
                     print(f"   • Classification accuracy: Could not evaluate")
                 print(f"{'='*80}\n")
             
+            # Generate performance report
+            if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
+                if verbose:
+                    print(f"\n🔍 Generating performance report...")
+                print(f"\n📊 PERFORMANCE REPORT:")
+                print(f"{'='*50}")
+                
+                if memory_tracker:
+                    if verbose:
+                        print(f"   • Stopping memory monitoring...")
+                    memory_stats = memory_tracker.stop_monitoring()
+                    print(f"💾 Memory Usage:")
+                    print(memory_tracker.format_stats(memory_stats, detailed_performance_report))
+                    
+                if latency_tracker or show_timing_summary:
+                    if verbose:
+                        print(f"   • Collecting timing data...")
+                    from .core.tracking import format_timing_summary
+                    print(f"\n⏱️ Timing Summary:")
+                    print(format_timing_summary(detailed_performance_report))
+                    
+                if export_performance_csv:
+                    if latency_tracker:
+                        latency_tracker.export_csv(export_performance_csv)
+                        print(f"\n📄 Performance data exported to: {export_performance_csv}")
+                
+                print(f"{'='*50}")
+            
             logger.info(f"Pipeline completed for {task_name}")
             return results
         
     except Exception as e:
         logger.error(f"Error in pipeline for {task_name}: {e}")
+        # Stop tracking on error
+        if memory_tracker:
+            try:
+                memory_tracker.stop_monitoring()
+            except:
+                pass
         return {"task_name": task_name, "error": str(e)}
 
 
@@ -1732,6 +1913,8 @@ def main():
         handle_tasks_command(args)
     elif args.command == "test-nonsense":
         handle_test_nonsense_command(args)
+    elif args.command == "monitor":
+        handle_monitor_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -2040,7 +2223,16 @@ def handle_tasks_command(args):
                 token_min_strength=args.token_min_strength,
                 token_max_strength=args.token_max_strength,
                 token_apply_to_prompt=args.token_apply_to_prompt,
-                token_prompt_strength_multiplier=args.token_prompt_strength_multiplier
+                token_prompt_strength_multiplier=args.token_prompt_strength_multiplier,
+                # Performance monitoring parameters
+                enable_memory_tracking=args.enable_memory_tracking,
+                enable_latency_tracking=args.enable_latency_tracking,
+                memory_sampling_interval=args.memory_sampling_interval,
+                track_gpu_memory=args.track_gpu_memory,
+                detailed_performance_report=args.detailed_performance_report,
+                export_performance_csv=args.export_performance_csv,
+                show_memory_usage=args.show_memory_usage,
+                show_timing_summary=args.show_timing_summary
             )
             
             all_results[display_name] = task_results
@@ -2277,6 +2469,68 @@ def handle_test_nonsense_command(args):
                 break
             except Exception as e:
                 print(f"❌ Error: {e}")
+
+
+def handle_monitor_command(args):
+    """Handle the monitor command for performance monitoring."""
+    from .core.tracking import (
+        get_memory_info, 
+        format_memory_usage, 
+        MemoryTracker,
+        LatencyTracker,
+        get_timing_summary,
+        format_timing_summary
+    )
+    import time
+    import sys
+    import platform
+    import torch
+    
+    print("🔍 Wisent-Guard Performance Monitor")
+    print("=" * 50)
+    
+    # System information
+    if args.system_info:
+        print("\n💻 System Information:")
+        print(f"   Platform: {platform.system()} {platform.release()}")
+        print(f"   Python: {platform.python_version()}")
+        print(f"   Architecture: {platform.machine()}")
+        print(f"   Processor: {platform.processor()}")
+        
+        # PyTorch info
+        print(f"   PyTorch: {torch.__version__}")
+        print(f"   CUDA Available: {torch.cuda.is_available()}")
+        if torch.cuda.is_available():
+            print(f"   CUDA Version: {torch.version.cuda}")
+            print(f"   GPU Count: {torch.cuda.device_count()}")
+            for i in range(torch.cuda.device_count()):
+                gpu_name = torch.cuda.get_device_name(i)
+                gpu_memory = torch.cuda.get_device_properties(i).total_memory / 1024**3
+                print(f"   GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
+    
+    # Memory information
+    if args.memory_info:
+        print("\n💾 Current Memory Usage:")
+        memory_info = get_memory_info()
+        print(f"   {format_memory_usage(memory_info)}")
+    
+    # Show default info if no specific options provided
+    if not any([args.system_info, args.memory_info, args.test_gpu, args.benchmark, args.continuous]):
+        print("\n💾 Current Memory Usage:")
+        memory_info = get_memory_info()
+        print(f"   {format_memory_usage(memory_info)}")
+        
+        print(f"\n💻 System: {platform.system()} {platform.release()}")
+        print(f"🐍 Python: {platform.python_version()}")
+        print(f"🔥 PyTorch: {torch.__version__}")
+        print(f"🎮 CUDA: {'Available' if torch.cuda.is_available() else 'Not Available'}")
+        
+        if torch.cuda.is_available():
+            for i in range(torch.cuda.device_count()):
+                gpu_name = torch.cuda.get_device_name(i)
+                print(f"   GPU {i}: {gpu_name}")
+        
+        print(f"\n💡 Use --help to see more monitoring options")
 
 
 if __name__ == "__main__":
