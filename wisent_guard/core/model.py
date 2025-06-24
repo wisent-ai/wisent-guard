@@ -507,7 +507,7 @@ class Model:
                 activations = None
         else:
             activations = None
-        
+                    
         return generated_text, activations, token_count
 
     def extract_activations(self, text: str, layer: 'Layer'):
@@ -517,7 +517,7 @@ class Model:
         
         # Format the text
         formatted_text = self.format_prompt(text)
-        
+            
         inputs = self.tokenizer(formatted_text, return_tensors="pt", padding=True, truncation=True)
         inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
         

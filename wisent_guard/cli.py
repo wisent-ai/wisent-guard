@@ -215,7 +215,7 @@ def run_task_pipeline(
         # Time model loading
         if latency_tracker:
             with latency_tracker.time_operation("model_loading"):
-                model = Model(name=model_name, device=device)
+        model = Model(name=model_name, device=device)
         else:
             model = Model(name=model_name, device=device)
         
@@ -648,12 +648,12 @@ def run_task_pipeline(
                     token_targeting_strategy=targeting_strategy
                 )
         else:
-            processed_pairs = collector.collect_activations_batch(
-                pairs=contrastive_pairs,
-                layer_index=layers[0],
-                device=device,
-                token_targeting_strategy=targeting_strategy
-            )
+        processed_pairs = collector.collect_activations_batch(
+            pairs=contrastive_pairs,
+            layer_index=layers[0],
+            device=device,
+            token_targeting_strategy=targeting_strategy
+        )
         
         # Convert to ContrastivePairSet format for training
         phrase_pairs = []
@@ -946,11 +946,11 @@ def run_task_pipeline(
                             else:
                                 # Default behavior: apply steering to the last token only
                                 steered_hidden = steering_obj.apply_steering(
-                                    hidden_states[:, -1:, :], strength=steering_strength
-                                )
-                                # Replace the last token's activations
-                                new_hidden_states = hidden_states.clone()
-                                new_hidden_states[:, -1:, :] = steered_hidden
+                                hidden_states[:, -1:, :], strength=steering_strength
+                            )
+                            # Replace the last token's activations
+                            new_hidden_states = hidden_states.clone()
+                            new_hidden_states[:, -1:, :] = steered_hidden
                                 steered_hidden = new_hidden_states
                             
                             if isinstance(output, tuple):
