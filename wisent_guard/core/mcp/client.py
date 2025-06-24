@@ -11,13 +11,13 @@ from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 
 try:
-    from mcp.client import Client
-    from mcp.client.stdio import stdio_client
+    from mcp import stdio_client, ClientSession, StdioServerParameters
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
-    Client = None
+    ClientSession = None
     stdio_client = None
+    StdioServerParameters = None
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,7 @@ class WisentGuardMCPClient:
         
         self.server_command = server_command or ["python", "-m", "wisent_guard.core.mcp.server"]
         self.client = None
+        self.client_context = None
         self.available_tools = []
     
     async def __aenter__(self):
@@ -75,8 +76,18 @@ class WisentGuardMCPClient:
     async def connect(self):
         """Connect to the MCP server."""
         try:
-            # Start the server process and connect
-            self.client = await stdio_client(self.server_command)
+            # Create server parameters
+            server_params = StdioServerParameters(
+                command=self.server_command[0],
+                args=self.server_command[1:] if len(self.server_command) > 1 else []
+            )
+            
+            # Start the server process and connect using context manager
+            self.client_context = stdio_client(server_params)
+            read_stream, write_stream = await self.client_context.__aenter__()
+            
+            # Create client session with the streams
+            self.client = ClientSession(read_stream, write_stream)
             
             # Initialize the client
             await self.client.initialize()
@@ -95,11 +106,12 @@ class WisentGuardMCPClient:
         """Disconnect from the MCP server."""
         if self.client:
             try:
-                await self.client.close()
+                await self.client_context.__aexit__(None, None, None)
             except Exception as e:
                 logger.error(f"Error disconnecting from MCP server: {e}")
             finally:
                 self.client = None
+                self.client_context = None
     
     async def perform_self_reflection(self, request: SelfReflectionRequest) -> Dict[str, Any]:
         """

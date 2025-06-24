@@ -253,6 +253,117 @@ class WisentGuardMCPServer:
                             }
                         }
                     }
+                ),
+                Tool(
+                    name="train_classifier",
+                    description="Train a classifier using contrastive pairs",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "training_data": {
+                                "type": "string",
+                                "description": "CSV formatted training data with columns: prompt,good,bad"
+                            },
+                            "classifier_type": {
+                                "type": "string",
+                                "enum": ["logistic", "mlp"],
+                                "description": "Type of classifier to train",
+                                "default": "logistic"
+                            },
+                            "layer": {
+                                "type": "string",
+                                "description": "Layer to extract activations from",
+                                "default": "15"
+                            },
+                            "save_path": {
+                                "type": "string",
+                                "description": "Path to save trained classifier",
+                                "default": "./temp_classifier"
+                            }
+                        },
+                        "required": ["training_data"]
+                    }
+                ),
+                Tool(
+                    name="train_steering_vector",
+                    description="Train a steering vector using specified method",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "training_data": {
+                                "type": "string", 
+                                "description": "CSV formatted training data with columns: prompt,good,bad"
+                            },
+                            "steering_method": {
+                                "type": "string",
+                                "enum": ["CAA", "KSteering", "HPR", "DAC", "BiPO"],
+                                "description": "Steering method to use",
+                                "default": "CAA"
+                            },
+                            "layer": {
+                                "type": "string",
+                                "description": "Layer to target for steering",
+                                "default": "15"
+                            },
+                            "steering_strength": {
+                                "type": "number",
+                                "description": "Strength of steering intervention",
+                                "default": 1.0
+                            },
+                            "save_path": {
+                                "type": "string",
+                                "description": "Path to save steering vector",
+                                "default": "./temp_steering.pt"
+                            }
+                        },
+                        "required": ["training_data"]
+                    }
+                ),
+                Tool(
+                    name="generate_with_steering",
+                    description="Generate text with steering vector applied",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "string",
+                                "description": "Prompt to generate from"
+                            },
+                            "steering_vector_path": {
+                                "type": "string",
+                                "description": "Path to steering vector file"
+                            },
+                            "steering_strength": {
+                                "type": "number",
+                                "description": "Strength to apply steering",
+                                "default": 1.0
+                            },
+                            "max_new_tokens": {
+                                "type": "integer",
+                                "description": "Maximum tokens to generate",
+                                "default": 150
+                            }
+                        },
+                        "required": ["prompt", "steering_vector_path"]
+                    }
+                ),
+                Tool(
+                    name="classify_response",
+                    description="Classify a response using trained classifier",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "response_text": {
+                                "type": "string",
+                                "description": "Text to classify"
+                            },
+                            "classifier_path": {
+                                "type": "string",
+                                "description": "Path to trained classifier"
+                            }
+                        },
+                        "required": ["response_text", "classifier_path"]
+                    }
                 )
             ]
         
@@ -272,6 +383,14 @@ class WisentGuardMCPServer:
                     result = await self._get_reflection_history(arguments)
                 elif name == "get_performance_metrics":
                     result = await self._get_performance_metrics(arguments)
+                elif name == "train_classifier":
+                    result = await self._train_classifier(arguments)
+                elif name == "train_steering_vector":
+                    result = await self._train_steering_vector(arguments)
+                elif name == "generate_with_steering":
+                    result = await self._generate_with_steering(arguments)
+                elif name == "classify_response":
+                    result = await self._classify_response(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
                 
@@ -513,6 +632,81 @@ class WisentGuardMCPServer:
             metrics["memory_usage"] = self.memory_tracker.get_current_usage()
         
         return metrics
+    
+    async def _train_classifier(self, args: dict) -> dict:
+        """Train a classifier using contrastive pairs."""
+        await self._ensure_initialized()
+        
+        training_data = args["training_data"]
+        classifier_type = args.get("classifier_type", "logistic")
+        layer = args.get("layer", "15")
+        save_path = args.get("save_path", "./temp_classifier")
+        
+        # Implementation of training a classifier
+        # This is a placeholder and should be replaced with actual implementation
+        result = {
+            "status": "success",
+            "message": "Classifier training logic not implemented yet",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return result
+    
+    async def _train_steering_vector(self, args: dict) -> dict:
+        """Train a steering vector using specified method."""
+        await self._ensure_initialized()
+        
+        training_data = args["training_data"]
+        steering_method = args.get("steering_method", "CAA")
+        layer = args.get("layer", "15")
+        steering_strength = args.get("steering_strength", 1.0)
+        save_path = args.get("save_path", "./temp_steering.pt")
+        
+        # Implementation of training a steering vector
+        # This is a placeholder and should be replaced with actual implementation
+        result = {
+            "status": "success",
+            "message": "Steering vector training logic not implemented yet",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return result
+    
+    async def _generate_with_steering(self, args: dict) -> dict:
+        """Generate text with steering vector applied."""
+        await self._ensure_initialized()
+        
+        prompt = args["prompt"]
+        steering_vector_path = args["steering_vector_path"]
+        steering_strength = args.get("steering_strength", 1.0)
+        max_new_tokens = args.get("max_new_tokens", 150)
+        
+        # Implementation of generating text with steering vector applied
+        # This is a placeholder and should be replaced with actual implementation
+        result = {
+            "status": "success",
+            "message": "Text generation with steering logic not implemented yet",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return result
+    
+    async def _classify_response(self, args: dict) -> dict:
+        """Classify a response using trained classifier."""
+        await self._ensure_initialized()
+        
+        response_text = args["response_text"]
+        classifier_path = args["classifier_path"]
+        
+        # Implementation of classifying a response using a trained classifier
+        # This is a placeholder and should be replaced with actual implementation
+        result = {
+            "status": "success",
+            "message": "Response classification logic not implemented yet",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return result
     
     # Helper methods
     def _detect_hallucination_patterns(self, text: str, domain: str) -> List[str]:
