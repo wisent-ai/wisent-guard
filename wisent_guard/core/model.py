@@ -426,49 +426,68 @@ class Model:
     def _generate_with_timing(self, formatted_prompt: str, layer_index: int, max_new_tokens: int, 
                              enable_gradients: bool, gen_state=None, **generation_kwargs):
         """Helper method to handle generation with optional timing tracking."""
-        # Use inference_mode only if gradients are not needed (for K-steering compatibility)
-        if enable_gradients:
-            # For gradient-based steering methods like K-steering, we need gradients enabled
-            inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
-            inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
-            input_length = inputs["input_ids"].shape[1]
-            
-            generation_config = {
-                "max_new_tokens": max_new_tokens,
-                "do_sample": True,
-                "temperature": 0.7,
-                "pad_token_id": self.tokenizer.pad_token_id,
-                "output_hidden_states": True,
-                "return_dict_in_generate": True,
-                **generation_kwargs
-            }
-            
-            outputs = self.hf_model.generate(**inputs, **generation_config)
-        else:
-            # Standard inference mode for better performance
-            with torch.inference_mode():
-                inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
-                inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
-                input_length = inputs["input_ids"].shape[1]
-                
-                generation_config = {
-                    "max_new_tokens": max_new_tokens,
-                    "do_sample": True,
-                    "temperature": 0.7,
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                    "output_hidden_states": True,
-                    "return_dict_in_generate": True,
-                    **generation_kwargs
-                }
-                
-                outputs = self.hf_model.generate(**inputs, **generation_config)
+        import time
         
-        # Mark first token if timing tracker provided
+        # Prepare inputs
+        inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+        input_length = inputs["input_ids"].shape[1]
+        
+        generation_config = {
+            "max_new_tokens": max_new_tokens,
+            "do_sample": True,
+            "temperature": 0.7,
+            "pad_token_id": self.tokenizer.pad_token_id,
+            "output_hidden_states": True,
+            "return_dict_in_generate": True,
+            **generation_kwargs
+        }
+        
+        # For TTFT tracking, we need to implement streaming-like generation
         if gen_state:
+            # Use a simple approach: measure time to generate just the first token, then the rest
+            first_token_config = generation_config.copy()
+            first_token_config["max_new_tokens"] = 1
+            
+            # Generate first token
+            if enable_gradients:
+                first_outputs = self.hf_model.generate(**inputs, **first_token_config)
+            else:
+                with torch.inference_mode():
+                    first_outputs = self.hf_model.generate(**inputs, **first_token_config)
+            
+            # Mark first token time
             gen_state["mark_first_token"]()
+            
+            # Continue with remaining tokens if max_new_tokens > 1
+            if max_new_tokens > 1:
+                # Update inputs with the first generated token
+                new_inputs = {"input_ids": first_outputs.sequences, "attention_mask": torch.ones_like(first_outputs.sequences)}
+                remaining_config = generation_config.copy()
+                remaining_config["max_new_tokens"] = max_new_tokens - 1
+                
+                if enable_gradients:
+                    outputs = self.hf_model.generate(**new_inputs, **remaining_config)
+                else:
+                    with torch.inference_mode():
+                        outputs = self.hf_model.generate(**new_inputs, **remaining_config)
+                
+                # Combine sequences
+                generated_tokens = outputs.sequences[0][input_length:]
+            else:
+                outputs = first_outputs
+                generated_tokens = first_outputs.sequences[0][input_length:]
+        else:
+            # Standard generation without TTFT tracking
+            if enable_gradients:
+                outputs = self.hf_model.generate(**inputs, **generation_config)
+            else:
+                with torch.inference_mode():
+                    outputs = self.hf_model.generate(**inputs, **generation_config)
+            
+            generated_tokens = outputs.sequences[0][input_length:]
         
         # Extract generated text
-        generated_tokens = outputs.sequences[0][input_length:]
         generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
         token_count = len(generated_tokens)
         
