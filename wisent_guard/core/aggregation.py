@@ -2,6 +2,11 @@ from enum import Enum
 import torch
 import os
 from typing import List, Tuple, Dict, Any, Optional
+from .normalization import (
+    VectorNormalizationMethod, 
+    integrate_normalization_with_aggregation,
+    normalize_control_vector
+)
 
 class ActivationAggregationMethod(Enum):
     LAST_TOKEN = 'last_token'
@@ -18,7 +23,9 @@ def create_control_vector_from_contrastive_pairs(
     pos_activations: List, 
     neg_activations: List, 
     method: ControlVectorAggregationMethod = ControlVectorAggregationMethod.CAA,
-    device: str = None
+    device: str = None,
+    normalization_method: VectorNormalizationMethod = VectorNormalizationMethod.NONE,
+    target_norm: Optional[float] = None
 ) -> Tuple[torch.Tensor, Dict[str, Any]]:
     """
     Create a control vector from contrastive activation pairs using various aggregation methods.
@@ -28,6 +35,8 @@ def create_control_vector_from_contrastive_pairs(
         neg_activations: List of negative (undesirable) activations
         method: Aggregation method to use for creating the control vector
         device: Target device for the control vector
+        normalization_method: Normalization method to apply after aggregation
+        target_norm: Target norm for certain normalization methods
         
     Returns:
         Tuple of (control_vector, training_stats)
@@ -82,6 +91,12 @@ def create_control_vector_from_contrastive_pairs(
         'aggregation_method': method.value
     }
     
+    # Apply normalization if requested
+    if normalization_method != VectorNormalizationMethod.NONE:
+        control_vector, training_stats = integrate_normalization_with_aggregation(
+            control_vector, training_stats, normalization_method, target_norm
+        )
+    
     return control_vector, training_stats
 
 
@@ -89,7 +104,9 @@ def create_control_vector_from_representations(
     positive_representation: torch.Tensor,
     negative_representation: torch.Tensor,
     method: ControlVectorAggregationMethod = ControlVectorAggregationMethod.CAA,
-    device: str = None
+    device: str = None,
+    normalization_method: VectorNormalizationMethod = VectorNormalizationMethod.NONE,
+    target_norm: Optional[float] = None
 ) -> Tuple[torch.Tensor, Dict[str, Any]]:
     """
     Create a control vector from pre-aggregated positive and negative representations.
@@ -99,6 +116,8 @@ def create_control_vector_from_representations(
         negative_representation: Pre-aggregated negative activation representation  
         method: Aggregation method (currently only CAA supported for pre-aggregated)
         device: Target device for the control vector
+        normalization_method: Normalization method to apply after aggregation
+        target_norm: Target norm for certain normalization methods
         
     Returns:
         Tuple of (control_vector, training_stats)
@@ -126,6 +145,12 @@ def create_control_vector_from_representations(
         'aggregation_method': method.value,
         'source': 'pre_aggregated_representations'
     }
+    
+    # Apply normalization if requested
+    if normalization_method != VectorNormalizationMethod.NONE:
+        control_vector, training_stats = integrate_normalization_with_aggregation(
+            control_vector, training_stats, normalization_method, target_norm
+        )
     
     return control_vector, training_stats
 

@@ -103,11 +103,46 @@ Examples:
     parser.add_argument("--steering-mode", action="store_true",
                        help="Enable steering mode (uses CAA vectors instead of classification)")
     parser.add_argument("--steering-strength", type=float, default=1.0,
-                       help="Steering vector strength multiplier (default: 1.0)")
-    parser.add_argument("--save-steering-vector", type=str, default=None,
-                       help="Path to save the computed steering vector")
-    parser.add_argument("--load-steering-vector", type=str, default=None,
-                       help="Path to load a pre-computed steering vector")
+                       help="Strength of steering vector application (default: 1.0)")
+    
+    # Steering method selection
+    parser.add_argument("--steering-method", type=str, default="CAA",
+                        choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                        help="Steering method to use")
+    
+    # HPR-specific parameters
+    parser.add_argument("--hpr-beta", type=float, default=1.0,
+                        help="Beta parameter for HPR method")
+    
+    # DAC-specific parameters
+    parser.add_argument("--dac-dynamic-control", action="store_true",
+                        help="Enable dynamic control for DAC method")
+    parser.add_argument("--dac-entropy-threshold", type=float, default=1.0,
+                        help="Entropy threshold for DAC dynamic control")
+    
+    # BiPO-specific parameters
+    parser.add_argument("--bipo-beta", type=float, default=0.1,
+                        help="Beta parameter for BiPO method")
+    parser.add_argument("--bipo-learning-rate", type=float, default=5e-4,
+                        help="Learning rate for BiPO method")
+    parser.add_argument("--bipo-epochs", type=int, default=100,
+                        help="Number of epochs for BiPO training")
+    
+    # K-Steering-specific parameters
+    parser.add_argument("--ksteering-num-labels", type=int, default=6,
+                        help="Number of labels for K-steering classifier")
+    parser.add_argument("--ksteering-hidden-dim", type=int, default=512,
+                        help="Hidden dimension for K-steering classifier")
+    parser.add_argument("--ksteering-learning-rate", type=float, default=1e-3,
+                        help="Learning rate for K-steering classifier training")
+    parser.add_argument("--ksteering-classifier-epochs", type=int, default=100,
+                        help="Number of epochs for K-steering classifier training")
+    parser.add_argument("--ksteering-target-labels", type=str, default="0",
+                        help="Comma-separated target label indices for K-steering (e.g., '0,1,2')")
+    parser.add_argument("--ksteering-avoid-labels", type=str, default="",
+                        help="Comma-separated avoid label indices for K-steering (e.g., '3,4,5')")
+    parser.add_argument("--ksteering-alpha", type=float, default=50.0,
+                        help="Alpha parameter (step size) for K-steering")
     
     # Training/Inference mode arguments
     parser.add_argument("--train-only", action="store_true",
@@ -130,6 +165,20 @@ Examples:
                        choices=["choice_token", "continuation_token", "last_token", "first_token", "mean_pooling", "max_pooling"],
                        default="choice_token",
                        help="Strategy for targeting tokens during activation extraction (default: choice_token)")
+    
+    # Normalization options
+    parser.add_argument("--normalize-mode", action="store_true",
+                        help="Enable normalization mode (legacy flag)")
+    parser.add_argument("--normalization-method", type=str, default="none",
+                        choices=["none", "l2_unit", "cross_behavior", "layer_wise_mean"],
+                        help="Vector normalization method to apply")
+    parser.add_argument("--target-norm", type=float, default=None,
+                        help="Target norm for certain normalization methods")
+    
+    parser.add_argument("--save-steering-vector", type=str, default=None,
+                        help="Path to save the computed steering vector")
+    parser.add_argument("--load-steering-vector", type=str, default=None,
+                        help="Path to load a pre-computed steering vector")
     
     return parser
 

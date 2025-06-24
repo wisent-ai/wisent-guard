@@ -69,7 +69,24 @@ def run_task_pipeline(
     load_classifier: str = None,
     classifier_dir: str = "./models",
     prompt_construction_strategy: str = "multiple_choice",
-    token_targeting_strategy: str = "choice_token"
+    token_targeting_strategy: str = "choice_token",
+    normalize_mode: bool = False,
+    normalization_method: str = "none",
+    target_norm: Optional[float] = None,
+    steering_method: str = "CAA",
+    hpr_beta: float = 1.0,
+    dac_dynamic_control: bool = False,
+    dac_entropy_threshold: float = 1.0,
+    bipo_beta: float = 0.1,
+    bipo_learning_rate: float = 5e-4,
+    bipo_epochs: int = 100,
+    ksteering_num_labels: int = 6,
+    ksteering_hidden_dim: int = 512,
+    ksteering_learning_rate: float = 1e-3,
+    ksteering_classifier_epochs: int = 100,
+    ksteering_target_labels: str = "0",
+    ksteering_avoid_labels: str = "",
+    ksteering_alpha: float = 50.0
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -589,31 +606,114 @@ def run_task_pipeline(
         # STEERING MODE vs CLASSIFICATION MODE
         if steering_mode:
             if verbose:
-                print(f"\n🎯 STEERING MODE: Computing CAA Vector")
-                print(f"   • Method: Contrastive Activation Addition (CAA)")
+                print(f"\n🎯 STEERING MODE: Computing {steering_method} Vector")
+                print(f"   • Method: {steering_method}")
                 print(f"   • Target layer: {layer}")
                 print(f"   • Training pairs: {len(pair_set)}")
                 print(f"   • Steering strength: {steering_strength}")
+                print(f"   • Normalization: {normalization_method}")
+                if target_norm:
+                    print(f"   • Target norm: {target_norm}")
             
-            # Import CAA from steering_method
-            from .core.steering_method import CAA
+            # Import steering methods
+            from .core.steering_method import CAA, HPR, DAC, BiPO, KSteering
+            from .core.normalization import VectorNormalizationMethod
             
-            # Create CAA steering method
-            caa_steering = CAA(device=device)
-            
-            # Train CAA to compute steering vector
+            # Convert string to enum
             try:
-                training_stats = caa_steering.train(pair_set, layers[0])
+                norm_method = VectorNormalizationMethod(normalization_method)
+            except ValueError:
+                norm_method = VectorNormalizationMethod.NONE
+                if verbose:
+                    print(f"   • Warning: Unknown normalization method '{normalization_method}', using 'none'")
+            
+            # Create steering method based on selection
+            if steering_method == "CAA":
+                steering_obj = CAA(
+                    device=device, 
+                    normalization_method=norm_method,
+                    target_norm=target_norm
+                )
+            elif steering_method == "HPR":
+                steering_obj = HPR(
+                    device=device,
+                    beta=hpr_beta
+                )
+                if verbose:
+                    print(f"   • HPR beta: {hpr_beta}")
+            elif steering_method == "DAC":
+                steering_obj = DAC(
+                    device=device,
+                    dynamic_control=dac_dynamic_control,
+                    entropy_threshold=dac_entropy_threshold
+                )
+                if verbose:
+                    print(f"   • DAC dynamic control: {dac_dynamic_control}")
+                    print(f"   • DAC entropy threshold: {dac_entropy_threshold}")
+            elif steering_method == "BiPO":
+                steering_obj = BiPO(
+                    device=device,
+                    beta=bipo_beta,
+                    learning_rate=bipo_learning_rate,
+                    num_epochs=bipo_epochs
+                )
+                if verbose:
+                    print(f"   • BiPO beta: {bipo_beta}")
+                    print(f"   • BiPO learning rate: {bipo_learning_rate}")
+                    print(f"   • BiPO epochs: {bipo_epochs}")
+            elif steering_method == "KSteering":
+                # Parse target and avoid labels
+                target_labels = [int(x.strip()) for x in ksteering_target_labels.split(",") if x.strip()]
+                avoid_labels = [int(x.strip()) for x in ksteering_avoid_labels.split(",") if x.strip()] if ksteering_avoid_labels else []
+                
+                steering_obj = KSteering(
+                    device=device,
+                    num_labels=ksteering_num_labels,
+                    hidden_dim=ksteering_hidden_dim,
+                    learning_rate=ksteering_learning_rate,
+                    classifier_epochs=ksteering_classifier_epochs,
+                    target_labels=target_labels,
+                    avoid_labels=avoid_labels,
+                    alpha=ksteering_alpha
+                )
+                if verbose:
+                    print(f"   • K-Steering num labels: {ksteering_num_labels}")
+                    print(f"   • K-Steering hidden dim: {ksteering_hidden_dim}")
+                    print(f"   • K-Steering learning rate: {ksteering_learning_rate}")
+                    print(f"   • K-Steering classifier epochs: {ksteering_classifier_epochs}")
+                    print(f"   • K-Steering target labels: {target_labels}")
+                    print(f"   • K-Steering avoid labels: {avoid_labels}")
+                    print(f"   • K-Steering alpha: {ksteering_alpha}")
+            else:
+                raise ValueError(f"Unknown steering method: {steering_method}")
+            
+            # Train steering method to compute steering vector
+            try:
+                training_stats = steering_obj.train(pair_set, layers[0])
                 
                 if verbose:
-                    print(f"✅ CAA vector computed successfully!")
+                    print(f"✅ {steering_method} vector computed successfully!")
                     print(f"   • Vector norm: {training_stats['vector_norm']:.4f}")
                     print(f"   • Vector shape: {training_stats['vector_shape']}")
                     print(f"   • Training pairs used: {training_stats['num_pairs']}")
+                    if 'normalization' in training_stats:
+                        norm_info = training_stats['normalization']
+                        print(f"   • Normalization applied: {norm_info['method']}")
+                        if 'final_norm' in norm_info:
+                            print(f"   • Final norm: {norm_info['final_norm']:.4f}")
+                        if 'scaling_factor' in norm_info:
+                            print(f"   • Scaling factor: {norm_info['scaling_factor']:.4f}")
+                    
+                    # Show method-specific stats
+                    if steering_method == "HPR" and 'householder_matrix_norm' in training_stats:
+                        print(f"   • Householder matrix norm: {training_stats['householder_matrix_norm']:.4f}")
+                    elif steering_method == "BiPO" and 'final_loss' in training_stats:
+                        print(f"   • Final training loss: {training_stats['final_loss']:.6f}")
+                        print(f"   • Epochs trained: {training_stats['num_epochs_trained']}")
                 
                 # Save steering vector if requested
                 if save_steering_vector:
-                    success = caa_steering.save_steering_vector(save_steering_vector)
+                    success = steering_obj.save_steering_vector(save_steering_vector)
                     if verbose:
                         if success:
                             print(f"   • Saved steering vector to: {save_steering_vector}")
@@ -622,7 +722,7 @@ def run_task_pipeline(
                 
                 # TEST THE STEERING by generating responses with and without the vector
                 if verbose:
-                    print(f"\n🧪 TESTING CAA STEERING:")
+                    print(f"\n🧪 TESTING {steering_method} STEERING:")
                     print(f"   • Generating responses with steering applied...")
                 
                 # Get test questions
@@ -665,12 +765,15 @@ def run_task_pipeline(
                         print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
                         print(f"      ✅ Expected: {qa_pair['correct_answer']}")
                     
+                    # Check if we need gradients for gradient-based steering methods
+                    enable_gradients = steering_method == "KSteering"
+                    
                     # Generate UNSTEERED response (baseline)
-                    unsteered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens)
+                    unsteered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens, enable_gradients=enable_gradients)
                     
                     # Generate STEERED response using activation hooks
                     def steering_hook(module, input, output):
-                        """Hook function that applies CAA steering to activations"""
+                        """Hook function that applies steering to activations"""
                         if isinstance(output, tuple):
                             hidden_states = output[0]
                         else:
@@ -678,7 +781,7 @@ def run_task_pipeline(
                         
                         if isinstance(hidden_states, torch.Tensor):
                             # Apply steering to the last token
-                            steered_hidden = caa_steering.apply_steering(
+                            steered_hidden = steering_obj.apply_steering(
                                 hidden_states[:, -1:, :], strength=steering_strength
                             )
                             # Replace the last token's activations
@@ -708,8 +811,8 @@ def run_task_pipeline(
                         handle = layer_module.register_forward_hook(steering_hook)
                         
                         try:
-                            # Generate with steering
-                            steered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens)
+                            # Generate with steering (enable gradients for gradient-based methods)
+                            steered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens, enable_gradients=enable_gradients)
                         finally:
                             # Always remove the hook
                             handle.remove()
@@ -731,7 +834,7 @@ def run_task_pipeline(
                         print(f"      📊 Steering strength: {steering_strength}")
                 
                 if verbose:
-                    print(f"\n✅ CAA steering test completed!")
+                    print(f"\n✅ {steering_method} steering test completed!")
                     print(f"   • Generated {len(steered_responses)} steered responses")
                     print(f"   • Vector applied at layer {layers[0]} with strength {steering_strength}")
                 
@@ -741,7 +844,7 @@ def run_task_pipeline(
                     "model_name": model_name,
                     "layer": layers[0],
                     "steering_mode": True,
-                    "steering_method": "CAA",
+                    "steering_method": steering_method,
                     "steering_strength": steering_strength,
                     "training_stats": training_stats,
                     "training_pairs": len(pair_set),
@@ -751,17 +854,19 @@ def run_task_pipeline(
                 }
                 
             except Exception as e:
-                error_msg = f"CAA steering vector computation failed: {str(e)}"
+                error_msg = f"{steering_method} steering vector computation failed: {str(e)}"
                 if verbose:
                     print(f"\n❌ STEERING ERROR: {error_msg}")
                     print(f"   • Training pairs: {len(pair_set)}")
                     print(f"   • Layer: {layers[0]}")
+                    print(f"   • Method: {steering_method}")
                 
                 return {
                     "task_name": task_name,
                     "model_name": model_name,
                     "error": error_msg,
                     "steering_mode": True,
+                    "steering_method": steering_method,
                     "error_type": "steering_failure",
                     "suggestion": "Check activation extraction and data quality"
                 }
@@ -1307,7 +1412,7 @@ def run_task_pipeline(
             if verbose:
                 print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
                 print(f"\n🔍 Test Examples:")
-                for i, qa_pair in enumerate(test_qa_pairs[:3]):  # Show first 3
+                for i, qa_pair in enumerate(test_qa_pairs):
                     print(f"\n   📋 Test Example {i+1}:")
                     print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
                     print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
@@ -1604,7 +1709,24 @@ def main():
                 load_classifier=args.load_classifier,
                 classifier_dir=args.classifier_dir,
                 prompt_construction_strategy=args.prompt_construction_strategy,
-                token_targeting_strategy=args.token_targeting_strategy
+                token_targeting_strategy=args.token_targeting_strategy,
+                normalize_mode=args.normalize_mode,
+                normalization_method=args.normalization_method,
+                target_norm=args.target_norm,
+                steering_method=args.steering_method,
+                hpr_beta=args.hpr_beta,
+                dac_dynamic_control=args.dac_dynamic_control,
+                dac_entropy_threshold=args.dac_entropy_threshold,
+                bipo_beta=args.bipo_beta,
+                bipo_learning_rate=args.bipo_learning_rate,
+                bipo_epochs=args.bipo_epochs,
+                ksteering_num_labels=args.ksteering_num_labels,
+                ksteering_hidden_dim=args.ksteering_hidden_dim,
+                ksteering_learning_rate=args.ksteering_learning_rate,
+                ksteering_classifier_epochs=args.ksteering_classifier_epochs,
+                ksteering_target_labels=args.ksteering_target_labels,
+                ksteering_avoid_labels=args.ksteering_avoid_labels,
+                ksteering_alpha=args.ksteering_alpha
             )
             
             all_results[display_name] = task_results

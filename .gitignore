@@ -106,5 +106,6 @@ results/
 evaluation_results/
 opt_param/
 smoke_test_results/
+references/
 
 # Cache directories for our tools

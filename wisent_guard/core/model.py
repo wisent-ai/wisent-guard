@@ -353,15 +353,17 @@ class Model:
         
         return result
 
-    def generate(self, prompt: str, layer_index: int, max_new_tokens: int = 50, **generation_kwargs):
+    def generate(self, prompt: str, layer_index: int, max_new_tokens: int = 50, enable_gradients: bool = False, **generation_kwargs):
         """Generate text and extract activations from specified layer (legacy method)."""
         if self.hf_model is None:
             raise ValueError("No model loaded")
             
         # Format prompt
         formatted_prompt = self.format_prompt(prompt)
-            
-        with torch.inference_mode():
+        
+        # Use inference_mode only if gradients are not needed (for K-steering compatibility)
+        if enable_gradients:
+            # For gradient-based steering methods like K-steering, we need gradients enabled
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
             inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
             input_length = inputs["input_ids"].shape[1]
@@ -388,11 +390,45 @@ class Model:
                 else:
                     layer_hidden_state = last_step_hidden_states[0][0, -1, :]
             else:
-                with torch.no_grad():
-                    forward_outputs = self.hf_model(**inputs)
-                    layer_hidden_state = forward_outputs.hidden_states[layer_index][0, -1, :]
+                # Fallback without no_grad for gradient compatibility
+                forward_outputs = self.hf_model(**inputs)
+                layer_hidden_state = forward_outputs.hidden_states[layer_index][0, -1, :]
                     
             return generated_text, layer_hidden_state.cpu().to(torch.float32)
+        else:
+            # Standard inference with gradients disabled for efficiency
+            with torch.inference_mode():
+                inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+                inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+                input_length = inputs["input_ids"].shape[1]
+                
+                generation_config = {
+                    "max_new_tokens": max_new_tokens,
+                    "do_sample": True,
+                    "temperature": 0.7,
+                    "pad_token_id": self.tokenizer.pad_token_id,
+                    "output_hidden_states": True,
+                    "return_dict_in_generate": True,
+                    **generation_kwargs
+                }
+                
+                outputs = self.hf_model.generate(**inputs, **generation_config)
+                generated_ids = outputs.sequences[0][input_length:]
+                generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
+                
+                # Extract hidden states
+                if outputs.hidden_states and len(outputs.hidden_states) > 0:
+                    last_step_hidden_states = outputs.hidden_states[-1]
+                    if layer_index < len(last_step_hidden_states):
+                        layer_hidden_state = last_step_hidden_states[layer_index][0, -1, :]
+                    else:
+                        layer_hidden_state = last_step_hidden_states[0][0, -1, :]
+                else:
+                    with torch.no_grad():
+                        forward_outputs = self.hf_model(**inputs)
+                        layer_hidden_state = forward_outputs.hidden_states[layer_index][0, -1, :]
+                        
+                return generated_text, layer_hidden_state.cpu().to(torch.float32)
 
     def extract_activations(self, text: str, layer: 'Layer'):
         """Extract activations from the specified layer for given text."""
@@ -947,8 +983,15 @@ class ActivationHooks:
                     # Get last token's activations
                     last_token_idx = hidden_states.shape[1] - 1
                     
-                    # Store activations
-                    self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
+                    # Store activations - preserve gradients if needed for steering
+                    # Check if we're in a gradient-enabled context (for steering methods like K-steering)
+                    if torch.is_grad_enabled() and hidden_states.requires_grad:
+                        # Preserve computational graph for gradient-based steering
+                        self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].clone().to(device)
+                    else:
+                        # Standard extraction - detach for memory efficiency
+                        self.layer_activations[layer_idx] = hidden_states[:, last_token_idx, :].detach().clone().to(device)
+                    
                     self.last_token_position = last_token_idx
                     
                     # Try to get the token ID if available
