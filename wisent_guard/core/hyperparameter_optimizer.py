@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
-from .contrastive_pair_set import ContrastivePairSet
+from .contrastive_pairs import ContrastivePairSet
 from .steering import SteeringMethod, SteeringType
 
 logger = logging.getLogger(__name__)

@@ -18,11 +18,13 @@ from typing import List, Dict, Tuple, Callable
 from enum import Enum
 from .layer import Layer
 from .activations import Activations, ActivationAggregationMethod
+from .contrastive_pairs import ContrastivePair
+from .response import PositiveResponse, NegativeResponse
 
 try:
-    from .contrastive_pair import ContrastivePair
+    from .contrastive_pairs import ContrastivePair
 except ImportError:
-    from contrastive_pair import ContrastivePair
+    from contrastive_pairs import ContrastivePair
 
 
 class PromptConstructionStrategy(Enum):

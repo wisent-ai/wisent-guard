@@ -1,6 +1,6 @@
 from .contrastive_pair import ContrastivePair
-from .response import PositiveResponse, NegativeResponse
-from .activations import Activations, ActivationAggregationMethod
+from ..response import PositiveResponse, NegativeResponse
+from ..activations import Activations, ActivationAggregationMethod
 import torch
 import random
 import json

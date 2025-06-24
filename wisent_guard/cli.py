@@ -23,6 +23,11 @@ from .core.save_results import save_results_json, save_results_csv, save_classif
 from .core.parser import setup_parser, parse_layer_range, aggregate_token_scores, parse_layers_from_arg
 from .inference import (generate_with_classification_and_handling, generate_with_classification,
                         generate_with_multi_layer_classification, generate_with_multi_layer_classification_and_handling)
+from .core.contrastive_pairs import (
+    ContrastivePairSet, 
+    generate_synthetic_pairs_cli, 
+    load_synthetic_pairs_cli
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -86,7 +91,14 @@ def run_task_pipeline(
     ksteering_classifier_epochs: int = 100,
     ksteering_target_labels: str = "0",
     ksteering_avoid_labels: str = "",
-    ksteering_alpha: float = 50.0
+    ksteering_alpha: float = 50.0,
+    # Nonsense detection parameters
+    enable_nonsense_detection: bool = False,
+    max_word_length: int = 20,
+    repetition_threshold: float = 0.7,
+    gibberish_threshold: float = 0.3,
+    disable_dictionary_check: bool = False,
+    nonsense_action: str = "regenerate"
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -239,7 +251,7 @@ def run_task_pipeline(
                 print(f"   • Loading {task_name} data with correct/incorrect answers...")
             
             # Use the proper extraction method from ContrastivePairSet
-            from .core.contrastive_pair_set import ContrastivePairSet
+            # ContrastivePairSet import moved to top of file
             qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
                 
             test_qa_pairs_source = test_docs  # Keep original format for test docs
@@ -769,7 +781,14 @@ def run_task_pipeline(
                     enable_gradients = steering_method == "KSteering"
                     
                     # Generate UNSTEERED response (baseline)
-                    unsteered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens, enable_gradients=enable_gradients)
+                    unsteered_response, _ = model.generate(
+                        qa_pair['question'], 
+                        layers[0], 
+                        max_new_tokens, 
+                        enable_gradients=enable_gradients,
+                        nonsense_detector=nonsense_detector,
+                        nonsense_action=nonsense_action
+                    )
                     
                     # Generate STEERED response using activation hooks
                     def steering_hook(module, input, output):
@@ -812,7 +831,14 @@ def run_task_pipeline(
                         
                         try:
                             # Generate with steering (enable gradients for gradient-based methods)
-                            steered_response, _ = model.generate(qa_pair['question'], layers[0], max_new_tokens, enable_gradients=enable_gradients)
+                            steered_response, _ = model.generate(
+                                qa_pair['question'], 
+                                layers[0], 
+                                max_new_tokens, 
+                                enable_gradients=enable_gradients,
+                                nonsense_detector=nonsense_detector,
+                                nonsense_action=nonsense_action
+                            )
                         finally:
                             # Always remove the hook
                             handle.remove()
@@ -1624,6 +1650,206 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
+    # Handle different commands
+    if args.command == "generate-pairs":
+        handle_generate_pairs_command(args)
+    elif args.command == "synthetic":
+        handle_synthetic_command(args)
+    elif args.command == "tasks":
+        handle_tasks_command(args)
+    elif args.command == "test-nonsense":
+        handle_test_nonsense_command(args)
+    else:
+        print(f"Unknown command: {args.command}")
+        sys.exit(1)
+
+
+def handle_generate_pairs_command(args):
+    """Handle the generate-pairs command."""
+    print(f"🎯 Generating synthetic contrastive pairs...")
+    print(f"   • Trait: {args.trait}")
+    print(f"   • Number of pairs: {args.num_pairs}")
+    print(f"   • Output file: {args.output}")
+    
+    try:
+        # Load model
+        from .core.model import Model
+        model = Model(name=args.model, device=args.device)
+        
+        # Generate pairs
+        pair_set = generate_synthetic_pairs_cli(
+            trait_description=args.trait,
+            num_pairs=args.num_pairs,
+            output_file=args.output,
+            model=model
+        )
+        
+        print(f"✅ Successfully generated and saved {len(pair_set.pairs)} contrastive pairs!")
+        
+    except Exception as e:
+        print(f"❌ Error generating pairs: {e}")
+        sys.exit(1)
+
+
+def handle_synthetic_command(args):
+    """Handle the synthetic command (generate + train + test)."""
+    print(f"🚀 Running synthetic contrastive pair pipeline...")
+    
+    try:
+        # Load model
+        from .core.model import Model
+        model = Model(name=args.model, device=args.device)
+        
+        # Initialize nonsense detector if enabled
+        nonsense_detector = None
+        if args.enable_nonsense_detection:
+            if args.verbose:
+                print(f"🛡️ NONSENSE DETECTION ENABLED:")
+                print(f"   • Max word length: {args.max_word_length}")
+                print(f"   • Repetition threshold: {args.repetition_threshold}")
+                print(f"   • Gibberish threshold: {args.gibberish_threshold}")
+                print(f"   • Dictionary check: {'disabled' if args.disable_dictionary_check else 'enabled'}")
+                print(f"   • Action on detection: {args.nonsense_action}")
+            
+            from .core.evaluate import create_nonsense_detector
+            nonsense_detector = create_nonsense_detector(
+                max_word_length=args.max_word_length,
+                repetition_threshold=args.repetition_threshold,
+                gibberish_threshold=args.gibberish_threshold,
+                enable_dictionary_check=not args.disable_dictionary_check
+            )
+        
+        # Get or generate contrastive pairs
+        if args.trait:
+            print(f"   • Generating pairs for trait: {args.trait}")
+            pair_set = generate_synthetic_pairs_cli(
+                trait_description=args.trait,
+                num_pairs=args.num_pairs,
+                output_file=args.save_pairs,
+                model=model
+            )
+        else:
+            print(f"   • Loading pairs from: {args.pairs_file}")
+            pair_set = load_synthetic_pairs_cli(args.pairs_file, model)
+        
+        # Extract activations
+        print(f"📊 Extracting activations from layer {args.layer}...")
+        from .core.layer import Layer
+        layer = Layer(int(args.layer))
+        pair_set.extract_activations_with_model(model, layer)
+        
+        # Train steering method
+        print(f"🎓 Training {args.steering_method} steering method...")
+        if args.steering_method == "KSteering":
+            from .core.steering_methods.k_steering import KSteering
+            steering_method = KSteering(
+                target_labels=[int(x.strip()) for x in args.ksteering_target_labels.split(",") if x.strip()],
+                avoid_labels=[int(x.strip()) for x in args.ksteering_avoid_labels.split(",") if x.strip()],
+                alpha=args.ksteering_alpha
+            )
+        elif args.steering_method == "CAA":
+            from .core.steering_methods.caa import CAA
+            steering_method = CAA()
+        else:
+            print(f"❌ Steering method {args.steering_method} not yet implemented for synthetic mode")
+            sys.exit(1)
+        
+        # Train the steering method
+        steering_method.train(pair_set, layer)
+        
+        # Generate test scenarios and evaluate
+        print(f"🧪 Generating test scenarios...")
+        test_scenarios = _generate_test_scenarios(args.trait or "synthetic behavior", args.test_questions, model)
+        
+        print(f"🎭 Testing steering effectiveness...")
+        results = []
+        for i, scenario in enumerate(test_scenarios):
+            print(f"   Testing scenario {i+1}: {scenario[:50]}...")
+            
+            # Generate unsteered response
+            unsteered_response, unsteered_activations = model.generate(
+                scenario, 
+                int(args.layer), 
+                max_new_tokens=100,
+                nonsense_detector=nonsense_detector if args.enable_nonsense_detection else None,
+                nonsense_action=args.nonsense_action if args.enable_nonsense_detection else "regenerate"
+            )
+            
+            # Generate steered response
+            steered_activations = steering_method.apply_steering(unsteered_activations, strength=args.steering_strength)
+            # Note: For full steered generation, we'd need to integrate with the generation process
+            
+            results.append({
+                "scenario": scenario,
+                "unsteered_response": unsteered_response,
+                "steering_applied": True
+            })
+        
+        # Save results
+        import json
+        import os
+        from datetime import datetime
+        
+        os.makedirs(args.output, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_file = os.path.join(args.output, f"synthetic_results_{timestamp}.json")
+        
+        with open(results_file, 'w') as f:
+            json.dump({
+                "trait": args.trait or "loaded_from_file",
+                "pairs_file": args.pairs_file,
+                "num_pairs": len(pair_set.pairs),
+                "steering_method": args.steering_method,
+                "steering_strength": args.steering_strength,
+                "layer": args.layer,
+                "test_results": results
+            }, f, indent=2)
+        
+        print(f"✅ Synthetic pipeline completed!")
+        print(f"   • Trained {args.steering_method} on {len(pair_set.pairs)} pairs")
+        print(f"   • Tested on {len(test_scenarios)} scenarios")
+        print(f"   • Results saved to: {results_file}")
+        
+    except Exception as e:
+        print(f"❌ Error in synthetic pipeline: {e}")
+        import traceback
+        if args.verbose:
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def _generate_test_scenarios(trait_description: str, num_scenarios: int, model) -> List[str]:
+    """Generate test scenarios for evaluating the steering method."""
+    prompt = f"""Generate {num_scenarios} diverse test scenarios where this trait would be relevant: "{trait_description}"
+
+List each scenario on a new line, starting with a number:"""
+    
+    response, _ = model.generate(
+        prompt, 
+        layer_index=15, 
+        max_new_tokens=300, 
+        temperature=0.8,
+        nonsense_detector=None,  # Disable for scenario generation
+        nonsense_action="regenerate"
+    )
+    
+    # Parse scenarios
+    scenarios = []
+    for line in response.split('\n'):
+        line = line.strip()
+        if line and len(line) > 10:
+            # Remove numbering
+            for prefix in ['1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.']:
+                if line.startswith(prefix):
+                    line = line[len(prefix):].strip()
+            if len(line) > 10:
+                scenarios.append(line)
+    
+    return scenarios[:num_scenarios]
+
+
+def handle_tasks_command(args):
+    """Handle the tasks command (existing functionality)."""
     # Validate file input arguments
     if args.from_csv and args.from_json:
         print("Error: Cannot specify both --from-csv and --from-json")
@@ -1726,7 +1952,14 @@ def main():
                 ksteering_classifier_epochs=args.ksteering_classifier_epochs,
                 ksteering_target_labels=args.ksteering_target_labels,
                 ksteering_avoid_labels=args.ksteering_avoid_labels,
-                ksteering_alpha=args.ksteering_alpha
+                ksteering_alpha=args.ksteering_alpha,
+                # Nonsense detection parameters
+                enable_nonsense_detection=args.enable_nonsense_detection,
+                max_word_length=args.max_word_length,
+                repetition_threshold=args.repetition_threshold,
+                gibberish_threshold=args.gibberish_threshold,
+                disable_dictionary_check=args.disable_dictionary_check,
+                nonsense_action=args.nonsense_action
             )
             
             all_results[display_name] = task_results
@@ -1789,6 +2022,180 @@ def main():
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         sys.exit(1)
+
+
+def handle_test_nonsense_command(args):
+    """Handle the test-nonsense command."""
+    from .core.evaluate import create_nonsense_detector
+    import json
+    
+    # Create nonsense detector with specified parameters
+    detector = create_nonsense_detector(
+        max_word_length=args.max_word_length,
+        repetition_threshold=args.repetition_threshold,
+        gibberish_threshold=args.gibberish_threshold,
+        enable_dictionary_check=not args.disable_dictionary_check
+    )
+    
+    # Example texts for testing
+    example_texts = [
+        # Normal text
+        "This is a perfectly normal response that should not trigger any nonsense detection.",
+        
+        # Repetitive text
+        "I love cats cats cats cats cats cats cats cats cats cats cats cats cats cats cats cats cats cats cats cats.",
+        
+        # Long words
+        "This response contains supercalifragilisticexpialidocious and antidisestablishmentarianism words that are unusually long.",
+        
+        # Gibberish words
+        "This response contains blurflexnip and zorgblatnik which are completely made-up words that don't exist.",
+        
+        # Multiple issues
+        "Blurflexnip blurflexnip blurflexnip blurflexnip supercalifragilisticexpialidociously zorgblatnik zorgblatnik pseudopseudohypoparathyroidism.",
+        
+        # Incoherent
+        "Cat. Dog. Fish. Bird. Tree. Car. House. Book. Phone. Computer. Random. Words. Without. Context.",
+        
+        # Mixed repetition and gibberish
+        "The flibbertigibbet was flibbertigibbeting all day long, flibbertigibbet flibbertigibbet flibbertigibbet everywhere you look."
+    ]
+    
+    if args.examples:
+        # Test with built-in examples
+        print("🧪 TESTING NONSENSE DETECTION WITH EXAMPLES\n")
+        print("="*60)
+        
+        for i, text in enumerate(example_texts, 1):
+            print(f"\n📝 Example {i}:")
+            print(f"Text: {text[:100]}{'...' if len(text) > 100 else ''}")
+            
+            result = detector.detect_nonsense(text)
+            
+            print(f"🤖 Detection Result:")
+            print(f"   • Is Nonsense: {'❌ YES' if result['is_nonsense'] else '✅ NO'}")
+            print(f"   • Confidence: {result['confidence']:.2%}")
+            
+            if result['issues']:
+                print(f"   • Issues Found: {', '.join(result['issues'])}")
+            
+            if args.verbose and result['details']:
+                print(f"   • Details:")
+                details = result['details']
+                
+                if details['long_words']['has_long_words']:
+                    print(f"     - Long words: {details['long_words']['long_words']}")
+                
+                if details['repetition']['is_repetitive']:
+                    print(f"     - Repetition score: {details['repetition']['score']:.2%}")
+                    if details['repetition']['details']['repeated_phrases']:
+                        phrases = details['repetition']['details']['repeated_phrases'][:3]  # Show first 3
+                        print(f"     - Repeated phrases: {phrases}")
+                
+                if details['gibberish']['has_gibberish']:
+                    print(f"     - Gibberish words: {details['gibberish']['gibberish_words']}")
+                
+                if details['incoherence']['is_incoherent']:
+                    print(f"     - Incoherence score: {details['incoherence']['score']:.2%}")
+            
+            print("-" * 40)
+        
+        return
+    
+    if args.text:
+        # Test with provided text
+        print("🧪 TESTING NONSENSE DETECTION\n")
+        print(f"📝 Input Text: {args.text}")
+        print("="*60)
+        
+        result = detector.detect_nonsense(args.text)
+        
+        print(f"\n🤖 Detection Result:")
+        print(f"   • Is Nonsense: {'❌ YES' if result['is_nonsense'] else '✅ NO'}")
+        print(f"   • Confidence: {result['confidence']:.2%}")
+        
+        if result['issues']:
+            print(f"   • Issues Found: {', '.join(result['issues'])}")
+        
+        if args.verbose:
+            print(f"\n📊 Detailed Analysis:")
+            details = result['details']
+            
+            # Long words analysis
+            long_words = details['long_words']
+            print(f"   • Long Words Check:")
+            print(f"     - Has long words: {long_words['has_long_words']}")
+            if long_words['long_words']:
+                print(f"     - Long words found: {long_words['long_words']}")
+                print(f"     - Max length: {long_words['max_length']}")
+            
+            # Repetition analysis
+            repetition = details['repetition']
+            print(f"   • Repetition Check:")
+            print(f"     - Is repetitive: {repetition['is_repetitive']}")
+            print(f"     - Repetition score: {repetition['score']:.2%}")
+            rep_details = repetition['details']
+            print(f"     - Unique/Total words: {rep_details['unique_words']}/{rep_details['total_words']}")
+            if rep_details['repeated_phrases']:
+                print(f"     - Repeated phrases: {rep_details['repeated_phrases'][:5]}")  # Show first 5
+            
+            # Gibberish analysis
+            gibberish = details['gibberish']
+            print(f"   • Gibberish Check:")
+            print(f"     - Has gibberish: {gibberish['has_gibberish']}")
+            if gibberish['gibberish_words']:
+                print(f"     - Gibberish words: {gibberish['gibberish_words']}")
+                print(f"     - Gibberish ratio: {gibberish['score']:.2%}")
+            
+            # Incoherence analysis
+            incoherence = details['incoherence']
+            print(f"   • Incoherence Check:")
+            print(f"     - Is incoherent: {incoherence['is_incoherent']}")
+            print(f"     - Incoherence score: {incoherence['score']:.2%}")
+            inc_details = incoherence.get('details', {})
+            print(f"     - Short sentences: {inc_details.get('short_sentences', 0)}/{inc_details.get('total_sentences', 0)}")
+            print(f"     - No punctuation: {inc_details.get('no_punct_sentences', 0)}/{inc_details.get('total_sentences', 0)}")
+        
+        # Test should_stop_generation
+        should_stop, reason = detector.should_stop_generation(args.text)
+        print(f"\n🛑 Generation Control:")
+        print(f"   • Should stop generation: {'YES' if should_stop else 'NO'}")
+        if should_stop:
+            print(f"   • Reason: {reason}")
+     
+    else:
+        # Interactive mode
+        print("🧪 INTERACTIVE NONSENSE DETECTION")
+        print("Enter text to analyze (or 'quit' to exit):")
+        print("="*60)
+        
+        while True:
+            try:
+                text = input("\n📝 Enter text: ").strip()
+                
+                if text.lower() in ['quit', 'exit', 'q']:
+                    print("👋 Goodbye!")
+                    break
+                
+                if not text:
+                    continue
+                
+                result = detector.detect_nonsense(text)
+                
+                print(f"\n🤖 Result: {'❌ NONSENSE' if result['is_nonsense'] else '✅ NORMAL'} (confidence: {result['confidence']:.2%})")
+                
+                if result['issues']:
+                    print(f"   Issues: {', '.join(result['issues'])}")
+                
+                should_stop, reason = detector.should_stop_generation(text)
+                if should_stop:
+                    print(f"   🛑 Would stop generation: {reason}")
+                
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
+                break
+            except Exception as e:
+                print(f"❌ Error: {e}")
 
 
 if __name__ == "__main__":

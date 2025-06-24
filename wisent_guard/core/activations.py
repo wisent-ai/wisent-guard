@@ -4,9 +4,10 @@ from .layer import Layer
 from enum import Enum
 from typing import Optional, Dict, Any, Union, List, Tuple
 try:
-    from .contrastive_pair import ContrastivePair
+    from .contrastive_pairs import ContrastivePair
 except ImportError:
-    from contrastive_pair import ContrastivePair
+    from contrastive_pairs import ContrastivePair
+from .response import PositiveResponse, NegativeResponse
 
 class ActivationAggregationMethod(Enum):
     LAST_TOKEN = "last_token"

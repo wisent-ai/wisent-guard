@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import re
 from typing import Optional, Union, List, Dict, Any, Tuple
 from enum import Enum
+from .contrastive_pairs import ContrastivePairSet
 
 class PromptFormat(Enum):
     LEGACY = "legacy"
@@ -353,7 +354,9 @@ class Model:
         
         return result
 
-    def generate(self, prompt: str, layer_index: int, max_new_tokens: int = 50, enable_gradients: bool = False, **generation_kwargs):
+    def generate(self, prompt: str, layer_index: int, max_new_tokens: int = 50, enable_gradients: bool = False, 
+                 nonsense_detector=None, nonsense_action: str = "regenerate", max_regeneration_attempts: int = 3,
+                 **generation_kwargs):
         """Generate text and extract activations from specified layer (legacy method)."""
         if self.hf_model is None:
             raise ValueError("No model loaded")
@@ -361,74 +364,100 @@ class Model:
         # Format prompt
         formatted_prompt = self.format_prompt(prompt)
         
-        # Use inference_mode only if gradients are not needed (for K-steering compatibility)
-        if enable_gradients:
-            # For gradient-based steering methods like K-steering, we need gradients enabled
-            inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
-            inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
-            input_length = inputs["input_ids"].shape[1]
-            
-            generation_config = {
-                "max_new_tokens": max_new_tokens,
-                "do_sample": True,
-                "temperature": 0.7,
-                "pad_token_id": self.tokenizer.pad_token_id,
-                "output_hidden_states": True,
-                "return_dict_in_generate": True,
-                **generation_kwargs
-            }
-            
-            outputs = self.hf_model.generate(**inputs, **generation_config)
-            generated_ids = outputs.sequences[0][input_length:]
-            generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
-            
-            # Extract hidden states
-            if outputs.hidden_states and len(outputs.hidden_states) > 0:
-                last_step_hidden_states = outputs.hidden_states[-1]
-                if layer_index < len(last_step_hidden_states):
-                    layer_hidden_state = last_step_hidden_states[layer_index][0, -1, :]
-                else:
-                    layer_hidden_state = last_step_hidden_states[0][0, -1, :]
-            else:
-                # Fallback without no_grad for gradient compatibility
-                forward_outputs = self.hf_model(**inputs)
-                layer_hidden_state = forward_outputs.hidden_states[layer_index][0, -1, :]
+        # Track regeneration attempts for nonsense detection
+        attempt = 0
+        
+        while attempt <= max_regeneration_attempts:
+            try:
+                # Use inference_mode only if gradients are not needed (for K-steering compatibility)
+                if enable_gradients:
+                    # For gradient-based steering methods like K-steering, we need gradients enabled
+                    inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+                    inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+                    input_length = inputs["input_ids"].shape[1]
                     
-            return generated_text, layer_hidden_state.cpu().to(torch.float32)
-        else:
-            # Standard inference with gradients disabled for efficiency
-            with torch.inference_mode():
-                inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
-                inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
-                input_length = inputs["input_ids"].shape[1]
-                
-                generation_config = {
-                    "max_new_tokens": max_new_tokens,
-                    "do_sample": True,
-                    "temperature": 0.7,
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                    "output_hidden_states": True,
-                    "return_dict_in_generate": True,
-                    **generation_kwargs
-                }
-                
-                outputs = self.hf_model.generate(**inputs, **generation_config)
-                generated_ids = outputs.sequences[0][input_length:]
-                generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
-                
-                # Extract hidden states
-                if outputs.hidden_states and len(outputs.hidden_states) > 0:
-                    last_step_hidden_states = outputs.hidden_states[-1]
-                    if layer_index < len(last_step_hidden_states):
-                        layer_hidden_state = last_step_hidden_states[layer_index][0, -1, :]
-                    else:
-                        layer_hidden_state = last_step_hidden_states[0][0, -1, :]
+                    generation_config = {
+                        "max_new_tokens": max_new_tokens,
+                        "do_sample": True,
+                        "temperature": 0.7,
+                        "pad_token_id": self.tokenizer.pad_token_id,
+                        "output_hidden_states": True,
+                        "return_dict_in_generate": True,
+                        **generation_kwargs
+                    }
+                    
+                    outputs = self.hf_model.generate(**inputs, **generation_config)
                 else:
-                    with torch.no_grad():
-                        forward_outputs = self.hf_model(**inputs)
-                        layer_hidden_state = forward_outputs.hidden_states[layer_index][0, -1, :]
+                    # Standard inference mode for better performance
+                    with torch.inference_mode():
+                        inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+                        inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+                        input_length = inputs["input_ids"].shape[1]
                         
-                return generated_text, layer_hidden_state.cpu().to(torch.float32)
+                        generation_config = {
+                            "max_new_tokens": max_new_tokens,
+                            "do_sample": True,
+                            "temperature": 0.7,
+                            "pad_token_id": self.tokenizer.pad_token_id,
+                            "output_hidden_states": True,
+                            "return_dict_in_generate": True,
+                            **generation_kwargs
+                        }
+                        
+                        outputs = self.hf_model.generate(**inputs, **generation_config)
+                
+                # Extract generated text
+                generated_tokens = outputs.sequences[0][input_length:]
+                generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+                
+                # Check for nonsense if detector is provided
+                if nonsense_detector is not None and nonsense_action != "flag":
+                    result = nonsense_detector.detect_nonsense(generated_text)
+                    
+                    if result["is_nonsense"]:
+                        if nonsense_action == "stop":
+                            print(f"⚠️ Nonsense detected, stopping generation: {', '.join(result['issues'])}")
+                            return "", None
+                        elif nonsense_action == "regenerate" and attempt < max_regeneration_attempts:
+                            print(f"⚠️ Nonsense detected (attempt {attempt + 1}), regenerating: {', '.join(result['issues'])}")
+                            attempt += 1
+                            # Increase temperature slightly for next attempt
+                            generation_kwargs["temperature"] = generation_kwargs.get("temperature", 0.7) + 0.1
+                            continue
+                        else:
+                            print(f"⚠️ Max regeneration attempts reached, returning potentially nonsensical response")
+                
+                # Extract activations from the specified layer
+                if hasattr(outputs, 'hidden_states') and outputs.hidden_states:
+                    # Get hidden states from the last generation step
+                    last_hidden_states = outputs.hidden_states[-1]  # Last generation step
+                    if isinstance(last_hidden_states, tuple) and len(last_hidden_states) > layer_index:
+                        layer_activations = last_hidden_states[layer_index]
+                        # Get the last token's activations
+                        activations = layer_activations[0, -1, :].detach()
+                    else:
+                        activations = None
+                else:
+                    activations = None
+                
+                # Add nonsense detection results to output if flagging
+                if nonsense_detector is not None and nonsense_action == "flag":
+                    result = nonsense_detector.detect_nonsense(generated_text)
+                    if result["is_nonsense"]:
+                        generated_text = f"[FLAGGED: {', '.join(result['issues'])}] {generated_text}"
+                
+                return generated_text, activations
+                
+            except Exception as e:
+                if attempt < max_regeneration_attempts:
+                    print(f"⚠️ Generation error (attempt {attempt + 1}), retrying: {e}")
+                    attempt += 1
+                    continue
+                else:
+                    raise e
+        
+        # If we get here, all attempts failed
+        return "", None
 
     def extract_activations(self, text: str, layer: 'Layer'):
         """Extract activations from the specified layer for given text."""
@@ -507,7 +536,7 @@ class Model:
             Optimization results with best parameters
         """
         from .steering import SteeringMethod, SteeringType
-        from .contrastive_pair_set import ContrastivePairSet
+        # ContrastivePairSet import moved to top of file
         from .layer import Layer
         
         if steering_types is None:

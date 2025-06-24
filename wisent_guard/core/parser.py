@@ -13,29 +13,61 @@ def setup_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Traditional task evaluation
   python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B --token-aggregation final
-  python -m wisent_guard tasks hellaswag,mmlu --layer 10 --model meta-llama/Llama-3.1-8B --shots 5 --token-aggregation max
-  python -m wisent_guard tasks truthfulqa --optimize --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks truthfulqa --layer -1 --auto-optimize --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks truthfulqa --optimize --optimize-layers "10-20" --model meta-llama/Llama-3.1-8B
+  python -m wisent_guard tasks hellaswag,mmlu --layer 10 --model meta-llama/Llama-3.1-8B --shots 5
+  
+  # Generate synthetic contrastive pairs
+  python -m wisent_guard generate-pairs --trait "The model should refuse harmful requests politely" --output ./my_pairs.json
+  python -m wisent_guard generate-pairs --trait "The model should be helpful and honest" --num-pairs 50 --output ./helpful_pairs.json
+  
+  # Use synthetic pairs for training and testing
+  python -m wisent_guard synthetic --trait "The model should refuse harmful requests" --steering-method KSteering
+  python -m wisent_guard synthetic --pairs-file ./my_pairs.json --steering-method CAA --steering-strength 1.5
+  
+  # File-based evaluation
   python -m wisent_guard tasks data.csv --from-csv --model meta-llama/Llama-3.1-8B
   python -m wisent_guard tasks data.json --from-json --model meta-llama/Llama-3.1-8B
-  
-  # Detection handling examples:
-  python -m wisent_guard tasks data.csv --from-csv --detection-action replace_with_placeholder
-  python -m wisent_guard tasks data.csv --from-csv --detection-action regenerate_until_safe --max-regeneration-attempts 5
-  python -m wisent_guard tasks data.csv --from-csv --detection-action replace_with_placeholder --placeholder-message "Content flagged for review"
-  
-  # Training/Inference mode examples:
-  python -m wisent_guard tasks truthfulqa --train-only --save-classifier my_classifier --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks truthfulqa --layer 14-16 --train-only --classifier-dir ./models --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks data.csv --from-csv --inference-only --load-classifier ./models/my_classifier --model meta-llama/Llama-3.1-8B
-  python -m wisent_guard tasks data.csv --from-csv --layer 14-16 --inference-only --load-classifier ./models/truthfulqa_classifier --model meta-llama/Llama-3.1-8B
         """
     )
     
-    parser.add_argument("command", choices=["tasks"], help="Command to run")
+    # Create subparsers for different commands
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Tasks subcommand (existing functionality)
+    tasks_parser = subparsers.add_parser("tasks", help="Run evaluation tasks")
+    setup_tasks_parser(tasks_parser)
+    
+    # Generate-pairs subcommand
+    generate_parser = subparsers.add_parser("generate-pairs", help="Generate synthetic contrastive pairs")
+    setup_generate_pairs_parser(generate_parser)
+    
+    # Synthetic subcommand (generate + train + test in one go)
+    synthetic_parser = subparsers.add_parser("synthetic", help="Generate synthetic contrastive pairs and run full pipeline")
+    setup_synthetic_parser(synthetic_parser)
+    
+    # Add test-nonsense subcommand
+    nonsense_parser = subparsers.add_parser('test-nonsense', help='Test nonsense detection on sample text')
+    nonsense_parser.add_argument("text", type=str, nargs='?',
+                                 help="Text to analyze (if not provided, will use interactive mode)")
+    nonsense_parser.add_argument("--max-word-length", type=int, default=20,
+                                 help="Maximum reasonable word length (default: 20)")
+    nonsense_parser.add_argument("--repetition-threshold", type=float, default=0.7,
+                                 help="Threshold for repetitive content detection (0-1, default: 0.7)")
+    nonsense_parser.add_argument("--gibberish-threshold", type=float, default=0.3,
+                                 help="Threshold for gibberish word detection (0-1, default: 0.3)")
+    nonsense_parser.add_argument("--disable-dictionary-check", action="store_true",
+                                 help="Disable dictionary-based word validation")
+    nonsense_parser.add_argument("--verbose", action="store_true",
+                                 help="Show detailed analysis")
+    nonsense_parser.add_argument("--examples", action="store_true",
+                                 help="Test with built-in example texts")
+    
+    return parser
+
+
+def setup_tasks_parser(parser):
+    """Set up the tasks subcommand parser."""
     parser.add_argument("task_names", help="Comma-separated list of task names, or path to CSV/JSON file with --from-csv/--from-json")
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")
@@ -175,12 +207,25 @@ Examples:
     parser.add_argument("--target-norm", type=float, default=None,
                         help="Target norm for certain normalization methods")
     
+    # Nonsense detection options
+    parser.add_argument("--enable-nonsense-detection", action="store_true",
+                        help="Enable nonsense detection to stop lobotomized responses")
+    parser.add_argument("--max-word-length", type=int, default=20,
+                        help="Maximum reasonable word length for nonsense detection (default: 20)")
+    parser.add_argument("--repetition-threshold", type=float, default=0.7,
+                        help="Threshold for repetitive content detection (0-1, default: 0.7)")
+    parser.add_argument("--gibberish-threshold", type=float, default=0.3,
+                        help="Threshold for gibberish word detection (0-1, default: 0.3)")
+    parser.add_argument("--disable-dictionary-check", action="store_true",
+                        help="Disable dictionary-based word validation (faster but less accurate)")
+    parser.add_argument("--nonsense-action", type=str, default="regenerate",
+                        choices=["regenerate", "stop", "flag"],
+                        help="Action when nonsense is detected: regenerate, stop generation, or flag for review")
+    
     parser.add_argument("--save-steering-vector", type=str, default=None,
                         help="Path to save the computed steering vector")
     parser.add_argument("--load-steering-vector", type=str, default=None,
                         help="Path to load a pre-computed steering vector")
-    
-    return parser
 
 
 def parse_layers_from_arg(layer_arg: str, model=None) -> List[int]:
@@ -262,3 +307,83 @@ def aggregate_token_scores(token_scores: List[float], method: str) -> float:
     else:
         # Default to average if unknown method
         return sum(token_scores) / len(token_scores)
+
+
+def setup_generate_pairs_parser(parser):
+    """Set up the generate-pairs subcommand parser."""
+    parser.add_argument("--trait", type=str, required=True,
+                        help="Natural language description of the desired trait or behavior")
+    parser.add_argument("--num-pairs", type=int, default=30,
+                        help="Number of contrastive pairs to generate (default: 30)")
+    parser.add_argument("--output", type=str, required=True,
+                        help="Output file path for the generated pairs (JSON format)")
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct",
+                        help="Model name or path to use for generation")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Device to run on")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Enable verbose output")
+    parser.add_argument("--similarity-threshold", type=float, default=0.8,
+                        help="Similarity threshold for deduplication (0-1, higher = more strict)")
+
+
+def setup_synthetic_parser(parser):
+    """Set up the synthetic subcommand parser."""
+    # Either generate new pairs or load existing ones
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--trait", type=str,
+                       help="Natural language description of the desired trait or behavior (generates new pairs)")
+    group.add_argument("--pairs-file", type=str,
+                       help="Path to existing JSON file with contrastive pairs")
+    
+    # Generation parameters (only used if --trait is specified)
+    parser.add_argument("--num-pairs", type=int, default=30,
+                        help="Number of contrastive pairs to generate (default: 30, only used with --trait)")
+    parser.add_argument("--save-pairs", type=str, default=None,
+                        help="Save generated pairs to this file (optional, only used with --trait)")
+    
+    # Model and device
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct",
+                        help="Model name or path")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Device to run on")
+    
+    # Training/evaluation parameters
+    parser.add_argument("--layer", type=str, default="15",
+                        help="Layer(s) to extract activations from")
+    parser.add_argument("--steering-method", type=str, default="CAA",
+                        choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                        help="Steering method to use")
+    parser.add_argument("--steering-strength", type=float, default=1.0,
+                        help="Strength of steering vector application")
+    parser.add_argument("--test-questions", type=int, default=5,
+                        help="Number of test questions to generate for evaluation")
+    
+    # Output
+    parser.add_argument("--output", type=str, default="./results",
+                        help="Output directory for results")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Enable verbose output")
+    
+    # K-Steering specific parameters
+    parser.add_argument("--ksteering-target-labels", type=str, default="0",
+                        help="Comma-separated target label indices for K-steering")
+    parser.add_argument("--ksteering-avoid-labels", type=str, default="",
+                        help="Comma-separated avoid label indices for K-steering")
+    parser.add_argument("--ksteering-alpha", type=float, default=50.0,
+                        help="Alpha parameter for K-steering")
+    
+    # Nonsense detection options
+    parser.add_argument("--enable-nonsense-detection", action="store_true",
+                        help="Enable nonsense detection to stop lobotomized responses")
+    parser.add_argument("--max-word-length", type=int, default=20,
+                        help="Maximum reasonable word length for nonsense detection (default: 20)")
+    parser.add_argument("--repetition-threshold", type=float, default=0.7,
+                        help="Threshold for repetitive content detection (0-1, default: 0.7)")
+    parser.add_argument("--gibberish-threshold", type=float, default=0.3,
+                        help="Threshold for gibberish word detection (0-1, default: 0.3)")
+    parser.add_argument("--disable-dictionary-check", action="store_true",
+                        help="Disable dictionary-based word validation (faster but less accurate)")
+    parser.add_argument("--nonsense-action", type=str, default="regenerate",
+                        choices=["regenerate", "stop", "flag"],
+                        help="Action when nonsense is detected: regenerate, stop generation, or flag for review")

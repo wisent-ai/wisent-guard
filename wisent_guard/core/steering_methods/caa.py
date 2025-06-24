@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import torch
 
 from .base import SteeringMethod
-from ..contrastive_pair_set import ContrastivePairSet
+from ..contrastive_pairs import ContrastivePairSet
 from ..aggregation import ControlVectorAggregationMethod, create_control_vector_from_contrastive_pairs
 from ..normalization import VectorNormalizer
 

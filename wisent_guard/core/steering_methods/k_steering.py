@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import SteeringMethod
-from ..contrastive_pair_set import ContrastivePairSet
+from ..contrastive_pairs import ContrastivePairSet
 
 
 class KSteeringClassifier(nn.Module):

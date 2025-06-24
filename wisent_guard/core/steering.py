@@ -1,6 +1,6 @@
 from enum import Enum
 from .classifier import Classifier
-from .contrastive_pair_set import ContrastivePairSet
+from .contrastive_pairs import ContrastivePairSet
 from .activations import Activations
 from .steering_method import SteeringMethod as BaseSteeringMethod, CAA
 import torch

@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import torch
 
 from .base import SteeringMethod
-from ..contrastive_pair_set import ContrastivePairSet
+from ..contrastive_pairs import ContrastivePairSet
 
 
 class BiPO(SteeringMethod):

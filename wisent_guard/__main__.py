@@ -14,23 +14,27 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python -m wisent_guard <subcommand> [args...]")
         print("\nAvailable subcommands:")
-        print("  tasks    - Run lm-evaluation benchmarks through wisent-guard pipeline")
+        print("  tasks          - Run lm-evaluation benchmarks through wisent-guard pipeline")
+        print("  generate-pairs - Generate synthetic contrastive pairs from trait descriptions")
+        print("  synthetic      - Run synthetic pair generation and evaluation pipeline")
+        print("  test-nonsense  - Run test-nonsense command")
         print("\nExamples:")
         print("  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B")
-        print("  python -m wisent_guard tasks hellaswag,mmlu --layer 10 --shots 5")
+        print("  python -m wisent_guard generate-pairs --trait 'refuse harmful requests' --output pairs.json")
+        print("  python -m wisent_guard synthetic --trait 'be helpful and honest' --steering-method KSteering")
         sys.exit(1)
     
     subcommand = sys.argv[1]
     
-    if subcommand == "tasks":
+    if subcommand in ["tasks", "generate-pairs", "synthetic", "test-nonsense"]:
         # Import and run the integrated CLI
         from .cli import main as cli_main
         # Remove the subcommand from sys.argv so the CLI parser works correctly
-        sys.argv = [sys.argv[0]] + ["tasks"] + sys.argv[2:]
+        sys.argv = [sys.argv[0]] + [subcommand] + sys.argv[2:]
         cli_main()
     else:
         print(f"Unknown subcommand: {subcommand}")
-        print("Available subcommands: tasks")
+        print("Available subcommands: tasks, generate-pairs, synthetic, test-nonsense")
         sys.exit(1)
 
 if __name__ == "__main__":
