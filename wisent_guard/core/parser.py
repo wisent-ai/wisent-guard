@@ -176,6 +176,24 @@ def setup_tasks_parser(parser):
     parser.add_argument("--ksteering-alpha", type=float, default=50.0,
                         help="Alpha parameter (step size) for K-steering")
     
+    # Token steering arguments
+    parser.add_argument("--enable-token-steering", action="store_true",
+                        help="Enable token-level steering control")
+    parser.add_argument("--token-steering-strategy", type=str, default="last_only",
+                        choices=["last_only", "first_only", "all_equal", "exponential_decay", 
+                                "exponential_growth", "linear_decay", "linear_growth", "custom"],
+                        help="Token steering strategy (default: last_only)")
+    parser.add_argument("--token-decay-rate", type=float, default=0.5,
+                        help="Decay rate for exponential token steering strategies (0-1, default: 0.5)")
+    parser.add_argument("--token-min-strength", type=float, default=0.1,
+                        help="Minimum steering strength for token strategies (default: 0.1)")
+    parser.add_argument("--token-max-strength", type=float, default=1.0,
+                        help="Maximum steering strength for token strategies (default: 1.0)")
+    parser.add_argument("--token-apply-to-prompt", action="store_true",
+                        help="Apply steering to prompt tokens as well as generated tokens")
+    parser.add_argument("--token-prompt-strength-multiplier", type=float, default=0.1,
+                        help="Strength multiplier for prompt tokens (default: 0.1)")
+    
     # Training/Inference mode arguments
     parser.add_argument("--train-only", action="store_true",
                        help="Training-only mode: train classifiers/vectors and save them, skip inference")

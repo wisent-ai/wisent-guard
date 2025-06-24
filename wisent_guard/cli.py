@@ -98,7 +98,15 @@ def run_task_pipeline(
     repetition_threshold: float = 0.7,
     gibberish_threshold: float = 0.3,
     disable_dictionary_check: bool = False,
-    nonsense_action: str = "regenerate"
+    nonsense_action: str = "regenerate",
+    # Token steering parameters
+    enable_token_steering: bool = False,
+    token_steering_strategy: str = "last_only",
+    token_decay_rate: float = 0.5,
+    token_min_strength: float = 0.1,
+    token_max_strength: float = 1.0,
+    token_apply_to_prompt: bool = False,
+    token_prompt_strength_multiplier: float = 0.1
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -699,6 +707,50 @@ def run_task_pipeline(
             else:
                 raise ValueError(f"Unknown steering method: {steering_method}")
             
+            # Apply token steering wrapper if enabled
+            if enable_token_steering:
+                if verbose:
+                    print(f"   • Token steering enabled: {token_steering_strategy}")
+                    print(f"   • Token decay rate: {token_decay_rate}")
+                    print(f"   • Token strength range: {token_min_strength} - {token_max_strength}")
+                    print(f"   • Apply to prompt: {token_apply_to_prompt}")
+                    if token_apply_to_prompt:
+                        print(f"   • Prompt strength multiplier: {token_prompt_strength_multiplier}")
+                
+                from .core.steering_methods.token_steered import (
+                    TokenSteeringStrategy, TokenSteeringConfig, TokenSteeringWrapper
+                )
+                
+                # Convert string to enum
+                strategy_mapping = {
+                    "last_only": TokenSteeringStrategy.LAST_ONLY,
+                    "first_only": TokenSteeringStrategy.FIRST_ONLY,
+                    "all_equal": TokenSteeringStrategy.ALL_EQUAL,
+                    "exponential_decay": TokenSteeringStrategy.EXPONENTIAL_DECAY,
+                    "exponential_growth": TokenSteeringStrategy.EXPONENTIAL_GROWTH,
+                    "linear_decay": TokenSteeringStrategy.LINEAR_DECAY,
+                    "linear_growth": TokenSteeringStrategy.LINEAR_GROWTH,
+                    "custom": TokenSteeringStrategy.CUSTOM
+                }
+                
+                strategy = strategy_mapping.get(token_steering_strategy, TokenSteeringStrategy.LAST_ONLY)
+                
+                # Create token steering configuration
+                token_config = TokenSteeringConfig(
+                    strategy=strategy,
+                    decay_rate=token_decay_rate,
+                    min_strength=token_min_strength,
+                    max_strength=token_max_strength,
+                    apply_to_prompt=token_apply_to_prompt,
+                    prompt_strength_multiplier=token_prompt_strength_multiplier
+                )
+                
+                # Wrap the steering method with token steering
+                steering_obj = TokenSteeringWrapper(steering_obj, token_config)
+                
+                if verbose:
+                    print(f"   • Wrapped {steering_method} with token steering: {steering_obj.name}")
+            
             # Train steering method to compute steering vector
             try:
                 training_stats = steering_obj.train(pair_set, layers[0])
@@ -731,6 +783,19 @@ def run_task_pipeline(
                             print(f"   • Saved steering vector to: {save_steering_vector}")
                         else:
                             print(f"   • Failed to save steering vector to: {save_steering_vector}")
+                
+                # Initialize nonsense detector if needed
+                nonsense_detector = None
+                if enable_nonsense_detection:
+                    from .core.evaluate import create_nonsense_detector
+                    nonsense_detector = create_nonsense_detector(
+                        max_word_length=max_word_length,
+                        repetition_threshold=repetition_threshold,
+                        gibberish_threshold=gibberish_threshold,
+                        enable_dictionary_check=not disable_dictionary_check
+                    )
+                    if verbose:
+                        print(f"   • Nonsense detection enabled: action={nonsense_action}")
                 
                 # TEST THE STEERING by generating responses with and without the vector
                 if verbose:
@@ -799,18 +864,26 @@ def run_task_pipeline(
                             hidden_states = output
                         
                         if isinstance(hidden_states, torch.Tensor):
-                            # Apply steering to the last token
-                            steered_hidden = steering_obj.apply_steering(
-                                hidden_states[:, -1:, :], strength=steering_strength
-                            )
-                            # Replace the last token's activations
-                            new_hidden_states = hidden_states.clone()
-                            new_hidden_states[:, -1:, :] = steered_hidden
+                            # Apply steering using the configured method
+                            if enable_token_steering and hasattr(steering_obj, 'apply_token_steering'):
+                                # Use token steering with full sequence
+                                steered_hidden = steering_obj.apply_steering(
+                                    hidden_states, strength=steering_strength
+                                )
+                            else:
+                                # Default behavior: apply steering to the last token only
+                                steered_hidden = steering_obj.apply_steering(
+                                    hidden_states[:, -1:, :], strength=steering_strength
+                                )
+                                # Replace the last token's activations
+                                new_hidden_states = hidden_states.clone()
+                                new_hidden_states[:, -1:, :] = steered_hidden
+                                steered_hidden = new_hidden_states
                             
                             if isinstance(output, tuple):
-                                return (new_hidden_states,) + output[1:]
+                                return (steered_hidden,) + output[1:]
                             else:
-                                return new_hidden_states
+                                return steered_hidden
                         return output
                     
                     # Apply steering hook to the target layer
@@ -1959,7 +2032,15 @@ def handle_tasks_command(args):
                 repetition_threshold=args.repetition_threshold,
                 gibberish_threshold=args.gibberish_threshold,
                 disable_dictionary_check=args.disable_dictionary_check,
-                nonsense_action=args.nonsense_action
+                nonsense_action=args.nonsense_action,
+                # Token steering parameters
+                enable_token_steering=args.enable_token_steering,
+                token_steering_strategy=args.token_steering_strategy,
+                token_decay_rate=args.token_decay_rate,
+                token_min_strength=args.token_min_strength,
+                token_max_strength=args.token_max_strength,
+                token_apply_to_prompt=args.token_apply_to_prompt,
+                token_prompt_strength_multiplier=args.token_prompt_strength_multiplier
             )
             
             all_results[display_name] = task_results
