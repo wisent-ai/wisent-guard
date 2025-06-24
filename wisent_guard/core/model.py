@@ -364,7 +364,7 @@ class Model:
             
         # Format prompt
         formatted_prompt = self.format_prompt(prompt)
-        
+            
         # Track regeneration attempts for nonsense detection
         attempt = 0
         
@@ -517,7 +517,7 @@ class Model:
         
         # Format the text
         formatted_text = self.format_prompt(text)
-            
+        
         inputs = self.tokenizer(formatted_text, return_tensors="pt", padding=True, truncation=True)
         inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
         
@@ -550,7 +550,8 @@ class Model:
         formatted_text = self.format_prompt(text)
         
         # Tokenize input
-        inputs = self.tokenizer(formatted_text, return_tensors="pt").to(self.device)
+        inputs = self.tokenizer(formatted_text, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
         
         # Run through model to get outputs
         with torch.no_grad():
