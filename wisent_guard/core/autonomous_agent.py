@@ -21,9 +21,9 @@ from .model import Model
 from .steering import SteeringMethod, SteeringType
 from .layer import Layer
 from .contrastive_pairs.contrastive_pair_set import ContrastivePairSet
-from ..evaluate.stop_nonsense import NonsenseDetector
-from ..performance.latency_tracker import LatencyTracker
-from ..performance.memory_tracker import MemoryTracker
+from .evaluate.stop_nonsense import NonsenseDetector
+from .tracking.latency import LatencyTracker
+from .tracking.memory import MemoryTracker
 
 
 @dataclass
@@ -172,11 +172,18 @@ class AutonomousAgent:
     
     async def _generate_response(self, prompt: str) -> str:
         """Generate a response to the prompt."""
-        response, _, _ = self.model.generate(
+        result = self.model.generate(
             prompt, 
             self.default_layer, 
             max_new_tokens=200
         )
+        # Handle both 2 and 3 return values
+        if isinstance(result, tuple) and len(result) == 3:
+            response, _, _ = result
+        elif isinstance(result, tuple) and len(result) == 2:
+            response, _ = result
+        else:
+            response = result
         return response
     
     async def _analyze_response(self, response: str, prompt: str) -> AnalysisResult:
