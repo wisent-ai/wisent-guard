@@ -235,7 +235,7 @@ def setup_tasks_parser(parser):
                         help="Path to save the computed steering vector")
     parser.add_argument("--load-steering-vector", type=str, default=None,
                         help="Path to load a pre-computed steering vector")
-    
+
     # Test-time activation saving/loading
     parser.add_argument("--save-test-activations", type=str, default=None,
                         help="Path to save test-time activations extracted during inference")

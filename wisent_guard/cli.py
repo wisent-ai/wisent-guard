@@ -1508,7 +1508,7 @@ def run_task_pipeline(
                         generated_responses.append(response_entry)
                         
                         if verbose and not optimize:
-                            print(f"      🤖 Cached Response: {response[:150]}{'...' if len(response) > 150 else ''}")
+                            print(f"      🤖 Cached Response: {response}")
                             print(f"      📊 Classification: {classification} (score: {aggregated_score:.3f})")
                             print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']})")
                             if classification_correct is not None:
@@ -1584,7 +1584,6 @@ def run_task_pipeline(
                                     
                                     # Create Activations object
                                     from .core.activations import Activations, ActivationAggregationMethod
-                                    from .core.layer import Layer
                                     
                                     layer_obj = Layer(index=layers[0], type="transformer")
                                     activations_obj = Activations(
@@ -1655,10 +1654,8 @@ def run_task_pipeline(
                         generated_responses.append(response_entry)
                         
                         if verbose and not optimize:  # Only show detailed output when not optimizing
-                            print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                            print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                            if len(token_scores) > 10:
-                                print(f"                    ... ({len(token_scores)} total tokens)")
+                            print(f"      🤖 Generated: {response}")
+                            print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores]}")
                             aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
                             print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
                             print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
@@ -1969,10 +1966,8 @@ def run_task_pipeline(
                     generated_responses.append(response_entry)
                     
                     if verbose and not optimize:  # Only show detailed output when not optimizing
-                        print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                        if len(token_scores) > 10:
-                            print(f"                    ... ({len(token_scores)} total tokens)")
+                        print(f"      🤖 Generated: {response}")
+                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores]}")
                         aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
                         print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
                         print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
@@ -2191,7 +2186,6 @@ def handle_synthetic_command(args):
         
         # Extract activations
         print(f"📊 Extracting activations from layer {args.layer}...")
-        from .core.layer import Layer
         layer_obj = Layer(int(args.layer))
         pair_set.extract_activations_with_model(model, layer_obj)
         

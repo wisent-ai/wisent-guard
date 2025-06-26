@@ -1112,7 +1112,7 @@ class ContrastivePairSet:
         """
         qa_pairs = []
         
-        for doc in docs:
+        for i, doc in enumerate(docs):
             try:
                 # Extract question using task's doc_to_text method
                 if hasattr(task_data, 'doc_to_text'):
@@ -1124,21 +1124,22 @@ class ContrastivePairSet:
                 correct_answer = None
                 incorrect_answer = None
                 
-                if 'truthfulqa' in task_name.lower():
+                if 'truthfulqa' in task_name.lower() or 'truthful_qa' in task_name.lower():
                     # TruthfulQA-specific extraction
-                    correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                    correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                    mc1_targets = doc.get('mc1_targets', {})
+                    correct_answers = mc1_targets.get('choices', [])
+                    correct_labels = mc1_targets.get('labels', [])
                     
                     # Find the correct answer
-                    for i, label in enumerate(correct_labels):
-                        if label == 1 and i < len(correct_answers):
-                            correct_answer = correct_answers[i]
+                    for j, label in enumerate(correct_labels):
+                        if label == 1 and j < len(correct_answers):
+                            correct_answer = correct_answers[j]
                             break
                     
                     # Find an incorrect answer
-                    for i, label in enumerate(correct_labels):
-                        if label == 0 and i < len(correct_answers):
-                            incorrect_answer = correct_answers[i]
+                    for j, label in enumerate(correct_labels):
+                        if label == 0 and j < len(correct_answers):
+                            incorrect_answer = correct_answers[j]
                             break
                             
                 elif task_name == 'hellaswag':
