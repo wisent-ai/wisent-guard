@@ -203,115 +203,73 @@ class KSteering(SteeringMethod):
     
     def compute_steering_loss(self, activations: torch.Tensor) -> torch.Tensor:
         """
-        Compute the K-steering loss: L(x) = -1/|T| * Σ(f_k(x)) + 1/|A| * Σ(f_k(x))
+        Compute steering loss for gradient computation.
         
         Args:
             activations: Input activations
             
         Returns:
-            Steering loss
+            Loss tensor for gradient computation
         """
         if not self.is_trained:
-            raise ValueError("K-steering must be trained before computing steering loss")
+            raise ValueError("K-steering method must be trained before computing loss")
         
-        # CRITICAL FIX: Enable gradients explicitly since they're globally disabled
-        with torch.enable_grad():
-            print(f"      🎯 compute_steering_loss DEBUG:")
-            print(f"         📊 Input activations shape: {activations.shape}")
-            print(f"         📊 Input activations requires_grad: {activations.requires_grad}")
-            print(f"         📊 Target labels: {self.target_labels}")
-            print(f"         📊 Avoid labels: {self.avoid_labels}")
-            print(f"         ⚡ torch.is_grad_enabled(): {torch.is_grad_enabled()}")
-            print(f"         📊 Classifier in training mode: {self.classifier.training}")
+        # Ensure classifier is in training mode for gradient computation
+        original_training = self.classifier.training
+        self.classifier.train()
+        
+        try:
+            # Handle different activation shapes
+            if len(activations.shape) == 3:
+                # [batch, seq, hidden] -> use second-to-last token (reference behavior)
+                batch_size, seq_len, hidden_dim = activations.shape
+                if seq_len > 1:
+                    activations_2d = activations[:, -2, :].contiguous()
+                else:
+                    # Fallback to last token for single-token sequences
+                    activations_2d = activations[:, -1, :].contiguous()
+            else:
+                # [batch, hidden] -> use as is
+                activations_2d = activations.contiguous()
             
-            # Now that activations preserve gradients, we should have proper computational graph
-            if not activations.requires_grad:
-                print(f"         🔧 Input activations don't have gradients, enabling them...")
-                activations = activations.requires_grad_(True)
-                print(f"         ✅ Enabled gradients on input activations")
-            
-            print(f"         📊 Final input activations requires_grad: {activations.requires_grad}")
-            print(f"         📊 Final input activations grad_fn: {activations.grad_fn}")
-            
-            # CRITICAL FIX: Ensure ALL classifier parameters have requires_grad=True
-            print(f"         🔧 Ensuring classifier parameters have gradients enabled...")
-            for name, param in self.classifier.named_parameters():
-                if not param.requires_grad:
-                    print(f"            ⚠️  Parameter {name} had requires_grad=False, fixing...")
-                    param.requires_grad = True
-            
-            print(f"         📊 Classifier training mode: {self.classifier.training}")
-            
-            # 🧠 Running forward pass through classifier...
-            print(f"         🧠 Running forward pass through classifier...")
-            
-            # Reshape activations for classifier input
-            activations_2d = activations.view(activations.shape[0], -1)  # [batch_size, hidden_dim]
-            
-            # Ensure activations_2d preserves gradients
+            # Ensure activations have gradients
             if not activations_2d.requires_grad:
-                print(f"         🔧 View operation lost gradients, enabling them...")
                 activations_2d = activations_2d.requires_grad_(True)
-                print(f"         ✅ Enabled gradients on activations_2d")
             
-            print(f"         📊 Activations_2d requires_grad: {activations_2d.requires_grad}")
-            print(f"         📊 Activations_2d grad_fn: {activations_2d.grad_fn}")
-            
-            # Forward pass through classifier - this should preserve gradients
+            # Forward pass through classifier
             logits = self.classifier(activations_2d)
-            print(f"         📊 Raw logits requires_grad: {logits.requires_grad}")
-            print(f"         📊 Raw logits grad_fn: {logits.grad_fn}")
             
             # Reshape logits back if needed
             if len(activations.shape) == 3:
-                # Original shape was [batch_size, seq_len, hidden_dim]
-                # Logits are [batch_size, num_labels]  
-                # Reshape to [batch_size, 1, num_labels] to match original sequence structure
                 logits = logits.view(activations.shape[0], 1, self.num_labels)
-                print(f"         📊 Reshaped logits back to {logits.shape}")
-                print(f"         📊 Final logits requires_grad: {logits.requires_grad}")
-                print(f"         📊 Final logits grad_fn: {logits.grad_fn}")
                     
-            print(f"         📊 Logits shape: {logits.shape}")
-            print(f"         📊 Logits requires_grad: {logits.requires_grad}")
-            print(f"         📊 Logits grad_fn: {logits.grad_fn}")
-            print(f"         📊 Logits mean: {logits.mean().item()}")
-            
-            # Build loss components without initializing with requires_grad tensor
+            # Build loss components
             loss_components = []
             
             # Target labels - we want to maximize these (negative in loss)
             if self.target_labels:
                 target_logits = logits[:, :, self.target_labels]
                 target_mean = target_logits.mean()
-                print(f"         📈 Target logits shape: {target_logits.shape}")
-                print(f"         📈 Target logits mean: {target_mean.item()}")
-                print(f"         📈 Target logits requires_grad: {target_mean.requires_grad}")
-                print(f"         📈 Target logits grad_fn: {target_mean.grad_fn}")
                 loss_components.append(-target_mean)
             
             # Avoid labels - we want to minimize these (positive in loss)  
             if self.avoid_labels:
                 avoid_logits = logits[:, :, self.avoid_labels]
                 avoid_mean = avoid_logits.mean()
-                print(f"         📉 Avoid logits shape: {avoid_logits.shape}")
-                print(f"         📉 Avoid logits mean: {avoid_mean.item()}")
-                print(f"         📉 Avoid logits requires_grad: {avoid_mean.requires_grad}")
-                print(f"         📉 Avoid logits grad_fn: {avoid_mean.grad_fn}")
                 loss_components.append(avoid_mean)
             
-            # Combine loss components properly
+            # Combine loss components
             if loss_components:
                 loss = sum(loss_components)
             else:
                 # Fallback: use mean of all logits if no specific labels
                 loss = logits.mean()
             
-            print(f"         ✅ Final loss: {loss.item()}")
-            print(f"         ✅ Final loss requires_grad: {loss.requires_grad}")
-            print(f"         ✅ Final loss grad_fn: {loss.grad_fn}")
-            
             return loss
+            
+        finally:
+            # Restore original training mode
+            self.classifier.train(original_training)
     
     def apply_steering(self, activations: torch.Tensor, strength: float = 1.0) -> torch.Tensor:
         """
@@ -327,43 +285,17 @@ class KSteering(SteeringMethod):
         if not self.is_trained:
             raise ValueError("K-steering method must be trained before applying steering")
         
-        # CRITICAL FIX: Enable gradients explicitly since they're globally disabled
+        # Enable gradients for steering computation
         with torch.enable_grad():
-            print(f"\n🔍 K-STEERING DEBUG - apply_steering:")
-            print(f"   📊 Input activations shape: {activations.shape}")
-            print(f"   📊 Input activations device: {activations.device}")
-            print(f"   📊 Input activations dtype: {activations.dtype}")
-            print(f"   📊 Input activations requires_grad: {activations.requires_grad}")
-            print(f"   📊 Input activations grad_fn: {activations.grad_fn}")
-            print(f"   📊 Steering strength: {strength}")
-            print(f"   📊 Alpha parameter: {self.alpha}")
-            print(f"   ⚡ torch.is_grad_enabled(): {torch.is_grad_enabled()}")
-            
             # Ensure the input activations require gradients for steering
             if not activations.requires_grad:
-                print(f"   🔧 Input activations don't have gradients, enabling them...")
                 steered_activations = activations.requires_grad_(True)
-                print(f"   ✅ Enabled gradients on input activations")
             else:
                 steered_activations = activations
             
-            print(f"   ✅ Prepared steered_activations:")
-            print(f"      📊 Shape: {steered_activations.shape}")
-            print(f"      📊 Device: {steered_activations.device}")
-            print(f"      📊 Requires_grad: {steered_activations.requires_grad}")
-            print(f"      📊 Grad_fn: {steered_activations.grad_fn}")
-            
-            # Ensure classifier parameters have gradients enabled
-            print(f"   🧠 Classifier state:")
-            print(f"      📊 Training mode: {self.classifier.training}")
-            classifier_params_with_grad = sum(1 for p in self.classifier.parameters() if p.requires_grad)
-            total_classifier_params = sum(1 for p in self.classifier.parameters())
-            print(f"      📊 Parameters with gradients: {classifier_params_with_grad}/{total_classifier_params}")
-            
-            # Force classifier into training mode to enable gradient computation
+            # Force classifier into training mode for gradient computation
             original_classifier_training = self.classifier.training
             self.classifier.train()
-            print(f"   🔧 Set classifier to training mode")
             
             try:
                 # Clear any existing gradients
@@ -371,16 +303,10 @@ class KSteering(SteeringMethod):
                     steered_activations.grad.zero_()
                 
                 # Compute steering loss
-                print(f"   🎯 Computing steering loss...")
                 loss = self.compute_steering_loss(steered_activations)
-                print(f"      📊 Loss value: {loss.item()}")
-                print(f"      📊 Loss requires_grad: {loss.requires_grad}")
-                print(f"      📊 Loss grad_fn: {loss.grad_fn}")
                 
                 # Compute gradients with respect to activations
-                print(f"   📈 Computing gradients...")
                 try:
-                    # Use autograd.grad for more explicit control
                     import torch.autograd as autograd
                     gradients = autograd.grad(
                         outputs=loss,
@@ -390,41 +316,24 @@ class KSteering(SteeringMethod):
                         only_inputs=True
                     )[0]
                     
-                    print(f"      ✅ Gradient computation successful")
-                    print(f"      📊 Gradient shape: {gradients.shape}")
-                    print(f"      📊 Gradient norm: {torch.norm(gradients).item()}")
-                    print(f"      📊 Gradient mean: {gradients.mean().item()}")
-                    print(f"      📊 Gradient requires_grad: {gradients.requires_grad}")
-                    
                     # Apply gradient step: x' = x - α * ∇_x L(x)
-                    print(f"   🎯 Applying gradient step...")
                     with torch.no_grad():
                         effective_alpha = self.alpha * strength
-                        print(f"      📊 Effective alpha: {effective_alpha}")
-                        
                         grad_step = effective_alpha * gradients
-                        print(f"      📊 Gradient step norm: {torch.norm(grad_step).item()}")
                         result = steered_activations - grad_step
-                        print(f"      ✅ Applied gradient step")
                         
                         # Preserve original requires_grad setting
                         result = result.requires_grad_(activations.requires_grad)
                         
                 except RuntimeError as e:
-                    print(f"      ❌ Gradient computation failed: {e}")
-                    print(f"      🔄 Returning original activations")
+                    # Fallback to original activations if gradient computation fails
                     result = activations.clone()
-                
-                print(f"   ✅ Final steered activations:")
-                print(f"      📊 Shape: {result.shape}")
-                print(f"      📊 Requires_grad: {result.requires_grad}")
                 
                 return result
                 
             finally:
                 # Restore original classifier training mode
                 self.classifier.train(original_classifier_training)
-                print(f"   🔄 Restored classifier training mode to: {original_classifier_training}")
     
     def get_steering_vector(self) -> torch.Tensor:
         """

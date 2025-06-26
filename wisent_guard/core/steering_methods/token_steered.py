@@ -17,6 +17,7 @@ from ..contrastive_pairs import ContrastivePairSet
 class TokenSteeringStrategy(Enum):
     """Strategies for applying steering to different token positions."""
     LAST_ONLY = "last_only"                    # Only steer the last token (current behavior)
+    SECOND_TO_LAST = "second_to_last"          # Only steer the second-to-last token (reference behavior)
     FIRST_ONLY = "first_only"                  # Only steer the first token
     ALL_EQUAL = "all_equal"                    # Apply equal steering to all tokens
     EXPONENTIAL_DECAY = "exponential_decay"    # Exponentially decreasing from first to last
@@ -152,6 +153,10 @@ class TokenSteeringMixin:
         if strategy == TokenSteeringStrategy.LAST_ONLY:
             strengths = torch.zeros(length)
             strengths[-1] = max_strength
+            
+        elif strategy == TokenSteeringStrategy.SECOND_TO_LAST:
+            strengths = torch.zeros(length)
+            strengths[-2] = max_strength
             
         elif strategy == TokenSteeringStrategy.FIRST_ONLY:
             strengths = torch.zeros(length)
@@ -354,6 +359,10 @@ class TokenSteeringWrapper(SteeringMethod):
         if strategy == TokenSteeringStrategy.LAST_ONLY:
             strengths = torch.zeros(length)
             strengths[-1] = max_strength
+            
+        elif strategy == TokenSteeringStrategy.SECOND_TO_LAST:
+            strengths = torch.zeros(length)
+            strengths[-2] = max_strength
             
         elif strategy == TokenSteeringStrategy.FIRST_ONLY:
             strengths = torch.zeros(length)

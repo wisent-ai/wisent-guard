@@ -89,16 +89,29 @@ class DAC(SteeringMethod):
         if not self.is_trained:
             raise ValueError("DAC method must be trained before applying steering")
         
-        # Calculate dynamic strength if enabled and token probabilities provided
-        if self.dynamic_control and token_probs is not None:
-            # Compute entropy from token probabilities
-            entropy = -torch.sum(token_probs * torch.log(token_probs + 1e-10), dim=-1)
-            
-            # Modulate strength based on entropy
-            # High entropy (uncertainty) -> reduce steering
-            # Low entropy (confidence) -> maintain/increase steering
-            entropy_factor = torch.clamp(self.entropy_threshold / (entropy + 1e-10), 0.1, 2.0)
-            dynamic_strength = strength * entropy_factor.mean().item()
+        # Calculate dynamic strength if enabled
+        if self.dynamic_control:
+            if token_probs is not None:
+                # Use provided token probabilities
+                entropy = -torch.sum(token_probs * torch.log(token_probs + 1e-10), dim=-1)
+                entropy_factor = torch.clamp(self.entropy_threshold / (entropy + 1e-10), 0.1, 2.0)
+                dynamic_strength = strength * entropy_factor.mean().item()
+            else:
+                # Fallback: estimate entropy from activation variance
+                # High variance suggests uncertainty, low variance suggests confidence
+                if len(activations.shape) == 3:
+                    # Use last token activations for entropy estimation
+                    last_token_acts = activations[:, -1, :]
+                else:
+                    last_token_acts = activations
+                
+                # Compute activation variance as proxy for entropy
+                activation_var = torch.var(last_token_acts, dim=-1).mean()
+                # Normalize variance to reasonable range (heuristic)
+                normalized_var = torch.clamp(activation_var / 10.0, 0.1, 2.0)
+                # High variance -> high entropy -> reduce steering
+                entropy_factor = self.entropy_threshold / normalized_var
+                dynamic_strength = strength * entropy_factor.item()
         else:
             dynamic_strength = strength
         
@@ -107,9 +120,14 @@ class DAC(SteeringMethod):
         
         # Handle different activation shapes
         if len(activations.shape) == 3:  # [batch, seq, hidden]
-            # Apply to last token position
+            # Apply to second-to-last token position (reference behavior)
             steered = activations.clone()
-            steered[:, -1:, :] = steered[:, -1:, :] + dynamic_strength * steering_vector.unsqueeze(0).unsqueeze(0)
+            if activations.shape[1] > 1:
+                # Use second-to-last token if sequence has more than 1 token
+                steered[:, -2:-1, :] = steered[:, -2:-1, :] + dynamic_strength * steering_vector.unsqueeze(0).unsqueeze(0)
+            else:
+                # Fallback to last token for single-token sequences
+                steered[:, -1:, :] = steered[:, -1:, :] + dynamic_strength * steering_vector.unsqueeze(0).unsqueeze(0)
         elif len(activations.shape) == 2:  # [batch, hidden]
             steered = activations + dynamic_strength * steering_vector.unsqueeze(0)
         else:

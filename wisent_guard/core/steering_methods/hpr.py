@@ -118,6 +118,13 @@ class HPR(SteeringMethod):
         # Reshape back to original shape
         steered = steered_flat.view(original_shape)
         
+        # For 3D tensors, apply to second-to-last token position (reference behavior)
+        if len(original_shape) == 3 and original_shape[1] > 1:
+            # Only modify second-to-last token, keep others unchanged
+            result = activations.clone()
+            result[:, -2:-1, :] = steered[:, -2:-1, :]
+            return result
+        
         return steered
     
     def get_steering_vector(self) -> torch.Tensor:

@@ -110,9 +110,14 @@ class CAA(SteeringMethod):
         
         # Handle different activation shapes
         if len(activations.shape) == 3:  # [batch, seq, hidden]
-            # Apply to last token position
+            # Apply to second-to-last token position (reference behavior)
             steered = activations.clone()
-            steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+            if activations.shape[1] > 1:
+                # Use second-to-last token if sequence has more than 1 token
+                steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+            else:
+                # Fallback to last token for single-token sequences
+                steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
         elif len(activations.shape) == 2:  # [batch, hidden]
             steered = activations + strength * steering_vector.unsqueeze(0)
         else:

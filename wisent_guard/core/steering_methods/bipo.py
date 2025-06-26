@@ -64,14 +64,14 @@ class BiPO(SteeringMethod):
         optimizer = torch.optim.AdamW([self.steering_vector], lr=self.learning_rate)
         
         losses = []
-        for epoch in range(min(10, self.num_epochs)):  # Simplified training
+        for epoch in range(self.num_epochs):  # Use full epoch count
             optimizer.zero_grad()
             
             # Compute preference-based loss (simplified)
             pos_scores = []
             neg_scores = []
             
-            for pos_act, neg_act in zip(pos_activations[:10], neg_activations[:10]):  # Limit for efficiency
+            for pos_act, neg_act in zip(pos_activations, neg_activations):  # Use all pairs
                 pos_act = pos_act.to(self.device)
                 neg_act = neg_act.to(self.device)
                 
@@ -133,9 +133,14 @@ class BiPO(SteeringMethod):
         
         # Handle different activation shapes  
         if len(activations.shape) == 3:  # [batch, seq, hidden]
-            # Apply to last token position
+            # Apply to second-to-last token position (reference behavior)
             steered = activations.clone()
-            steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+            if activations.shape[1] > 1:
+                # Use second-to-last token if sequence has more than 1 token
+                steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+            else:
+                # Fallback to last token for single-token sequences
+                steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
         elif len(activations.shape) == 2:  # [batch, hidden]
             steered = activations + strength * steering_vector.unsqueeze(0)
         else:

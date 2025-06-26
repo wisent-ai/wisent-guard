@@ -101,7 +101,7 @@ def run_task_pipeline(
     nonsense_action: str = "regenerate",
     # Token steering parameters
     enable_token_steering: bool = False,
-    token_steering_strategy: str = "last_only",
+    token_steering_strategy: str = "second_to_last",
     token_decay_rate: float = 0.5,
     token_min_strength: float = 0.1,
     token_max_strength: float = 1.0,
@@ -648,12 +648,12 @@ def run_task_pipeline(
                     token_targeting_strategy=targeting_strategy
                 )
         else:
-        processed_pairs = collector.collect_activations_batch(
-            pairs=contrastive_pairs,
-            layer_index=layers[0],
-            device=device,
-            token_targeting_strategy=targeting_strategy
-        )
+            processed_pairs = collector.collect_activations_batch(
+                pairs=contrastive_pairs,
+                layer_index=layers[0],
+                device=device,
+                token_targeting_strategy=targeting_strategy
+            )
         
         # Convert to ContrastivePairSet format for training
         phrase_pairs = []
@@ -784,6 +784,7 @@ def run_task_pipeline(
                 # Convert string to enum
                 strategy_mapping = {
                     "last_only": TokenSteeringStrategy.LAST_ONLY,
+                    "second_to_last": TokenSteeringStrategy.SECOND_TO_LAST,
                     "first_only": TokenSteeringStrategy.FIRST_ONLY,
                     "all_equal": TokenSteeringStrategy.ALL_EQUAL,
                     "exponential_decay": TokenSteeringStrategy.EXPONENTIAL_DECAY,
@@ -793,7 +794,7 @@ def run_task_pipeline(
                     "custom": TokenSteeringStrategy.CUSTOM
                 }
                 
-                strategy = strategy_mapping.get(token_steering_strategy, TokenSteeringStrategy.LAST_ONLY)
+                strategy = strategy_mapping.get(token_steering_strategy, TokenSteeringStrategy.SECOND_TO_LAST)
                 
                 # Create token steering configuration
                 token_config = TokenSteeringConfig(
@@ -946,11 +947,11 @@ def run_task_pipeline(
                             else:
                                 # Default behavior: apply steering to the last token only
                                 steered_hidden = steering_obj.apply_steering(
-                                hidden_states[:, -1:, :], strength=steering_strength
-                            )
-                            # Replace the last token's activations
-                            new_hidden_states = hidden_states.clone()
-                            new_hidden_states[:, -1:, :] = steered_hidden
+                                    hidden_states[:, -1:, :], strength=steering_strength
+                                )
+                                # Replace the last token's activations
+                                new_hidden_states = hidden_states.clone()
+                                new_hidden_states[:, -1:, :] = steered_hidden
                                 steered_hidden = new_hidden_states
                             
                             if isinstance(output, tuple):
