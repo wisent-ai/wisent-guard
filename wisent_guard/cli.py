@@ -9,14 +9,14 @@ import sys
 import os
 import json
 import csv
+import torch
 from typing import List, Dict, Any, Optional
 
 from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
 from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
 from .core.hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
-from .core.model import Model
 from .core.classifier import Classifier
-from .core.layer import Layer
+from .core.activations import TestActivationCache
 from .optimize import run_smart_optimization, run_interactive_optimization, generate_with_all_layer_activations, compute_classification_score
 from .core.detection_handling import DetectionHandler, DetectionAction
 from .core.save_results import save_results_json, save_results_csv, save_classification_results_csv, create_evaluation_report
@@ -115,7 +115,10 @@ def run_task_pipeline(
     detailed_performance_report: bool = False,
     export_performance_csv: str = None,
     show_memory_usage: bool = False,
-    show_timing_summary: bool = False
+    show_timing_summary: bool = False,
+    # Test-time activation saving/loading parameters
+    save_test_activations: str = None,
+    load_test_activations: str = None
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -215,7 +218,7 @@ def run_task_pipeline(
         # Time model loading
         if latency_tracker:
             with latency_tracker.time_operation("model_loading"):
-        model = Model(name=model_name, device=device)
+                model = Model(name=model_name, device=device)
         else:
             model = Model(name=model_name, device=device)
         
@@ -1425,116 +1428,264 @@ def run_task_pipeline(
             correct_classifications = 0
             total_classifications = 0
             
-            for i, qa_pair in enumerate(test_qa_pairs):
+            if use_cached_activations:
+                # Use cached activations instead of generating new responses
                 if verbose:
-                    print(f"\n   🎯 Generating response {i+1}:")
-                    print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                    print(f"\n🔄 PROCESSING CACHED ACTIVATIONS:")
+                    print(f"   • Processing {len(cached_layer_activations)} cached responses...")
                 
-                # Use the raw question for natural generation
-                simple_prompt = qa_pair['question']
-                
-                # Generate response with token-level scoring and detection handling
-                if len(layers) > 1:
-                    # Multi-layer mode: use multi-layer generation function
-                    response, layer_results, was_handled = generate_with_multi_layer_classification_and_handling(
-                        model, simple_prompt, layers, max_new_tokens, steering_methods, 
-                        token_aggregation, detection_threshold, verbose and not optimize, detection_handler
-                    )
-                    # For backward compatibility, use primary layer's results for main fields
-                    primary_layer = layers[0]
-                    token_scores = layer_results[primary_layer]['token_scores'] if primary_layer in layer_results else []
-                    classification = layer_results[primary_layer]['classification'] if primary_layer in layer_results else 'UNKNOWN'
-                    aggregated_score = layer_results[primary_layer]['aggregated_score'] if primary_layer in layer_results else 0.0
-                else:
-                    # Single-layer mode: use original function
-                    response, token_scores, classification, was_handled = generate_with_classification_and_handling(
-                        model, simple_prompt, layers[0], max_new_tokens, steering_method, 
-                        token_aggregation, detection_threshold, verbose and not optimize, detection_handler
-                    )
-                    layer_results = None
-                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation) if token_scores else 0.0
-                
-                # Evaluate the generated response using the ground truth evaluator
-                try:
-                    # Create ground truth evaluator
-                    evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
-                    
-                    # Get correct answer for comparison
-                    correct_answers = qa_pair.get('correct_answer', '')
-                    
-                    # Get user label if available
-                    user_label = None
-                    if user_labels and i < len(user_labels):
-                        user_label = user_labels[i]
-                    
-                    # Evaluate the response
-                    evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
-                    
-                    ground_truth = evaluation_result["ground_truth"]
-                    
-                    # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
-                    classification_correct = None
-                    if ground_truth != "UNKNOWN":
-                        expected_classification = "HALLUCINATION" if ground_truth == "HALLUCINATION" else "TRUTHFUL"
-                        classification_correct = (classification == expected_classification)
-                        
-                        if classification_correct:
-                            correct_classifications += 1
-                        total_classifications += 1
-                    
-                    # Create response entry with layer results if available
-                    response_entry = {
-                        'question': qa_pair['question'],  # Add the question
-                        'response': response,
-                        'token_scores': token_scores,
-                        'aggregated_score': aggregated_score,
-                        'classification': classification,
-                        'ground_truth': ground_truth,
-                        'ground_truth_method': evaluation_result["method_used"],
-                        'ground_truth_confidence': evaluation_result["confidence"],
-                        'ground_truth_details': evaluation_result["details"],
-                        'classification_correct': classification_correct,
-                        'was_handled': was_handled
-                    }
-                    
-                    # Add layer-specific results if multi-layer
-                    if layer_results:
-                        response_entry['layer_results'] = layer_results
-                    
-                    generated_responses.append(response_entry)
-                    
-                    if verbose and not optimize:  # Only show detailed output when not optimizing
-                        print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
-                        print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
-                        if len(token_scores) > 10:
-                            print(f"                    ... ({len(token_scores)} total tokens)")
-                        aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
-                        print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
-                        print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
-                        if classification_correct is not None:
-                            print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
-                        else:
-                            print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
-                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                        print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
-                        if evaluation_result["details"]:
-                            print(f"      📝 Details: {evaluation_result['details']}")
-                    
-                except Exception as e:
+                for i, cached_item in enumerate(cached_layer_activations):
                     if verbose and not optimize:
-                        print(f"      ⚠️  Could not evaluate response: {e}")
-                    generated_responses.append({
-                        'question': qa_pair['question'],  # Add the question
-                        'response': response,
-                        'token_scores': token_scores,
-                        'classification': classification,
-                        'ground_truth': 'UNKNOWN',
-                        'ground_truth_method': 'error',
-                        'ground_truth_confidence': 0.0,
-                        'ground_truth_details': f'Error during evaluation: {str(e)}',
-                        'classification_correct': None,
-                        'was_handled': was_handled
-                    })
+                        print(f"\n   🎯 Processing cached response {i+1}:")
+                        print(f"      📝 Question: {cached_item['question'][:100]}{'...' if len(cached_item['question']) > 100 else ''}")
+                    
+                    # Use cached response and activations
+                    response = cached_item['response']
+                    activations = cached_item['activations']
+                    
+                    # Classify using the current layer's trained classifier
+                    if len(layers) > 1:
+                        # Multi-layer mode - get classification from the appropriate layer
+                        if layers[0] in steering_methods:
+                            current_steering_method = steering_methods[layers[0]]
+                            classification_result = current_steering_method.classify_activation(activations)
+                            classification = "HALLUCINATION" if classification_result.get('is_harmful', False) else "TRUTHFUL"
+                            token_scores = [classification_result.get('score', 0.5)]  # Single score for cached
+                            aggregated_score = classification_result.get('score', 0.5)
+                        else:
+                            classification = 'UNKNOWN'
+                            token_scores = [0.5]
+                            aggregated_score = 0.5
+                    else:
+                        # Single-layer mode
+                        classification_result = steering_method.classify_activation(activations)
+                        classification = "HALLUCINATION" if classification_result.get('is_harmful', False) else "TRUTHFUL"
+                        token_scores = [classification_result.get('score', 0.5)]  # Single score for cached
+                        aggregated_score = classification_result.get('score', 0.5)
+                    
+                    # Create a mock qa_pair for ground truth evaluation
+                    qa_pair = {'question': cached_item['question'], 'correct_answer': 'N/A'}
+                    
+                    # Evaluate the cached response using the ground truth evaluator
+                    try:
+                        # Create ground truth evaluator
+                        evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+                        
+                        # Get user label if available
+                        user_label = None
+                        if user_labels and i < len(user_labels):
+                            user_label = user_labels[i]
+                        
+                        # Evaluate the response
+                        evaluation_result = evaluator.evaluate_response(response, qa_pair.get('correct_answer', ''), user_label)
+                        
+                        ground_truth = evaluation_result["ground_truth"]
+                        
+                        # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
+                        classification_correct = None
+                        if ground_truth != "UNKNOWN":
+                            classification_correct = (classification == ground_truth)
+                            if classification_correct:
+                                correct_classifications += 1
+                            total_classifications += 1
+                        
+                        # Create response entry
+                        response_entry = {
+                            'question': cached_item['question'],
+                            'response': response,
+                            'token_scores': token_scores,
+                            'aggregated_score': aggregated_score,
+                            'classification': classification,
+                            'ground_truth': ground_truth,
+                            'ground_truth_method': evaluation_result["method_used"],
+                            'ground_truth_confidence': evaluation_result["confidence"],
+                            'ground_truth_details': evaluation_result["details"],
+                            'classification_correct': classification_correct,
+                            'was_handled': False,
+                            'source': 'cached_activations'
+                        }
+                        
+                        generated_responses.append(response_entry)
+                        
+                        if verbose and not optimize:
+                            print(f"      🤖 Cached Response: {response[:150]}{'...' if len(response) > 150 else ''}")
+                            print(f"      📊 Classification: {classification} (score: {aggregated_score:.3f})")
+                            print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']})")
+                            if classification_correct is not None:
+                                print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                        
+                    except Exception as e:
+                        if verbose and not optimize:
+                            print(f"      ⚠️  Could not evaluate cached response: {e}")
+                        generated_responses.append({
+                            'question': cached_item['question'],
+                            'response': response,
+                            'token_scores': token_scores,
+                            'classification': classification,
+                            'ground_truth': 'UNKNOWN',
+                            'ground_truth_method': 'error',
+                            'ground_truth_confidence': 0.0,
+                            'ground_truth_details': f'Error during evaluation: {str(e)}',
+                            'classification_correct': None,
+                            'was_handled': False,
+                            'source': 'cached_activations'
+                        })
+                        
+            else:
+                # Generate new responses (original logic)
+                for i, qa_pair in enumerate(test_qa_pairs):
+                    if verbose and not optimize:  # Only show detailed progress when not optimizing
+                        print(f"\n   🎯 Generating response {i+1}:")
+                        print(f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
+                    
+                    # Use the raw question for natural generation
+                    # The formatted_question contains few-shot examples which are for training, not generation
+                    simple_prompt = qa_pair['question']
+                    
+                    # Generate response with token-level scoring and detection handling
+                    if len(layers) > 1:
+                        # Multi-layer mode: use multi-layer generation function
+                        response, layer_results, was_handled = generate_with_multi_layer_classification_and_handling(
+                            model, simple_prompt, layers, max_new_tokens, steering_methods, 
+                            token_aggregation, detection_threshold, verbose and not optimize, detection_handler
+                        )
+                        # For backward compatibility, use primary layer's results for main fields
+                        primary_layer = layers[0]
+                        token_scores = layer_results[primary_layer]['token_scores'] if primary_layer in layer_results else []
+                        classification = layer_results[primary_layer]['classification'] if primary_layer in layer_results else 'UNKNOWN'
+                        aggregated_score = layer_results[primary_layer]['aggregated_score'] if primary_layer in layer_results else 0.0
+                    else:
+                        # Single-layer mode: use original function
+                        response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                            model, simple_prompt, layers[0], max_new_tokens, steering_method, 
+                            token_aggregation, detection_threshold, verbose and not optimize, detection_handler
+                        )
+                        layer_results = None
+                        aggregated_score = aggregate_token_scores(token_scores, token_aggregation) if token_scores else 0.0
+                    
+                    # Save activations if requested (extract from last generation)
+                    if save_test_activations and test_activation_cache is not None:
+                        try:
+                            # We need to extract activations from the last forward pass
+                            # This is a simplified version - ideally we'd modify the generation functions
+                            # to return activations as well
+                            
+                            # For now, we'll do a quick forward pass to extract activations
+                            model_inputs = model.tokenizer(simple_prompt, return_tensors="pt", padding=True)
+                            if hasattr(model, 'device'):
+                                model_inputs = {k: v.to(model.device) for k, v in model_inputs.items()}
+                            
+                            with torch.no_grad():
+                                outputs = model.model(**model_inputs, output_hidden_states=True)
+                                
+                                # Extract activations from the target layer
+                                if outputs.hidden_states and len(outputs.hidden_states) > layers[0]:
+                                    layer_activations = outputs.hidden_states[layers[0] + 1]  # +1 because hidden_states[0] is embeddings
+                                    
+                                    # Create Activations object
+                                    from .core.activations import Activations, ActivationAggregationMethod
+                                    from .core.layer import Layer
+                                    
+                                    layer_obj = Layer(index=layers[0], type="transformer")
+                                    activations_obj = Activations(
+                                        tensor=layer_activations,
+                                        layer=layer_obj,
+                                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN
+                                    )
+                                    
+                                    # Add to cache
+                                    test_activation_cache.add_activation(
+                                        question=qa_pair['question'],
+                                        response=response,
+                                        activations=activations_obj,
+                                        layer=layers[0]
+                                    )
+                                    
+                        except Exception as e:
+                            if verbose:
+                                print(f"      ⚠️  Could not save activation: {e}")
+                    
+                    # Evaluate the generated response using the ground truth evaluator
+                    try:
+                        # Create ground truth evaluator
+                        evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+                        
+                        # Get correct answer for comparison
+                        correct_answers = qa_pair.get('correct_answer', '')
+                        
+                        # Get user label if available
+                        user_label = None
+                        if user_labels and i < len(user_labels):
+                            user_label = user_labels[i]
+                        
+                        # Evaluate the response
+                        evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
+                        
+                        ground_truth = evaluation_result["ground_truth"]
+                        
+                        # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
+                        classification_correct = None
+                        if ground_truth != "UNKNOWN":
+                            expected_classification = "HALLUCINATION" if ground_truth == "HALLUCINATION" else "TRUTHFUL"
+                            classification_correct = (classification == expected_classification)
+                            
+                            if classification_correct:
+                                correct_classifications += 1
+                            total_classifications += 1
+                        
+                        # Create response entry with layer results if available
+                        response_entry = {
+                            'question': qa_pair['question'],  # Add the question
+                            'response': response,
+                            'token_scores': token_scores,
+                            'aggregated_score': aggregated_score,
+                            'classification': classification,
+                            'ground_truth': ground_truth,
+                            'ground_truth_method': evaluation_result["method_used"],
+                            'ground_truth_confidence': evaluation_result["confidence"],
+                            'ground_truth_details': evaluation_result["details"],
+                            'classification_correct': classification_correct,
+                            'was_handled': was_handled
+                        }
+                        
+                        # Add layer-specific results if multi-layer
+                        if layer_results:
+                            response_entry['layer_results'] = layer_results
+                        
+                        generated_responses.append(response_entry)
+                        
+                        if verbose and not optimize:  # Only show detailed output when not optimizing
+                            print(f"      🤖 Generated: {response[:150]}{'...' if len(response) > 150 else ''}")
+                            print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores[:10]]}")
+                            if len(token_scores) > 10:
+                                print(f"                    ... ({len(token_scores)} total tokens)")
+                            aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                            print(f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})")
+                            print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})")
+                            if classification_correct is not None:
+                                print(f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}")
+                            else:
+                                print(f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})")
+                            print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                            print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                            if evaluation_result["details"]:
+                                print(f"      📝 Details: {evaluation_result['details']}")
+                    
+                    except Exception as e:
+                        if verbose and not optimize:
+                            print(f"      ⚠️  Could not evaluate response: {e}")
+                        generated_responses.append({
+                            'question': qa_pair['question'],  # Add the question
+                            'response': response,
+                            'token_scores': token_scores,
+                            'classification': classification,
+                            'ground_truth': 'UNKNOWN',
+                            'ground_truth_method': 'error',
+                            'ground_truth_confidence': 0.0,
+                            'ground_truth_details': f'Error during evaluation: {str(e)}',
+                            'classification_correct': None,
+                            'was_handled': was_handled
+                        })
             
             # Calculate evaluation results
             if total_classifications > 0:
@@ -1670,7 +1821,7 @@ def run_task_pipeline(
             
             test_processed_pairs = collector.collect_activations_batch(
                 pairs=test_contrastive_pairs,
-                layer_index=layer,
+                layer_index=layers[0],
                 device=device,
                 token_targeting_strategy=targeting_strategy
             )
@@ -1690,6 +1841,42 @@ def run_task_pipeline(
             # NOTE: Removed pointless "classifier validation" step that just tested on pre-written answers
             # The real evaluation happens when we test on actual generated responses below
             evaluation_results = {"accuracy": "N/A", "note": "Validation on pre-written answers removed as misleading"}
+            
+            # Handle test activation loading/saving
+            test_activation_cache = None
+            use_cached_activations = False
+            
+            if load_test_activations:
+                # Load cached test activations instead of generating new responses
+                if verbose:
+                    print(f"\n💾 LOADING CACHED TEST ACTIVATIONS:")
+                    print(f"   • Loading from: {load_test_activations}")
+                
+                try:
+                    test_activation_cache = TestActivationCache.load_from_file(load_test_activations)
+                    
+                    # Filter activations for the current layer
+                    cached_layer_activations = test_activation_cache.get_activations_for_layer(layers[0])
+                    
+                    if cached_layer_activations:
+                        use_cached_activations = True
+                        if verbose:
+                            print(f"   ✅ Found {len(cached_layer_activations)} cached activations for layer {layers[0]}")
+                    else:
+                        if verbose:
+                            print(f"   ❌ No cached activations found for layer {layers[0]}")
+                            print(f"   • Available layers: {list(set(item['layer'] for item in test_activation_cache.activations))}")
+                        
+                except Exception as e:
+                    if verbose:
+                        print(f"   ❌ Failed to load cached activations: {e}")
+                        print(f"   • Will generate new responses instead")
+            
+            if save_test_activations and not use_cached_activations:
+                # Initialize cache for saving
+                test_activation_cache = TestActivationCache()
+                if verbose:
+                    print(f"\n💾 WILL SAVE TEST ACTIVATIONS TO: {save_test_activations}")
             
             # Generate sample responses with token-level classification
             if verbose:
@@ -1883,6 +2070,19 @@ def run_task_pipeline(
                 
                 print(f"{'='*50}")
             
+            # Save test activations if requested
+            if save_test_activations and test_activation_cache is not None and len(test_activation_cache.activations) > 0:
+                try:
+                    test_activation_cache.save_to_file(save_test_activations)
+                    if verbose:
+                        print(f"\n💾 SAVED TEST ACTIVATIONS:")
+                        print(f"   • File: {save_test_activations}")
+                        print(f"   • Count: {len(test_activation_cache.activations)} activations")
+                        print(f"   • Layer: {layers[0]}")
+                except Exception as e:
+                    if verbose:
+                        print(f"\n❌ Failed to save test activations: {e}")
+            
             logger.info(f"Pipeline completed for {task_name}")
             return results
         
@@ -1992,8 +2192,8 @@ def handle_synthetic_command(args):
         # Extract activations
         print(f"📊 Extracting activations from layer {args.layer}...")
         from .core.layer import Layer
-        layer = Layer(int(args.layer))
-        pair_set.extract_activations_with_model(model, layer)
+        layer_obj = Layer(int(args.layer))
+        pair_set.extract_activations_with_model(model, layer_obj)
         
         # Train steering method
         print(f"🎓 Training {args.steering_method} steering method...")
@@ -2012,7 +2212,7 @@ def handle_synthetic_command(args):
             sys.exit(1)
         
         # Train the steering method
-        steering_method.train(pair_set, layer)
+        steering_method.train(pair_set, layer_obj)
         
         # Generate test scenarios and evaluate
         print(f"🧪 Generating test scenarios...")
@@ -2233,7 +2433,10 @@ def handle_tasks_command(args):
                 detailed_performance_report=args.detailed_performance_report,
                 export_performance_csv=args.export_performance_csv,
                 show_memory_usage=args.show_memory_usage,
-                show_timing_summary=args.show_timing_summary
+                show_timing_summary=args.show_timing_summary,
+                # Test-time activation parameters
+                save_test_activations=args.save_test_activations,
+                load_test_activations=args.load_test_activations
             )
             
             all_results[display_name] = task_results

@@ -421,10 +421,113 @@ class ActivationMonitor:
         loaded_data = torch.load(filepath)
         activations = {}
         for layer_idx, tensor in loaded_data.items():
-            layer = Layer(index=layer_idx, type="transformer")
-            activations[layer_idx] = Activations(tensor=tensor, layer=layer)
+            layer_obj = Layer(index=layer_idx, type="transformer")
+            activations[layer_idx] = Activations(tensor=tensor, layer=layer_obj)
         
         self.current_activations = activations
         return activations
+
+class TestActivationCache:
+    """
+    Cache for test-time activations with associated questions and responses.
+    Allows saving activations from one layer and reusing them for different layer classifiers.
+    """
+    
+    def __init__(self):
+        self.activations = []  # List of dicts with 'question', 'response', 'activations', 'layer'
+    
+    def add_activation(self, question: str, response: str, activations: 'Activations', layer: int):
+        """Add a test activation to the cache."""
+        self.activations.append({
+            'question': question,
+            'response': response,  
+            'activations': activations,
+            'layer': layer
+        })
+    
+    def save_to_file(self, filepath: str) -> None:
+        """Save cached activations to file."""
+        import torch
+        import json
+        
+        if not self.activations:
+            raise ValueError("No activations to save")
+        
+        # Prepare data for saving
+        save_data = {
+            'metadata': {
+                'num_samples': len(self.activations),
+                'layers': list(set(item['layer'] for item in self.activations)),
+                'created_at': __import__('datetime').datetime.now().isoformat()
+            },
+            'activations': []
+        }
+        
+        for i, item in enumerate(self.activations):
+            activation_data = {
+                'index': i,
+                'question': item['question'],
+                'response': item['response'],
+                'layer': item['layer'],
+                'activation_tensor': item['activations'].tensor,
+                'activation_shape': list(item['activations'].tensor.shape),
+                'aggregation_method': item['activations'].aggregation_method.value if hasattr(item['activations'].aggregation_method, 'value') else str(item['activations'].aggregation_method)
+            }
+            save_data['activations'].append(activation_data)
+        
+        # Save using torch
+        torch.save(save_data, filepath)
+        print(f"💾 Saved {len(self.activations)} test activations to {filepath}")
+    
+    @classmethod
+    def load_from_file(cls, filepath: str) -> 'TestActivationCache':
+        """Load cached activations from file."""
+        import torch
+        from .layer import Layer
+        
+        loaded_data = torch.load(filepath, map_location='cpu')
+        cache = cls()
+        
+        metadata = loaded_data.get('metadata', {})
+        print(f"📁 Loading {metadata.get('num_samples', 0)} test activations from {filepath}")
+        
+        for item in loaded_data['activations']:
+            # Reconstruct Activations object
+            layer_obj = Layer(index=item['layer'], type="transformer")
+            
+            # Reconstruct aggregation method
+            from .activations import ActivationAggregationMethod
+            agg_method = ActivationAggregationMethod.LAST_TOKEN  # default
+            try:
+                if item.get('aggregation_method'):
+                    agg_method = ActivationAggregationMethod(item['aggregation_method'])
+            except:
+                pass
+            
+            activations = Activations(
+                tensor=item['activation_tensor'],
+                layer=layer_obj,
+                aggregation_method=agg_method
+            )
+            
+            cache.add_activation(
+                question=item['question'],
+                response=item['response'],
+                activations=activations,
+                layer=item['layer']
+            )
+        
+        return cache
+    
+    def get_activations_for_layer(self, target_layer: int) -> List[Dict]:
+        """Get all activations for a specific layer."""
+        return [item for item in self.activations if item['layer'] == target_layer]
+    
+    def __len__(self):
+        return len(self.activations)
+    
+    def __repr__(self):
+        layers = list(set(item['layer'] for item in self.activations))
+        return f"TestActivationCache({len(self.activations)} samples, layers: {layers})"
 
 
