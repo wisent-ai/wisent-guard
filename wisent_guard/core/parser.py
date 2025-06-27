@@ -241,6 +241,14 @@ def setup_tasks_parser(parser):
                         help="Path to save test-time activations extracted during inference")
     parser.add_argument("--load-test-activations", type=str, default=None,
                         help="Path to load pre-saved test-time activations (skips inference generation)")
+    
+    # Additional output options
+    parser.add_argument("--csv-output", type=str, default=None,
+                        help="Path to save results in CSV format")
+    parser.add_argument("--evaluation-report", type=str, default=None,
+                        help="Path to save evaluation report")
+    parser.add_argument("--continue-on-error", action="store_true",
+                        help="Continue processing other tasks if one fails")
 
 
 def parse_layers_from_arg(layer_arg: str, model=None) -> List[int]:
