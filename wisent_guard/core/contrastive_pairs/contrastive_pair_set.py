@@ -911,11 +911,13 @@ class ContrastivePairSet:
         """Create contrastive pairs from TruthfulQA documents."""
         for doc in docs:
             try:
-                # Extract question
-                if hasattr(task, 'doc_to_text'):
-                    question = task.doc_to_text(doc)
-                else:
-                    question = doc.get('question', str(doc))
+                # FIXED: Extract just the actual question, not the full template
+                # The template includes 6 example Q&As which pollute the contrastive pairs
+                question = doc.get('question', '')
+                
+                # Skip if we don't have a proper question
+                if not question or len(question.strip()) < 10:
+                    continue
                 
                 # Extract correct and incorrect answers from mc1_targets
                 correct_answers = doc.get('mc1_targets', {}).get('choices', [])
@@ -1114,11 +1116,20 @@ class ContrastivePairSet:
         
         for i, doc in enumerate(docs):
             try:
-                # Extract question using task's doc_to_text method
-                if hasattr(task_data, 'doc_to_text'):
-                    question = task_data.doc_to_text(doc)
+                # FIXED: For TruthfulQA, extract just the actual question, not the template
+                if 'truthfulqa' in task_name.lower() or 'truthful_qa' in task_name.lower():
+                    # Use actual question, not the template with examples
+                    question = doc.get('question', '')
                 else:
-                    question = doc.get('question', str(doc))
+                    # For other tasks, use the template method
+                    if hasattr(task_data, 'doc_to_text'):
+                        question = task_data.doc_to_text(doc)
+                    else:
+                        question = doc.get('question', str(doc))
+                
+                # Skip if we don't have a proper question
+                if not question or len(question.strip()) < 10:
+                    continue
                 
                 # Task-specific answer extraction
                 correct_answer = None
