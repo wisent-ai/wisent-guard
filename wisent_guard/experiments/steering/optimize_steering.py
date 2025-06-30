@@ -344,8 +344,15 @@ class SteeringOptimizer:
             result = run_task_pipeline(**cli_args)
             
             # Extract metrics
-            accuracy = result.get('steering_accuracy', 0.0)
-            likelihood_change = result.get('avg_likelihood_change', 0.0)
+            accuracy = result.get('accuracy', 0.0)
+            
+            # Calculate likelihood change from baseline vs steered likelihoods
+            likelihood_change = 0.0
+            if 'evaluation_results' in result and 'baseline_likelihoods' in result['evaluation_results'] and 'steered_likelihoods' in result['evaluation_results']:
+                baseline = result['evaluation_results']['baseline_likelihoods']
+                steered = result['evaluation_results']['steered_likelihoods']
+                if baseline and steered and len(baseline) == len(steered):
+                    likelihood_change = sum(s - b for s, b in zip(steered, baseline)) / len(baseline)
             
             runtime = time.time() - start_time
             
