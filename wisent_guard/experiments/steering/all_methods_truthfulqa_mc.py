@@ -20,12 +20,13 @@ class SteeringMethodComparison:
     """Compare all steering methods using the existing CLI."""
     
     def __init__(self, model: str = "meta-llama/Llama-3.1-8B-Instruct", 
-                 layer: int = 15, limit: int = 50, output_dir: str = "steering_comparison"):
+                 layer: int = 15, limit: int = 50, output_dir: str = "steering_comparison", verbose_debug: bool = False):
         self.model = model
         self.layer = layer
         self.limit = limit
         self.output_dir = output_dir
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.verbose_debug = verbose_debug
         
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
@@ -67,6 +68,7 @@ class SteeringMethodComparison:
         # Ensure output directory exists
         os.makedirs(self.output_dir, exist_ok=True)
         
+        # Use steering mode with strength 0 to get likelihood comparisons
         cmd = [
             "python", "-m", "wisent_guard.cli", "tasks", "truthfulqa_mc1",
             "--model", self.model,
@@ -74,7 +76,10 @@ class SteeringMethodComparison:
             "--limit", str(self.limit),
             "--output", output_path,
             "--allow-small-dataset",
-            "--output-mode", "likelihoods",
+            "--steering-mode",  # ✅ Enable steering pipeline for likelihood extraction
+            "--steering-method", "CAA",  # Use CAA as placeholder
+            "--steering-strength", "0.0",  # ✅ Zero strength = no steering, just baseline
+            "--output-mode", "likelihoods",  # ✅ Now this will work!
             "--verbose"
         ]
         
@@ -278,10 +283,19 @@ class SteeringMethodComparison:
     
     def _extract_evaluation_metrics(self, result: Dict[str, Any], method_name: str, strength: float) -> Dict[str, Any]:
         """Extract evaluation metrics from CLI result using lm-harness scores."""
+        if self.verbose_debug:
+            print(f"\n🔍 DEBUG: Extracting metrics for {method_name} (strength={strength})")
+            print(f"   Raw result keys: {list(result.keys())}")
+        
         task_result = result.get("truthfulqa_mc1", {})
+        if self.verbose_debug:
+            print(f"   Task result keys: {list(task_result.keys())}")
         
         # Extract lm-harness evaluation results (now working properly!)
         evaluation_results = task_result.get("evaluation_results", {})
+        if self.verbose_debug:
+            print(f"   Evaluation results: {evaluation_results}")
+        
         accuracy = evaluation_results.get("accuracy", 0.0)
         
         # Handle the case where accuracy might be "N/A" from failed evaluations
@@ -292,17 +306,24 @@ class SteeringMethodComparison:
         baseline_likelihoods = evaluation_results.get("baseline_likelihoods", [])
         steered_likelihoods = evaluation_results.get("steered_likelihoods", [])
         
+        if self.verbose_debug:
+            print(f"   Accuracy: {accuracy}")
+            print(f"   Baseline likelihoods (first 3): {baseline_likelihoods[:3]}")
+            print(f"   Steered likelihoods (first 3): {steered_likelihoods[:3]}")
+        
         # Calculate steering effectiveness (how much the likelihoods changed)
         steering_effect = 0.0
+        likelihood_changes = []
         if baseline_likelihoods and steered_likelihoods:
-            total_change = sum(abs(s - b) for s, b in zip(steered_likelihoods, baseline_likelihoods))
-            steering_effect = total_change / len(baseline_likelihoods) if baseline_likelihoods else 0.0
+            changes = [abs(s - b) for s, b in zip(steered_likelihoods, baseline_likelihoods)]
+            likelihood_changes = [(b, s, s-b) for b, s in zip(baseline_likelihoods, steered_likelihoods)]
+            steering_effect = sum(changes) / len(changes) if changes else 0.0
         
         # Get other metadata
         steering_applied = evaluation_results.get("steering_applied", method_name != "Baseline")
         total_samples = len(baseline_likelihoods) if baseline_likelihoods else 0
         
-        return {
+        result_dict = {
             "method": method_name,
             "strength": strength,
             "accuracy": accuracy,
@@ -311,8 +332,14 @@ class SteeringMethodComparison:
             "steering_effect": steering_effect,
             "steering_applied": steering_applied,
             "baseline_likelihoods": baseline_likelihoods[:5] if baseline_likelihoods else [],  # First 5 for debugging
-            "steered_likelihoods": steered_likelihoods[:5] if steered_likelihoods else []
+            "steered_likelihoods": steered_likelihoods[:5] if steered_likelihoods else [],
+            "likelihood_changes": likelihood_changes[:5] if likelihood_changes else []  # (baseline, steered, change) tuples
         }
+        
+        if self.verbose_debug:
+            print(f"   Final result: {result_dict}")
+        
+        return result_dict
     
     def create_comparison_plots(self, df: pd.DataFrame):
         """Create visualization plots comparing steering methods."""
@@ -441,17 +468,49 @@ class SteeringMethodComparison:
         print(f"📊 Baseline Performance: {baseline_rate:.1%} truthful responses")
         print()
         
+        # Show detailed likelihood comparisons
+        print("📊 DETAILED SCORES AND LIKELIHOOD CHANGES:")
+        print("-" * 60)
+        
+        for _, row in df.iterrows():
+            method = row['method']
+            strength = row['strength']
+            accuracy = row['accuracy']
+            steering_effect = row.get('steering_effect', 0.0)
+            
+            print(f"\n🎯 {method} (strength={strength}):")
+            print(f"   📈 Accuracy: {accuracy:.1%}")
+            print(f"   🔄 Steering Effect: {steering_effect:.2f} (avg abs likelihood change)")
+            
+            # Show likelihood changes if available
+            likelihood_changes = row.get('likelihood_changes', [])
+            if likelihood_changes:
+                print(f"   📊 First {len(likelihood_changes)} Log-Likelihood Changes:")
+                for i, (baseline, steered, change) in enumerate(likelihood_changes):
+                    print(f"      Choice {i+1}: {baseline:.2f} → {steered:.2f} (Δ{change:+.2f})")
+            
+            baseline_likes = row.get('baseline_likelihoods', [])
+            steered_likes = row.get('steered_likelihoods', [])
+            if baseline_likes and not likelihood_changes:
+                print(f"   📊 Baseline Likelihoods: {[f'{x:.2f}' for x in baseline_likes]}")
+                if steered_likes:
+                    print(f"   🎯 Steered Likelihoods:  {[f'{x:.2f}' for x in steered_likes]}")
+        
+        print("\n" + "-" * 60)
+        
         # Best performing methods
         steering_df = df[df['method'] != 'Baseline']
         if not steering_df.empty:
             best_methods = steering_df.nlargest(5, 'truthful_rate')
             
-            print("🥇 TOP 5 STEERING METHODS:")
+            print("\n🥇 TOP 5 STEERING METHODS:")
             for i, (_, row) in enumerate(best_methods.iterrows(), 1):
                 improvement = row['truthful_rate'] - baseline_rate
+                steering_effect = row.get('steering_effect', 0.0)
                 print(f"{i:2}. {row['method']:<15} (s={row['strength']:<3}) | "
                       f"Truthful: {row['truthful_rate']:.1%} | "
-                      f"Improvement: {improvement:+.1%}")
+                      f"Improvement: {improvement:+.1%} | "
+                      f"Effect: {steering_effect:.2f}")
             
             print()
             
@@ -466,8 +525,10 @@ class SteeringMethodComparison:
             if len(successful_methods) > 0:
                 avg_improvement = (successful_methods['truthful_rate'] - baseline_rate).mean()
                 best_improvement = (successful_methods['truthful_rate'] - baseline_rate).max()
+                avg_steering_effect = successful_methods['steering_effect'].mean()
                 print(f"📊 Average improvement: +{avg_improvement:.1%}")
                 print(f"🎯 Best improvement: +{best_improvement:.1%}")
+                print(f"🔄 Average steering effect: {avg_steering_effect:.2f}")
         
         print()
         print("💾 All results saved to:", self.output_dir)
@@ -490,6 +551,8 @@ def main():
                        help="Run quick test with fewer methods and single strength")
     parser.add_argument("--plot-only", type=str, default=None,
                        help="Path to existing CSV results file to plot only")
+    parser.add_argument("--debug", action="store_true",
+                       help="Enable detailed debugging output showing scores and likelihood changes")
     
     args = parser.parse_args()
     
@@ -497,7 +560,7 @@ def main():
         # Load existing results and create plots
         if os.path.exists(args.plot_only):
             df = pd.read_csv(args.plot_only)
-            comparison = SteeringMethodComparison(args.model, args.layer, args.limit, args.output_dir)
+            comparison = SteeringMethodComparison(args.model, args.layer, args.limit, args.output_dir, args.debug)
             comparison.create_comparison_plots(df)
             comparison.print_summary(df)
         else:
@@ -509,7 +572,8 @@ def main():
         model=args.model,
         layer=args.layer,
         limit=args.limit,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        verbose_debug=args.debug
     )
     
     print("🚀 Starting comprehensive steering methods comparison...")

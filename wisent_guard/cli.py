@@ -61,7 +61,11 @@ def _run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods
             print(f"\n🔍 RUNNING LM-HARNESS EVALUATION WITH STEERING:")
             print(f"   • Task: {task_data.config.task}")
             print(f"   • Test samples: {len(test_qa_pairs)}")
-            print(f"   • Steering methods: {[m.method_type.value for m in steering_methods] if steering_methods else 'None'}")
+            try:
+                steering_method_names = [m.method_type.value if hasattr(m, 'method_type') else str(m) for m in steering_methods] if steering_methods else 'None'
+            except:
+                steering_method_names = 'Unknown'
+            print(f"   • Steering methods: {steering_method_names}")
             print(f"   • Layers: {layers}")
         
         # Create a steered model wrapper for lm-harness evaluation
@@ -1913,7 +1917,8 @@ def run_task_pipeline(
                 })
             
             # Run proper lm-harness evaluation on the test set with steering
-            evaluation_results = _run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, verbose)
+            from .core.steering_methods.steering_evaluation import run_lm_harness_evaluation
+            evaluation_results = run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, 1.0, True, verbose, "likelihoods")
             
             # Handle test activation loading/saving
             test_activation_cache = None
