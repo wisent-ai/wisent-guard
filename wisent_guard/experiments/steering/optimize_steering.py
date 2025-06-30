@@ -432,6 +432,121 @@ class SteeringOptimizer:
             if self.verbose:
                 print(f"   Warning: Could not estimate runtime: {e}")
             return 3600.0  # Default 1 hour estimate
+
+    def _optimize_parameters_for_runtime(self, target_minutes: float) -> Tuple[int, int]:
+        """Determine optimal budget and limit for target runtime."""
+        if self.verbose:
+            print(f"🎯 Optimizing parameters for {target_minutes:.1f} minute target...")
+        
+        # Run timing test with small sample
+        test_config = SteeringConfig(layer=15, method='CAA', strength=1.0, split_ratio=0.8, seed=42)
+        
+        start_time = time.time()
+        try:
+            from wisent_guard.cli import run_task_pipeline
+            
+            cli_args = {
+                'task_name': self.task_name,
+                'model_name': self.model_name,
+                'layer': str(test_config.layer),
+                'limit': 5,
+                'steering_mode': True,
+                'steering_method': test_config.method,
+                'steering_strength': test_config.strength,
+                'split_ratio': test_config.split_ratio,
+                'seed': test_config.seed,
+                'device': self.device,
+                'verbose': False,
+                'allow_small_dataset': True,
+                'output_mode': 'likelihoods'
+            }
+            
+            run_task_pipeline(**cli_args)
+            base_time = time.time() - start_time
+            
+            target_seconds = target_minutes * 60
+            
+            # Estimate model loading overhead (roughly 25-35s based on observations)
+            model_loading_overhead = 30.0  # seconds per config
+            processing_time_per_5_examples = max(20.0, base_time - model_loading_overhead)  # Remove loading overhead
+            
+            if self.verbose:
+                print(f"   Total time (5 examples): {base_time:.1f}s")
+                print(f"   Model loading overhead: {model_loading_overhead:.1f}s")
+                print(f"   Processing time (5 examples): {processing_time_per_5_examples:.1f}s")
+            
+            # Calculate time accounting for loading overhead
+            def estimate_total_time(budget, limit):
+                loading_time = budget * model_loading_overhead
+                processing_time = budget * (limit / 5.0) * processing_time_per_5_examples
+                return loading_time + processing_time
+            
+            # Try different combinations and find optimal
+            best_score = 0
+            best_budget = 3
+            best_limit = 10
+            
+            # Calculate maximum possible examples for 1 config within time limit
+            max_processing_time_for_1 = target_seconds - model_loading_overhead
+            max_possible_limit = int((max_processing_time_for_1 / processing_time_per_5_examples) * 5)
+            min_useful_limit = max(5, min(15, max_possible_limit // 3))  # More conservative
+            
+            if self.verbose:
+                print(f"   Max possible limit for 1 config: {max_possible_limit}")
+                print(f"   Using minimum limit: {min_useful_limit}")
+            
+            # Score = budget * sqrt(limit) - rewards both breadth and depth
+            for budget in [3, 5, 8, 10, 15, 20]:
+                # Calculate max limit for this budget accounting for loading overhead
+                available_processing_time = target_seconds - (budget * model_loading_overhead)
+                if available_processing_time <= 0:  # No time left after loading
+                    continue
+                    
+                max_limit_for_budget = int((available_processing_time / budget) / processing_time_per_5_examples * 5)
+                if max_limit_for_budget < min_useful_limit:  # Skip if too small
+                    continue
+                    
+                # Test different limit options
+                limit_options = [
+                    min_useful_limit,
+                    max(min_useful_limit, max_limit_for_budget//3),
+                    max(min_useful_limit, max_limit_for_budget//2),
+                    max_limit_for_budget
+                ]
+                
+                for limit in set(limit_options):  # Remove duplicates
+                    estimated_time = estimate_total_time(budget, limit)
+                    if estimated_time <= target_seconds * 1.05:  # 5% tolerance
+                        score = budget * (limit ** 0.5)  # Favor breadth over depth
+                        if score > best_score:
+                            best_score = score
+                            best_budget = budget
+                            best_limit = limit
+            
+            # If no valid combination found, use most conservative approach
+            if best_score == 0:
+                if self.verbose:
+                    print("   No optimal combination found within time limit, using conservative fallback")
+                best_budget = 1
+                available_time = target_seconds - model_loading_overhead
+                best_limit = max(5, int((available_time / processing_time_per_5_examples * 5) * 0.8))  # 80% safety margin
+            
+            if self.verbose:
+                estimated_total = estimate_total_time(best_budget, best_limit)
+                print(f"   Optimal: {best_budget} configs × {best_limit} examples")
+                print(f"   Estimated time: {estimated_total/60:.1f} minutes")
+                print(f"   Score: {best_score:.1f} (budget × √limit)")
+            
+            return best_budget, best_limit
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"   Warning: Could not optimize parameters: {e}")
+            # Fallback - very conservative for short time targets
+            if target_minutes <= 10:
+                return 5, max(10, int(target_minutes * 3))  # Very conservative
+            else:
+                return 10, min(100, int(target_minutes * 10))
     
     def _confirm_runtime(self, estimated_seconds: float, budget: int) -> bool:
         """Ask user to confirm if they want to proceed with estimated runtime."""
@@ -461,7 +576,7 @@ class SteeringOptimizer:
                 return False
             else:
                 print("Please enter 'y' or 'n'")
-
+    
     def optimize(self, search_strategy: str = 'smart', budget: int = 50, confirm_runtime: bool = True) -> List[OptimizationResult]:
         """Run optimization with specified strategy and budget."""
         
@@ -510,6 +625,21 @@ class SteeringOptimizer:
         
         self.results = results
         return results
+
+    def optimize_with_runtime_target(self, target_minutes: float, search_strategy: str = 'smart') -> List[OptimizationResult]:
+        """Run optimization with automatic parameter selection for target runtime."""
+        
+        # Determine optimal budget and limit
+        optimal_budget, optimal_limit = self._optimize_parameters_for_runtime(target_minutes)
+        
+        # Update instance parameters
+        self.limit = optimal_limit
+        
+        if self.verbose:
+            logger.info(f"Auto-configured: {optimal_budget} configs × {optimal_limit} examples for {target_minutes:.1f}min target")
+        
+        # Run optimization with optimal parameters
+        return self.optimize(search_strategy=search_strategy, budget=optimal_budget, confirm_runtime=False)
     
     def get_best_config(self) -> Optional[OptimizationResult]:
         """Get the best performing configuration."""
@@ -667,6 +797,7 @@ def main():
     parser.add_argument('--device', default='cuda', help='Device to use')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     parser.add_argument('--skip-confirmation', action='store_true', help='Skip runtime confirmation prompt')
+    parser.add_argument('--target-runtime', type=float, help='Target runtime in minutes')
     
     args = parser.parse_args()
     
@@ -682,7 +813,10 @@ def main():
     
     # Run optimization
     skip_confirmation = getattr(args, 'skip_confirmation', False)
-    results = optimizer.optimize(search_strategy=args.strategy, budget=args.budget, confirm_runtime=not skip_confirmation)
+    if getattr(args, 'target_runtime', None):
+        results = optimizer.optimize_with_runtime_target(args.target_runtime, search_strategy=args.strategy)
+    else:
+        results = optimizer.optimize(search_strategy=args.strategy, budget=args.budget, confirm_runtime=not skip_confirmation)
     
     # Check if optimization was cancelled
     if not results:
