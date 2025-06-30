@@ -113,3 +113,6 @@ references/
 # Experiment results
 wisent_guard/experiments/steering/steering_comparison_results/
 wisent_guard/experiments/steering/optimization_results/
+
+# Device-specific benchmark files (contain hardware-specific timing data)
+device_benchmarks.json

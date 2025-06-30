@@ -762,12 +762,12 @@ class Model:
         Returns:
             List of available task names
         """
-        return AVAILABLE_TASKS.copy()
+        return _get_available_tasks()
     
     @staticmethod
     def is_valid_task(task_name: str) -> bool:
         """
-        Check if a task name is valid.
+        Check if a task name is valid, including fuzzy matching.
         
         Args:
             task_name: Name of the task to check
@@ -775,12 +775,11 @@ class Model:
         Returns:
             True if task is valid, False otherwise
         """
-        actual_task_name = TASK_NAME_MAPPINGS.get(task_name, task_name)
-        return actual_task_name in AVAILABLE_TASKS
+        return _is_valid_task(task_name)
     
     def load_lm_eval_task(self, task_name: str, shots: int = 0, limit: Optional[int] = None):
         """
-        Load a task from lm-evaluation-harness.
+        Load a task from lm-evaluation-harness with dynamic task name resolution.
         
         Args:
             task_name: Name of the task
@@ -790,38 +789,38 @@ class Model:
         Returns:
             Task object from lm_eval
         """
-        try:
-            from lm_eval.tasks import get_task_dict
-            from lm_eval.api.registry import TASK_REGISTRY
-        except ImportError as e:
-            raise ImportError(
-                "lm-evaluation-harness is required. Install with: pip install lm-eval"
-            ) from e
+        if _task_manager is None:
+            raise RuntimeError("Task management system not available")
         
-        actual_task_name = TASK_NAME_MAPPINGS.get(task_name, task_name)
+        return _task_manager.load_task(task_name, shots=shots, limit=limit)
+    
+    def _resolve_task_name(self, task_name: str) -> str:
+        """Dynamically resolve a task name to an available task."""
+        return _resolve_task_name(task_name)
+    
+    def _calculate_task_name_similarity(self, name1: str, name2: str) -> float:
+        """Calculate similarity between two task names."""
+        # Exact match
+        if name1 == name2:
+            return 1.0
         
-        # Check if task is in our available tasks list
-        if not self.is_valid_task(task_name):
-            raise ValueError(
-                f"Task '{task_name}' (mapped to '{actual_task_name}') not found in available tasks. "
-                f"Use Model.get_available_tasks() to see all available tasks."
-            )
+        # Substring matching
+        if name1 in name2 or name2 in name1:
+            longer = max(name1, name2, key=len)
+            shorter = min(name1, name2, key=len)
+            return len(shorter) / len(longer)
         
-        try:
-            task_dict = get_task_dict([actual_task_name])
-            
-            if actual_task_name not in task_dict:
-                raise ValueError(
-                    f"Task '{task_name}' (mapped to '{actual_task_name}') not found in lm_eval registry."
-                )
-            
-            task = task_dict[actual_task_name]
-            task._limit = limit
-            
-            return task
-            
-        except Exception as e:
-            raise ValueError(f"Failed to load task '{task_name}': {e}") from e
+        # Token-based similarity
+        tokens1 = set(name1.replace('_', ' ').replace('-', ' ').split())
+        tokens2 = set(name2.replace('_', ' ').replace('-', ' ').split())
+        
+        if not tokens1 or not tokens2:
+            return 0.0
+        
+        intersection = len(tokens1 & tokens2)
+        union = len(tokens1 | tokens2)
+        
+        return intersection / union if union > 0 else 0.0
     
     def split_task_data(self, task_data, split_ratio: float = 0.8, random_seed: int = 42):
         """
@@ -835,26 +834,10 @@ class Model:
         Returns:
             Tuple of (train_docs, test_docs)
         """
-        import random
+        if _task_manager is None:
+            raise RuntimeError("Task management system not available")
         
-        docs = load_docs(task_data, limit=getattr(task_data, '_limit', None))
-        
-        if not docs:
-            return [], []
-        
-        if len(docs) < 2:
-            return docs, docs
-        
-        # Simple split implementation
-        random.seed(random_seed)
-        shuffled_docs = docs.copy()
-        random.shuffle(shuffled_docs)
-        
-        split_idx = int(len(shuffled_docs) * split_ratio)
-        train_docs = shuffled_docs[:split_idx]
-        test_docs = shuffled_docs[split_idx:]
-        
-        return train_docs, test_docs
+        return _task_manager.split_task_data(task_data, split_ratio=split_ratio, random_seed=random_seed)
     
     def prepare_prompts_from_docs(self, task, docs: List[Dict[str, Any]]) -> List[str]:
         """
@@ -867,36 +850,10 @@ class Model:
         Returns:
             List of formatted prompts
         """
-        prompts = []
+        if _task_manager is None:
+            raise RuntimeError("Task management system not available")
         
-        for doc in docs:
-            try:
-                # Use task's doc_to_text method if available
-                if hasattr(task, 'doc_to_text'):
-                    prompt = task.doc_to_text(doc)
-                else:
-                    # Fallback: extract common fields
-                    if 'question' in doc:
-                        prompt = doc['question']
-                    elif 'text' in doc:
-                        prompt = doc['text']
-                    elif 'prompt' in doc:
-                        prompt = doc['prompt']
-                    else:
-                        # Use first string value found
-                        for key, value in doc.items():
-                            if isinstance(value, str) and len(value) > 10:
-                                prompt = value
-                                break
-                        else:
-                            prompt = str(doc)
-                
-                prompts.append(str(prompt))
-                
-            except Exception:
-                prompts.append(str(doc))
-        
-        return prompts
+        return _task_manager.prepare_prompts_from_docs(task, docs)
     
     def get_reference_answers(self, task, docs: List[Dict[str, Any]]) -> List[str]:
         """
@@ -909,30 +866,10 @@ class Model:
         Returns:
             List of reference answers
         """
-        references = []
+        if _task_manager is None:
+            raise RuntimeError("Task management system not available")
         
-        for doc in docs:
-            try:
-                # Use task's doc_to_target method if available
-                if hasattr(task, 'doc_to_target'):
-                    reference = task.doc_to_target(doc)
-                else:
-                    # Fallback: extract common answer fields
-                    if 'answer' in doc:
-                        reference = doc['answer']
-                    elif 'target' in doc:
-                        reference = doc['target']
-                    elif 'label' in doc:
-                        reference = doc['label']
-                    else:
-                        reference = "Unknown"
-                
-                references.append(str(reference))
-                
-            except Exception:
-                references.append("Unknown")
-        
-        return references
+        return _task_manager.get_reference_answers(task, docs)
 
 
 class ModelParameterOptimizer:
@@ -1151,65 +1088,26 @@ class ActivationHooks:
         self.reset()
 
 
-# LM Evaluation Integration
-import json
-import os
-
-def load_available_tasks():
-    """Load available tasks from tasks.json file."""
-    try:
-        tasks_file = os.path.join(os.path.dirname(__file__), 'tasks.json')
-        with open(tasks_file, 'r') as f:
-            data = json.load(f)
-            return data.get('tasks', [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        # Fallback to basic tasks if file not found
-        return [
-            'truthfulqa_mc1', 'truthfulqa_mc2', 'hellaswag', 'mmlu', 
-            'arc_easy', 'arc_challenge', 'winogrande', 'piqa', 'boolq'
-        ]
-
-# Load available tasks
-AVAILABLE_TASKS = load_available_tasks()
-
-# Task name mappings for common aliases
-TASK_NAME_MAPPINGS = {
-    'truthfulqa': 'truthfulqa_mc1',
-    'truthful_qa': 'truthfulqa_mc1',
-    'hellaswag': 'hellaswag',
-    'mmlu': 'mmlu_abstract_algebra',
-    'mmlu_easy': 'mmlu_elementary_mathematics',
-    'arc_easy': 'arc_easy',
-    'arc_challenge': 'arc_challenge',
-    'winogrande': 'winogrande',
-    'piqa': 'piqa',
-    'boolq': 'boolq',
-}
-
-
-def load_docs(task, limit: Optional[int] = None):
-    """
-    Load documents from the most appropriate split (validation → test → train).
-    
-    Args:
-        task: Task object from lm_eval
-        limit: Optional limit on number of documents to load
-        
-    Returns:
-        List of documents from the most appropriate split
-    """
-    docs = []
-    
-    if task.has_validation_docs():
-        docs = list(task.validation_docs())
-    elif task.has_test_docs():
-        docs = list(task.test_docs())
-    elif task.has_training_docs():
-        docs = list(task.training_docs())
-    else:
-        raise RuntimeError(f"No labelled docs available for task {task.NAME}")
-    
-    if limit is not None and limit > 0:
-        docs = docs[:limit]
-    
-    return docs 
+# LM Evaluation Integration - now handled by task management system
+# Import from the dedicated task management system
+try:
+    from .agent.diagnose.tasks import (
+        get_available_tasks as _get_available_tasks,
+        is_valid_task as _is_valid_task,
+        resolve_task_name as _resolve_task_name,
+        TaskManager,
+        load_docs
+    )
+    # Initialize global task manager for Model class methods
+    _task_manager = TaskManager()
+except ImportError:
+    # Fallback if task management system not available
+    _task_manager = None
+    def _get_available_tasks():
+        return []
+    def _is_valid_task(task_name):
+        return False
+    def _resolve_task_name(task_name):
+        raise ValueError(f"Task management system not available")
+    def load_docs(task, limit=None):
+        raise ValueError(f"Task management system not available")
