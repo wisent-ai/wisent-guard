@@ -109,3 +109,6 @@ smoke_test_results/
 references/
 
 # Cache directories for our tools
+
+# Experiment results
+wisent_guard/experiments/steering/steering_comparison_results/

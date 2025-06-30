@@ -1,0 +1,41 @@
+{
+  "truthfulqa_mc1": {
+    "task_name": "truthfulqa_mc1",
+    "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+    "layer": 15,
+    "steering_mode": true,
+    "steering_method": "CAA",
+    "steering_strength": 0.0,
+    "training_stats": {
+      "num_pairs": 20,
+      "vector_norm": 7.991687774658203,
+      "vector_mean": 0.0019309150520712137,
+      "vector_std": 0.1248704344034195,
+      "vector_shape": [
+        4096
+      ],
+      "aggregation_method": "caa",
+      "method": "CAA",
+      "normalization_method": "VectorNormalizationMethod.NONE",
+      "target_norm": null,
+      "layer_index": 15,
+      "final_vector_norm": 7.991687774658203
+    },
+    "training_pairs": 20,
+    "vector_saved": false,
+    "evaluation_results": {
+      "accuracy": 0.4,
+      "method": "lm_harness_with_steering",
+      "task_name": "truthfulqa_mc1",
+      "steering_applied": true,
+      "full_results": {
+        "alias": "truthfulqa_mc1",
+        "acc,none": 0.4,
+        "acc_stderr,none": "N/A"
+      }
+    },
+    "num_test": 5,
+    "test_responses": [],
+    "tests_performed": 5
+  }
+}

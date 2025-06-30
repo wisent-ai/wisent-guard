@@ -115,6 +115,11 @@ def setup_tasks_parser(parser):
                         choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
                         help="Steering method to use")
     
+    # Steering output mode selection
+    parser.add_argument("--output-mode", type=str, default="both",
+                        choices=["likelihoods", "responses", "both"],
+                        help="Type of comparison to show: 'likelihoods' for log-likelihood comparison only, 'responses' for response generation only, 'both' for both (default: both)")
+    
     # HPR-specific parameters
     parser.add_argument("--hpr-beta", type=float, default=1.0,
                         help="Beta parameter for HPR method")

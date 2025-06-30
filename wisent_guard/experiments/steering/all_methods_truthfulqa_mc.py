@@ -39,8 +39,20 @@ class SteeringMethodComparison:
             {"name": "HPR_Beta0.5", "method": "HPR", "params": {"hpr_beta": 0.5}},
             {"name": "BiPO", "method": "BiPO", "params": {"bipo_beta": 0.1, "bipo_epochs": 50}},
             {"name": "BiPO_Beta0.05", "method": "BiPO", "params": {"bipo_beta": 0.05, "bipo_epochs": 50}},
-            {"name": "KSteering", "method": "KSteering", "params": {"ksteering_alpha": 50.0}},
-            {"name": "KSteering_Alpha25", "method": "KSteering", "params": {"ksteering_alpha": 25.0}},
+            {"name": "KSteering", "method": "KSteering", "params": {
+                "ksteering_alpha": 5.0, 
+                "ksteering_target_labels": "0",
+                "ksteering_avoid_labels": ""
+            }},
+            {"name": "KSteering_Alpha3", "method": "KSteering", "params": {
+                "ksteering_alpha": 3.0,
+                "ksteering_target_labels": "0", 
+                "ksteering_avoid_labels": ""
+            }},
+            {"name": "DAC", "method": "DAC", "params": {
+                "dac_dynamic_control": True,
+                "dac_entropy_threshold": 1.0
+            }},
         ]
         
         # Different steering strengths to test
@@ -62,6 +74,7 @@ class SteeringMethodComparison:
             "--limit", str(self.limit),
             "--output", output_path,
             "--allow-small-dataset",
+            "--output-mode", "likelihoods",
             "--verbose"
         ]
         
@@ -105,6 +118,7 @@ class SteeringMethodComparison:
             "--allow-small-dataset",
             "--steering-mode",
             "--steering-strength", str(strength),
+            "--output-mode", "likelihoods",
             "--verbose"
         ]
         
@@ -114,7 +128,12 @@ class SteeringMethodComparison:
         
         # Add method-specific parameters
         for param, value in params.items():
-            cmd.extend([f"--{param.replace('_', '-')}", str(value)])
+            param_name = f"--{param.replace('_', '-')}"
+            if isinstance(value, bool):
+                if value:  # Only add the flag if True
+                    cmd.append(param_name)
+            else:
+                cmd.extend([param_name, str(value)])
         
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
@@ -258,75 +277,42 @@ class SteeringMethodComparison:
         return df
     
     def _extract_evaluation_metrics(self, result: Dict[str, Any], method_name: str, strength: float) -> Dict[str, Any]:
-        """Extract evaluation metrics from CLI result using classifier scores."""
+        """Extract evaluation metrics from CLI result using lm-harness scores."""
         task_result = result.get("truthfulqa_mc1", {})
         
-        # Since CLI doesn't do lm-harness evaluation (says "N/A"), use classifier scores
-        sample_responses = task_result.get("sample_responses", [])
-        test_responses = task_result.get("test_responses", [])
+        # Extract lm-harness evaluation results (now working properly!)
+        evaluation_results = task_result.get("evaluation_results", {})
+        accuracy = evaluation_results.get("accuracy", 0.0)
         
-        # For baseline: use classifier results on sample_responses
-        if method_name == "Baseline":
-            truthful_count = 0
-            total_responses = len(sample_responses)
-            
-            for response in sample_responses:
-                classification = response.get("classification", "UNKNOWN")
-                if classification == "TRUTHFUL":
-                    truthful_count += 1
-            
-            truthful_rate = truthful_count / total_responses if total_responses > 0 else 0.0
-            
-        else:
-            # For steering: compare steered vs unsteered response quality
-            total_responses = len(test_responses)
-            better_count = 0
-            
-            for response in test_responses:
-                steered_text = response.get("steered_response", "")
-                unsteered_text = response.get("unsteered_response", "")
-                
-                # Simple heuristic: steered response is better if it's more cautious
-                steered_better = self._is_response_better(steered_text, unsteered_text)
-                if steered_better:
-                    better_count += 1
-            
-            truthful_rate = better_count / total_responses if total_responses > 0 else 0.0
+        # Handle the case where accuracy might be "N/A" from failed evaluations
+        if isinstance(accuracy, str) or accuracy is None:
+            accuracy = 0.0
         
-        # Get training accuracy if available
-        training_accuracy = task_result.get("training_results", {}).get("accuracy", 0.0)
+        # Get baseline and steered log-likelihoods if available
+        baseline_likelihoods = evaluation_results.get("baseline_likelihoods", [])
+        steered_likelihoods = evaluation_results.get("steered_likelihoods", [])
+        
+        # Calculate steering effectiveness (how much the likelihoods changed)
+        steering_effect = 0.0
+        if baseline_likelihoods and steered_likelihoods:
+            total_change = sum(abs(s - b) for s, b in zip(steered_likelihoods, baseline_likelihoods))
+            steering_effect = total_change / len(baseline_likelihoods) if baseline_likelihoods else 0.0
+        
+        # Get other metadata
+        steering_applied = evaluation_results.get("steering_applied", method_name != "Baseline")
+        total_samples = len(baseline_likelihoods) if baseline_likelihoods else 0
         
         return {
             "method": method_name,
             "strength": strength,
-            "accuracy": truthful_rate,
-            "truthful_rate": truthful_rate,
-            "total_responses": len(sample_responses) + len(test_responses),
-            "training_accuracy": training_accuracy
+            "accuracy": accuracy,
+            "truthful_rate": accuracy,  # For TruthfulQA, accuracy == truthfulness rate
+            "total_responses": total_samples,
+            "steering_effect": steering_effect,
+            "steering_applied": steering_applied,
+            "baseline_likelihoods": baseline_likelihoods[:5] if baseline_likelihoods else [],  # First 5 for debugging
+            "steered_likelihoods": steered_likelihoods[:5] if steered_likelihoods else []
         }
-    
-    def _is_response_better(self, steered: str, unsteered: str) -> bool:
-        """Simple heuristic to determine if steered response is better than unsteered."""
-        steered = steered.lower()
-        unsteered = unsteered.lower()
-        
-        # Steered is better if it's more cautious/truthful
-        cautious_phrases = ["no comment", "i don't know", "uncertain", "no answer", "there is no"]
-        
-        steered_cautious = any(phrase in steered for phrase in cautious_phrases)
-        unsteered_cautious = any(phrase in unsteered for phrase in cautious_phrases)
-        
-        # If steered is cautious but unsteered isn't, steered is better
-        if steered_cautious and not unsteered_cautious:
-            return True
-        
-        # If both are cautious or both aren't, steered is better if it's shorter (less verbose)
-        if len(steered) < len(unsteered) * 0.8:  # Significantly shorter
-            return True
-        
-        return False
-    
-
     
     def create_comparison_plots(self, df: pd.DataFrame):
         """Create visualization plots comparing steering methods."""
