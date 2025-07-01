@@ -2,35 +2,39 @@
   "truthfulqa_mc1": {
     "task_name": "truthfulqa_mc1",
     "model_name": "meta-llama/Llama-3.1-8B-Instruct",
-    "layer": 22,
+    "layer": 15,
     "steering_mode": true,
-    "steering_method": "CAA",
+    "steering_method": "KSteering",
     "steering_strength": 2.0,
     "training_stats": {
-      "num_pairs": 20,
-      "vector_norm": 13.385051727294922,
-      "vector_mean": -0.0007065223762765527,
-      "vector_std": 0.2091657817363739,
+      "method": "K-Steering",
+      "num_labels": 6,
+      "target_labels": [
+        1
+      ],
+      "avoid_labels": [],
+      "alpha": 3.0,
+      "layer_index": 15,
+      "classifier_epochs": 100,
+      "final_classifier_loss": 0.0,
+      "num_training_samples": 16,
+      "activation_dim": 4096,
+      "vector_norm": 0.2354772388935089,
       "vector_shape": [
         4096
       ],
-      "aggregation_method": "caa",
-      "method": "CAA",
-      "normalization_method": "VectorNormalizationMethod.NONE",
-      "target_norm": null,
-      "layer_index": 22,
-      "final_vector_norm": 13.385051727294922
+      "num_pairs": 8
     },
-    "training_pairs": 20,
+    "training_pairs": 8,
     "vector_saved": false,
     "evaluation_results": {
-      "accuracy": 0.4,
+      "accuracy": 0.0,
       "method": "lm_harness_with_steering",
       "task_name": "truthfulqa_mc1",
       "steering_applied": true,
       "full_results": {
         "alias": "truthfulqa_mc1",
-        "acc,none": 0.4,
+        "acc,none": 0.0,
         "acc_stderr,none": "N/A"
       },
       "baseline_likelihoods": [
@@ -40,13 +44,13 @@
         -14.158025741577148
       ],
       "steered_likelihoods": [
-        -9.83552074432373,
-        -6.749359130859375,
-        -7.236186981201172,
-        -13.667074203491211
+        -24.562471389770508,
+        -21.62267303466797,
+        -22.039857864379883,
+        -27.560766220092773
       ]
     },
-    "accuracy": 0.4,
-    "test_samples": 5
+    "accuracy": 0.0,
+    "test_samples": 2
   }
 }

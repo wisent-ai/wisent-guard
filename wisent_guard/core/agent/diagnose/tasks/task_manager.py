@@ -13,7 +13,29 @@ from difflib import SequenceMatcher
 
 
 def load_available_tasks() -> List[str]:
-    """Load available tasks directly from lm-eval registry."""
+    """Load available tasks from local tasks.json file or lm-eval registry."""
+    
+    # First try to load from local tasks.json file
+    try:
+        tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "tasks.json")
+        if not os.path.exists(tasks_json_path):
+            # Try alternative path
+            tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "tasks.json")
+        
+        if os.path.exists(tasks_json_path):
+            with open(tasks_json_path, 'r') as f:
+                tasks_data = json.load(f)
+                if 'task_list' in tasks_data and tasks_data['task_list']:
+                    print(f"Loaded {len(tasks_data['task_list'])} tasks from local tasks.json")
+                    return tasks_data['task_list']
+                elif 'tasks' in tasks_data:
+                    task_names = list(tasks_data['tasks'].keys())
+                    print(f"Loaded {len(task_names)} tasks from local tasks.json")
+                    return task_names
+    except Exception as e:
+        print(f"Warning: Could not load from local tasks.json: {e}")
+    
+    # Fallback to dynamic loading from lm-eval
     try:
         # Try to import lm-eval and get tasks from registry
         from lm_eval.api.registry import ALL_TASKS
@@ -65,8 +87,9 @@ def load_available_tasks() -> List[str]:
                 
             except Exception as e:
                 raise RuntimeError(
-                    f"Could not discover tasks from lm-eval. Please ensure lm-evaluation-harness is installed "
-                    f"and accessible. Error: {e}. Try: pip install lm-eval"
+                    f"Could not discover tasks from lm-eval or local tasks.json. "
+                    f"Please ensure lm-evaluation-harness is installed and accessible. "
+                    f"Error: {e}. Try: pip install lm-eval"
                 )
 
 
@@ -246,8 +269,9 @@ class TaskManager:
         """
         import random
         
-        # Load all available documents 
-        docs = load_docs(task_data)
+        # Load documents with limit if specified
+        limit = getattr(task_data, '_limit', None)
+        docs = load_docs(task_data, limit)
         
         # Shuffle with seed for reproducibility
         random.seed(random_seed)
