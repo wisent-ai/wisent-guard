@@ -242,7 +242,7 @@ class BudgetManager:
         if resource_type == ResourceType.TIME:
             # Use device-specific benchmarks for time estimates
             try:
-                from .device_benchmarks import estimate_task_time
+                from ..device_benchmarks import estimate_task_time
                 
                 # Map task names to benchmark types
                 task_mapping = {
@@ -356,7 +356,7 @@ def calculate_max_tasks_for_time_budget(task_type: str = "benchmark_evaluation",
     """
     # Use device benchmarking for more accurate estimates
     try:
-        from .device_benchmarks import estimate_task_time
+        from ..device_benchmarks import estimate_task_time
         
         # Map task types to benchmark types
         benchmark_mapping = {
@@ -440,7 +440,7 @@ def run_device_benchmark(force_rerun: bool = False) -> None:
     Args:
         force_rerun: Force re-run even if cached results exist
     """
-    from .device_benchmarks import ensure_benchmark_exists
+    from ..device_benchmarks import ensure_benchmark_exists
     
     print("🚀 Running device performance benchmark...")
     benchmark = ensure_benchmark_exists(force_rerun=force_rerun)
@@ -467,7 +467,7 @@ def run_device_benchmark(force_rerun: bool = False) -> None:
 
 def get_device_info() -> Dict[str, str]:
     """Get current device information."""
-    from .device_benchmarks import get_current_device_info
+    from ..device_benchmarks import get_current_device_info
     return get_current_device_info()
 
 
@@ -482,7 +482,7 @@ def estimate_task_time_direct(task_type: str, quantity: int = 1) -> float:
     Returns:
         Estimated time in seconds
     """
-    from .device_benchmarks import estimate_task_time
+    from ..device_benchmarks import estimate_task_time
     return estimate_task_time(task_type, quantity)
 
 
