@@ -23,7 +23,7 @@ def timeout_handler(signum, frame):
 
 def main():
     # Set budget first
-    budget_minutes = 0.5  # 30 seconds
+    budget_minutes = 10.0  # 10 minutes - enough time for full benchmarking process
     budget_seconds = int(budget_minutes * 60)
     set_time_budget(budget_minutes)
     

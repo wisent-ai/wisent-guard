@@ -242,7 +242,7 @@ class BudgetManager:
         if resource_type == ResourceType.TIME:
             # Use device-specific benchmarks for time estimates
             try:
-                from ..device_benchmarks import estimate_task_time
+                from .device_benchmarks import estimate_task_time
                 
                 # Map task names to benchmark types
                 task_mapping = {
@@ -276,56 +276,23 @@ class BudgetManager:
                     return estimate_task_time("benchmark_eval", 100)
                     
             except Exception as e:
-                print(f"   ⚠️ Error getting device benchmark estimate: {e}")
-                # Fallback to hardcoded estimates if benchmarking fails
-                if "benchmark" in task_name.lower() or "eval" in task_name.lower():
-                    return 30.0  # 30 seconds per benchmark task
-                elif "classifier" in task_name.lower() or "training" in task_name.lower():
-                    return 120.0  # 2 minutes per classifier training
-                elif "generation" in task_name.lower() or "synthetic" in task_name.lower():
-                    return 60.0  # 1 minute per generation task
-                else:
-                    return 30.0  # Default fallback
+                raise RuntimeError(f"Device benchmark estimate failed for task '{task_name}': {e}. Run device benchmark first with: python -m wisent_guard.core.agent.budget benchmark")
         
         elif resource_type == ResourceType.MEMORY:
-            return 512.0  # 512 MB default
+            raise RuntimeError(f"Memory estimation not implemented for task '{task_name}'")
         
         elif resource_type == ResourceType.COMPUTE:
-            return 1.0  # 1 compute unit default
+            raise RuntimeError(f"Compute estimation not implemented for task '{task_name}'")
         
         elif resource_type == ResourceType.TOKENS:
-            return 1000  # 1000 tokens default
+            raise RuntimeError(f"Token estimation not implemented for task '{task_name}'")
         
-        return 0.0
+        raise RuntimeError(f"Unknown resource type: {resource_type}")
     
     def _get_default_task_estimates(self) -> Dict[str, TaskEstimate]:
         """Get default task estimates for common operations."""
-        return {
-            "benchmark_evaluation": TaskEstimate(
-                task_name="benchmark_evaluation",
-                time_seconds=30.0,
-                memory_mb=256.0,
-                tokens=500
-            ),
-            "classifier_training": TaskEstimate(
-                task_name="classifier_training", 
-                time_seconds=120.0,
-                memory_mb=1024.0,
-                tokens=2000
-            ),
-            "data_generation": TaskEstimate(
-                task_name="data_generation",
-                time_seconds=60.0,
-                memory_mb=512.0,
-                tokens=1500
-            ),
-            "model_loading": TaskEstimate(
-                task_name="model_loading",
-                time_seconds=30.0,
-                memory_mb=2048.0,
-                tokens=0
-            )
-        }
+        # No default estimates - all estimates must come from device benchmarks
+        return {}
 
 
 # Global budget manager instance
@@ -356,7 +323,7 @@ def calculate_max_tasks_for_time_budget(task_type: str = "benchmark_evaluation",
     """
     # Use device benchmarking for more accurate estimates
     try:
-        from ..device_benchmarks import estimate_task_time
+        from .device_benchmarks import estimate_task_time
         
         # Map task types to benchmark types
         benchmark_mapping = {
@@ -381,8 +348,7 @@ def calculate_max_tasks_for_time_budget(task_type: str = "benchmark_evaluation",
         return max_tasks
         
     except Exception as e:
-        print(f"   ⚠️ Error using device benchmark, falling back to budget manager: {e}")
-        return _budget_manager.calculate_max_tasks_for_budget(task_type, time_budget_minutes)
+        raise RuntimeError(f"Budget calculation failed for task '{task_type}': {e}. Run device benchmark first with: python -m wisent_guard.core.agent.budget benchmark")
 
 
 def optimize_tasks_for_budget(task_candidates: List[str], 
@@ -440,7 +406,7 @@ def run_device_benchmark(force_rerun: bool = False) -> None:
     Args:
         force_rerun: Force re-run even if cached results exist
     """
-    from ..device_benchmarks import ensure_benchmark_exists
+    from .device_benchmarks import ensure_benchmark_exists
     
     print("🚀 Running device performance benchmark...")
     benchmark = ensure_benchmark_exists(force_rerun=force_rerun)
@@ -467,7 +433,7 @@ def run_device_benchmark(force_rerun: bool = False) -> None:
 
 def get_device_info() -> Dict[str, str]:
     """Get current device information."""
-    from ..device_benchmarks import get_current_device_info
+    from .device_benchmarks import get_current_device_info
     return get_current_device_info()
 
 
@@ -482,7 +448,7 @@ def estimate_task_time_direct(task_type: str, quantity: int = 1) -> float:
     Returns:
         Estimated time in seconds
     """
-    from ..device_benchmarks import estimate_task_time
+    from .device_benchmarks import estimate_task_time
     return estimate_task_time(task_type, quantity)
 
 

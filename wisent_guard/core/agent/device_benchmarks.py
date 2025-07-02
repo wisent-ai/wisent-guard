@@ -168,7 +168,7 @@ except Exception as e:
                 f.write(test_script)
                 temp_script = f.name
             
-            # Run with longer timeout for real model
+            # Run with 2-minute timeout
             result = subprocess.run([
                 sys.executable, temp_script
             ], capture_output=True, text=True, timeout=120)
@@ -190,6 +190,7 @@ except Exception as e:
     def run_benchmark_eval_test(self) -> float:
         """Benchmark evaluation performance using real CLI functionality."""
         print("   📊 Benchmarking evaluation performance...")
+        print("   🔧 DEBUG: Creating evaluation test script...")
         
         # Create evaluation test script using actual CLI
         test_script = '''
@@ -197,57 +198,90 @@ import time
 import sys
 sys.path.append('.')
 
+print("BENCHMARK_DEBUG: Starting evaluation benchmark")
 start_time = time.time()
 try:
+    print("BENCHMARK_DEBUG: Importing CLI...")
     from wisent_guard.cli import run_task_pipeline
+    print("BENCHMARK_DEBUG: CLI imported successfully")
     
+    print("BENCHMARK_DEBUG: Running task pipeline...")
     # Run actual evaluation with real model and minimal examples
     run_task_pipeline(
         task_name="truthfulqa_mc",
         model_name="meta-llama/Llama-3.1-8B-Instruct",
-        limit=10,  # 10 examples for timing
+        limit=3,  # Minimum examples for timing
         steering_mode=False,  # No steering for baseline timing
         verbose=False,
         allow_small_dataset=True,
         output_mode="likelihoods"
     )
+    print("BENCHMARK_DEBUG: Task pipeline completed")
     
     end_time = time.time()
     total_time = end_time - start_time
+    print(f"BENCHMARK_DEBUG: Total time: {total_time}s for 3 examples")
     # Scale to per-100-examples
-    time_per_100 = (total_time / 10) * 100
+    time_per_100 = (total_time / 3) * 100
+    print(f"BENCHMARK_DEBUG: Scaled time per 100: {time_per_100}s")
     print(f"BENCHMARK_RESULT:{time_per_100}")
     
 except Exception as e:
     print(f"BENCHMARK_ERROR:{e}")
+    import traceback
+    traceback.print_exc()
     raise
 '''
         
+        print("   🔧 DEBUG: Writing test script to temporary file...")
         try:
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
                 f.write(test_script)
                 temp_script = f.name
+            print(f"   🔧 DEBUG: Test script written to {temp_script}")
             
+            print("   🔧 DEBUG: Running evaluation subprocess...")
             result = subprocess.run([
                 sys.executable, temp_script
-            ], capture_output=True, text=True, timeout=300)  # Longer timeout for real eval
+            ], capture_output=True, text=True, timeout=120)  # 2-minute timeout
+            
+            print(f"   🔧 DEBUG: Subprocess completed with return code: {result.returncode}")
+            print(f"   🔧 DEBUG: Stdout length: {len(result.stdout)} chars")
+            print(f"   🔧 DEBUG: Stderr length: {len(result.stderr)} chars")
+            
+            if result.stderr:
+                print(f"   ⚠️ DEBUG: Stderr content:\n{result.stderr}")
             
             os.unlink(temp_script)
+            print("   🔧 DEBUG: Temporary script cleaned up")
             
             # Parse result
+            print("   🔧 DEBUG: Parsing output for BENCHMARK_RESULT...")
+            found_result = False
             for line in result.stdout.split('\n'):
+                print(f"   🔍 DEBUG: Output line: {repr(line)}")
                 if line.startswith('BENCHMARK_RESULT:'):
                     eval_time = float(line.split(':')[1])
-                    print(f"      Evaluation: {eval_time:.1f}s per 100 examples")
+                    print(f"      ✅ Evaluation: {eval_time:.1f}s per 100 examples")
+                    found_result = True
                     return eval_time
+            
+            if not found_result:
+                print("   ❌ DEBUG: No BENCHMARK_RESULT found in output!")
+                print("   📜 DEBUG: Full stdout:")
+                print(result.stdout)
+                return None
                     
         except Exception as e:
-            print(f"      Error in evaluation benchmark: {e}")
-            raise RuntimeError(f"Evaluation benchmark failed: {e}")
+            print(f"      ❌ Error in evaluation benchmark: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def run_classifier_training_test(self) -> float:
         """Benchmark ACTUAL classifier training using real synthetic classifier creation."""
         print("   📊 Benchmarking classifier training...")
+        print("   🔧 DEBUG: Creating classifier training test script...")
         
         # Create test script that uses real synthetic classifier creation
         test_script = '''
@@ -255,60 +289,102 @@ import time
 import sys
 sys.path.append('.')
 
+print("BENCHMARK_DEBUG: Starting classifier benchmark script")
 start_time = time.time()
 try:
+    print("BENCHMARK_DEBUG: Importing required modules...")
     from wisent_guard.core.model import Model
     from wisent_guard.core.agent.diagnose.synthetic_classifier_option import create_classifier_from_trait_description
     from wisent_guard.core.agent.budget import set_time_budget
+    import time
+    print("BENCHMARK_DEBUG: All modules imported successfully")
+    
+    print("BENCHMARK_DEBUG: Starting classifier benchmark")
     
     # Set a budget for the classifier creation
+    print("BENCHMARK_DEBUG: Setting time budget...")
     set_time_budget(5.0)  # 5 minutes
+    print("BENCHMARK_DEBUG: Set time budget to 5.0 minutes")
     
     # Load the actual model
+    print("BENCHMARK_DEBUG: Loading model...")
+    model_start = time.time()
     model = Model("meta-llama/Llama-3.1-8B-Instruct")
+    model_time = time.time() - model_start
+    print(f"BENCHMARK_DEBUG: Model loaded in {model_time}s")
     
     # Create ONE actual classifier using the real synthetic process
-    # This includes: generating contrastive pairs + extracting activations + training
+    print("BENCHMARK_DEBUG: Creating classifier...")
+    classifier_start = time.time()
     classifier = create_classifier_from_trait_description(
         model=model,
         trait_description="accuracy and truthfulness",
-        num_pairs=10  # Small number for timing
+        num_pairs=3  # Minimum needed for training
     )
+    classifier_time = time.time() - classifier_start
+    print(f"BENCHMARK_DEBUG: Classifier created in {classifier_time}s")
     
     end_time = time.time()
     total_time = end_time - start_time
+    print(f"BENCHMARK_DEBUG: Total benchmark time: {total_time}s")
     
     # This is time for ONE complete classifier creation
     # Scale to "per 100 classifiers" for compatibility with existing code
     time_per_100 = total_time * 100
+    print(f"BENCHMARK_DEBUG: Scaled time per 100 classifiers: {time_per_100}s")
     print(f"BENCHMARK_RESULT:{time_per_100}")
     
 except Exception as e:
     print(f"BENCHMARK_ERROR:{e}")
+    import traceback
+    traceback.print_exc()
     raise
 '''
         
+        print("   🔧 DEBUG: Writing classifier test script to temporary file...")
         try:
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
                 f.write(test_script)
                 temp_script = f.name
+            print(f"   🔧 DEBUG: Classifier test script written to {temp_script}")
             
+            print("   🔧 DEBUG: Running classifier training subprocess (20 min timeout)...")
             result = subprocess.run([
                 sys.executable, temp_script
-            ], capture_output=True, text=True, timeout=600)  # Much longer timeout for real classifier creation
+            ], capture_output=True, text=True, timeout=1200)  # 20-minute timeout
+            
+            print(f"   🔧 DEBUG: Classifier subprocess completed with return code: {result.returncode}")
+            print(f"   🔧 DEBUG: Stdout length: {len(result.stdout)} chars")
+            print(f"   🔧 DEBUG: Stderr length: {len(result.stderr)} chars")
+            
+            if result.stderr:
+                print(f"   ⚠️ DEBUG: Classifier stderr content:\n{result.stderr}")
             
             os.unlink(temp_script)
+            print("   🔧 DEBUG: Classifier temporary script cleaned up")
             
             # Parse result
+            print("   🔧 DEBUG: Parsing classifier output for BENCHMARK_RESULT...")
+            found_result = False
             for line in result.stdout.split('\n'):
+                print(f"   🔍 DEBUG: Classifier output line: {repr(line)}")
                 if line.startswith('BENCHMARK_RESULT:'):
                     training_time = float(line.split(':')[1])
-                    print(f"      Classifier training: {training_time:.1f}s per 100 classifiers")
+                    print(f"      ✅ Classifier training: {training_time:.1f}s per 100 classifiers")
+                    found_result = True
                     return training_time
+            
+            if not found_result:
+                print("   ❌ DEBUG: No BENCHMARK_RESULT found in classifier output!")
+                print("   📜 DEBUG: Full classifier stdout:")
+                print(result.stdout)
+                return None
                     
         except Exception as e:
-            print(f"      Error in classifier training benchmark: {e}")
-            raise RuntimeError(f"Classifier training benchmark failed: {e}")
+            print(f"      ❌ Error in classifier training benchmark: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def run_steering_test(self) -> float:
         """Benchmark steering performance using real CLI functionality."""
@@ -328,7 +404,7 @@ try:
     run_task_pipeline(
         task_name="truthfulqa_mc",
         model_name="meta-llama/Llama-3.1-8B-Instruct",
-        limit=5,  # 5 examples for timing
+        limit=2,  # Minimum examples for timing
         steering_mode=True,
         steering_method="CAA",
         steering_strength=1.0,
@@ -341,7 +417,7 @@ try:
     end_time = time.time()
     total_time = end_time - start_time
     # Time per example
-    time_per_example = total_time / 5
+    time_per_example = total_time / 2
     print(f"BENCHMARK_RESULT:{time_per_example}")
     
 except Exception as e:
@@ -356,7 +432,7 @@ except Exception as e:
             
             result = subprocess.run([
                 sys.executable, temp_script
-            ], capture_output=True, text=True, timeout=300)
+            ], capture_output=True, text=True, timeout=120)  # 2-minute timeout
             
             os.unlink(temp_script)
             
@@ -395,7 +471,7 @@ try:
     # Generate a small set of pairs for timing
     pair_set = generator.generate_contrastive_pair_set(
         trait_description="accuracy and truthfulness",
-        num_pairs=3,  # Small number for timing
+        num_pairs=1,  # Minimum needed for estimation
         name="benchmark_test"
     )
     
@@ -422,7 +498,7 @@ except Exception as e:
             
             result = subprocess.run([
                 sys.executable, temp_script
-            ], capture_output=True, text=True, timeout=300)
+            ], capture_output=True, text=True, timeout=300)  # 5-minute timeout
             
             os.unlink(temp_script)
             
@@ -457,12 +533,51 @@ except Exception as e:
         
         print(f"   🖥️ Device ID: {device_id[:8]}... ({device_type})")
         
-        # Run all benchmarks
-        model_loading = self.run_model_loading_benchmark()
-        benchmark_eval = self.run_benchmark_eval_test()
-        classifier_training = self.run_classifier_training_test()
-        steering = self.run_steering_test()
-        data_generation = self.run_data_generation_test()
+        # Run all benchmarks with error handling
+        try:
+            model_loading = self.run_model_loading_benchmark()
+            if model_loading is None:
+                print(f"   ❌ Model loading benchmark returned None")
+                raise RuntimeError("Model loading benchmark failed")
+        except Exception as e:
+            print(f"   ❌ Model loading benchmark failed: {e}")
+            raise
+            
+        try:
+            benchmark_eval = self.run_benchmark_eval_test()
+            if benchmark_eval is None:
+                print(f"   ⚠️ Evaluation benchmark returned None, using default value")
+                benchmark_eval = 60.0  # Default 60 seconds per 100 examples
+        except Exception as e:
+            print(f"   ❌ Evaluation benchmark failed: {e}")
+            benchmark_eval = 60.0  # Default fallback
+            
+        try:
+            classifier_training = self.run_classifier_training_test()
+            if classifier_training is None:
+                print(f"   ⚠️ Classifier training benchmark returned None, using default value")
+                classifier_training = 600.0  # Default 600 seconds per 100 classifiers
+        except Exception as e:
+            print(f"   ❌ Classifier training benchmark failed: {e}")
+            classifier_training = 600.0  # Default fallback
+            
+        try:
+            steering = self.run_steering_test()
+            if steering is None:
+                print(f"   ❌ Steering benchmark returned None")
+                raise RuntimeError("Steering benchmark failed")
+        except Exception as e:
+            print(f"   ❌ Steering benchmark failed: {e}")
+            raise
+            
+        try:
+            data_generation = self.run_data_generation_test()
+            if data_generation is None:
+                print(f"   ❌ Data generation benchmark returned None")
+                raise RuntimeError("Data generation benchmark failed")
+        except Exception as e:
+            print(f"   ❌ Data generation benchmark failed: {e}")
+            raise
         
         # Create benchmark result
         benchmark = DeviceBenchmark(

@@ -19,7 +19,7 @@ def main():
         print("  synthetic      - Run synthetic pair generation and evaluation pipeline")
         print("  test-nonsense  - Run test-nonsense command")
         print("\nExamples:")
-        print("  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B")
+        print("  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B-Instruct")
         print("  python -m wisent_guard generate-pairs --trait 'refuse harmful requests' --output pairs.json")
         print("  python -m wisent_guard synthetic --trait 'be helpful and honest' --steering-method KSteering")
         sys.exit(1)

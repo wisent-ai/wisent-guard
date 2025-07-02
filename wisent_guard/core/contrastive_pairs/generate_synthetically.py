@@ -8,6 +8,7 @@ import numpy as np
 
 from .contrastive_pair import ContrastivePair
 from .contrastive_pair_set import ContrastivePairSet
+from .quality_check import quality_check_synthetic_pairs
 from ..response import PositiveResponse, NegativeResponse
 
 
@@ -43,19 +44,26 @@ class SyntheticContrastivePairGenerator:
         Returns:
             List of scenario descriptions
         """
+        print(f"🎯 DEBUG: Generating scenarios for trait: '{trait_description}'")
+        print(f"🎯 DEBUG: Target number of scenarios: {num_scenarios}")
+        
         # Overgenerate to ensure diversity
         target_scenarios = num_scenarios * 3
         all_scenarios = []
         
-        # Different prompt strategies to ensure diversity
+        print(f"🎯 DEBUG: Will generate {target_scenarios} total scenarios to select {num_scenarios} best ones")
+        
+        # Different prompt strategies to ensure diversity  
         prompt_templates = [
-            f"Generate specific scenarios where this trait is important: '{trait_description}'. List {target_scenarios//4} different situations:",
-            f"Think of edge cases and challenging situations for: '{trait_description}'. Provide {target_scenarios//4} examples:",
-            f"Consider various contexts where '{trait_description}' would apply. Give {target_scenarios//4} diverse scenarios:",
-            f"What are subtle or complex situations where '{trait_description}' matters? List {target_scenarios//4} cases:"
+            f"Write {target_scenarios//4} short questions testing {trait_description}:\n1.",
+            f"List {target_scenarios//4} simple questions about {trait_description}:\n1.",
+            f"Create {target_scenarios//4} direct questions requiring {trait_description}:\n1.",
+            f"Generate {target_scenarios//4} brief questions on {trait_description}:\n1."
         ]
         
-        for template in prompt_templates:
+        for i, template in enumerate(prompt_templates):
+            print(f"🎯 DEBUG: Using prompt template {i+1}/{len(prompt_templates)}")
+            print(f"🎯 DEBUG: Template: {template[:100]}...")
             try:
                 response, _ = self.model.generate(
                     template,
@@ -65,19 +73,32 @@ class SyntheticContrastivePairGenerator:
                     do_sample=True
                 )
                 
+                print(f"🎯 DEBUG: Generated response length: {len(response)} chars")
+                print(f"🎯 DEBUG: Response preview: {response[:200]}...")
+                
                 # Parse scenarios from response
                 scenarios = self._parse_scenarios_from_response(response)
+                print(f"🎯 DEBUG: Parsed {len(scenarios)} scenarios from this template")
+                for j, scenario in enumerate(scenarios):
+                    print(f"🎯 DEBUG:   Scenario {j+1}: {scenario[:100]}...")
                 all_scenarios.extend(scenarios)
                 
             except Exception as e:
-                print(f"Warning: Error generating scenarios with template: {e}")
+                print(f"🎯 DEBUG: Error generating scenarios with template: {e}")
                 continue
+        
+        print(f"🎯 DEBUG: Total scenarios before deduplication: {len(all_scenarios)}")
         
         # Deduplicate and select most diverse scenarios
         unique_scenarios = self._deduplicate_scenarios(all_scenarios)
+        print(f"🎯 DEBUG: Unique scenarios after deduplication: {len(unique_scenarios)}")
         
         # Select the best diverse scenarios
         selected_scenarios = self._select_diverse_scenarios(unique_scenarios, num_scenarios)
+        print(f"🎯 DEBUG: Final selected scenarios: {len(selected_scenarios)}")
+        
+        for i, scenario in enumerate(selected_scenarios):
+            print(f"🎯 DEBUG: Final scenario {i+1}: {scenario}")
         
         return selected_scenarios
     
@@ -102,8 +123,21 @@ class SyntheticContrastivePairGenerator:
                 if cleaned.startswith(prefix):
                     cleaned = cleaned[len(prefix):].strip()
             
-            # Only keep substantial scenarios
-            if len(cleaned) > 15 and len(cleaned) < 200:
+            # Filter out meta-descriptions and keep only actual questions/scenarios
+            skip_phrases = [
+                'here are', 'here is', 'these are', 'this is', 'the following',
+                'examples of', 'scenarios where', 'situations where', 'cases where',
+                'questions that', 'prompts that', 'list of', 'different situations'
+            ]
+            
+            cleaned_lower = cleaned.lower()
+            is_meta = any(phrase in cleaned_lower for phrase in skip_phrases)
+            
+            # Only keep short, direct questions 
+            if (len(cleaned) > 10 and len(cleaned) < 100 and not is_meta and
+                ('?' in cleaned or 'what' in cleaned_lower or 
+                 'how' in cleaned_lower or 'why' in cleaned_lower or 'when' in cleaned_lower or
+                 'can you' in cleaned_lower or 'should' in cleaned_lower)):
                 scenarios.append(cleaned)
         
         return scenarios[:10]  # Limit per response
@@ -186,38 +220,51 @@ class SyntheticContrastivePairGenerator:
         Returns:
             ContrastivePair object
         """
-        # Generate positive response (demonstrates good trait)
-        positive_prompt = f"""Scenario: {scenario}
+        print(f"🔄 DEBUG: Generating contrastive pair for scenario: {scenario[:100]}...")
+        print(f"🔄 DEBUG: Trait: {trait_description}")
+        
+        # Generate positive response (demonstrates the trait)
+        positive_prompt = f"""{scenario}
 
-Show how a model should respond to demonstrate this trait: "{trait_description}"
-
-Response:"""
+Brief answer showing {trait_description}:"""
+        
+        print(f"🔄 DEBUG: Positive prompt: {positive_prompt}")
         
         positive_response, _ = self.model.generate(
             positive_prompt,
             layer_index=15,
-            max_new_tokens=150,
-            temperature=0.7,
+            max_new_tokens=8,
+            temperature=0.8,
             do_sample=True
         )
         
+        print(f"🔄 DEBUG: Positive response: {positive_response[:100]}...")
+        
         # Generate negative response (opposite of trait)
-        negative_prompt = f"""Scenario: {scenario}
+        negative_prompt = f"""{scenario}
 
-Show how a model should NOT respond (demonstrate the opposite of this trait): "{trait_description}"
-
-Response:"""
+Brief answer showing non-{trait_description}:"""
+        
+        print(f"🔄 DEBUG: Negative prompt: {negative_prompt}")
         
         negative_response, _ = self.model.generate(
             negative_prompt,
             layer_index=15,
-            max_new_tokens=150,
-            temperature=0.7,
+            max_new_tokens=8,
+            temperature=0.8,
             do_sample=True
         )
         
+        print(f"🔄 DEBUG: Negative response: {negative_response[:100]}...")
+        
         # Create contrastive pair
-        prompt = f"Scenario: {scenario}"
+        # Use scenario directly if it's already a question, otherwise add context
+        if scenario.strip().endswith('?') or any(word in scenario.lower() for word in ['what', 'how', 'why', 'when', 'explain', 'tell me']):
+            prompt = scenario.strip()
+            print(f"🔄 DEBUG: Using scenario as direct prompt: {prompt}")
+        else:
+            prompt = f"Scenario: {scenario}"
+            print(f"🔄 DEBUG: Using scenario with prefix: {prompt}")
         
         pair = ContrastivePair(
             prompt=prompt,
@@ -228,6 +275,8 @@ Response:"""
         # Store metadata
         pair.scenario = scenario
         pair.trait_description = trait_description
+        
+        print(f"🔄 DEBUG: Created contrastive pair successfully")
         
         return pair
     
@@ -273,7 +322,15 @@ Response:"""
         
         print(f"✅ Successfully generated {len(pair_set.pairs)} contrastive pairs")
         
-        return pair_set
+        # Apply quality check to filter out low-quality pairs
+        print("🔍 Applying quality check to filter pairs...")
+        filtered_pair_set = quality_check_synthetic_pairs(
+            pair_set, 
+            trait_description, 
+            strict_mode=True
+        )
+        
+        return filtered_pair_set
     
     def save_to_json(self, pair_set: ContrastivePairSet, filepath: str) -> None:
         """Save contrastive pair set to JSON file."""

@@ -139,27 +139,63 @@ class SyntheticClassifierFactory:
             
             print(f"      🧠 Extracting activations from {len(pair_set.pairs)} pairs...")
             
-            for pair in pair_set.pairs:
+            # Create Layer object for activation extraction
+            from wisent_guard.core.layer import Layer
+            layer_obj = Layer(index=15, type="transformer")
+            print(f"      🔧 Created Layer object: index={layer_obj.index}, type={layer_obj.type}")
+            
+            for i, pair in enumerate(pair_set.pairs):
+                print(f"      🔍 Processing pair {i+1}/{len(pair_set.pairs)}...")
                 try:
                     # Get activations for positive response
-                    pos_activations, _ = self.model.extract_activations(pair.positive_response.text, layer=15)
+                    print(f"         📊 Extracting positive activations for: {repr(pair.positive_response.text[:100])}")
+                    pos_activations = self.model.extract_activations(pair.positive_response.text, layer_obj)
+                    print(f"         ✅ Positive activations shape: {pos_activations.shape if hasattr(pos_activations, 'shape') else 'N/A'}")
                     positive_activations.append(pos_activations)
                     
                     # Get activations for negative response
-                    neg_activations, _ = self.model.extract_activations(pair.negative_response.text, layer=15)
+                    print(f"         📊 Extracting negative activations for: {repr(pair.negative_response.text[:100])}")
+                    neg_activations = self.model.extract_activations(pair.negative_response.text, layer_obj)
+                    print(f"         ✅ Negative activations shape: {neg_activations.shape if hasattr(neg_activations, 'shape') else 'N/A'}")
                     negative_activations.append(neg_activations)
                     
+                    print(f"         ✅ Successfully processed pair {i+1}")
+                    
                 except Exception as e:
-                    print(f"         ⚠️ Error extracting activations for pair: {e}")
+                    print(f"         ⚠️ Error extracting activations for pair {i+1}: {e}")
+                    import traceback
+                    error_details = traceback.format_exc()
+                    print(f"         📜 Full error traceback:\n{error_details}")
                     continue
             
+            print(f"      📊 ACTIVATION EXTRACTION SUMMARY:")
+            print(f"         Positive activations collected: {len(positive_activations)}")
+            print(f"         Negative activations collected: {len(negative_activations)}")
+            print(f"         Total pairs processed: {len(pair_set.pairs)}")
+            print(f"         Success rate: {(len(positive_activations) / len(pair_set.pairs) * 100):.1f}%")
+            
             if len(positive_activations) < 2 or len(negative_activations) < 2:
-                raise ValueError("Insufficient activation data for training")
+                error_msg = f"Insufficient activation data for training: {len(positive_activations)} positive, {len(negative_activations)} negative"
+                print(f"      ❌ ERROR: {error_msg}")
+                raise ValueError(error_msg)
             
             # Train classifier on activations
             print(f"      🏋️ Training classifier on {len(positive_activations)} positive, {len(negative_activations)} negative activations...")
+            
+            print(f"      🔧 Creating ActivationClassifier instance...")
             classifier = ActivationClassifier()
-            classifier.fit(negative_activations, positive_activations)
+            print(f"      ✅ ActivationClassifier created")
+            
+            print(f"      🎯 Starting classifier training...")
+            try:
+                classifier.fit(negative_activations, positive_activations)
+                print(f"      ✅ Classifier training completed successfully!")
+            except Exception as e:
+                print(f"      ❌ ERROR during classifier training: {e}")
+                import traceback
+                error_details = traceback.format_exc()
+                print(f"      📜 Full training error traceback:\n{error_details}")
+                raise
             
             return classifier, len(pair_set.pairs)
             
@@ -384,55 +420,134 @@ def create_classifier_from_trait_description(
     Returns:
         Trained ActivationClassifier
     """
-    print(f"🎯 Creating classifier for trait: '{trait_description}'")
+    import datetime
+    
+    # Setup logging to file
+    log_file = f"synthetic_classifier_debug_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    
+    def log_and_print(message):
+        print(message)
+        with open(log_file, 'a') as f:
+            f.write(f"{datetime.datetime.now().isoformat()}: {message}\n")
+    
+    log_and_print(f"🎯 Creating classifier for trait: '{trait_description}'")
+    log_and_print(f"📋 Parameters: num_pairs={num_pairs}")
     
     # Create synthetic contrastive pair generator
+    log_and_print("🏭 Creating SyntheticContrastivePairGenerator...")
     pair_generator = SyntheticContrastivePairGenerator(model)
+    log_and_print("✅ SyntheticContrastivePairGenerator created successfully")
     
     # Generate contrastive pairs for this trait
-    print(f"📝 Generating {num_pairs} contrastive pairs...")
+    log_and_print(f"📝 Generating {num_pairs} contrastive pairs...")
     pair_set = pair_generator.generate_contrastive_pair_set(
         trait_description=trait_description,
         num_pairs=num_pairs,
         name=f"synthetic_{trait_description[:20].replace(' ', '_')}"
     )
     
+    log_and_print(f"✅ Generated {len(pair_set.pairs)} pairs total")
+    
+    # Log all generated pairs in detail
+    log_and_print("=" * 80)
+    log_and_print("DETAILED PAIR ANALYSIS:")
+    log_and_print("=" * 80)
+    
+    for i, pair in enumerate(pair_set.pairs):
+        log_and_print(f"\n--- PAIR {i+1}/{len(pair_set.pairs)} ---")
+        log_and_print(f"Prompt: {repr(pair.prompt)}")
+        log_and_print(f"Positive Response: {repr(pair.positive_response.text)}")
+        log_and_print(f"Negative Response: {repr(pair.negative_response.text)}")
+        log_and_print(f"Positive Response Type: {type(pair.positive_response)}")
+        log_and_print(f"Negative Response Type: {type(pair.negative_response)}")
+        log_and_print(f"Positive Response Length: {len(pair.positive_response.text) if hasattr(pair.positive_response, 'text') else 'N/A'}")
+        log_and_print(f"Negative Response Length: {len(pair.negative_response.text) if hasattr(pair.negative_response, 'text') else 'N/A'}")
+        
+        # Check for any special attributes
+        if hasattr(pair, '_prompt_pair'):
+            log_and_print(f"Has _prompt_pair: {pair._prompt_pair}")
+        if hasattr(pair, '_prompt_strategy'):
+            log_and_print(f"Has _prompt_strategy: {pair._prompt_strategy}")
+    
+    log_and_print("=" * 80)
+    
     if len(pair_set.pairs) < 3:
-        raise ValueError(f"Insufficient training pairs generated: {len(pair_set.pairs)}")
+        error_msg = f"Insufficient training pairs generated: {len(pair_set.pairs)}"
+        log_and_print(f"❌ ERROR: {error_msg}")
+        raise ValueError(error_msg)
     
     # Extract activations for training
     positive_activations = []
     negative_activations = []
     
-    print(f"🧠 Extracting activations from {len(pair_set.pairs)} pairs...")
+    log_and_print(f"🧠 Extracting activations from {len(pair_set.pairs)} pairs...")
     
-    for pair in pair_set.pairs:
+    # Create Layer object for activation extraction
+    from wisent_guard.core.layer import Layer
+    layer_obj = Layer(index=15, type="transformer")
+    log_and_print(f"🔧 Created Layer object: index={layer_obj.index}, type={layer_obj.type}")
+    
+    for i, pair in enumerate(pair_set.pairs):
+        log_and_print(f"\n🔍 Processing pair {i+1}/{len(pair_set.pairs)}...")
         try:
             # Get activations for positive response
-            pos_activations, _ = model.extract_activations(pair.positive_response.text, layer=15)
+            log_and_print(f"   📊 Extracting positive activations for: {repr(pair.positive_response.text[:100])}")
+            pos_activations = model.extract_activations(pair.positive_response.text, layer_obj)
+            log_and_print(f"   ✅ Positive activations shape: {pos_activations.shape if hasattr(pos_activations, 'shape') else 'N/A'}")
             positive_activations.append(pos_activations)
             
             # Get activations for negative response
-            neg_activations, _ = model.extract_activations(pair.negative_response.text, layer=15)
+            log_and_print(f"   📊 Extracting negative activations for: {repr(pair.negative_response.text[:100])}")
+            neg_activations = model.extract_activations(pair.negative_response.text, layer_obj)
+            log_and_print(f"   ✅ Negative activations shape: {neg_activations.shape if hasattr(neg_activations, 'shape') else 'N/A'}")
             negative_activations.append(neg_activations)
             
+            log_and_print(f"   ✅ Successfully processed pair {i+1}")
+            
         except Exception as e:
-            print(f"   ⚠️ Error extracting activations for pair: {e}")
+            log_and_print(f"   ⚠️ Error extracting activations for pair {i+1}: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            log_and_print(f"   📜 Full error traceback:\n{error_details}")
             continue
     
-    if len(positive_activations) < 2 or len(negative_activations) < 2:
-        raise ValueError("Insufficient activation data for training")
+    log_and_print(f"\n📊 ACTIVATION EXTRACTION SUMMARY:")
+    log_and_print(f"   Positive activations collected: {len(positive_activations)}")
+    log_and_print(f"   Negative activations collected: {len(negative_activations)}")
+    log_and_print(f"   Total pairs processed: {len(pair_set.pairs)}")
+    log_and_print(f"   Success rate: {(len(positive_activations) / len(pair_set.pairs) * 100):.1f}%")
     
+    if len(positive_activations) < 2 or len(negative_activations) < 2:
+        error_msg = f"Insufficient activation data for training: {len(positive_activations)} positive, {len(negative_activations)} negative"
+        log_and_print(f"❌ ERROR: {error_msg}")
+        raise ValueError(error_msg)
+
     # Train classifier on activations
-    print(f"🏋️ Training classifier on {len(positive_activations)} positive, {len(negative_activations)} negative activations...")
+    log_and_print(f"🏋️ Training classifier on {len(positive_activations)} positive, {len(negative_activations)} negative activations...")
+    
+    log_and_print("🔧 Creating ActivationClassifier instance...")
     classifier = ActivationClassifier()
-    classifier.fit(negative_activations, positive_activations)
+    log_and_print("✅ ActivationClassifier created")
+    
+    log_and_print("🎯 Starting classifier training...")
+    try:
+        classifier.fit(negative_activations, positive_activations)
+        log_and_print("✅ Classifier training completed successfully!")
+    except Exception as e:
+        log_and_print(f"❌ ERROR during classifier training: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        log_and_print(f"📜 Full training error traceback:\n{error_details}")
+        raise
     
     # Store metadata
     classifier._trait_description = trait_description
     classifier._pairs_count = len(pair_set.pairs)
+    log_and_print(f"📝 Stored metadata: trait='{trait_description}', pairs_count={len(pair_set.pairs)}")
     
-    print(f"✅ Classifier created successfully for '{trait_description}'")
+    log_and_print(f"🎉 Classifier creation completed successfully!")
+    log_and_print(f"📁 Debug log saved to: {log_file}")
+    
     return classifier
 
 
