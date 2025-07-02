@@ -2192,6 +2192,8 @@ def main():
         handle_test_nonsense_command(args)
     elif args.command == "monitor":
         handle_monitor_command(args)
+    elif args.command == "agent":
+        handle_agent_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -2470,6 +2472,75 @@ def handle_monitor_command(args):
             print(f"   GPU {i}: {gpu_name}")
     
     print(f"\n💡 Use --help to see more monitoring options")
+
+
+def handle_agent_command(args):
+    """Handle the agent command."""
+    import asyncio
+    from .core.autonomous_agent import AutonomousAgent
+    
+    async def run_agent():
+        print(f"🤖 Starting autonomous agent...")
+        print(f"   Prompt: {args.prompt}")
+        print(f"   Model: {args.model}")
+        print(f"   Quality threshold: {args.quality_threshold}")
+        print(f"   Time budget: {args.time_budget} minutes")
+        print(f"   Max attempts: {args.max_attempts}")
+        
+        try:
+            # Initialize agent
+            agent = AutonomousAgent(
+                model_name=args.model,
+                enable_tracking=True
+            )
+            
+            await agent.initialize(
+                quality_threshold=args.quality_threshold,
+                default_time_budget_minutes=args.time_budget
+            )
+            
+            # Process the prompt
+            result = await agent.respond_autonomously(
+                prompt=args.prompt,
+                max_attempts=args.max_attempts,
+                quality_threshold=args.quality_threshold,
+                time_budget_minutes=args.time_budget,
+                max_classifiers=args.max_classifiers
+            )
+            
+            # Show results
+            print(f"\n🎯 FINAL RESPONSE:")
+            print(f"{result['final_response']}")
+            
+            if args.verbose:
+                print(f"\n📊 DETAILS:")
+                print(f"   Attempts: {result['attempts']}")
+                print(f"   Improvements: {len(result['improvement_chain'])}")
+                
+                # Handle both dict and string classifier_info
+                classifier_info = result['classifier_info']
+                if isinstance(classifier_info, dict):
+                    print(f"   Classifiers used: {classifier_info['count']}")
+                    print(f"   Classifier types: {classifier_info['types']}")
+                else:
+                    print(f"   Classifier info: {classifier_info}")
+                
+                # Show performance summary
+                summary = agent.get_performance_summary()
+                if not summary.get('tracking_disabled'):
+                    print(f"\n📈 PERFORMANCE SUMMARY:")
+                    print(f"   Total improvements: {summary.get('total_improvements_attempted', 0)}")
+                    print(f"   Success rate: {summary.get('success_rate', 0):.2%}")
+            
+        except Exception as e:
+            print(f"❌ Agent failed: {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+            sys.exit(1)
+    
+    # Run the async agent
+    asyncio.run(run_agent())
 
 
 if __name__ == "__main__":

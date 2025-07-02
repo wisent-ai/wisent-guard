@@ -36,6 +36,10 @@ def setup_parser() -> argparse.ArgumentParser:
     monitor_parser = subparsers.add_parser("monitor", help="Performance monitoring and system information")
     setup_monitor_parser(monitor_parser)
     
+    # Agent command for autonomous agent interaction
+    agent_parser = subparsers.add_parser("agent", help="Interact with autonomous agent")
+    setup_agent_parser(agent_parser)
+    
     return parser
 
 
@@ -457,3 +461,14 @@ def setup_monitor_parser(parser):
                         help="Include GPU monitoring (requires CUDA)")
     parser.add_argument("--detailed", action="store_true",
                         help="Show detailed monitoring information")
+
+
+def setup_agent_parser(parser):
+    """Set up the agent subcommand parser."""
+    parser.add_argument("prompt", type=str, help="Prompt to send to the autonomous agent")
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model to use")
+    parser.add_argument("--quality-threshold", type=float, default=0.3, help="Quality threshold for classifiers (default: 0.3)")
+    parser.add_argument("--time-budget", type=float, default=10.0, help="Time budget in minutes for creating classifiers (default: 10.0)")
+    parser.add_argument("--max-attempts", type=int, default=3, help="Maximum improvement attempts (default: 3)")
+    parser.add_argument("--max-classifiers", type=int, default=None, help="Maximum classifiers to use (default: no limit)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
