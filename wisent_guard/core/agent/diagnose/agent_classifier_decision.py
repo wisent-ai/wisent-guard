@@ -37,7 +37,7 @@ class AgentClassifierDecisionSystem:
         
     def analyze_task_requirements(self, prompt: str, context: str = "") -> TaskAnalysis:
         """
-        Analyze a task/prompt to predict what types of classifiers might be needed.
+        Analyze a task/prompt using model decisions to predict classifier needs.
         
         Args:
             prompt: The prompt or task to analyze
@@ -46,89 +46,72 @@ class AgentClassifierDecisionSystem:
         Returns:
             Analysis of predicted classifier needs
         """
-        prompt_lower = prompt.lower()
-        combined_text = f"{prompt} {context}".lower()
+        # Get available classifier types from the marketplace
+        available_classifiers = self.marketplace.discover_available_classifiers()
+        available_issue_types = list(set(c.issue_type for c in available_classifiers if c.issue_type != "unknown"))
         
-        # Pattern-based analysis for different issue types
-        issue_patterns = {
-            "hallucination": [
-                r'\b(fact|truth|accurate|verify|correct|real|actual|evidence)\b',
-                r'\b(when|where|who|what|how|which)\b',  # Question words
-                r'\b(history|science|geography|politics|news|event)\b',
-                r'\b(happen|occur|exist|true|false)\b'
-            ],
-            "harmful": [
-                r'\b(violence|weapon|drug|illegal|harm|danger|kill|hurt)\b',
-                r'\b(hate|discriminat|racist|sexist|offensive)\b',
-                r'\b(suicide|self.harm|abuse|threat)\b',
-                r'\b(explicit|sexual|adult|nsfw)\b'
-            ],
-            "bias": [
-                r'\b(gender|race|ethnic|religion|age|disability)\b',
-                r'\b(stereotype|prejudice|discrimination|bias)\b',
-                r'\b(men|women|black|white|asian|muslim|christian)\b',
-                r'\b(should|better|worse|superior|inferior)\b'
-            ],
-            "quality": [
-                r'\b(explain|describe|analyze|compare|summarize)\b',
-                r'\b(write|create|generate|compose|draft)\b',
-                r'\b(essay|report|article|story|poem)\b',
-                r'\b(help|advice|suggestion|recommend)\b'
-            ],
-            "coherence": [
-                r'\b(logic|reason|consistent|contradict|make sense)\b',
-                r'\b(confusing|unclear|jumbled|mixed up)\b',
-                r'\b(follow|sequence|order|structure)\b'
-            ]
-        }
-        
-        predicted_issues = {}
-        
-        for issue_type, patterns in issue_patterns.items():
-            score = 0.0
-            matches = 0
+        # Use model to analyze the task and determine needs
+        analysis_prompt = f"""Analyze this task/prompt for potential AI safety issues that would require classification.
+
+Task: {prompt}
+Context: {context}
+
+Available issue types: {', '.join(available_issue_types)}
+
+What types of AI safety issues might this task involve? Consider:
+- hallucination (false information, factual errors)
+- quality (output quality, coherence issues)  
+- harmful (toxic content, safety violations)
+- bias (unfairness, discrimination)
+- coherence (logical consistency problems)
+
+Respond with:
+1. List of relevant issue types from available types (comma-separated, or 'none')
+2. Task complexity (0.0-1.0)
+3. Risk level (0.0-1.0)
+
+Format: issue_types|complexity|risk
+Example: hallucination,quality|0.7|0.3"""
+
+        try:
+            response = self.marketplace.model.generate(analysis_prompt, max_length=50, temperature=0.1)
+            parts = response.strip().split('|')
             
-            for pattern in patterns:
-                found = re.findall(pattern, combined_text)
-                if found:
-                    matches += len(found)
-                    score += len(found) * 0.1  # Each match adds 0.1
+            if len(parts) >= 3:
+                issue_types_str = parts[0].strip()
+                if issue_types_str.lower() == 'none':
+                    issue_types = []
+                else:
+                    issue_types = [t.strip() for t in issue_types_str.split(',') if t.strip() and t.strip() in available_issue_types]
+                
+                complexity = float(parts[1]) if parts[1].replace('.','').replace('-','').isdigit() else 0.5
+                risk = float(parts[2]) if parts[2].replace('.','').replace('-','').isdigit() else 0.5
+            else:
+                issue_types = []
+                complexity = 0.5
+                risk = 0.5
             
-            # Normalize score based on text length
-            text_length = len(combined_text.split())
-            if text_length > 0:
-                score = min(score / (text_length / 100), 1.0)  # Normalize per 100 words
-            
-            if score > 0.05:  # Only include if meaningful signal
-                predicted_issues[issue_type] = score
-        
-        # Calculate task complexity based on prompt characteristics
-        complexity_factors = [
-            len(prompt.split()) / 100,  # Length factor
-            len(re.findall(r'\?', prompt)) * 0.2,  # Question complexity
-            len(re.findall(r'\b(complex|difficult|detailed|comprehensive)\b', prompt_lower)) * 0.3,
-            len(predicted_issues) * 0.1  # Multiple issue types = more complex
-        ]
-        task_complexity = min(sum(complexity_factors), 1.0)
-        
-        # Calculate risk level
-        risk_indicators = [
-            'sensitive', 'controversial', 'political', 'medical', 'legal',
-            'advice', 'recommendation', 'should', 'must', 'never', 'always'
-        ]
-        risk_score = sum(0.1 for indicator in risk_indicators if indicator in prompt_lower)
-        risk_level = min(risk_score, 1.0)
-        
-        # Sort issue types by confidence
-        sorted_issues = sorted(predicted_issues.keys(), key=lambda x: predicted_issues[x], reverse=True)
-        
-        return TaskAnalysis(
-            predicted_issue_types=sorted_issues,
-            confidence_scores=predicted_issues,
-            task_complexity=task_complexity,
-            prompt_content=prompt,
-            risk_level=risk_level
-        )
+            # Generate confidence scores for each predicted issue type
+            confidence_scores = {}
+            for issue_type in issue_types:
+                confidence_scores[issue_type] = 0.8  # Default confidence for model predictions
+                
+            return TaskAnalysis(
+                predicted_issue_types=issue_types,
+                confidence_scores=confidence_scores,
+                task_complexity=min(1.0, max(0.0, complexity)),
+                prompt_content=prompt,
+                risk_level=min(1.0, max(0.0, risk))
+            )
+        except Exception as e:
+            print(f"   ⚠️ Model analysis failed: {e}")
+            return TaskAnalysis(
+                predicted_issue_types=[],
+                confidence_scores={},
+                task_complexity=0.5,
+                prompt_content=prompt,
+                risk_level=0.5
+            )
     
     async def make_classifier_decisions(self, 
                                       task_analysis: TaskAnalysis,
@@ -147,10 +130,7 @@ class AgentClassifierDecisionSystem:
         Returns:
             List of classifier decisions
         """
-        print(f"🤖 Agent making classifier decisions...")
-        print(f"   🎯 Predicted issues: {task_analysis.predicted_issue_types}")
-        print(f"   📊 Task complexity: {task_analysis.task_complexity:.2f}")
-        print(f"   ⚠️ Risk level: {task_analysis.risk_level:.2f}")
+        # Removed hardcoded analysis output
         
         # Set up budget manager
         budget_manager = get_budget_manager()
@@ -207,7 +187,7 @@ class AgentClassifierDecisionSystem:
         # Store decisions in history
         self.decision_history.extend(decisions)
         
-        print(f"\n   📋 Final decisions: {len([d for d in decisions if d.action != 'skip'])} classifiers selected")
+        # Return decisions without verbose output
         return decisions
     
     def _evaluate_classifier_options(self,

@@ -168,20 +168,38 @@ class ClassifierMarketplace:
                     layer = int(match.group(1))
                     break
         
-        # Extract issue type
-        issue_type = "unknown"
-        if 'hallucination' in filename or 'truthful' in filename:
-            issue_type = "hallucination"
-        elif 'quality' in filename:
-            issue_type = "quality"
-        elif 'harmful' in filename or 'safety' in filename:
-            issue_type = "harmful"
-        elif 'bias' in filename:
-            issue_type = "bias"
-        elif 'coherence' in filename:
-            issue_type = "coherence"
+        # Extract issue type using model
+        issue_type = self._get_model_issue_type(filename)
         
         return layer, issue_type
+    
+    def _get_model_issue_type(self, filename: str) -> str:
+        """Extract issue type from filename using model decisions."""
+        prompt = f"""What AI safety issue type is this classifier filename related to?
+
+Filename: {filename}
+
+Common issue types include:
+- hallucination (false information, factual errors) 
+- quality (output quality, coherence)
+- harmful (toxic content, safety violations)
+- bias (unfairness, discrimination)
+- coherence (logical consistency)
+
+Respond with just the issue type (one word):"""
+        
+        try:
+            response = self.model.generate(prompt, max_length=15, temperature=0.1)
+            issue_type = response.strip().lower()
+            
+            # Clean up response to single word
+            import re
+            match = re.search(r'(hallucination|quality|harmful|bias|coherence|unknown)', issue_type)
+            if match:
+                return match.group(1)
+            return "unknown"
+        except:
+            return "unknown"
     
     def _calculate_quality_score(self, metadata: Dict[str, Any]) -> float:
         """Calculate a comprehensive quality score for the classifier."""
@@ -214,21 +232,30 @@ class ClassifierMarketplace:
         return min(score, 1.0)
     
     def _extract_model_family(self, model_name: str) -> str:
-        """Extract model family from model name."""
+        """Extract model family from model name using model decisions."""
         if not model_name:
             return "unknown"
         
-        model_name = model_name.lower()
-        if 'llama' in model_name:
-            return 'llama'
-        elif 'mistral' in model_name:
-            return 'mistral'
-        elif 'gemma' in model_name:
-            return 'gemma'
-        elif 'qwen' in model_name:
-            return 'qwen'
-        else:
-            return 'unknown'
+        prompt = f"""What model family is this model name from?
+
+Model name: {model_name}
+
+Common families include: llama, mistral, gemma, qwen, gpt, claude, other
+
+Respond with just the family name (one word):"""
+        
+        try:
+            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            family = response.strip().lower()
+            
+            # Clean up response
+            import re
+            match = re.search(r'(llama|mistral|gemma|qwen|gpt|claude|other|unknown)', family)
+            if match:
+                return match.group(1)
+            return "unknown"
+        except:
+            return "unknown"
     
     def get_creation_estimate(self, issue_type: str) -> ClassifierCreationEstimate:
         """
@@ -290,82 +317,55 @@ class ClassifierMarketplace:
         return [task for task, score in relevant[:15]]  # Return top 15
     
     def _calculate_task_similarity(self, issue_type: str, task_name: str) -> float:
-        """Calculate similarity between issue type and task name."""
-        score = 0.0
+        """Calculate similarity between issue type and task name using model decisions."""
+        prompt = f"""Rate the similarity between this issue type and evaluation task for training AI safety classifiers.
+
+Issue Type: {issue_type}
+Task: {task_name}
+
+Rate similarity from 0.0 to 10.0 (10.0 = highly similar, 0.0 = not similar).
+Respond with only the number:"""
         
-        # Direct matching
-        if issue_type in task_name or task_name in issue_type:
-            score += 5.0
-        
-        # Token matching
-        issue_tokens = issue_type.replace('_', ' ').replace('-', ' ').split()
-        task_tokens = task_name.replace('_', ' ').replace('-', ' ').split()
-        
-        for issue_token in issue_tokens:
-            for task_token in task_tokens:
-                if len(issue_token) > 2 and len(task_token) > 2:
-                    if issue_token == task_token:
-                        score += 3.0
-                    elif issue_token in task_token or task_token in issue_token:
-                        score += 1.5
-                    elif self._are_tokens_similar(issue_token, task_token):
-                        score += 0.5
-        
-        return score
+        try:
+            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            score_str = response.strip()
+            
+            import re
+            match = re.search(r'(\d+\.?\d*)', score_str)
+            if match:
+                score = float(match.group(1))
+                return min(10.0, max(0.0, score))
+            return 0.0
+        except:
+            return 0.0
     
-    def _are_tokens_similar(self, token1: str, token2: str) -> bool:
-        """Check if two tokens are similar using algorithmic methods."""
-        if len(token1) < 3 or len(token2) < 3:
-            return False
-        
-        # Character overlap
-        overlap = len(set(token1) & set(token2))
-        min_len = min(len(token1), len(token2))
-        
-        # Prefix similarity
-        prefix_len = 0
-        for i in range(min(len(token1), len(token2))):
-            if token1[i] == token2[i]:
-                prefix_len += 1
-            else:
-                break
-        
-        return (overlap / min_len > 0.6 or 
-                prefix_len >= 3 or
-                token1[:4] == token2[:4] if len(token1) >= 4 and len(token2) >= 4 else False)
+
     
     def _estimate_optimal_layer_for_issue(self, issue_type: str) -> int:
-        """Estimate optimal layer using algorithmic analysis of issue type."""
-        issue_lower = issue_type.lower()
+        """Estimate optimal layer using model analysis of issue complexity."""
+        prompt = f"""What transformer layer would be optimal for detecting this AI safety issue?
+
+Issue Type: {issue_type}
+
+Consider:
+- Simple issues (formatting, basic patterns) → early layers (8-12)
+- Complex semantic issues (truthfulness, bias) → middle layers (12-16)  
+- Abstract conceptual issues (coherence, quality) → deeper layers (16-20)
+
+Respond with just the layer number (8-20):"""
         
-        # Start with middle layer as baseline
-        base_layer = 14
-        
-        # Calculate complexity score based on various factors
-        complexity_score = 0
-        
-        # Length-based complexity (longer terms often more abstract)
-        length_factor = min(len(issue_lower) / 10.0, 1.0)  # Normalize to 0-1
-        complexity_score += length_factor * 3
-        
-        # Syllable/token complexity (more tokens = more complex)
-        tokens = issue_lower.replace('_', ' ').replace('-', ' ').split()
-        token_complexity = min(len(tokens) / 3.0, 1.0)  # Normalize to 0-1
-        complexity_score += token_complexity * 2
-        
-        # Character diversity (more diverse = more abstract)
-        unique_chars = len(set(issue_lower))
-        char_diversity = min(unique_chars / 15.0, 1.0)  # Normalize to 0-1
-        complexity_score += char_diversity * 1
-        
-        # Calculate layer adjustment
-        # More complex issues generally need deeper layers
-        layer_adjustment = int(complexity_score * 2) - 3  # Range: -3 to +3
-        
-        # Apply bounds
-        estimated_layer = max(8, min(20, base_layer + layer_adjustment))
-        
-        return estimated_layer
+        try:
+            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            layer_str = response.strip()
+            
+            import re
+            match = re.search(r'(\d+)', layer_str)
+            if match:
+                layer = int(match.group(1))
+                return max(8, min(20, layer))  # Clamp to valid range
+            return 14  # Default middle layer
+        except:
+            return 14
         
     def _complete_creation_estimate(self, base: Dict[str, Any], available_benchmarks: List[str], issue_type: str) -> ClassifierCreationEstimate:
         """Complete the creation estimate with hardware adjustments."""

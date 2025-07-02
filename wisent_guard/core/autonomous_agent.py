@@ -34,20 +34,70 @@ class AutonomousAgent:
     
     def __init__(self, 
                  model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
-                 default_layer: int = 15,
-                 enable_tracking: bool = True):
+                 layer_override: int = None,
+                 enable_tracking: bool = True,
+                 steering_method: str = "CAA",
+                 steering_strength: float = 1.0,
+                 steering_mode: bool = False,
+                 normalization_method: str = "none",
+                 target_norm: Optional[float] = None,
+                 hpr_beta: float = 1.0,
+                 dac_dynamic_control: bool = False,
+                 dac_entropy_threshold: float = 1.0,
+                 bipo_beta: float = 0.1,
+                 bipo_learning_rate: float = 5e-4,
+                 bipo_epochs: int = 100,
+                 ksteering_num_labels: int = 6,
+                 ksteering_hidden_dim: int = 512,
+                 ksteering_learning_rate: float = 1e-3,
+                 ksteering_classifier_epochs: int = 100,
+                 ksteering_target_labels: str = "0",
+                 ksteering_avoid_labels: str = "",
+                 ksteering_alpha: float = 50.0):
         """
         Initialize the autonomous agent.
         
         Args:
             model_name: Name of the model to use
-            default_layer: Default layer for generation
+            layer_override: Layer override from CLI (None to use parameter file)
             enable_tracking: Whether to track improvement history
+            steering_method: Steering method to use (CAA, HPR, DAC, BiPO, KSteering)
+            steering_strength: Strength of steering application
+            steering_mode: Whether to enable steering mode
+            (... other steering parameters ...)
         """
         self.model_name = model_name
         self.model: Optional[Model] = None
-        self.default_layer = default_layer
+        self.layer_override = layer_override
         self.enable_tracking = enable_tracking
+        
+        # Load model parameters first
+        from .parameters import load_model_parameters
+        self.params = load_model_parameters(model_name, layer_override)
+        
+        # Store steering parameters and load method-specific configs from parameter file
+        self.steering_method = steering_method
+        self.steering_strength = steering_strength
+        self.steering_mode = steering_mode
+        self.normalization_method = normalization_method
+        self.target_norm = target_norm
+        
+        # Load method-specific parameters from parameter file, with CLI overrides
+        steering_config = self.params.get_steering_config(steering_method)
+        
+        self.hpr_beta = hpr_beta if hpr_beta != 1.0 else steering_config.get("beta", 1.0)
+        self.dac_dynamic_control = dac_dynamic_control if dac_dynamic_control else steering_config.get("dynamic_control", False)
+        self.dac_entropy_threshold = dac_entropy_threshold if dac_entropy_threshold != 1.0 else steering_config.get("entropy_threshold", 1.0)
+        self.bipo_beta = bipo_beta if bipo_beta != 0.1 else steering_config.get("beta", 0.1)
+        self.bipo_learning_rate = bipo_learning_rate if bipo_learning_rate != 5e-4 else steering_config.get("learning_rate", 5e-4)
+        self.bipo_epochs = bipo_epochs if bipo_epochs != 100 else steering_config.get("num_epochs", 100)
+        self.ksteering_num_labels = ksteering_num_labels if ksteering_num_labels != 6 else steering_config.get("num_labels", 6)
+        self.ksteering_hidden_dim = ksteering_hidden_dim if ksteering_hidden_dim != 512 else steering_config.get("hidden_dim", 512)
+        self.ksteering_learning_rate = ksteering_learning_rate if ksteering_learning_rate != 1e-3 else steering_config.get("learning_rate", 1e-3)
+        self.ksteering_classifier_epochs = ksteering_classifier_epochs if ksteering_classifier_epochs != 100 else steering_config.get("classifier_epochs", 100)
+        self.ksteering_target_labels = ksteering_target_labels if ksteering_target_labels != "0" else ",".join(map(str, steering_config.get("target_labels", [0])))
+        self.ksteering_avoid_labels = ksteering_avoid_labels if ksteering_avoid_labels != "" else ",".join(map(str, steering_config.get("avoid_labels", [])))
+        self.ksteering_alpha = ksteering_alpha if ksteering_alpha != 50.0 else steering_config.get("alpha", 50.0)
         
         # New marketplace-based system
         self.marketplace: Optional[ClassifierMarketplace] = None
@@ -61,6 +111,10 @@ class AutonomousAgent:
         
         print(f"🤖 Autonomous Agent initialized with {model_name}")
         print(f"   🎯 Using marketplace-based classifier selection")
+        print(f"   🎛️ Steering: {steering_method} (strength: {steering_strength})")
+        if steering_mode:
+            print(f"   🔧 Steering mode enabled with {normalization_method} normalization")
+        print(self.params.get_summary())
         
     async def initialize(self, 
                         classifier_search_paths: Optional[List[str]] = None,
@@ -145,8 +199,8 @@ class AutonomousAgent:
             )
             
             self.steering = ResponseSteering(
-                model=self.model,
-                diagnostics=self.diagnostics
+                generate_response_func=self._generate_response,
+                analyze_response_func=self.diagnostics.analyze_response
             )
         else:
             print("   ⚠️ No classifiers selected - proceeding without advanced diagnostics")
@@ -218,10 +272,38 @@ class AutonomousAgent:
         }
     
     async def _generate_response(self, prompt: str) -> str:
-        """Generate a response to the prompt."""
+        """Generate a response to the prompt with optional steering."""
+        if self.steering_mode:
+            # Use actual activation steering
+            print(f"   🎛️ Applying {self.steering_method} steering...")
+            try:
+                # Use actual steering methods from steering_methods folder
+                from ..inference import generate_with_classification_and_handling
+                
+                # Create steering method object based on configuration
+                steering_method = self._create_steering_method()
+                
+                response, _, _, _ = generate_with_classification_and_handling(
+                    self.model,
+                    prompt,
+                    self.params.layer,
+                    max_new_tokens=200,
+                    steering_method=steering_method,
+                    token_aggregation="average",
+                    threshold=0.6,
+                    verbose=False,
+                    detection_handler=None
+                )
+                return response
+                
+            except Exception as e:
+                print(f"   ⚠️ Steering failed, falling back to basic generation: {e}")
+                # Fall through to basic generation
+        
+        # Basic generation without steering
         result = self.model.generate(
             prompt, 
-            self.default_layer, 
+            self.params.layer, 
             max_new_tokens=200
         )
         # Handle both 2 and 3 return values
@@ -232,6 +314,50 @@ class AutonomousAgent:
         else:
             response = result
         return response
+    
+    def _create_steering_method(self):
+        """Create a steering method object based on configuration."""
+        # Import actual steering methods
+        from .steering_methods import CAA, HPR, DAC, BiPO, KSteering
+        
+        # Create the appropriate steering method with parameters
+        if self.steering_method == "CAA":
+            steering_method = CAA(device=None)
+        elif self.steering_method == "HPR":
+            steering_method = HPR(device=None, beta=self.hpr_beta)
+        elif self.steering_method == "DAC":
+            steering_method = DAC(
+                device=None,
+                dynamic_control=self.dac_dynamic_control,
+                entropy_threshold=self.dac_entropy_threshold
+            )
+        elif self.steering_method == "BiPO":
+            steering_method = BiPO(
+                device=None,
+                beta=self.bipo_beta,
+                learning_rate=self.bipo_learning_rate,
+                epochs=self.bipo_epochs
+            )
+        elif self.steering_method == "KSteering":
+            # Parse target and avoid labels
+            target_labels = [int(x.strip()) for x in self.ksteering_target_labels.split(",") if x.strip()]
+            avoid_labels = [int(x.strip()) for x in self.ksteering_avoid_labels.split(",") if x.strip()]
+            
+            steering_method = KSteering(
+                device=None,
+                num_labels=self.ksteering_num_labels,
+                hidden_dim=self.ksteering_hidden_dim,
+                learning_rate=self.ksteering_learning_rate,
+                classifier_epochs=self.ksteering_classifier_epochs,
+                target_labels=target_labels,
+                avoid_labels=avoid_labels,
+                alpha=self.ksteering_alpha
+            )
+        else:
+            # Default to CAA
+            steering_method = CAA(device=None)
+        
+        return steering_method
     
     def _decide_if_improvement_needed(self, analysis: AnalysisResult) -> bool:
         """Decide if the response needs improvement based on analysis."""

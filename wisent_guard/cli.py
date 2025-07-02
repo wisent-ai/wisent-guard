@@ -2483,15 +2483,36 @@ def handle_agent_command(args):
         print(f"🤖 Starting autonomous agent...")
         print(f"   Prompt: {args.prompt}")
         print(f"   Model: {args.model}")
+        if args.layer:
+            print(f"   Layer: {args.layer} (CLI override)")
         print(f"   Quality threshold: {args.quality_threshold}")
         print(f"   Time budget: {args.time_budget} minutes")
         print(f"   Max attempts: {args.max_attempts}")
         
         try:
-            # Initialize agent
+            # Initialize agent with steering parameters
             agent = AutonomousAgent(
                 model_name=args.model,
-                enable_tracking=True
+                layer_override=args.layer,
+                enable_tracking=True,
+                steering_method=getattr(args, 'steering_method', 'CAA'),
+                steering_strength=getattr(args, 'steering_strength', 1.0),
+                steering_mode=getattr(args, 'steering_mode', False),
+                normalization_method=getattr(args, 'normalization_method', 'none'),
+                target_norm=getattr(args, 'target_norm', None),
+                hpr_beta=getattr(args, 'hpr_beta', 1.0),
+                dac_dynamic_control=getattr(args, 'dac_dynamic_control', False),
+                dac_entropy_threshold=getattr(args, 'dac_entropy_threshold', 1.0),
+                bipo_beta=getattr(args, 'bipo_beta', 0.1),
+                bipo_learning_rate=getattr(args, 'bipo_learning_rate', 5e-4),
+                bipo_epochs=getattr(args, 'bipo_epochs', 100),
+                ksteering_num_labels=getattr(args, 'ksteering_num_labels', 6),
+                ksteering_hidden_dim=getattr(args, 'ksteering_hidden_dim', 512),
+                ksteering_learning_rate=getattr(args, 'ksteering_learning_rate', 1e-3),
+                ksteering_classifier_epochs=getattr(args, 'ksteering_classifier_epochs', 100),
+                ksteering_target_labels=getattr(args, 'ksteering_target_labels', '0'),
+                ksteering_avoid_labels=getattr(args, 'ksteering_avoid_labels', ''),
+                ksteering_alpha=getattr(args, 'ksteering_alpha', 50.0)
             )
             
             await agent.initialize(
