@@ -210,6 +210,7 @@ try:
     run_task_pipeline(
         task_name="truthfulqa_mc",
         model_name="meta-llama/Llama-3.1-8B-Instruct",
+        layer="15",  # Required parameter
         limit=3,  # Minimum examples for timing
         steering_mode=False,  # No steering for baseline timing
         verbose=False,

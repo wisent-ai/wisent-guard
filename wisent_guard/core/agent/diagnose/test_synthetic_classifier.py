@@ -22,16 +22,16 @@ def timeout_handler(signum, frame):
     raise TimeoutError("Test exceeded time budget!")
 
 def main():
-    # Set budget first
-    budget_minutes = 10.0  # 10 minutes - enough time for full benchmarking process
-    budget_seconds = int(budget_minutes * 60)
+    # Set budget and timeout separately
+    budget_minutes = 1.0  # 1 minute - internal budget for classifier creation
+    timeout_seconds = 120  # 2 minutes - hard timeout for the test process
     set_time_budget(budget_minutes)
     
-    print(f"⏱️ Starting synthetic classifier test with {budget_seconds}s timeout...")
+    print(f"⏱️ Starting synthetic classifier test with {timeout_seconds}s timeout and {budget_minutes*60}s budget...")
     
     # Set up timeout signal
     signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(budget_seconds)
+    signal.alarm(timeout_seconds)
     
     start_time = time.time()
     
@@ -47,17 +47,17 @@ def main():
         
         elapsed_time = time.time() - start_time
         print(f"✅ SUCCESS: Created {len(classifiers)} classifiers for {len(trait_discovery.traits_discovered)} traits")
-        print(f"⏱️ Total time: {elapsed_time:.1f}s (budget: {budget_seconds}s)")
+        print(f"⏱️ Total time: {elapsed_time:.1f}s (timeout: {timeout_seconds}s, budget: {budget_minutes*60}s)")
         
-        if elapsed_time > budget_seconds:
-            print(f"⚠️ WARNING: Test completed but exceeded budget by {elapsed_time - budget_seconds:.1f}s")
+        if elapsed_time > timeout_seconds:
+            print(f"⚠️ WARNING: Test completed but exceeded timeout by {elapsed_time - timeout_seconds:.1f}s")
         else:
-            print(f"🎉 Test completed within budget with {budget_seconds - elapsed_time:.1f}s to spare!")
+            print(f"🎉 Test completed within timeout with {timeout_seconds - elapsed_time:.1f}s to spare!")
             
     except TimeoutError as e:
         elapsed_time = time.time() - start_time
         print(f"❌ ERROR: {e}")
-        print(f"❌ Test failed after {elapsed_time:.1f}s (budget: {budget_seconds}s)")
+        print(f"❌ Test failed after {elapsed_time:.1f}s (timeout: {timeout_seconds}s, budget: {budget_minutes*60}s)")
         print("❌ This indicates a performance issue that needs investigation.")
         sys.exit(1)
     except Exception as e:
