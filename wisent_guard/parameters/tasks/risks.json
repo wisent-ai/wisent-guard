@@ -1,0 +1,10 @@
+[
+  "harmfulness",
+  "toxicity",
+  "bias",
+  "hallucination",
+  "violence",
+  "adversarial robustness",
+  "sycophancy",
+  "deception"
+]

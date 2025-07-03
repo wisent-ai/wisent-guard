@@ -11,6 +11,202 @@ import sys
 import subprocess
 import random
 
+def get_task_samples_for_analysis(task_name: str, num_samples: int = 5) -> Dict[str, Any]:
+    """
+    Retrieve sample questions and answers from a benchmark task for AI analysis.
+    
+    This function extracts representative examples from a benchmark that can be
+    analyzed to determine what cognitive abilities the benchmark tests.
+    
+    Args:
+        task_name: Name of the task to analyze
+        num_samples: Number of samples to retrieve (default 5)
+    
+    Returns:
+        Dictionary containing task info and samples for analysis
+    """
+    try:
+        # Load lm_eval
+        from lm_eval.tasks import get_task_dict
+        
+        # Get the task (automatically trust remote code via environment)
+        task_dict = get_task_dict([task_name])
+        if task_name not in task_dict:
+            return {
+                "task_name": task_name,
+                "error": f"Task '{task_name}' not found",
+                "samples": []
+            }
+        
+        task = task_dict[task_name]
+        
+        # Get task description
+        description = getattr(task, 'DESCRIPTION', getattr(task, '__doc__', f"Task: {task_name}"))
+        
+        # Get documents
+        docs = []
+        try:
+            if hasattr(task, 'validation_docs') and task.has_validation_docs():
+                docs = list(task.validation_docs())
+            elif hasattr(task, 'test_docs') and task.has_test_docs():
+                docs = list(task.test_docs())
+            elif hasattr(task, 'training_docs') and task.has_training_docs():
+                docs = list(task.training_docs())
+        except Exception as e:
+            print(f"Warning: Could not get docs for {task_name}: {e}")
+        
+        if not docs:
+            return {
+                "task_name": task_name,
+                "description": description,
+                "error": "No documents found for this task",
+                "samples": []
+            }
+        
+        # Sample documents - take up to num_samples, distributed across the dataset
+        if len(docs) <= num_samples:
+            sample_docs = docs
+        else:
+            # Use a combination of random and distributed sampling for diversity
+            if len(docs) > 100:
+                # For large datasets, use random sampling from different sections
+                section_size = len(docs) // num_samples
+                sample_docs = []
+                for i in range(num_samples):
+                    start_idx = i * section_size
+                    end_idx = min((i + 1) * section_size, len(docs))
+                    # Pick a random document from this section
+                    random_idx = random.randint(start_idx, min(end_idx - 1, len(docs) - 1))
+                    sample_docs.append(docs[random_idx])
+            else:
+                # For smaller datasets, just take random samples
+                sample_docs = random.sample(docs, num_samples)
+        
+        # Extract samples
+        samples = []
+        for i, doc in enumerate(sample_docs):
+            sample = {"sample_id": i + 1}
+            
+            # Get question/prompt
+            try:
+                if hasattr(task, 'doc_to_text'):
+                    sample["question"] = str(task.doc_to_text(doc))
+                elif 'question' in doc:
+                    sample["question"] = str(doc['question'])
+                elif 'text' in doc:
+                    sample["question"] = str(doc['text'])
+                elif 'prompt' in doc:
+                    sample["question"] = str(doc['prompt'])
+                else:
+                    sample["question"] = "Question format not recognized"
+            except Exception as e:
+                sample["question"] = f"Error extracting question: {e}"
+            
+            # Get correct answer
+            try:
+                if hasattr(task, 'doc_to_target'):
+                    target = task.doc_to_target(doc)
+                    sample["correct_answer"] = str(target)
+                elif 'answer' in doc:
+                    sample["correct_answer"] = str(doc['answer'])
+                elif 'target' in doc:
+                    sample["correct_answer"] = str(doc['target'])
+                else:
+                    sample["correct_answer"] = "Answer format not recognized"
+            except Exception as e:
+                sample["correct_answer"] = f"Error extracting answer: {e}"
+            
+            # Get choices if it's multiple choice
+            sample["choices"] = []
+            try:
+                # Check for standard multiple choice format
+                if 'choices' in doc and isinstance(doc['choices'], list):
+                    sample["choices"] = [str(choice) for choice in doc['choices']]
+                    sample["format"] = "multiple_choice"
+                    
+                    # Get correct choice index
+                    gold = doc.get('gold', doc.get('label', None))
+                    if isinstance(gold, list) and len(gold) > 0:
+                        sample["correct_choice_index"] = gold[0]
+                    elif isinstance(gold, int):
+                        sample["correct_choice_index"] = gold
+                    else:
+                        sample["correct_choice_index"] = None
+                
+                # Special handling for TruthfulQA format
+                elif 'mc1_targets' in doc or 'mc2_targets' in doc:
+                    sample["format"] = "multiple_choice"
+                    
+                    # Try to get choices from mc1_targets
+                    if 'mc1_targets' in doc:
+                        mc1_targets = doc['mc1_targets']
+                        if 'choices' in mc1_targets:
+                            sample["choices"] = [str(choice) for choice in mc1_targets['choices']]
+                            # Find the correct answer
+                            if 'labels' in mc1_targets:
+                                labels = mc1_targets['labels']
+                                if isinstance(labels, list) and len(labels) > 0:
+                                    # Find the index of the correct answer (label = 1)
+                                    try:
+                                        sample["correct_choice_index"] = labels.index(1)
+                                    except ValueError:
+                                        sample["correct_choice_index"] = 0  # fallback
+                
+                # If still no choices found, check if it has multiple choice indicators
+                elif any(key in doc for key in ['A)', 'B)', 'C)', 'D)']):
+                    sample["format"] = "multiple_choice"
+                    # Try to extract choices from text
+                    sample["choices"] = ["Could not extract choices automatically"]
+                else:
+                    sample["format"] = "open_ended"
+                    
+            except Exception as e:
+                sample["choices"] = []
+                sample["format"] = "unknown"
+                print(f"Warning: Error processing choices for {task_name}: {e}")
+            
+            # Add any additional context from the document
+            sample["additional_info"] = {}
+            for key, value in doc.items():
+                if key not in ['question', 'text', 'answer', 'target', 'choices', 'gold', 'label']:
+                    try:
+                        # For nested structures, show the structure
+                        if isinstance(value, dict):
+                            sample["additional_info"][key] = f"Dict with keys: {list(value.keys())}"
+                        elif isinstance(value, list):
+                            sample["additional_info"][key] = f"List with {len(value)} items"
+                        else:
+                            sample["additional_info"][key] = str(value)[:200]  # Truncate long values
+                    except:
+                        sample["additional_info"][key] = "Could not convert to string"
+            
+            samples.append(sample)
+        
+        # Get task metadata
+        task_info = {
+            "task_name": task_name,
+            "description": description,
+            "total_docs": len(docs),
+            "sampled_docs": len(samples),
+            "output_type": getattr(task, 'OUTPUT_TYPE', 'unknown'),
+            "samples": samples
+        }
+        
+        return task_info
+        
+    except ImportError as e:
+        return {
+            "task_name": task_name,
+            "error": f"lm-evaluation-harness not installed: {e}",
+            "samples": []
+        }
+    except Exception as e:
+        return {
+            "task_name": task_name,
+            "error": f"Error retrieving samples: {e}",
+            "samples": []
+        }
+
 def load_lm_eval():
     """Load lm_eval library and handle import errors."""
     try:
@@ -363,8 +559,72 @@ def get_category(task) -> str:
     
     return category
 
+def test_sample_retrieval(task_name: str = "truthfulqa_mc1"):
+    """Test function to demonstrate the get_task_samples_for_analysis function."""
+    print(f"\n=== Testing Sample Retrieval for '{task_name}' ===")
+    
+    # Get samples
+    result = get_task_samples_for_analysis(task_name, num_samples=3)
+    
+    # Print results
+    if "error" in result:
+        print(f"❌ Error: {result['error']}")
+        return False
+    
+    print(f"✅ Successfully retrieved samples from '{result['task_name']}'")
+    
+    # Handle None description
+    description = result.get('description') or "No description available"
+    print(f"📝 Description: {description[:200]}...")
+    
+    print(f"📊 Total documents: {result['total_docs']}")
+    print(f"🎯 Sampled documents: {result['sampled_docs']}")
+    print(f"🔧 Output type: {result['output_type']}")
+    
+    print(f"\n--- Sample Questions ---")
+    for i, sample in enumerate(result['samples']):
+        print(f"\n📋 Sample {sample['sample_id']}:")
+        question = sample.get('question', 'No question available')
+        print(f"❓ Question: {question[:300]}...")
+        
+        answer = sample.get('correct_answer', 'No answer available')
+        print(f"✅ Correct Answer: {answer}")
+        
+        format_type = sample.get('format', 'unknown')
+        print(f"📐 Format: {format_type}")
+        
+        if sample.get('choices'):
+            print(f"🔤 Choices:")
+            for j, choice in enumerate(sample['choices']):
+                marker = "👉" if j == sample.get('correct_choice_index') else "  "
+                print(f"  {marker} {j}: {choice}")
+        
+        if sample.get('additional_info'):
+            print(f"ℹ️  Additional info: {list(sample['additional_info'].keys())}")
+    
+    print(f"\n=== Analysis Summary ===")
+    print("Based on these samples, an AI could analyze:")
+    print("- Question format and complexity")
+    print("- Type of reasoning required")
+    print("- Domain knowledge needed")
+    print("- Cognitive abilities being tested")
+    
+    return True
+
 def main():
     """Main function to populate tasks.json."""
+    
+    # Check for test mode
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        task_name = sys.argv[2] if len(sys.argv) > 2 else "truthfulqa_mc1"
+        print(f"🧪 Running in TEST MODE")
+        success = test_sample_retrieval(task_name)
+        if success:
+            print(f"\n✅ Test completed successfully!")
+        else:
+            print(f"\n❌ Test failed!")
+        return
+    
     print("Loading lm_eval library...")
     get_task_dict, task_registry = load_lm_eval()
     
