@@ -1140,9 +1140,7 @@ def get_category(task) -> str:
     
     return category
 
-def get_relevant_benchmarks_for_prompt(prompt: str, max_benchmarks: int = 1, existing_model=None, 
-                                      priority: str = "all", fast_only: bool = False, 
-                                      time_budget_minutes: float = None) -> List[Dict[str, Any]]:
+def get_relevant_benchmarks_for_prompt(prompt: str, max_benchmarks: int = 1, existing_model=None) -> List[Dict[str, Any]]:
     """
     Use Llama-3.1B-Instruct to determine the most relevant benchmarks for testing a given prompt.
     
@@ -1162,16 +1160,9 @@ def get_relevant_benchmarks_for_prompt(prompt: str, max_benchmarks: int = 1, exi
         
         # Try to import from only_benchmarks.py
         try:
-            from only_benchmarks import BENCHMARKS, apply_priority_filtering
-            
-            # Apply priority filtering if specified
-            if priority != "all" or fast_only or time_budget_minutes is not None:
-                filtered_benchmarks = apply_priority_filtering(BENCHMARKS, priority, fast_only, time_budget_minutes)
-            else:
-                filtered_benchmarks = BENCHMARKS
-            
-            available_benchmarks = list(filtered_benchmarks.keys())
-            benchmark_descriptions = {name: f"{name}: {', '.join(info['tags'])}" for name, info in filtered_benchmarks.items()}
+            from only_benchmarks import BENCHMARKS
+            available_benchmarks = list(BENCHMARKS.keys())
+            benchmark_descriptions = {name: f"{name}: {', '.join(info['tags'])}" for name, info in BENCHMARKS.items()}
         except ImportError:
             # Fallback to basic benchmark list
             available_benchmarks = [
@@ -1225,40 +1216,21 @@ def get_relevant_benchmarks_for_prompt(prompt: str, max_benchmarks: int = 1, exi
         
         print(f"   ✅ Successfully loaded Llama-3.1-8B-Instruct pipeline")
         
-        # Create analysis prompt with loading time and time budget information
-        benchmark_list_with_timing = []
-        for name, desc in benchmark_descriptions.items():
-            if name in filtered_benchmarks:
-                loading_time = filtered_benchmarks[name].get("loading_time", 60.0)
-                priority = filtered_benchmarks[name].get("priority", "unknown")
-                benchmark_list_with_timing.append(f"- {name}: {desc} (loading time: {loading_time:.1f}s, priority: {priority})")
-            else:
-                benchmark_list_with_timing.append(f"- {name}: {desc} (loading time: ~60s, priority: unknown)")
-        
-        benchmark_list = "\n".join(benchmark_list_with_timing)
-        
-        # Always prioritize faster benchmarks
-        time_budget_info = ""
-        if time_budget_minutes:
-            time_budget_info = f"""
-Time Budget: {time_budget_minutes:.1f} minutes ({time_budget_minutes * 60:.0f} seconds)"""
-        
-        speed_guidance = """
-IMPORTANT: When benchmarks have similar relevance, always prefer the faster-loading ones."""
+        # Create analysis prompt
+        benchmark_list = "\n".join([f"- {name}: {desc}" for name, desc in benchmark_descriptions.items()])
         
         user_prompt = f"""Analyze this prompt and determine which benchmarks would be most relevant for testing it.
 
-Prompt to analyze: "{prompt}"{time_budget_info}{speed_guidance}
+Prompt to analyze: "{prompt}"
 
-Available benchmarks with loading times:
+Available benchmarks:
 {benchmark_list}
 
 Instructions:
 1. Analyze what cognitive abilities, knowledge, or skills this prompt would test
 2. Match the prompt's requirements to the most relevant benchmarks
-3. Always prefer faster-loading benchmarks when relevance is similar
-4. Choose the top {max_benchmarks} benchmarks that would best evaluate this type of prompt
-5. Provide a brief explanation for each choice
+3. Choose the top {max_benchmarks} benchmarks that would best evaluate this type of prompt
+4. Provide a brief explanation for each choice
 
 Format your response as:
 1. [benchmark_name]: [explanation]
@@ -1328,21 +1300,10 @@ You are an expert in AI evaluation benchmarks. Your task is to analyze prompts a
                             break
                     
                     if matched_benchmark:
-                        # Get priority information for scoring
-                        benchmark_info = filtered_benchmarks.get(matched_benchmark, {})
-                        benchmark_priority = benchmark_info.get("priority", "unknown")
-                        loading_time = benchmark_info.get("loading_time", 60.0)
-                        
-                        # Store benchmark information preserving LLM's original ranking
-                        # The LLM has already considered loading time and priority in its ranking
-                        relevance_score = max_benchmarks - len(relevant_benchmarks)
-                        
                         relevant_benchmarks.append({
                             'benchmark': matched_benchmark,
                             'explanation': explanation,
-                            'relevance_score': relevance_score,
-                            'priority': benchmark_priority,
-                            'loading_time': loading_time
+                            'relevance_score': len(relevant_benchmarks) + 1  # Higher score for earlier mentions
                         })
                         
                         if len(relevant_benchmarks) >= max_benchmarks:
@@ -1353,30 +1314,17 @@ You are an expert in AI evaluation benchmarks. Your task is to analyze prompts a
             fallback_benchmarks = ["mmlu", "truthfulqa_mc1", "hellaswag"]
             for fallback in fallback_benchmarks:
                 if fallback in available_benchmarks and not any(rb['benchmark'] == fallback for rb in relevant_benchmarks):
-                    # Get priority information for fallback benchmarks
-                    fallback_info = filtered_benchmarks.get(fallback, {})
-                    fallback_priority = fallback_info.get("priority", "unknown")
-                    fallback_loading_time = fallback_info.get("loading_time", 60.0)
-                    
                     relevant_benchmarks.append({
                         'benchmark': fallback,
                         'explanation': f"General purpose benchmark suitable for testing various prompts",
-                        'relevance_score': len(relevant_benchmarks) + 1,
-                        'priority': fallback_priority,
-                        'loading_time': fallback_loading_time
+                        'relevance_score': len(relevant_benchmarks) + 1
                     })
                     if len(relevant_benchmarks) >= max_benchmarks:
                         break
         
-        # Don't sort - preserve LLM's intelligent ranking
-        # The LLM already analyzed and ranked these benchmarks by relevance
-        # Additional sorting would defeat the purpose of semantic analysis
-        
         print(f"   ✅ Found {len(relevant_benchmarks)} relevant benchmarks")
         for i, rb in enumerate(relevant_benchmarks, 1):
-            priority_str = f" (priority: {rb.get('priority', 'unknown')})" if rb.get('priority') != 'unknown' else ""
-            loading_time_str = f" (loading time: {rb.get('loading_time', 60.0):.1f}s)" if rb.get('loading_time') else ""
-            print(f"   {i}. {rb['benchmark']}: {rb['explanation']}{priority_str}{loading_time_str}")
+            print(f"   {i}. {rb['benchmark']}: {rb['explanation']}")
         
         return relevant_benchmarks[:max_benchmarks]
         

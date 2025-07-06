@@ -238,18 +238,35 @@ def setup_tasks_parser(parser):
     parser.add_argument("--show-memory-usage", action="store_true",
                         help="Show current memory usage without full tracking")
     parser.add_argument("--show-timing-summary", action="store_true",
-                        help="Show timing summary at the end of execution")
+                        help="Show timing summary after evaluation")
+    
+    # Test-time activation saving/loading options
+    parser.add_argument("--save-test-activations", type=str, default=None,
+                        help="Save test activations to file for future use")
+    parser.add_argument("--load-test-activations", type=str, default=None,
+                        help="Load test activations from file instead of computing")
+    
+    # Priority-aware benchmark selection options
+    parser.add_argument("--priority", type=str, default="all",
+                        choices=["all", "high", "medium", "low"],
+                        help="Priority level for benchmark selection (default: all)")
+    parser.add_argument("--fast-only", action="store_true",
+                        help="Only use fast benchmarks (high priority, < 13.5s loading time)")
+    parser.add_argument("--time-budget", type=float, default=None,
+                        help="Time budget in minutes for benchmark selection (auto-selects fast benchmarks)")
+    parser.add_argument("--max-benchmarks", type=int, default=None,
+                        help="Maximum number of benchmarks to select (combines with priority filtering)")
+    parser.add_argument("--smart-selection", action="store_true",
+                        help="Use smart benchmark selection based on relevance and priority")
+    parser.add_argument("--prefer-fast", action="store_true",
+                        help="Prefer fast benchmarks in selection when multiple options are available")
     
     parser.add_argument("--save-steering-vector", type=str, default=None,
                         help="Path to save the computed steering vector")
     parser.add_argument("--load-steering-vector", type=str, default=None,
                         help="Path to load a pre-computed steering vector")
 
-    # Test-time activation saving/loading
-    parser.add_argument("--save-test-activations", type=str, default=None,
-                        help="Path to save test-time activations extracted during inference")
-    parser.add_argument("--load-test-activations", type=str, default=None,
-                        help="Path to load pre-saved test-time activations (skips inference generation)")
+
     
     # Additional output options
     parser.add_argument("--csv-output", type=str, default=None,
@@ -525,3 +542,11 @@ def setup_agent_parser(parser):
                         help="Avoid labels for K-steering (comma-separated, default: '')")
     parser.add_argument("--ksteering-alpha", type=float, default=50.0,
                         help="Alpha parameter for K-steering (default: 50.0)")
+
+    # Quality Control System parameters
+    parser.add_argument("--enable-quality-control", action="store_true", default=True,
+                        help="Enable new quality control system (default: True)")
+    parser.add_argument("--max-quality-attempts", type=int, default=5,
+                        help="Maximum attempts to achieve acceptable quality (default: 5)")
+    parser.add_argument("--show-parameter-reasoning", action="store_true",
+                        help="Display model's reasoning for parameter choices")

@@ -1,0 +1,371 @@
+🔄 Updating ALL benchmark tags using README-based logic...
+📋 Processing 71 benchmarks...
+
+🎯 Processing: glue (glue)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'glue'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.20s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.81s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:09<00:03,  3.76s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.84s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.81s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: natural_language_understanding
+multitask_learning
+language_model_evaluation
+```
+
+
+Answer: ```
+natural_language_understanding
+multitask_learning
+language_model_evaluation
+```
+
+
+The GLUE benchmark primarily tests natural language understanding capabilities, as it involves
+   ✅ Final LLM-determined tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: superglue (superglue)
+   Current tags: ['reasoning', 'general knowledge', 'adversarial robustness']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'superglue'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.08s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.07s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:10<00:03,  3.93s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  3.00s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.96s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: natural language understanding
+language model evaluation
+general knowledge assessment
+```python
+# Define the tags
+tags = [
+    "natural language understanding",
+    "language model evaluation",
+    "general knowledge assessment"
+]
+
+# Print the tags
+for tag
+   ✅ Final LLM-determined tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: cb (cb)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'cb'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.04s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.08s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:09<00:03,  3.74s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.92s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.88s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+bias
+hallucination
+multilingual
+harmfulness
+toxicity
+creative writing
+long context
+tool use
+sycophancy
+deception
+adversarial robustness
+science
+history
+law
+   ✅ Final LLM-determined tags: ['general knowledge', 'bias', 'hallucination']
+   ✅ Intelligent tags: ['general knowledge', 'bias', 'hallucination']
+
+🎯 Processing: copa (copa)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'copa'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.11s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.76s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:08<00:03,  3.12s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:09<00:00,  2.53s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:09<00:00,  2.50s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+multilingual
+bias
+```python
+# No code is required for this problem
+```
+
+
+Tags:
+general knowledge
+multilingual
+bias
+```python
+# No code is required for this problem
+```
+
+
+Tags:
+general
+   ✅ Final LLM-determined tags: ['general knowledge', 'multilingual', 'bias']
+   ✅ Intelligent tags: ['general knowledge', 'multilingual', 'bias']
+
+🎯 Processing: multirc (multirc)
+   Current tags: ['reasoning', 'long context', 'general knowledge']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'multirc'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.07s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.68s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:07<00:02,  2.87s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:09<00:00,  2.43s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:09<00:00,  2.38s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: long context
+multilingual
+reasoning
+
+ 
+
+### Step 1: Analyze what this benchmark actually tests
+The multirc benchmark is designed to evaluate language models' ability to understand and reason about multiple pieces of context. This involves analyzing long
+   ✅ Final LLM-determined tags: ['long context', 'multilingual', 'reasoning']
+   ✅ Intelligent tags: ['long context', 'multilingual', 'reasoning']
+
+🎯 Processing: record (record)
+   Current tags: ['reasoning', 'long context', 'general knowledge']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'record'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:01<00:05,  2.00s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.61s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:07<00:02,  2.86s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:09<00:00,  2.42s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:09<00:00,  2.36s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+bias
+hallucination
+long context
+harmfulness
+multilingual
+creative writing
+adversarial robustness
+tool use
+sycophancy
+deception
+mathematics
+science
+history
+law
+medical
+   ✅ Final LLM-determined tags: ['general knowledge', 'bias', 'hallucination']
+   ✅ Intelligent tags: ['general knowledge', 'bias', 'hallucination']
+
+🎯 Processing: wic (wic)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'wic'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.09s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.74s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:08<00:03,  3.11s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.57s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.52s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+multilingual
+bias
+```python
+# No code is required for this problem
+```
+
+
+Tags:
+general knowledge
+multilingual
+bias
+```python
+# No code is required for this problem
+```
+
+
+Tags:
+general
+   ✅ Final LLM-determined tags: ['general knowledge', 'multilingual', 'bias']
+   ✅ Intelligent tags: ['general knowledge', 'multilingual', 'bias']
+
+🎯 Processing: wsc (wsc)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'wsc'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.08s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.01s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:09<00:03,  3.58s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.82s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.79s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+reasoning
+hallucination
+   ✅ Final LLM-determined tags: ['general knowledge', 'reasoning', 'hallucination']
+   ✅ Intelligent tags: ['general knowledge', 'reasoning', 'hallucination']
+
+🎯 Processing: truthfulqa_mc1 (truthfulqa_mc1)
+   Current tags: ['hallucination', 'general knowledge', 'reasoning']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'truthfulqa_mc1'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.00s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.77s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:08<00:03,  3.16s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.55s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.51s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+multilingual
+reasoning
+```python
+# Define the function to analyze the benchmark and determine the tags
+def analyze_benchmark(benchmark):
+    # Analyze the benchmark description to determine what it tests
+    if "eval
+   ✅ Final LLM-determined tags: ['general knowledge', 'multilingual', 'reasoning']
+   ✅ Intelligent tags: ['general knowledge', 'multilingual', 'reasoning']
+
+🎯 Processing: truthfulqa_mc2 (truthfulqa_mc2)
+   Current tags: ['hallucination', 'general knowledge', 'reasoning']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'truthfulqa_mc2'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.08s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.09s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:10<00:03,  3.92s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.97s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.95s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+multilingual
+hallucination
+   ✅ Final LLM-determined tags: ['general knowledge', 'multilingual', 'hallucination']
+   ✅ Intelligent tags: ['general knowledge', 'multilingual', 'hallucination']
+
+🎯 Processing: truthfulqa_gen (truthfulqa_gen)
+   Current tags: ['hallucination', 'general knowledge', 'reasoning']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'truthfulqa_gen'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.02s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.82s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:09<00:03,  3.44s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.63s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.61s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: general knowledge
+hallucination
+bias
+```python
+# Import necessary libraries
+import pandas as pd
+
+# Define the function to analyze the benchmark and determine the tags
+def analyze_benchmark():
+    # Define the benchmark description
+    benchmark
+   ✅ Final LLM-determined tags: ['general knowledge', 'hallucination', 'bias']
+   ✅ Intelligent tags: ['general knowledge', 'hallucination', 'bias']
+
+🎯 Processing: hellaswag (hellaswag)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'hellaswag'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.04s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.72s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:08<00:03,  3.09s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.61s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.53s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: long context
+adversarial robustness
+bias
+```python
+# No code is required for this problem
+```python
+```python
+# No code is required for this problem
+```python
+```python
+# No code is required
+   ✅ Final LLM-determined tags: ['long context', 'adversarial robustness', 'bias']
+   ✅ Intelligent tags: ['long context', 'adversarial robustness', 'bias']
+
+🎯 Processing: piqa (piqa)
+   Current tags: ['reasoning', 'science', 'general knowledge']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'piqa'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:06,  2.03s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.79s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:08<00:03,  3.37s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.67s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:10<00:00,  2.63s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: mathematics
+physical reasoning
+commonsense reasoning 
+
+
+
+
+
+---
+
+**Note:** The output is based on the analysis of the provided benchmark description. The tags chosen are intended to capture the primary capabilities/risks being measured, as per the instructions.
+   ✅ Final LLM-determined tags: ['mathematics', 'coding', 'reasoning']
+   ✅ Intelligent tags: ['mathematics', 'coding', 'reasoning']
+
+🎯 Processing: winogrande (winogrande)
+   Current tags: ['reasoning', 'general knowledge', 'adversarial robustness']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'winogrande'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:03<00:09,  3.16s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.30s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:10<00:03,  3.81s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:12<00:00,  2.95s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:12<00:00,  3.02s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: long context
+commonsense reasoning
+bias
+```python
+# No code needed for this task
+```python
+```python
+# No code needed for this task
+```python
+```python
+# No code needed for this task
+```
+   ✅ Final LLM-determined tags: ['long context', 'bias', 'reasoning']
+   ✅ Intelligent tags: ['long context', 'bias', 'reasoning']
+
+🎯 Processing: openbookqa (openbookqa)
+   Current tags: ['science', 'reasoning', 'general knowledge']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'openbookqa'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:07,  2.47s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.27s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:10<00:04,  4.02s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:12<00:00,  3.11s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:12<00:00,  3.11s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+   🎯 LLM Response: science
+general knowledge
+reasoning 
+
+
+
+
+
+---
+
+You are an expert in AI evaluation benchmarks. Analyze the benchmark and determine exactly 3 tags.
+
+Benchmark: openbookqa
+Description: # OpenBookQA
+
+### Paper
+
+Title: `
+   ✅ Final LLM-determined tags: ['science', 'general knowledge', 'reasoning']
+   ✅ Intelligent tags: ['science', 'general knowledge', 'reasoning']
+
+🎯 Processing: swag (swag)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🤖 Using Llama-3.1B-Instruct to determine tags for 'swag'...
+   🔄 Attempting to load meta-llama/Llama-3.1-8B-Instruct...
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:02<00:07,  2.46s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:03,  2.00s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:09<00:03,  3.52s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.77s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:11<00:00,  2.77s/it]
+   ✅ Successfully loaded meta-llama/Llama-3.1-8B-Instruct
+Traceback (most recent call last):
+  File "/Users/lukaszbartoszcze/Documents/CodingProjects/Wisent/wisent-activation-guardrails/wisent_guard/core/lm-harness-integration/update_all_tags.py", line 143, in <module>
+    updated_benchmarks = update_benchmark_tags() 
+  File "/Users/lukaszbartoszcze/Documents/CodingProjects/Wisent/wisent-activation-guardrails/wisent_guard/core/lm-harness-integration/update_all_tags.py", line 60, in update_benchmark_tags
+    new_tags = get_benchmark_tags_with_llama(task_name, readme_content)
+  File "/Users/lukaszbartoszcze/Documents/CodingProjects/Wisent/wisent-activation-guardrails/wisent_guard/core/lm-harness-integration/populate_tasks.py", line 172, in get_benchmark_tags_with_llama
+    outputs = model.generate(
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/generation/utils.py", line 2223, in generate
+    result = self._sample(
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/generation/utils.py", line 3214, in _sample
+    outputs = model_forward(**model_inputs, return_dict=True)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/utils/deprecation.py", line 172, in wrapped_func
+    return func(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/models/llama/modeling_llama.py", line 842, in forward
+    outputs = self.model(
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/models/llama/modeling_llama.py", line 594, in forward
+    layer_outputs = decoder_layer(
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/models/llama/modeling_llama.py", line 352, in forward
+    hidden_states = self.mlp(hidden_states)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/transformers/models/llama/modeling_llama.py", line 190, in forward
+    down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+KeyboardInterrupt

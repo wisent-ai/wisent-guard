@@ -189,7 +189,7 @@ Common issue types include:
 Respond with just the issue type (one word):"""
         
         try:
-            response = self.model.generate(prompt, max_length=15, temperature=0.1)
+            response = self.model.generate(prompt, layer_index=15, max_new_tokens=15, temperature=0.1)
             issue_type = response.strip().lower()
             
             # Clean up response to single word
@@ -245,7 +245,7 @@ Common families include: llama, mistral, gemma, qwen, gpt, claude, other
 Respond with just the family name (one word):"""
         
         try:
-            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            response = self.model.generate(prompt, layer_index=15, max_new_tokens=10, temperature=0.1)
             family = response.strip().lower()
             
             # Clean up response
@@ -327,7 +327,7 @@ Rate similarity from 0.0 to 10.0 (10.0 = highly similar, 0.0 = not similar).
 Respond with only the number:"""
         
         try:
-            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            response = self.model.generate(prompt, layer_index=15, max_new_tokens=10, temperature=0.1)
             score_str = response.strip()
             
             import re
@@ -355,7 +355,7 @@ Consider:
 Respond with just the layer number (8-20):"""
         
         try:
-            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            response = self.model.generate(prompt, layer_index=15, max_new_tokens=10, temperature=0.1)
             layer_str = response.strip()
             
             import re

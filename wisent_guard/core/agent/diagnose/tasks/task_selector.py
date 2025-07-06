@@ -83,7 +83,7 @@ Rate relevance from 0.0 to 1.0 (1.0 = highly relevant, 0.0 = not relevant).
 Respond with only the number:"""
         
         try:
-            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            response = self.model.generate(prompt, layer_index=15, max_new_tokens=10, temperature=0.1)
             score_str = response.strip()
             
             import re
@@ -110,7 +110,7 @@ Rate quality from 0.0 to 5.0 (5.0 = excellent quality, 0.0 = poor quality).
 Respond with only the number:"""
         
         try:
-            response = self.model.generate(prompt, max_length=10, temperature=0.1)
+            response = self.model.generate(prompt, layer_index=15, max_new_tokens=10, temperature=0.1)
             score_str = response.strip()
             
             import re

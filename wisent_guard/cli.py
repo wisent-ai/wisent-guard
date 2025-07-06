@@ -268,7 +268,13 @@ def run_task_pipeline(
     show_timing_summary: bool = False,
     # Test-time activation saving/loading parameters
     save_test_activations: str = None,
-    load_test_activations: str = None
+    load_test_activations: str = None,
+    # Priority-aware benchmark selection parameters
+    priority: str = "all",
+    fast_only: bool = False,
+    time_budget: float = None,
+    max_benchmarks: int = None,
+    smart_selection: bool = False
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -290,6 +296,11 @@ def run_task_pipeline(
         question_col: CSV column name for questions
         correct_col: CSV column name for correct answers
         incorrect_col: CSV column name for incorrect answers
+        priority: Priority level for benchmark selection ("all", "high", "medium", "low")
+        fast_only: Only use fast benchmarks (high priority)
+        time_budget: Time budget in minutes for benchmark selection
+        max_benchmarks: Maximum number of benchmarks to select
+        smart_selection: Use smart benchmark selection based on relevance and priority
         
     Returns:
         Dictionary with all results
@@ -451,22 +462,114 @@ def run_task_pipeline(
             # Traditional lm-harness task loading
             if verbose:
                 print(f"📚 Loading task data for {task_name}...")
-            task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
-            train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
             
-            if verbose:
-                print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
-            
-            # Extract QA pairs from training documents  
-            if verbose:
-                print(f"\n📝 TRAINING DATA PREPARATION:")
-                print(f"   • Loading {task_name} data with correct/incorrect answers...")
-            
-            # Use the proper extraction method from ContrastivePairSet
-            # ContrastivePairSet import moved to top of file
-            qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+            # FIRST: Check if this is a group task and expand if needed
+            try:
+                from lm_eval import evaluator
                 
-            test_qa_pairs_source = test_docs  # Keep original format for test docs
+                if verbose:
+                    print(f"🔍 Checking if '{task_name}' is a group task...")
+                
+                # Use lm-eval's task expansion to detect group tasks
+                task_dict = evaluator.get_task_dict([task_name])
+                expanded_tasks = list(task_dict.keys())
+                
+                if len(expanded_tasks) > 1:
+                    if verbose:
+                        print(f"🎯 Detected GROUP task '{task_name}' with {len(expanded_tasks)} subtasks: {expanded_tasks[:5]}{'...' if len(expanded_tasks) > 5 else ''}")
+                        print(f"📚 Extracting samples from all subtasks...")
+                    
+                    # Handle group task by combining samples from all subtasks
+                    all_qa_pairs = []
+                    
+                    for subtask_name in expanded_tasks:
+                        try:
+                            if verbose:
+                                print(f"   🔍 Loading subtask: {subtask_name}")
+                            
+                            # Load each subtask individually
+                            subtask_data = model.load_lm_eval_task(subtask_name, shots=shots, limit=limit)
+                            subtask_train_docs, _ = model.split_task_data(subtask_data, split_ratio=split_ratio, random_seed=seed)
+                            
+                            # Extract QA pairs from this subtask
+                            subtask_qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(subtask_name, subtask_data, subtask_train_docs)
+                            
+                            if verbose:
+                                print(f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}")
+                            
+                            # Add subtask identifier to each pair for tracking
+                            for pair in subtask_qa_pairs:
+                                pair['source_subtask'] = subtask_name
+                            
+                            all_qa_pairs.extend(subtask_qa_pairs)
+                            
+                        except Exception as e:
+                            if verbose:
+                                print(f"   ⚠️ Failed to load subtask {subtask_name}: {e}")
+                            continue
+                    
+                    if not all_qa_pairs:
+                        raise ValueError(f"No QA pairs could be extracted from any subtasks in group '{task_name}'")
+                    
+                    # Shuffle and limit the combined dataset
+                    import random
+                    random.seed(seed)
+                    random.shuffle(all_qa_pairs)
+                    
+                    if limit and len(all_qa_pairs) > limit:
+                        all_qa_pairs = all_qa_pairs[:limit]
+                    
+                    # Split for training (we'll use all for training since we extracted from train docs)
+                    qa_pairs = all_qa_pairs
+                    test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []  # Use 20% for testing
+                    
+                    if verbose:
+                        print(f"📊 Combined dataset: {len(qa_pairs)} total QA pairs from {len(expanded_tasks)} subtasks")
+                        
+                        # Show breakdown by subtask
+                        from collections import Counter
+                        subtask_counts = Counter(pair.get('source_subtask', 'unknown') for pair in qa_pairs)
+                        print(f"📋 Breakdown by subtask:")
+                        for subtask, count in subtask_counts.most_common():
+                            print(f"   • {subtask}: {count} pairs")
+                    
+                    # Set a flag to indicate we've already processed the group task
+                    group_task_processed = True
+                    group_task_qa_format = True  # Test data is already in QA format
+                    
+                else:
+                    if verbose:
+                        print(f"✅ '{task_name}' is an individual task, proceeding...")
+                    group_task_processed = False
+                    group_task_qa_format = False
+            
+            except Exception as e:
+                if "Group task" in str(e):
+                    raise e  # Re-raise group task errors
+                elif verbose:
+                    print(f"⚠️  Could not check if '{task_name}' is a group task: {e}")
+                    print(f"🔄 Proceeding with standard task loading...")
+                group_task_processed = False
+                group_task_qa_format = False
+            
+            # Only load individual task if we haven't already processed a group task
+            if not group_task_processed:
+                task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
+                train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
+            
+                if verbose:
+                    print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
+                
+                # Extract QA pairs from training documents  
+                if verbose:
+                    print(f"\n📝 TRAINING DATA PREPARATION:")
+                    print(f"   • Loading {task_name} data with correct/incorrect answers...")
+                
+                # Use the proper extraction method from ContrastivePairSet
+                # ContrastivePairSet import moved to top of file
+                qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+                    
+                test_qa_pairs_source = test_docs  # Keep original format for test docs
         
         if verbose:
             print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
@@ -1033,8 +1136,8 @@ def run_task_pipeline(
                 test_qa_pairs = []
                 for doc in test_qa_pairs_source:
                     try:
-                        if from_csv or from_json:
-                            # For CSV/JSON, doc is already a qa_pair dict
+                        if from_csv or from_json or group_task_qa_format:
+                            # For CSV/JSON/group tasks, doc is already a qa_pair dict
                             test_qa_pairs.append({
                                 'question': doc['question'],
                                 'formatted_question': doc['question'],
@@ -1839,8 +1942,8 @@ def run_task_pipeline(
             test_qa_pairs = []
             for doc in test_qa_pairs_source:
                 try:
-                    if from_csv or from_json:
-                        # For CSV/JSON, doc is already a qa_pair dict
+                    if from_csv or from_json or group_task_qa_format:
+                        # For CSV/JSON/group tasks, doc is already a qa_pair dict
                         test_qa_pairs.append({
                             'question': doc['question'],
                             'formatted_question': doc['question'],
@@ -1916,9 +2019,20 @@ def run_task_pipeline(
                     "harmless": positive_full  # B choice (correct)
                 })
             
-            # Run proper lm-harness evaluation on the test set with steering
+            # Run proper lm-harness evaluation on the test set with steering (only for individual tasks)
             from .core.steering_methods.steering_evaluation import run_lm_harness_evaluation
-            evaluation_results = run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, 1.0, True, verbose, "likelihoods")
+            
+            # Only run lm-harness evaluation for individual tasks, not group tasks
+            if not group_task_processed:
+                evaluation_results = run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, 1.0, True, verbose, "likelihoods")
+            else:
+                # For group tasks, we skip lm-harness evaluation since it doesn't apply to combined subtasks
+                evaluation_results = {
+                    "baseline_accuracy": "N/A (group task)",
+                    "steered_accuracy": "N/A (group task)", 
+                    "improvement": "N/A (group task)",
+                    "note": "lm-harness evaluation skipped for group tasks (combined subtasks)"
+                }
             
             # Handle test activation loading/saving
             test_activation_cache = None
@@ -2415,7 +2529,12 @@ def handle_tasks_command(args):
                 show_memory_usage=args.show_memory_usage,
                 show_timing_summary=args.show_timing_summary,
                 save_test_activations=args.save_test_activations,
-                load_test_activations=args.load_test_activations
+                load_test_activations=args.load_test_activations,
+                priority=args.priority,
+                fast_only=args.fast_only,
+                        time_budget=args.time_budget,
+        max_benchmarks=args.max_benchmarks,
+        smart_selection=args.smart_selection
             )
             
             all_results[source] = result
@@ -2490,7 +2609,7 @@ def handle_agent_command(args):
         print(f"   Max attempts: {args.max_attempts}")
         
         try:
-            # Initialize agent with steering parameters
+            # Initialize agent with steering parameters and priority-aware benchmark selection
             agent = AutonomousAgent(
                 model_name=args.model,
                 layer_override=args.layer,
@@ -2512,7 +2631,13 @@ def handle_agent_command(args):
                 ksteering_classifier_epochs=getattr(args, 'ksteering_classifier_epochs', 100),
                 ksteering_target_labels=getattr(args, 'ksteering_target_labels', '0'),
                 ksteering_avoid_labels=getattr(args, 'ksteering_avoid_labels', ''),
-                ksteering_alpha=getattr(args, 'ksteering_alpha', 50.0)
+                ksteering_alpha=getattr(args, 'ksteering_alpha', 50.0),
+                # Priority-aware benchmark selection parameters
+                priority=getattr(args, 'priority', 'all'),
+                fast_only=getattr(args, 'fast_only', False),
+                time_budget_minutes=getattr(args, 'time_budget', None),
+                max_benchmarks=getattr(args, 'max_benchmarks', None),
+                smart_selection=getattr(args, 'smart_selection', False)
             )
             
             await agent.initialize(
@@ -2520,38 +2645,100 @@ def handle_agent_command(args):
                 default_time_budget_minutes=args.time_budget
             )
             
-            # Process the prompt
-            result = await agent.respond_autonomously(
-                prompt=args.prompt,
-                max_attempts=args.max_attempts,
-                quality_threshold=args.quality_threshold,
-                time_budget_minutes=args.time_budget,
-                max_classifiers=args.max_classifiers
-            )
-            
-            # Show results
-            print(f"\n🎯 FINAL RESPONSE:")
-            print(f"{result['final_response']}")
-            
-            if args.verbose:
-                print(f"\n📊 DETAILS:")
-                print(f"   Attempts: {result['attempts']}")
-                print(f"   Improvements: {len(result['improvement_chain'])}")
+            # Choose which method to use based on enable_quality_control parameter
+            if getattr(args, 'enable_quality_control', True):
+                print(f"🎯 Using NEW Quality Control System...")
                 
-                # Handle both dict and string classifier_info
-                classifier_info = result['classifier_info']
-                if isinstance(classifier_info, dict):
-                    print(f"   Classifiers used: {classifier_info['count']}")
-                    print(f"   Classifier types: {classifier_info['types']}")
-                else:
-                    print(f"   Classifier info: {classifier_info}")
+                # Process the prompt using new quality control system
+                result = await agent.respond_with_quality_control(
+                    prompt=args.prompt,
+                    max_attempts=getattr(args, 'max_quality_attempts', args.max_attempts),
+                    time_budget_minutes=args.time_budget
+                )
                 
-                # Show performance summary
-                summary = agent.get_performance_summary()
-                if not summary.get('tracking_disabled'):
-                    print(f"\n📈 PERFORMANCE SUMMARY:")
-                    print(f"   Total improvements: {summary.get('total_improvements_attempted', 0)}")
-                    print(f"   Success rate: {summary.get('success_rate', 0):.2%}")
+                # Show results from quality control system
+                print(f"\n🎯 FINAL RESPONSE:")
+                print(f"{result.response_text}")
+                
+                if args.verbose:
+                    print(f"\n📊 QUALITY CONTROL DETAILS:")
+                    print(f"   Final quality score: {result.final_quality_score:.3f}")
+                    print(f"   Attempts needed: {result.attempts_needed}")
+                    print(f"   Total time: {result.total_time_seconds:.1f}s")
+                    
+                    # Show classifier parameters used
+                    classifier_params = result.classifier_params_used
+                    print(f"\n🧠 CLASSIFIER PARAMETERS:")
+                    if classifier_params is not None:
+                        print(f"   Layer: {classifier_params.optimal_layer}")
+                        print(f"   Threshold: {classifier_params.classification_threshold}")
+                        print(f"   Training samples: {classifier_params.training_samples}")
+                        print(f"   Classifier type: {classifier_params.classifier_type}")
+                        print(f"   Reasoning: {classifier_params.reasoning}")
+                    else:
+                        print(f"   ❌ No classifier parameters available (operation timed out)")
+                    
+                    # Show steering parameters if used
+                    if result.steering_params_used:
+                        steering_params = result.steering_params_used
+                        print(f"\n🎛️ STEERING PARAMETERS:")
+                        print(f"   Method: {steering_params.steering_method}")
+                        print(f"   Initial strength: {steering_params.initial_strength}")
+                        print(f"   Increment: {steering_params.increment}")
+                        print(f"   Maximum: {steering_params.maximum_strength}")
+                        print(f"   Reasoning: {steering_params.reasoning}")
+                    
+                    # Show quality progression
+                    if result.quality_progression and len(result.quality_progression) > 1:
+                        print(f"\n📈 QUALITY PROGRESSION:")
+                        for i, score in enumerate(result.quality_progression, 1):
+                            print(f"   Attempt {i}: {score:.3f}")
+                    
+                    if getattr(args, 'show_parameter_reasoning', False):
+                        print(f"\n💭 PARAMETER REASONING:")
+                        print(f"   All parameters were self-determined by the model")
+                        if classifier_params is not None:
+                            print(f"   Classifier: {classifier_params.reasoning}")
+                        else:
+                            print(f"   Classifier: ❌ No parameters available (operation timed out)")
+                        if result.steering_params_used:
+                            print(f"   Steering: {result.steering_params_used.reasoning}")
+                            
+            else:
+                print(f"🔄 Using Legacy Autonomous Response System...")
+                
+                # Process the prompt using legacy system
+                result = await agent.respond_autonomously(
+                    prompt=args.prompt,
+                    max_attempts=args.max_attempts,
+                    quality_threshold=args.quality_threshold,
+                    time_budget_minutes=args.time_budget,
+                    max_classifiers=args.max_classifiers
+                )
+                
+                # Show results from legacy system
+                print(f"\n🎯 FINAL RESPONSE:")
+                print(f"{result['final_response']}")
+                
+                if args.verbose:
+                    print(f"\n📊 DETAILS:")
+                    print(f"   Attempts: {result['attempts']}")
+                    print(f"   Improvements: {len(result['improvement_chain'])}")
+                    
+                    # Handle both dict and string classifier_info
+                    classifier_info = result['classifier_info']
+                    if isinstance(classifier_info, dict):
+                        print(f"   Classifiers used: {classifier_info['count']}")
+                        print(f"   Classifier types: {classifier_info['types']}")
+                    else:
+                        print(f"   Classifier info: {classifier_info}")
+                    
+                    # Show performance summary
+                    summary = agent.get_performance_summary()
+                    if not summary.get('tracking_disabled'):
+                        print(f"\n📈 PERFORMANCE SUMMARY:")
+                        print(f"   Total improvements: {summary.get('total_improvements_attempted', 0)}")
+                        print(f"   Success rate: {summary.get('success_rate', 0):.2%}")
             
         except Exception as e:
             print(f"❌ Agent failed: {e}")

@@ -82,22 +82,17 @@
     },
     "arabic_leaderboard_acva": {
       "tags": [
+        "multilingual",
         "arabic",
-        "cultural-values",
-        "multiple-choice",
-        "knowledge",
-        "acegpt"
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "arabic_leaderboard_acva_light": {
       "tags": [
         "arabic",
-        "cultural-values",
-        "multiple-choice",
-        "knowledge",
-        "acegpt",
-        "lightweight"
+        "general knowledge",
+        "history"
       ],
       "quality_score": 2
     },
@@ -113,12 +108,9 @@
     },
     "arabic_leaderboard_alghafa_light": {
       "tags": [
+        "history",
         "arabic",
-        "reading-comprehension",
-        "sentiment-analysis",
-        "question-answering",
-        "alghafa",
-        "lightweight"
+        "general knowledge"
       ],
       "quality_score": 2
     },
@@ -135,119 +127,104 @@
     "arabic_leaderboard_arabic_exams_light": {
       "tags": [
         "arabic",
-        "academic-exam",
-        "standardized-test",
-        "knowledge",
-        "translation",
-        "lightweight"
+        "multilingual",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mmlu": {
       "tags": [
+        "mathematics",
         "arabic",
-        "knowledge",
-        "multiple-choice",
-        "mmlu",
-        "translation",
-        "academic"
+        "reasoning"
       ],
       "quality_score": 3
     },
     "arabic_leaderboard_arabic_mmlu_light": {
       "tags": [
+        "mathematics",
         "arabic",
-        "knowledge",
-        "multiple-choice",
-        "mmlu",
-        "translation",
-        "academic",
-        "lightweight"
+        "reasoning"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_arc_challenge": {
       "tags": [
         "arabic",
-        "question-answering",
-        "translation"
+        "general knowledge",
+        "multilingual"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_arc_challenge_light": {
       "tags": [
-        "arabic",
-        "question-answering",
-        "translation",
-        "lightweight"
+        "multilingual",
+        "science",
+        "arabic"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_arc_easy": {
       "tags": [
         "arabic",
-        "question-answering",
-        "translation"
+        "general knowledge",
+        "history"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_arc_easy_light": {
       "tags": [
+        "multilingual",
         "arabic",
-        "question-answering",
-        "translation",
-        "lightweight"
+        "general knowledge"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_boolq": {
       "tags": [
+        "history",
         "arabic",
-        "question-answering",
-        "translation"
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_boolq_light": {
       "tags": [
         "arabic",
-        "question-answering",
-        "translation",
-        "lightweight"
+        "general knowledge",
+        "history"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_copa": {
       "tags": [
-        "arabic",
-        "commonsense",
-        "translation"
+        "medical",
+        "multilingual",
+        "arabic"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_copa_light": {
       "tags": [
-        "arabic",
-        "commonsense",
-        "translation",
-        "lightweight"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_hellaswag": {
       "tags": [
+        "multilingual",
         "arabic",
-        "commonsense",
-        "translation"
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_hellaswag_light": {
       "tags": [
+        "multilingual",
         "arabic",
-        "commonsense",
-        "translation",
-        "lightweight"
+        "long context"
       ],
       "quality_score": 1
     },
@@ -262,309 +239,313 @@
     },
     "arabic_leaderboard_arabic_mt_mmlu_light": {
       "tags": [
-        "arabic",
-        "knowledge",
-        "multiple-choice",
-        "translation",
-        "lightweight"
+        "english",
+        "law",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_openbook_qa": {
       "tags": [
         "arabic",
-        "question-answering",
-        "translation"
+        "general knowledge",
+        "science"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_openbook_qa_light": {
       "tags": [
+        "multilingual",
         "arabic",
-        "question-answering",
-        "translation",
-        "lightweight"
+        "general knowledge"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_piqa": {
       "tags": [
         "arabic",
-        "question-answering",
-        "commonsense",
-        "translation"
+        "mathematics",
+        "multilingual"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_piqa_light": {
       "tags": [
         "arabic",
-        "question-answering",
-        "commonsense",
-        "translation",
-        "lightweight"
+        "reasoning",
+        "multilingual"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_race": {
       "tags": [
+        "multilingual",
         "arabic",
-        "reading-comprehension",
-        "translation"
+        "long context"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_race_light": {
       "tags": [
+        "science",
         "arabic",
-        "reading-comprehension",
-        "translation",
-        "lightweight"
+        "general knowledge"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_sciq": {
       "tags": [
         "arabic",
-        "translation"
+        "general knowledge",
+        "history"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_sciq_light": {
       "tags": [
+        "multilingual",
         "arabic",
-        "translation",
-        "lightweight"
+        "bias"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_arabic_mt_toxigen": {
       "tags": [
         "arabic",
-        "translation"
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_arabic_mt_toxigen_light": {
       "tags": [
         "arabic",
-        "translation",
-        "lightweight"
+        "mathematics",
+        "multilingual"
       ],
       "quality_score": 1
     },
     "arabic_leaderboard_complete": {
       "tags": [
-        "arabic"
+        "multilingual",
+        "arabic",
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "arabic_leaderboard_light": {
       "tags": [
         "arabic",
-        "lightweight"
+        "general knowledge",
+        "science"
       ],
       "quality_score": 1
     },
     "arabicmmlu": {
       "tags": [
         "arabic",
-        "chinese",
-        "knowledge",
-        "multiple-choice"
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "arabicmmlu_humanities": {
       "tags": [
         "arabic",
-        "chinese",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "general knowledge",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "arabicmmlu_language": {
       "tags": [
+        "history",
         "arabic",
-        "chinese",
-        "knowledge",
-        "multiple-choice"
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "arabicmmlu_other": {
       "tags": [
         "arabic",
-        "chinese",
-        "knowledge",
-        "multiple-choice"
+        "reasoning",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "arabicmmlu_social_science": {
       "tags": [
-        "arabic",
-        "chinese",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "coding",
+        "bias",
+        "arabic"
       ],
       "quality_score": 3
     },
     "arabicmmlu_stem": {
       "tags": [
+        "multilingual",
         "arabic",
-        "chinese",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "basque_bench": {
       "tags": [
-        "basque"
+        "english",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 2
     },
     "bbh": {
       "tags": [
+        "english",
         "reasoning",
-        "english"
+        "hallucination"
       ],
       "quality_score": 3
     },
     "bbh_cot_fewshot": {
       "tags": [
-        "reasoning",
-        "chain-of-thought",
-        "few-shot",
-        "english"
+        "english",
+        "bias",
+        "coding"
       ],
       "quality_score": 3
     },
     "bbh_cot_zeroshot": {
       "tags": [
         "reasoning",
-        "chain-of-thought",
-        "zero-shot",
-        "english"
+        "english",
+        "hallucination"
       ],
       "quality_score": 3
     },
     "bbh_fewshot": {
       "tags": [
         "reasoning",
-        "few-shot",
-        "english"
+        "english",
+        "hallucination"
       ],
       "quality_score": 3
     },
     "bbh_zeroshot": {
       "tags": [
         "reasoning",
-        "zero-shot",
-        "english"
+        "english",
+        "hallucination"
       ],
       "quality_score": 3
     },
     "belebele": {
       "tags": [
-        "general",
-        "english"
+        "general knowledge",
+        "reasoning",
+        "history"
       ],
       "quality_score": 2
     },
     "blimp": {
       "tags": [
-        "general",
-        "english"
+        "english",
+        "reasoning",
+        "hallucination"
       ],
       "quality_score": 2
     },
     "catalan_bench": {
       "tags": [
-        "catalan"
+        "multilingual",
+        "spanish",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "ceval-valid": {
       "tags": [
-        "chinese"
+        "chinese",
+        "general knowledge",
+        "medical"
       ],
       "quality_score": 2
     },
     "cmmlu": {
       "tags": [
         "chinese",
-        "knowledge",
-        "multiple-choice"
+        "general knowledge",
+        "science"
       ],
       "quality_score": 3
     },
     "csatqa": {
       "tags": [
-        "question-answering",
-        "english"
+        "korean",
+        "long context",
+        "mathematics"
       ],
       "quality_score": 2
     },
     "evalita-mp": {
       "tags": [
-        "general",
-        "english"
+        "general knowledge",
+        "long context",
+        "multilingual"
       ],
       "quality_score": 2
     },
     "evalita-mp_at": {
       "tags": [
-        "general",
-        "english"
+        "medical",
+        "italian",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "evalita-mp_faq": {
       "tags": [
-        "general",
-        "english"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 2
     },
     "evalita-mp_gen": {
       "tags": [
-        "general",
-        "english"
+        "medical",
+        "italian",
+        "hallucination"
       ],
       "quality_score": 2
     },
     "evalita-mp_hs": {
       "tags": [
-        "general",
-        "english"
+        "toxicity",
+        "multilingual",
+        "bias"
       ],
       "quality_score": 2
     },
     "evalita-mp_ls": {
       "tags": [
-        "general",
-        "english"
+        "multilingual",
+        "reasoning",
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "evalita-mp_mc": {
       "tags": [
-        "general",
-        "english"
+        "law",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "evalita-mp_ner_adg_group": {
       "tags": [
-        "general",
-        "english"
+        "multilingual",
+        "reasoning",
+        "general knowledge"
       ],
       "quality_score": 2
     },
@@ -577,69 +558,79 @@
     },
     "evalita-mp_ner_group": {
       "tags": [
-        "general",
-        "english"
+        "multilingual",
+        "reasoning",
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "evalita-mp_ner_wn_group": {
       "tags": [
-        "general",
-        "english"
+        "multilingual",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "evalita-mp_re": {
       "tags": [
-        "general",
-        "english"
+        "hallucination",
+        "medical",
+        "bias"
       ],
       "quality_score": 2
     },
     "evalita-mp_sa": {
       "tags": [
-        "general",
-        "english"
+        "italian",
+        "reasoning",
+        "multilingual"
       ],
       "quality_score": 2
     },
     "evalita-mp_sum_fp": {
       "tags": [
-        "general",
-        "english"
+        "general knowledge",
+        "reasoning",
+        "creative writing"
       ],
       "quality_score": 2
     },
     "evalita-mp_te": {
       "tags": [
-        "general",
-        "english"
+        "italian",
+        "reasoning",
+        "history"
       ],
       "quality_score": 2
     },
     "evalita-mp_wic": {
       "tags": [
-        "general",
-        "english"
+        "reasoning",
+        "multilingual",
+        "general knowledge"
       ],
       "quality_score": 2
     },
     "flan_held_in": {
       "tags": [
-        "general",
-        "english"
+        "english",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 2
     },
     "flan_held_out": {
       "tags": [
-        "general",
-        "english"
+        "reasoning",
+        "english",
+        "hallucination"
       ],
       "quality_score": 2
     },
     "flores_ca": {
       "tags": [
+        "multilingual",
         "spanish",
         "translation"
       ],
@@ -647,20 +638,23 @@
     },
     "flores_es": {
       "tags": [
-        "spanish",
-        "translation"
+        "multilingual",
+        "translation",
+        "spanish"
       ],
       "quality_score": 2
     },
     "flores_eu": {
       "tags": [
-        "spanish",
-        "translation"
+        "multilingual",
+        "translation",
+        "spanish"
       ],
       "quality_score": 2
     },
     "flores_gl": {
       "tags": [
+        "multilingual",
         "spanish",
         "translation"
       ],
@@ -668,6 +662,7 @@
     },
     "flores_pt": {
       "tags": [
+        "multilingual",
         "spanish",
         "translation"
       ],
@@ -675,495 +670,457 @@
     },
     "galician_bench": {
       "tags": [
-        "galician"
+        "general knowledge",
+        "multilingual",
+        "spanish"
       ],
       "quality_score": 2
     },
     "global_mmlu_ar": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "arabic",
+        "multilingual",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_bn": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "reasoning",
+        "multilingual",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_de": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
+        "law",
+        "reasoning",
         "english"
       ],
       "quality_score": 3
     },
     "global_mmlu_en": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "english",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_es": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "spanish",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_fr": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "french",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_am": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "multilingual",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_am_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "english",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_am_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_am_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "law",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_am_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "law",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ar": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "medical",
+        "science",
+        "arabic"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ar_humanities": {
       "tags": [
-        "arabic",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "reasoning",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ar_other": {
       "tags": [
-        "arabic",
-        "knowledge",
-        "multiple-choice"
+        "multilingual",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ar_social_sciences": {
       "tags": [
-        "arabic",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "multilingual",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ar_stem": {
       "tags": [
-        "arabic",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "law",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_bn": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "general knowledge",
+        "science"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_bn_humanities": {
       "tags": [
-        "bengali",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "bias",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_bn_other": {
       "tags": [
-        "bengali",
-        "knowledge",
-        "multiple-choice"
+        "law",
+        "multilingual",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_bn_social_sciences": {
       "tags": [
-        "bengali",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "general knowledge",
+        "law",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_bn_stem": {
       "tags": [
-        "bengali",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "general knowledge",
+        "history",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_cs": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "law",
+        "multilingual",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_cs_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "reasoning",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_cs_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "law",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_cs_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "law",
+        "english",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_cs_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "law",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_de": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "bias",
+        "reasoning",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_de_humanities": {
       "tags": [
-        "german",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "multilingual",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_de_other": {
       "tags": [
-        "german",
-        "knowledge",
-        "multiple-choice"
+        "bias",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_de_social_sciences": {
       "tags": [
-        "german",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "law",
+        "english",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_de_stem": {
       "tags": [
-        "german",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "law",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_el": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "mathematics",
+        "reasoning",
+        "science"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_el_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "multilingual",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_el_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "bias",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_el_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "bias",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_el_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "law",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_en": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "mathematics",
+        "reasoning",
+        "science"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_en_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "english",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_en_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "law",
+        "english",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_en_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "multilingual",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_en_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "english",
+        "bias",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_es": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "spanish",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_es_humanities": {
       "tags": [
-        "spanish",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "general knowledge",
+        "law",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_es_other": {
       "tags": [
-        "spanish",
-        "knowledge",
-        "multiple-choice"
+        "law",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_es_social_sciences": {
       "tags": [
-        "spanish",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "bias",
+        "general knowledge",
+        "english"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_es_stem": {
       "tags": [
-        "spanish",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "law",
+        "multilingual",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fa": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "mathematics",
+        "persian",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fa_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "law",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fa_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fa_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "bias",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fa_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "law",
+        "reasoning",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fil": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "bias",
+        "hallucination",
+        "toxicity"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fil_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "law",
+        "general knowledge",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fil_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "history",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fil_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "law",
+        "general knowledge",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fil_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "general knowledge",
+        "history",
+        "law"
       ],
       "quality_score": 3
     },
@@ -1177,477 +1134,433 @@
     },
     "global_mmlu_full_fr_humanities": {
       "tags": [
-        "french",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "bias",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fr_other": {
       "tags": [
-        "french",
-        "knowledge",
-        "multiple-choice"
+        "bias",
+        "law",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fr_social_sciences": {
       "tags": [
-        "french",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "bias",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_fr_stem": {
       "tags": [
-        "french",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "law",
+        "english",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ha": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "reasoning",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ha_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "general knowledge",
+        "history",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ha_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "english",
+        "reasoning",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ha_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "law",
+        "general knowledge",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ha_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "law",
+        "english",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_he": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "multilingual",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_he_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "multilingual",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_he_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "law",
+        "multilingual",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_he_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "english",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_he_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "general knowledge",
+        "history",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_hi": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_hi_humanities": {
       "tags": [
-        "hindi",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "multilingual",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_hi_other": {
       "tags": [
-        "hindi",
-        "knowledge",
-        "multiple-choice"
+        "law",
+        "general knowledge",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_hi_social_sciences": {
       "tags": [
-        "hindi",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "general knowledge",
+        "history",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_hi_stem": {
       "tags": [
-        "hindi",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_id": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "history",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_id_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "bias",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_id_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "law",
+        "general knowledge",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_id_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "bias",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_id_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "general knowledge",
+        "law",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ig": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "english",
+        "reasoning",
+        "long context"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ig_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "general knowledge",
+        "law",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ig_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "general knowledge",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ig_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ig_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "reasoning",
+        "law",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_it": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "general knowledge",
+        "science",
+        "italian"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_it_humanities": {
       "tags": [
-        "italian",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "multilingual",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_it_other": {
       "tags": [
-        "italian",
-        "knowledge",
-        "multiple-choice"
+        "general knowledge",
+        "law",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_it_social_sciences": {
       "tags": [
-        "italian",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "general knowledge",
+        "english",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_it_stem": {
       "tags": [
-        "italian",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "law",
+        "general knowledge",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ja": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "multilingual",
+        "japanese",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ja_humanities": {
       "tags": [
-        "japanese",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "law",
+        "english",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ja_other": {
       "tags": [
         "japanese",
-        "knowledge",
-        "multiple-choice"
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ja_social_sciences": {
       "tags": [
-        "japanese",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "multilingual",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ja_stem": {
       "tags": [
-        "japanese",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "law",
+        "multilingual",
+        "japanese"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ko": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "korean",
+        "general knowledge",
+        "science"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ko_humanities": {
       "tags": [
-        "korean",
-        "knowledge",
-        "multiple-choice",
-        "humanities"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ko_other": {
       "tags": [
-        "korean",
-        "knowledge",
-        "multiple-choice"
+        "law",
+        "general knowledge",
+        "multilingual"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ko_social_sciences": {
       "tags": [
-        "korean",
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science"
+        "general knowledge",
+        "reasoning",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ko_stem": {
       "tags": [
-        "korean",
-        "knowledge",
-        "multiple-choice",
-        "stem"
+        "multilingual",
+        "general knowledge",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ky": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "mathematics",
+        "coding",
+        "science"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ky_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "general knowledge",
+        "multilingual",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ky_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "law",
+        "general knowledge",
+        "history"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ky_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "reasoning",
+        "law",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_ky_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "general knowledge",
+        "law",
+        "reasoning"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_lt": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "medical",
+        "science",
+        "general knowledge"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_lt_humanities": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "humanities",
-        "english"
+        "law",
+        "general knowledge",
+        "bias"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_lt_other": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "english"
+        "history",
+        "bias",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_lt_social_sciences": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "social-science",
-        "english"
+        "general knowledge",
+        "history",
+        "law"
       ],
       "quality_score": 3
     },
     "global_mmlu_full_lt_stem": {
       "tags": [
-        "knowledge",
-        "multiple-choice",
-        "stem",
-        "english"
+        "law",
+        "general knowledge",
+        "multilingual"
       ],
       "quality_score": 3
     },

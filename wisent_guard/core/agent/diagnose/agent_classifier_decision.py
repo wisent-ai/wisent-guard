@@ -3,27 +3,87 @@ from dataclasses import dataclass
 import re
 import asyncio
 import time
+import sys
+import os
+
+# Add the lm-harness-integration path for benchmark selection
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'lm-harness-integration'))
+
 from .classifier_marketplace import ClassifierMarketplace, ClassifierListing, ClassifierCreationEstimate
 from ..budget import get_budget_manager, track_task_performance, ResourceType
 
 @dataclass
 class TaskAnalysis:
     """Analysis of what classifiers might be needed for a task."""
-    predicted_issue_types: List[str]
-    confidence_scores: Dict[str, float]  # issue_type -> confidence
-    task_complexity: float  # 0.0 to 1.0
     prompt_content: str
-    risk_level: float  # 0.0 to 1.0, higher means more risk of issues
+    relevant_benchmarks: List[Dict[str, Any]] = None  # Selected benchmarks for training and steering
 
 @dataclass
 class ClassifierDecision:
     """A decision about whether to use an existing classifier or create a new one."""
-    issue_type: str
+    benchmark_name: str
     action: str  # "use_existing", "create_new", "skip"
     selected_classifier: Optional[ClassifierListing] = None
     creation_estimate: Optional[ClassifierCreationEstimate] = None
     reasoning: str = ""
     confidence: float = 0.0
+
+@dataclass
+class SingleClassifierDecision:
+    """Decision about creating one combined classifier from multiple benchmarks."""
+    benchmark_names: List[str]
+    action: str  # "use_existing", "create_new", "skip"
+    selected_classifier: Optional[ClassifierListing] = None
+    creation_estimate: Optional[ClassifierCreationEstimate] = None
+    reasoning: str = ""
+    confidence: float = 0.0
+
+@dataclass
+class ClassifierParams:
+    """Model-determined classifier parameters."""
+    optimal_layer: int  # 8-20: Based on semantic complexity needed
+    classification_threshold: float  # 0.1-0.9: Based on quality strictness required
+    training_samples: int  # 10-50: Based on complexity and time constraints
+    classifier_type: str  # logistic/svm/neural: Based on data characteristics
+    reasoning: str = ""
+    model_name: str = "unknown"  # Model name for matching existing classifiers
+    
+    # Additional classifier configuration parameters
+    aggregation_method: str = "last_token"  # last_token/mean/max for activation aggregation
+    token_aggregation: str = "average"  # average/final/first/max/min for token score aggregation
+    num_epochs: int = 50
+    batch_size: int = 32
+    learning_rate: float = 0.001
+    early_stopping_patience: int = 10
+    hidden_dim: int = 128
+
+@dataclass
+class SteeringParams:
+    """Model-determined steering parameters."""
+    steering_method: str  # CAA/HPR/DAC/BiPO/KSteering: Best fit for prompt type
+    initial_strength: float  # 0.1-2.0: How aggressive to start
+    increment: float  # 0.1-0.5: How much to increase per failed attempt
+    maximum_strength: float  # 0.5-3.0: Upper limit to prevent over-steering
+    method_specific_params: Dict[str, Any] = None  # Beta values, thresholds, etc.
+    reasoning: str = ""
+
+@dataclass
+class QualityResult:
+    """Result of quality evaluation."""
+    score: float  # Classifier prediction score
+    acceptable: bool  # Model judgment if quality is acceptable
+    reasoning: str = ""
+
+@dataclass
+class QualityControlledResponse:
+    """Final response with complete metadata."""
+    response_text: str
+    final_quality_score: float
+    attempts_needed: int
+    classifier_params_used: ClassifierParams
+    steering_params_used: Optional[SteeringParams] = None
+    quality_progression: List[float] = None  # Quality scores for each attempt
+    total_time_seconds: float = 0.0
 
 class AgentClassifierDecisionSystem:
     """
@@ -35,103 +95,300 @@ class AgentClassifierDecisionSystem:
         self.marketplace = marketplace
         self.decision_history: List[ClassifierDecision] = []
         
-    def analyze_task_requirements(self, prompt: str, context: str = "") -> TaskAnalysis:
+    def analyze_task_requirements(self, prompt: str, context: str = "", 
+                                 priority: str = "all", fast_only: bool = False, 
+                                 time_budget_minutes: float = 5.0, max_benchmarks: int = 1) -> TaskAnalysis:
         """
-        Analyze a task/prompt using model decisions to predict classifier needs.
+        Analyze a task/prompt to select relevant benchmarks for training and steering.
         
         Args:
             prompt: The prompt or task to analyze
             context: Additional context about the task
+            priority: Priority level for benchmark selection
+            fast_only: Only use fast benchmarks
+            time_budget_minutes: Time budget for benchmark selection
+            max_benchmarks: Maximum number of benchmarks to select
+            prefer_fast: Prefer fast benchmarks
             
         Returns:
-            Analysis of predicted classifier needs
+            Analysis with relevant benchmarks for direct use
         """
-        # Get available classifier types from the marketplace
-        available_classifiers = self.marketplace.discover_available_classifiers()
-        available_issue_types = list(set(c.issue_type for c in available_classifiers if c.issue_type != "unknown"))
+        print(f"🔍 Analyzing task requirements for prompt...")
         
-        # Use model to analyze the task and determine needs
-        analysis_prompt = f"""Analyze this task/prompt for potential AI safety issues that would require classification.
-
-Task: {prompt}
-Context: {context}
-
-Available issue types: {', '.join(available_issue_types)}
-
-What types of AI safety issues might this task involve? Consider:
-- hallucination (false information, factual errors)
-- quality (output quality, coherence issues)  
-- harmful (toxic content, safety violations)
-- bias (unfairness, discrimination)
-- coherence (logical consistency problems)
-
-Respond with:
-1. List of relevant issue types from available types (comma-separated, or 'none')
-2. Task complexity (0.0-1.0)
-3. Risk level (0.0-1.0)
-
-Format: issue_types|complexity|risk
-Example: hallucination,quality|0.7|0.3"""
-
-        try:
-            response = self.marketplace.model.generate(analysis_prompt, max_length=50, temperature=0.1)
-            parts = response.strip().split('|')
-            
-            if len(parts) >= 3:
-                issue_types_str = parts[0].strip()
-                if issue_types_str.lower() == 'none':
-                    issue_types = []
-                else:
-                    issue_types = [t.strip() for t in issue_types_str.split(',') if t.strip() and t.strip() in available_issue_types]
-                
-                complexity = float(parts[1]) if parts[1].replace('.','').replace('-','').isdigit() else 0.5
-                risk = float(parts[2]) if parts[2].replace('.','').replace('-','').isdigit() else 0.5
-            else:
-                issue_types = []
-                complexity = 0.5
-                risk = 0.5
-            
-            # Generate confidence scores for each predicted issue type
-            confidence_scores = {}
-            for issue_type in issue_types:
-                confidence_scores[issue_type] = 0.8  # Default confidence for model predictions
-                
-            return TaskAnalysis(
-                predicted_issue_types=issue_types,
-                confidence_scores=confidence_scores,
-                task_complexity=min(1.0, max(0.0, complexity)),
-                prompt_content=prompt,
-                risk_level=min(1.0, max(0.0, risk))
-            )
-        except Exception as e:
-            print(f"   ⚠️ Model analysis failed: {e}")
-            return TaskAnalysis(
-                predicted_issue_types=[],
-                confidence_scores={},
-                task_complexity=0.5,
-                prompt_content=prompt,
-                risk_level=0.5
-            )
+        # Get relevant benchmarks for the prompt using priority-aware selection
+        existing_model = getattr(self.marketplace, 'model', None)
+        relevant_benchmarks = self._get_relevant_benchmarks_for_prompt(
+            prompt, 
+            existing_model=existing_model,
+            priority=priority,
+            fast_only=fast_only,
+            time_budget_minutes=time_budget_minutes,
+            max_benchmarks=max_benchmarks
+        )
+        print(f"   📊 Found {len(relevant_benchmarks)} relevant benchmarks")
+        
+        return TaskAnalysis(
+            prompt_content=prompt,
+            relevant_benchmarks=relevant_benchmarks
+        )
     
+    def _get_relevant_benchmarks_for_prompt(self, prompt: str, existing_model=None, 
+                                           priority: str = "all", fast_only: bool = False, 
+                                           time_budget_minutes: float = 5.0, max_benchmarks: int = 1) -> List[Dict[str, Any]]:
+        """Get relevant benchmarks for the prompt using the intelligent selection system with priority awareness."""
+        try:
+            # Import the benchmark selection function from the correct location
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lm-harness-integration'))
+            from populate_tasks import get_relevant_benchmarks_for_prompt
+            
+            # Use priority-aware selection with provided parameters
+            relevant_benchmarks = get_relevant_benchmarks_for_prompt(
+                prompt=prompt, 
+                max_benchmarks=max_benchmarks, 
+                existing_model=existing_model,
+                priority=priority,
+                fast_only=fast_only,
+                time_budget_minutes=time_budget_minutes
+            )
+            
+            return relevant_benchmarks
+        except Exception as e:
+            print(f"   ⚠️ Failed to get relevant benchmarks: {e}")
+            # Fallback to basic high-priority benchmarks
+            return [
+                {'benchmark': 'mmlu', 'explanation': 'General knowledge benchmark', 'relevance_score': 1, 'priority': 'high', 'loading_time': 9.5},
+                {'benchmark': 'truthfulqa_mc1', 'explanation': 'Truthfulness benchmark', 'relevance_score': 2, 'priority': 'high', 'loading_time': 11.2},
+                {'benchmark': 'hellaswag', 'explanation': 'Commonsense reasoning benchmark', 'relevance_score': 3, 'priority': 'high', 'loading_time': 12.8}
+            ]
+    
+
+    
+
+    
+    async def create_single_quality_classifier(self, 
+                                          task_analysis: TaskAnalysis,
+                                          classifier_params: 'ClassifierParams',
+                                          quality_threshold: float = 0.3,
+                                          time_budget_minutes: float = 10.0) -> SingleClassifierDecision:
+        """
+        Create a single classifier trained on one benchmark.
+        
+        Args:
+            task_analysis: Analysis with relevant benchmarks
+            classifier_params: Model-determined classifier parameters
+            quality_threshold: Minimum quality score to accept existing classifiers
+            time_budget_minutes: Maximum time budget for creating new classifiers
+            
+        Returns:
+            Single classifier decision for the selected benchmark
+        """
+        print(f"🔍 Creating single quality classifier from {len(task_analysis.relevant_benchmarks)} benchmark(s)...")
+        
+        # Extract benchmark names (should be just one now)
+        benchmark_names = [b['benchmark'] for b in task_analysis.relevant_benchmarks]
+        
+        if not benchmark_names:
+            return SingleClassifierDecision(
+                benchmark_names=[],
+                action="skip",
+                reasoning="No benchmarks selected for classifier training",
+                confidence=0.0
+            )
+        
+        # Use first (and should be only) benchmark
+        benchmark_name = benchmark_names[0]
+        print(f"   📊 Using benchmark: {benchmark_name}")
+        
+        # Set up budget manager
+        budget_manager = get_budget_manager()
+        budget_manager.set_time_budget(time_budget_minutes)
+        
+        # Look for existing classifier for this exact model/layer/benchmark combination
+        available_classifiers = self.marketplace.discover_available_classifiers()
+        model_name = classifier_params.model_name if hasattr(classifier_params, 'model_name') else "unknown"
+        layer = classifier_params.optimal_layer
+        
+        # Create specific classifier identifier
+        classifier_id = f"{model_name}_{benchmark_name}_layer_{layer}"
+        
+        print(f"   🔍 Checking for existing classifier: {classifier_id}")
+        
+        # Find existing classifier with exact match
+        existing_classifier = None
+        for classifier in available_classifiers:
+            # Check if classifier matches our exact requirements
+            if (benchmark_name.lower() in classifier.path.lower() and
+                str(layer) in classifier.path and
+                classifier.layer == layer):
+                existing_classifier = classifier
+                print(f"   ✅ Found existing classifier: {classifier.path}")
+                break
+        
+        # Decision logic for single benchmark classifier
+        if existing_classifier and existing_classifier.quality_score >= quality_threshold:
+            return SingleClassifierDecision(
+                benchmark_names=[benchmark_name],
+                action="use_existing",
+                selected_classifier=existing_classifier,
+                reasoning=f"Found existing classifier for {benchmark_name} at layer {layer} with quality {existing_classifier.quality_score:.2f}",
+                confidence=existing_classifier.quality_score
+            )
+        
+        # Get creation estimate for single benchmark classifier
+        creation_estimate = self.marketplace.get_creation_estimate(benchmark_name)
+        
+        # Check if we can afford to create new classifier
+        training_time_seconds = creation_estimate.estimated_training_time_minutes * 60
+        time_budget = budget_manager.get_budget(ResourceType.TIME)
+        
+        if time_budget.can_afford(training_time_seconds):
+            return SingleClassifierDecision(
+                benchmark_names=[benchmark_name],
+                action="create_new",
+                creation_estimate=creation_estimate,
+                reasoning=f"Creating new classifier for {benchmark_name} at layer {layer}",
+                confidence=creation_estimate.confidence
+            )
+        else:
+            return SingleClassifierDecision(
+                benchmark_names=[benchmark_name],
+                action="skip",
+                reasoning=f"Insufficient time budget for creation (need {creation_estimate.estimated_training_time_minutes:.1f}min)",
+                confidence=0.0
+            )
+
+    async def execute_single_classifier_decision(self, decision: SingleClassifierDecision, classifier_params: 'ClassifierParams') -> Optional[Any]:
+        """
+        Execute the single classifier decision to create or use the benchmark classifier.
+        
+        Args:
+            decision: The single classifier decision to execute
+            classifier_params: Model-determined classifier parameters
+            
+        Returns:
+            The trained classifier instance or None if skipped
+        """
+        if decision.action == "skip":
+            print(f"   ⏹️ Skipping classifier creation: {decision.reasoning}")
+            return None
+            
+        elif decision.action == "use_existing":
+            print(f"   📦 Using existing classifier: {decision.selected_classifier.path}")
+            print(f"      Quality: {decision.selected_classifier.quality_score:.3f}")
+            print(f"      Layer: {decision.selected_classifier.layer}")
+            return decision.selected_classifier
+            
+        elif decision.action == "create_new":
+            benchmark_name = decision.benchmark_names[0] if decision.benchmark_names else "unknown"
+            print(f"   🏗️ Creating new classifier for benchmark: {benchmark_name}")
+            start_time = time.time()
+            try:
+                # Create classifier using single benchmark training data
+                new_classifier = await self._create_single_benchmark_classifier(
+                    benchmark_name=benchmark_name,
+                    classifier_params=classifier_params
+                )
+                
+                creation_time = time.time() - start_time
+                print(f"      ✅ Classifier created successfully in {creation_time:.1f}s")
+                return new_classifier
+                
+            except Exception as e:
+                print(f"      ❌ Failed to create classifier: {e}")
+                return None
+                
+        return None
+
+    async def _create_single_benchmark_classifier(self, benchmark_name: str, classifier_params: 'ClassifierParams') -> Optional[Any]:
+        """
+        Create a classifier for a single benchmark.
+        
+        Args:
+            benchmark_name: Name of the benchmark to use for training
+            classifier_params: Model-determined classifier parameters
+            
+        Returns:
+            The trained classifier instance or None if failed
+        """
+        from .create_classifier import ClassifierCreator
+        from ...training_config import TrainingConfig
+        
+        try:
+            # Create training config
+            config = TrainingConfig(
+                issue_type=f"quality_{benchmark_name}",
+                layer=classifier_params.optimal_layer,
+                classifier_type=classifier_params.classifier_type,
+                threshold=classifier_params.classification_threshold,
+                training_samples=classifier_params.training_samples,
+                model_name=self.marketplace.model.name if self.marketplace.model else "unknown"
+            )
+            
+            # Create classifier creator
+            creator = ClassifierCreator(self.marketplace.model)
+            
+            # Create classifier using benchmark-specific training data
+            result = await creator.create_classifier_for_issue_with_benchmarks(
+                issue_type=f"quality_{benchmark_name}",
+                relevant_benchmarks=[benchmark_name],
+                layer=classifier_params.optimal_layer,
+                num_samples=classifier_params.training_samples,
+                config=config
+            )
+            
+            return result.classifier if result else None
+            
+        except Exception as e:
+            print(f"      ❌ Error in single benchmark classifier creation: {e}")
+            raise
+
+    async def _create_combined_classifier(self, benchmark_names: List[str], classifier_params: 'ClassifierParams'):
+        """
+        Create a classifier using combined training data from multiple benchmarks.
+        
+        Args:
+            benchmark_names: List of benchmark names to combine
+            classifier_params: Model-determined parameters for classifier creation
+            
+        Returns:
+            Trained classifier instance
+        """
+        from .create_classifier import ClassifierCreator
+        
+        try:
+            # Initialize classifier creator
+            creator = ClassifierCreator(self.marketplace.model)
+            
+            # Create classifier using combined benchmark training data
+            print(f"      📊 Loading combined training data from benchmarks: {benchmark_names}")
+            classifier = await creator.create_combined_benchmark_classifier(
+                benchmark_names=benchmark_names,
+                classifier_params=classifier_params
+            )
+            
+            return classifier
+            
+        except Exception as e:
+            print(f"      ❌ Error in combined classifier creation: {e}")
+            raise
+
     async def make_classifier_decisions(self, 
                                       task_analysis: TaskAnalysis,
                                       quality_threshold: float = 0.3,
                                       time_budget_minutes: float = 10.0,
                                       max_classifiers: int = None) -> List[ClassifierDecision]:
         """
-        Make intelligent decisions about which classifiers to use for a task.
+        Make decisions about which benchmark-specific classifiers to create or use.
         
         Args:
-            task_analysis: Analysis of the task requirements
+            task_analysis: Analysis with relevant benchmarks
             quality_threshold: Minimum quality score to accept existing classifiers
             time_budget_minutes: Maximum time budget for creating new classifiers
             max_classifiers: Maximum number of classifiers to use (None = no limit)
             
         Returns:
-            List of classifier decisions
+            List of classifier decisions for each benchmark
         """
-        # Removed hardcoded analysis output
-        
         # Set up budget manager
         budget_manager = get_budget_manager()
         budget_manager.set_time_budget(time_budget_minutes)
@@ -143,31 +400,29 @@ Example: hallucination,quality|0.7|0.3"""
         decisions = []
         classifier_count = 0
         
-        # Process each predicted issue type
-        for issue_type in task_analysis.predicted_issue_types:
+        # Create one classifier per relevant benchmark
+        for benchmark_info in task_analysis.relevant_benchmarks:
             if max_classifiers and classifier_count >= max_classifiers:
                 print(f"   ⏹️ Reached maximum classifier limit ({max_classifiers})")
                 break
                 
-            confidence = task_analysis.confidence_scores[issue_type]
-            print(f"\n   🔍 Analyzing need for {issue_type} classifier (confidence: {confidence:.2f})")
+            benchmark_name = benchmark_info['benchmark']
+            print(f"\n   🔍 Analyzing classifier for benchmark: {benchmark_name}")
             
-            # Find best existing classifier for this issue type
-            existing_options = [c for c in available_classifiers if c.issue_type == issue_type]
+            # Look for existing benchmark-specific classifier
+            existing_options = [c for c in available_classifiers if benchmark_name.lower() in c.path.lower()]
             best_existing = max(existing_options, key=lambda x: x.quality_score) if existing_options else None
             
-            # Get creation estimate
-            creation_estimate = self.marketplace.get_creation_estimate(issue_type)
+            # Get creation estimate for this benchmark
+            creation_estimate = self.marketplace.get_creation_estimate(benchmark_name)
             
             # Make decision based on multiple factors
-            decision = self._evaluate_classifier_options(
-                issue_type=issue_type,
-                confidence=confidence,
+            decision = self._evaluate_benchmark_classifier_options(
+                benchmark_name=benchmark_name,
                 best_existing=best_existing,
                 creation_estimate=creation_estimate,
                 quality_threshold=quality_threshold,
-                budget_manager=budget_manager,
-                task_analysis=task_analysis
+                budget_manager=budget_manager
             )
             
             decisions.append(decision)
@@ -187,74 +442,59 @@ Example: hallucination,quality|0.7|0.3"""
         # Store decisions in history
         self.decision_history.extend(decisions)
         
-        # Return decisions without verbose output
         return decisions
     
-    def _evaluate_classifier_options(self,
-                                   issue_type: str,
-                                   confidence: float,
-                                   best_existing: Optional[ClassifierListing],
-                                   creation_estimate: ClassifierCreationEstimate,
-                                   quality_threshold: float,
-                                   budget_manager,
-                                   task_analysis: TaskAnalysis) -> ClassifierDecision:
-        """Evaluate whether to use existing, create new, or skip a classifier."""
+    def _evaluate_benchmark_classifier_options(self,
+                                          benchmark_name: str,
+                                          best_existing: Optional[ClassifierListing],
+                                          creation_estimate: ClassifierCreationEstimate,
+                                          quality_threshold: float,
+                                          budget_manager) -> ClassifierDecision:
+        """Evaluate whether to use existing, create new, or skip a benchmark-specific classifier."""
         
-        # Factor 1: Is this issue type important enough?
-        importance_threshold = 0.1 + (task_analysis.risk_level * 0.2)  # Higher risk = lower threshold
-        if confidence < importance_threshold:
-            return ClassifierDecision(
-                issue_type=issue_type,
-                action="skip",
-                reasoning=f"Confidence {confidence:.2f} below threshold {importance_threshold:.2f}",
-                confidence=0.0
-            )
-        
-        # Factor 2: Existing classifier quality
+        # Factor 1: Existing classifier quality
         existing_quality = best_existing.quality_score if best_existing else 0.0
         
-        # Factor 3: Time constraints
+        # Factor 2: Time constraints
         time_budget = budget_manager.get_budget(ResourceType.TIME)
         training_time_seconds = creation_estimate.estimated_training_time_minutes * 60
         can_afford_creation = time_budget.can_afford(training_time_seconds)
         
-        # Factor 4: Expected benefit vs cost
+        # Factor 3: Expected benefit vs cost
         creation_benefit = creation_estimate.estimated_quality_score
         existing_benefit = existing_quality
-        remaining_minutes = time_budget.remaining_budget / 60
-        creation_cost = creation_estimate.estimated_training_time_minutes / remaining_minutes if remaining_minutes > 0 else float('inf')
         
         # Decision logic
         if best_existing and existing_quality >= quality_threshold:
             if existing_quality >= creation_benefit or not can_afford_creation:
                 return ClassifierDecision(
-                    issue_type=issue_type,
+                    benchmark_name=benchmark_name,
                     action="use_existing",
                     selected_classifier=best_existing,
                     reasoning=f"Existing classifier quality {existing_quality:.2f} meets threshold",
-                    confidence=confidence * existing_quality
+                    confidence=existing_quality
                 )
         
         if can_afford_creation and creation_benefit > existing_benefit:
             return ClassifierDecision(
-                issue_type=issue_type,
+                benchmark_name=benchmark_name,
                 action="create_new",
                 creation_estimate=creation_estimate,
                 reasoning=f"Creating new classifier (est. quality {creation_benefit:.2f} > existing {existing_benefit:.2f})",
-                confidence=confidence * creation_estimate.confidence
+                confidence=creation_estimate.confidence
             )
         
         if best_existing:
             return ClassifierDecision(
-                issue_type=issue_type,
+                benchmark_name=benchmark_name,
                 action="use_existing",
                 selected_classifier=best_existing,
                 reasoning=f"Using existing despite low quality - time/budget constraints",
-                confidence=confidence * existing_quality * 0.7  # Penalty for low quality
+                confidence=existing_quality * 0.7  # Penalty for low quality
             )
         
         return ClassifierDecision(
-            issue_type=issue_type,
+            benchmark_name=benchmark_name,
             action="skip",
             reasoning="No suitable existing classifier and cannot create new within budget",
             confidence=0.0
@@ -282,29 +522,62 @@ Example: hallucination,quality|0.7|0.3"""
                 print(f"   📎 Using existing {decision.issue_type} classifier: {config['path']}")
                 
             elif decision.action == "create_new":
-                print(f"   🏗️ Creating new {decision.issue_type} classifier...")
+                print(f"   🏗️ Creating new classifier for benchmark: {decision.benchmark_name}...")
                 start_time = time.time()
                 try:
-                    new_classifier = await self.marketplace.create_classifier_on_demand(
-                        issue_type=decision.issue_type
+                    # Create benchmark-specific classifier
+                    new_classifier = await self._create_classifier_for_benchmark(
+                        benchmark_name=decision.benchmark_name
                     )
+                    
                     end_time = time.time()
                     
                     # Track performance for future budget estimates
                     track_task_performance(
-                        task_name=f"classifier_training_{decision.issue_type}",
+                        task_name=f"classifier_training_{decision.benchmark_name}",
                         start_time=start_time,
                         end_time=end_time
                     )
                     
                     config = new_classifier.to_config()
+                    config['benchmark'] = decision.benchmark_name
                     classifier_configs.append(config)
                     print(f"      ✅ Created: {config['path']} (took {end_time - start_time:.1f}s)")
                 except Exception as e:
-                    print(f"      ❌ Failed to create {decision.issue_type} classifier: {e}")
+                    print(f"      ❌ Failed to create {decision.benchmark_name} classifier: {e}")
                     continue
         
         return classifier_configs
+    
+    async def _create_classifier_for_benchmark(self, benchmark_name: str):
+        """
+        Create a classifier trained specifically on a benchmark dataset.
+        
+        Args:
+            benchmark_name: Name of the benchmark to train on
+            
+        Returns:
+            Trained classifier instance
+        """
+        from .create_classifier import ClassifierCreator
+        
+        try:
+            # Initialize classifier creator
+            creator = ClassifierCreator(self.marketplace.model)
+            
+            # Create classifier using benchmark-specific training data
+            print(f"      📊 Loading training data from benchmark: {benchmark_name}")
+            classifier = await creator.create_classifier_for_issue_with_benchmarks(
+                issue_type=benchmark_name,  # Use benchmark name as issue type
+                relevant_benchmarks=[benchmark_name],
+                num_samples=50
+            )
+            
+            return classifier
+            
+        except Exception as e:
+            print(f"      ⚠️ Benchmark-based creation failed: {e}")
+            raise e
     
     def get_decision_summary(self) -> str:
         """Get a summary of recent classifier decisions."""
@@ -323,7 +596,7 @@ Example: hallucination,quality|0.7|0.3"""
         summary += f"Actions taken: {dict(action_counts)}\n\n"
         
         for decision in recent_decisions[-5:]:  # Show last 5
-            summary += f"• {decision.issue_type}: {decision.action}\n"
+            summary += f"• {decision.benchmark_name}: {decision.action}\n"
             summary += f"  Reasoning: {decision.reasoning}\n"
             summary += f"  Confidence: {decision.confidence:.2f}\n\n"
         

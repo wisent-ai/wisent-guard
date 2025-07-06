@@ -27,6 +27,102 @@ try:
 except ImportError as e:
     print(f"Error: Could not import sample retrieval function: {e}")
     print("Make sure populate_tasks.py is in the correct location")
+    # For safety, define a dummy function to prevent NameError
+    def get_task_samples_for_analysis(task_name, num_samples):
+        return {"task_name": task_name, "error": "Sample retrieval function not available", "samples": []}
+
+# Global model cache to avoid reloading Llama for every task
+_llama_model_cache = None
+
+def get_llama_model(model_path: str = "meta-llama/Llama-3.1-8B-Instruct"):
+    """
+    Get cached Llama model or load it if not already loaded.
+    This avoids the massive overhead of reloading the model for every task.
+    """
+    global _llama_model_cache
+    
+    if _llama_model_cache is None:
+        print("🦙 Loading Llama 3.1B Instruct (one-time setup)...")
+        
+        try:
+            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+            import torch
+            
+            # Check if MPS is available (Apple Silicon)
+            if torch.backends.mps.is_available():
+                device = "mps"
+                print("Device set to use mps")
+            elif torch.cuda.is_available():
+                device = "cuda"
+                print("Device set to use cuda")
+            else:
+                device = "cpu"
+                print("Device set to use cpu")
+            
+            # Initialize the pipeline once
+            _llama_model_cache = pipeline(
+                "text-generation",
+                model=model_path,
+                torch_dtype=torch.float16,
+                device_map="auto" if device != "mps" else None,
+                device=0 if device == "cuda" else (device if device != "auto" else None),
+                max_new_tokens=1000,
+                temperature=0.3,
+                do_sample=True,
+                pad_token_id=50256
+            )
+            
+            print("✅ Llama model loaded and cached for reuse")
+            
+        except ImportError:
+            print("⚠️  transformers library not found. Install with: pip install transformers torch")
+            return None
+        except Exception as e:
+            print(f"❌ Error loading Llama model: {e}")
+            return None
+    
+    return _llama_model_cache
+
+def call_llama_instruct(prompt: str, model_path: str = "meta-llama/Llama-3.1-8B-Instruct") -> str:
+    """
+    Call Llama 3.1B Instruct model for cognitive analysis using cached model.
+    
+    Args:
+        prompt: The analysis prompt to send to the model
+        model_path: Path to the Llama model (default: meta-llama/Llama-3.1-8B-Instruct)
+    
+    Returns:
+        Model response with cognitive trait analysis
+    """
+    
+    try:
+        # Get cached model (loads once, reuses thereafter)
+        generator = get_llama_model(model_path)
+        
+        if generator is None:
+            return "ERROR: Could not load Llama model"
+        
+        # Format prompt for Llama instruct format
+        formatted_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are an expert cognitive scientist analyzing benchmark tasks to determine what specific cognitive abilities they test.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+        
+        print("🧠 Analyzing with Llama...")
+        response = generator(formatted_prompt, max_new_tokens=800, temperature=0.3)
+        
+        # Extract just the assistant's response
+        full_response = response[0]['generated_text']
+        assistant_response = full_response.split("<|start_header_id|>assistant<|end_header_id|>")[-1].strip()
+        
+        return assistant_response
+        
+    except Exception as e:
+        print(f"Error calling Llama: {e}")
+        return f"ERROR: Could not run Llama analysis: {e}"
 
 def load_allowed_tags() -> Set[str]:
     """Load allowed tags from risks.json, skills.json, and predefined languages."""
@@ -92,120 +188,6 @@ def filter_tags(tags: List[str], allowed_tags: Set[str]) -> List[str]:
                     break
     
     return list(set(filtered))  # Remove duplicates
-
-def call_llama_instruct(prompt: str, model_path: str = "meta-llama/Llama-3.1-8B-Instruct") -> str:
-    """
-    Call Llama 3.1B Instruct model for cognitive analysis.
-    
-    Args:
-        prompt: The analysis prompt to send to the model
-        model_path: Path to the Llama model (default: meta-llama/Llama-3.1-8B-Instruct)
-    
-    Returns:
-        Model response with cognitive trait analysis
-    """
-    
-    try:
-        # Try using transformers library
-        try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-            import torch
-            
-            print("🦙 Loading Llama 3.1B Instruct...")
-            
-            # Initialize the pipeline
-            generator = pipeline(
-                "text-generation",
-                model=model_path,
-                torch_dtype=torch.float16,
-                device_map="auto",
-                max_new_tokens=1000,
-                temperature=0.3,
-                do_sample=True,
-                pad_token_id=50256
-            )
-            
-            # Format prompt for Llama instruct format
-            formatted_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-You are an expert cognitive scientist analyzing benchmark tasks to determine what specific cognitive abilities they test.<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-"""
-            
-            print("🧠 Analyzing with Llama...")
-            response = generator(formatted_prompt, max_new_tokens=800, temperature=0.3)
-            
-            # Extract just the assistant's response
-            full_response = response[0]['generated_text']
-            assistant_response = full_response.split("<|start_header_id|>assistant<|end_header_id|>")[-1].strip()
-            
-            return assistant_response
-            
-        except ImportError:
-            print("⚠️  transformers library not found. Install with: pip install transformers torch")
-            
-        # Try using ollama as fallback
-        try:
-            print("🦙 Trying Ollama...")
-            result = subprocess.run(
-                ['ollama', 'run', 'llama3.1:8b-instruct-fp16', prompt],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-            
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                print(f"Ollama error: {result.stderr}")
-                
-        except FileNotFoundError:
-            print("⚠️  Ollama not found. Install from: https://ollama.com")
-        except subprocess.TimeoutExpired:
-            print("⚠️  Ollama timeout - model taking too long")
-            
-        # Try using llamacpp-python as fallback
-        try:
-            from llama_cpp import Llama
-            
-            print("🦙 Trying llama-cpp-python...")
-            llm = Llama(model_path="./models/llama-3.1-8b-instruct.gguf", n_ctx=4096)
-            
-            response = llm(prompt, max_tokens=800, temperature=0.3, stop=["</s>"])
-            return response['choices'][0]['text']
-            
-        except ImportError:
-            print("⚠️  llama-cpp-python not found. Install with: pip install llama-cpp-python")
-        except Exception as e:
-            print(f"⚠️  llama-cpp-python error: {e}")
-            
-    except Exception as e:
-        print(f"Error calling Llama: {e}")
-    
-    # If all methods fail, return instruction for manual setup
-    return f"""
-ERROR: Could not automatically run Llama 3.1B Instruct.
-
-Please set up one of these options:
-
-1. HuggingFace Transformers:
-   pip install transformers torch
-   
-2. Ollama:
-   - Install from https://ollama.com
-   - Run: ollama pull llama3.1:8b-instruct-fp16
-   
-3. llama-cpp-python:
-   pip install llama-cpp-python
-   - Download GGUF model to ./models/
-
-Then rerun the script.
-
-PROMPT FOR MANUAL ANALYSIS:
-{prompt}
-"""
 
 def parse_llama_response(response: str) -> Dict[str, Any]:
     """
@@ -283,7 +265,18 @@ def parse_llama_response(response: str) -> Dict[str, Any]:
             # Sort by score (highest first)
             tag_scores.sort(key=lambda x: x[1], reverse=True)
             result["cognitive_traits"] = tag_scores
-            result["top_tags"] = [tag for tag, score in tag_scores[:3]]
+            
+            # Get top 3 unique tags (handle duplicates)
+            seen_tags = set()
+            unique_top_tags = []
+            for tag, score in tag_scores:
+                if tag not in seen_tags:
+                    unique_top_tags.append(tag)
+                    seen_tags.add(tag)
+                    if len(unique_top_tags) >= 3:
+                        break
+            
+            result["top_tags"] = unique_top_tags
         
         # Fallback: try old format
         if not result["cognitive_traits"]:
@@ -313,14 +306,39 @@ def parse_llama_response(response: str) -> Dict[str, Any]:
                             tags.append(line.strip())
                 
                 raw_tags = [t for t in tags if t]
-                filtered_tags = filter_tags(raw_tags, allowed_tags)
+                filtered_tags = filter_tags(raw_tags, allowed_tags)  # This already removes duplicates
                 # Convert to scored format with default score of 5
                 result["cognitive_traits"] = [(tag, 5.0) for tag in filtered_tags]
                 result["top_tags"] = filtered_tags[:3]
             
     except Exception as e:
         print(f"Warning: Error parsing Llama response: {e}")
+        print(f"Raw response (first 500 chars): {response[:500]}")
         result["top_tags"] = []
+    
+    # Final safety check - if we still have no tags, try a more aggressive fallback
+    if not result["top_tags"]:
+        print(f"⚠️  No tags found with standard parsing, trying aggressive fallback...")
+        print(f"Raw response (full): {response}")
+        
+        # Try to extract ANY words that match our allowed tags
+        words = re.findall(r'\b\w+\b', response.lower())
+        found_tags = [word for word in words if word in allowed_tags]
+        
+        # Remove duplicates while preserving order
+        unique_tags = []
+        seen = set()
+        for tag in found_tags:
+            if tag not in seen:
+                unique_tags.append(tag)
+                seen.add(tag)
+        
+        if unique_tags:
+            result["top_tags"] = unique_tags[:3]
+            result["cognitive_traits"] = [(tag, 5.0) for tag in unique_tags[:3]]
+            print(f"✅ Fallback found tags: {unique_tags[:3]}")
+        else:
+            print(f"❌ Even fallback parsing failed!")
     
     return result
 
@@ -429,19 +447,53 @@ def find_related_tasks(task_name: str) -> List[str]:
             # Strategy 1: Look for tasks that start with this name + "_"
             related_tasks = [t for t in all_task_names if t.startswith(task_name + "_")]
             
-            # Strategy 2: If no direct sub-tasks, look for tasks that contain this name as a component
-            if not related_tasks:
-                # Split the task name and look for tasks containing those components
-                name_parts = task_name.split('_')
-                if len(name_parts) >= 2:
-                    # Look for tasks that start with any combination of the name parts
-                    for i in range(len(name_parts)):
-                        prefix = '_'.join(name_parts[:i+1])
-                        matching_tasks = [t for t in all_task_names if t.startswith(prefix + "_") and t != task_name]
-                        related_tasks.extend(matching_tasks)
+            # Strategy 2: Look for semantically similar tasks (remove prefixes and find core components)
+            # Always do this search in addition to prefix search
             
-            # Remove duplicates and return
-            return list(set(related_tasks))
+            # Extract key components from the task name
+            name_parts = task_name.split('_')
+            
+            # For arabic_leaderboard_arabic_exams -> look for arabic_exams
+            # For agieval_cn -> look for agieval_* tasks  
+            # For mmlu_college_biology -> look for mmlu_* tasks
+            
+            # Find the core semantic components (skip generic prefixes like "leaderboard")
+            core_parts = []
+            skip_words = {'leaderboard', 'test', 'eval', 'benchmark', 'dataset'}
+            
+            for part in name_parts:
+                if part not in skip_words:
+                    core_parts.append(part)
+            
+            # Try different combinations of core parts
+            for i in range(len(core_parts)):
+                for j in range(i+1, len(core_parts)+1):
+                    pattern = '_'.join(core_parts[i:j])
+                    # Look for exact matches and prefix matches
+                    matching_tasks = [t for t in all_task_names 
+                                    if t == pattern or 
+                                       t.startswith(pattern + "_") or
+                                       t.endswith("_" + pattern)]
+                    related_tasks.extend(matching_tasks)
+            
+            # Also try removing first component (for tasks like arabic_leaderboard_X -> arabic_X)
+            if len(name_parts) >= 3:
+                reduced_name = '_'.join(name_parts[1:])  # Skip first part
+                matching_tasks = [t for t in all_task_names if t.startswith(reduced_name)]
+                related_tasks.extend(matching_tasks)
+                
+                # Also try skipping middle parts
+                if len(name_parts) >= 3:
+                    pattern = name_parts[0] + "_" + '_'.join(name_parts[2:])
+                    matching_tasks = [t for t in all_task_names if t.startswith(pattern)]
+                    related_tasks.extend(matching_tasks)
+            
+            # Remove duplicates and the original task itself
+            related_tasks = list(set(related_tasks))
+            if task_name in related_tasks:
+                related_tasks.remove(task_name)
+            
+            return related_tasks
             
     except Exception as e:
         print(f"    Error reading tasks.json for task search: {e}")
@@ -533,10 +585,13 @@ def generate_cognitive_tags(task_name: str, num_samples: int = 5) -> Dict[str, A
     if "error" in task_samples:
         # Check if this might be a task we can analyze via related tasks
         error_msg = task_samples.get("error", "")
+        skip_reason = task_samples.get("skip_reason", "")
+        
         if "not found" in error_msg.lower():
             print(f"   ⚠️  Task not found directly, trying related tasks...")
             return try_related_tasks(task_name, num_samples)
         else:
+            # Return error - the aggressive search should have found alternatives
             return {
                 "task_name": task_name,
                 "error": task_samples["error"],

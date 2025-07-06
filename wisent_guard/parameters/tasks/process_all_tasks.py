@@ -81,6 +81,23 @@ def process_all_tasks(start_index: int = 0, save_every: int = 1):
     updated_count = 0
     start_time = time.time()
     
+    # Pre-load Llama model to avoid loading time in estimates
+    print("🚀 Pre-loading Llama model for optimal performance...")
+    try:
+        from generate_tags import get_llama_model
+        model = get_llama_model()
+        if model is not None:
+            print("✅ Llama model pre-loaded successfully!")
+        else:
+            print("⚠️  Could not pre-load Llama model")
+    except Exception as e:
+        print(f"⚠️  Model pre-loading failed: {e}")
+    
+    # Reset timer after model loading
+    start_time = time.time()
+    print("⏱️  Starting task processing timer...")
+    print("=" * 60)
+    
     for i in range(start_index, total_tasks):
         task_name = task_names[i]
         current_task = tasks[task_name]
@@ -88,13 +105,13 @@ def process_all_tasks(start_index: int = 0, save_every: int = 1):
         print(f"\n[{i+1}/{total_tasks}] Processing: {task_name}")
         print(f"   Current tags: {', '.join(current_task.get('tags', []))}")
         
-        # Generate new tags using AI - FAIL HARD ON ANY ERROR
+        # Generate new tags using AI - handle specific skip cases gracefully
         result = generate_cognitive_tags(task_name, num_samples=3)
         
         if "error" in result:
             error_msg = result['error']
             print(f"   ❌ FATAL ERROR: {error_msg}")
-            print(f"   💥 FAILING HARD - TASK MUST BE FIXED!")
+            print(f"   💥 NO TASK SHOULD FAIL - ALL TASKS MUST WORK!")
             raise RuntimeError(f"Task '{task_name}' failed: {error_msg}")
         
         # Get the top 3 tags
@@ -120,8 +137,7 @@ def process_all_tasks(start_index: int = 0, save_every: int = 1):
         updated_count += 1
         processed_count += 1
         
-        # Small delay to avoid overwhelming the system
-        time.sleep(0.5)
+        # No delay needed with cached model - go full speed!
         
         # Save progress periodically
         if processed_count % save_every == 0:
@@ -131,7 +147,19 @@ def process_all_tasks(start_index: int = 0, save_every: int = 1):
             eta = remaining_tasks / rate if rate > 0 else 0
             
             print(f"\n💾 Saving progress... ({processed_count} tasks processed)")
-            print(f"⏱️  Elapsed: {elapsed/60:.1f}min, ETA: {eta/60:.1f}min, Rate: {rate*60:.1f}/min")
+            
+            # Better time formatting
+            if eta < 60:
+                eta_str = f"{eta:.1f}sec"
+            elif eta < 3600:
+                eta_str = f"{eta/60:.1f}min"
+            else:
+                eta_str = f"{eta/3600:.1f}hours"
+                
+            elapsed_str = f"{elapsed/60:.1f}min" if elapsed > 60 else f"{elapsed:.1f}sec"
+            rate_str = f"{rate*60:.1f}/min" if rate*60 > 1 else f"{rate*3600:.1f}/hour"
+            
+            print(f"⏱️  Elapsed: {elapsed_str}, ETA: {eta_str}, Rate: {rate_str}")
             save_tasks(tasks_data)
             print(f"📊 Stats: {updated_count} updated, {error_count} errors, {skipped_count} skipped")
     

@@ -30,5 +30,18 @@
       "avoid_labels": [4, 5],
       "alpha": 50.0
     }
+  },
+  "classifier": {
+    "layer": 15,
+    "aggregation_method": "last_token",
+    "token_aggregation": "min",
+    "threshold": 0.9,
+    "samples": 25,
+    "type": "logistic",
+    "num_epochs": 50,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "early_stopping_patience": 10,
+    "hidden_dim": 128
   }
 }

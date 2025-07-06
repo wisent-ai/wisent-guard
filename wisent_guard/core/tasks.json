@@ -1462,27 +1462,7 @@
     "arc_ca": {},
     "arc_ca_challenge": {},
     "arc_ca_easy": {},
-    "arc_challenge": {
-      "name": "arc_challenge",
-      "description": null,
-      "example_question": "Question: Juan and LaKeisha roll a few objects down a ramp. They want to see which object rolls the farthest. What should they do so they can repeat their investigation?\nAnswer:",
-      "example_good_response": "3",
-      "example_bad_response": "Incorrect or irrelevant response",
-      "evaluation_method": "Multiple choice accuracy (argmax of log-likelihoods vs gold labels)",
-      "category": "multiple_choice",
-      "task_type": "individual",
-      "languages": [
-        "english"
-      ],
-      "domains": [],
-      "types": [
-        "question_answering",
-        "multiple_choice"
-      ],
-      "formats": [],
-      "safety_concerns": [],
-      "quality_score": 5
-    },
+    "arc_challenge": {},
     "arc_challenge_chat": {},
     "arc_challenge_mt_da": {},
     "arc_challenge_mt_de": {},
@@ -1498,31 +1478,7 @@
     "arc_challenge_mt_sv": {},
     "arc_da": {},
     "arc_de": {},
-    "arc_easy": {
-      "name": "arc_easy",
-      "description": null,
-      "example_question": "Question: Which technology was developed most recently?\nAnswer:",
-      "example_good_response": "0",
-      "example_bad_response": "Incorrect or irrelevant response",
-      "evaluation_method": "Multiple choice accuracy (argmax of log-likelihoods vs gold labels)",
-      "category": "multiple_choice",
-      "task_type": "individual",
-      "languages": [
-        "english"
-      ],
-      "domains": [
-        "technology"
-      ],
-      "types": [
-        "question_answering",
-        "multiple_choice"
-      ],
-      "formats": [
-        "short_context"
-      ],
-      "safety_concerns": [],
-      "quality_score": 2
-    },
+    "arc_easy": {},
     "arc_es": {},
     "arc_eu": {},
     "arc_eu_challenge": {},
@@ -5090,20 +5046,7 @@
       "example_bad_response": "is using wrap to wrap a pair of skis.",
       "evaluation_method": "Multiple choice accuracy (argmax of log-likelihoods vs gold labels)",
       "category": "multiple_choice",
-      "task_type": "individual",
-      "languages": [
-        "english"
-      ],
-      "domains": [],
-      "types": [
-        "text_completion",
-        "multiple_choice"
-      ],
-      "formats": [
-        "short_context"
-      ],
-      "safety_concerns": [],
-      "quality_score": 5
+      "task_type": "individual"
     },
     "hellaswag_ar": {},
     "hellaswag_bn": {},
@@ -6821,22 +6764,7 @@
       "example_bad_response": "This is a common misconception",
       "evaluation_method": "Multiple choice accuracy (argmax of log-likelihoods vs gold labels)",
       "category": "multiple_choice",
-      "task_type": "individual",
-      "languages": [
-        "english"
-      ],
-      "domains": [
-        "general_knowledge",
-        "geography"
-      ],
-      "types": [
-        "question_answering",
-        "truthfulness",
-        "multiple_choice"
-      ],
-      "formats": [],
-      "safety_concerns": [],
-      "quality_score": 5
+      "task_type": "individual"
     },
     "truthfulqa_mc2": {},
     "truthfulqa_ml_mc1": {},

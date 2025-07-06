@@ -1,0 +1,442 @@
+🔄 Updating ALL benchmark tags using README-based logic...
+📋 Processing 71 benchmarks...
+
+🎯 Processing: glue (glue)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'glue'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: superglue (superglue)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'superglue'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'adversarial robustness']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'adversarial robustness']
+
+🎯 Processing: cb (cb)
+   Current tags: ['reasoning', 'general knowledge', 'adversarial robustness']
+   🧠 Using intelligent mapping to determine tags for 'cb'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: copa (copa)
+   Current tags: ['reasoning', 'general knowledge', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'copa'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: multirc (multirc)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'multirc'...
+   ✅ Found exact match: ['reasoning', 'long context', 'general knowledge']
+   ✅ Intelligent tags: ['reasoning', 'long context', 'general knowledge']
+
+🎯 Processing: record (record)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'record'...
+   ✅ Found exact match: ['reasoning', 'long context', 'general knowledge']
+   ✅ Intelligent tags: ['reasoning', 'long context', 'general knowledge']
+
+🎯 Processing: wic (wic)
+   Current tags: ['reasoning', 'general knowledge', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'wic'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: wsc (wsc)
+   Current tags: ['reasoning', 'general knowledge', 'adversarial robustness']
+   🧠 Using intelligent mapping to determine tags for 'wsc'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: truthfulqa_mc1 (truthfulqa_mc1)
+   Current tags: ['hallucination', 'deception', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'truthfulqa_mc1'...
+   ✅ Found exact match: ['hallucination', 'general knowledge', 'reasoning']
+   ✅ Intelligent tags: ['hallucination', 'general knowledge', 'reasoning']
+
+🎯 Processing: truthfulqa_mc2 (truthfulqa_mc2)
+   Current tags: ['hallucination', 'deception', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'truthfulqa_mc2'...
+   ✅ Found exact match: ['hallucination', 'general knowledge', 'reasoning']
+   ✅ Intelligent tags: ['hallucination', 'general knowledge', 'reasoning']
+
+🎯 Processing: truthfulqa_gen (truthfulqa_gen)
+   Current tags: ['hallucination', 'deception', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'truthfulqa_gen'...
+   ✅ Found partial match with 'truthfulqa': ['hallucination', 'general knowledge', 'reasoning']
+   ✅ Intelligent tags: ['hallucination', 'general knowledge', 'reasoning']
+
+🎯 Processing: hellaswag (hellaswag)
+   Current tags: ['reasoning', 'long context', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'hellaswag'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: piqa (piqa)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'piqa'...
+   ✅ Found exact match: ['reasoning', 'science', 'general knowledge']
+   ✅ Intelligent tags: ['reasoning', 'science', 'general knowledge']
+
+🎯 Processing: winogrande (winogrande)
+   Current tags: ['reasoning', 'long context', 'bias']
+   🧠 Using intelligent mapping to determine tags for 'winogrande'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'adversarial robustness']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'adversarial robustness']
+
+🎯 Processing: openbookqa (openbookqa)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'openbookqa'...
+   ✅ Found exact match: ['science', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['science', 'reasoning', 'general knowledge']
+
+🎯 Processing: swag (swag)
+   Current tags: ['reasoning', 'long context', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'swag'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: storycloze (storycloze)
+   Current tags: ['reasoning', 'long context', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'storycloze'...
+   ✅ Determined from README analysis: ['long context', 'creative writing', 'reasoning']
+   ✅ Intelligent tags: ['long context', 'creative writing', 'reasoning']
+
+🎯 Processing: logiqa (logiqa)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'logiqa'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: wsc273 (wsc273)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'wsc273'...
+   ✅ Found partial match with 'wsc': ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: coqa (coqa)
+   Current tags: ['general knowledge', 'long context', 'reasoning']
+   🧠 Using intelligent mapping to determine tags for 'coqa'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'long context']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'long context']
+
+🎯 Processing: drop (drop)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'drop'...
+   ✅ Found exact match: ['mathematics', 'reasoning', 'long context']
+   ✅ Intelligent tags: ['mathematics', 'reasoning', 'long context']
+
+🎯 Processing: boolq (boolq)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🧠 Using intelligent mapping to determine tags for 'boolq'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: race (race)
+   Current tags: ['reasoning', 'long context', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'race'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: squad2 (squad2)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'squad2'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'long context']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'long context']
+
+🎯 Processing: triviaqa (triviaqa)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'triviaqa'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: naturalqs (nq_open)
+   Current tags: ['general knowledge', 'tool use', 'reasoning']
+   🧠 Using intelligent mapping to determine tags for 'nq_open'...
+   ✅ Determined from README analysis: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: webqs (webqs)
+   Current tags: ['general knowledge', 'long context', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'webqs'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: headqa (headqa)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'headqa'...
+   ✅ Determined from README analysis: ['medical', 'multilingual', 'adversarial robustness']
+   ✅ Intelligent tags: ['medical', 'multilingual', 'adversarial robustness']
+
+🎯 Processing: qasper (qasper)
+   Current tags: ['general knowledge', 'long context', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'qasper'...
+   ✅ Found exact match: ['science', 'long context', 'reasoning']
+   ✅ Intelligent tags: ['science', 'long context', 'reasoning']
+
+🎯 Processing: qa4mre (qa4mre)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'qa4mre'...
+   ✅ Determined from README analysis: ['medical', 'long context', 'reasoning']
+   ✅ Intelligent tags: ['medical', 'long context', 'reasoning']
+
+🎯 Processing: mutual (mutual)
+   Current tags: ['reasoning', 'long context', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'mutual'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: mmlu (mmlu)
+   Current tags: ['reasoning', 'long context', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'mmlu'...
+   ✅ Found exact match: ['general knowledge', 'science', 'reasoning']
+   ✅ Intelligent tags: ['general knowledge', 'science', 'reasoning']
+
+🎯 Processing: ai2_arc (ai2_arc)
+   Current tags: ['science', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'ai2_arc'...
+   ✅ Found partial match with 'arc': ['science', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['science', 'reasoning', 'general knowledge']
+
+🎯 Processing: arc_easy (arc_easy)
+   Current tags: ['science', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'arc_easy'...
+   ✅ Found partial match with 'arc': ['science', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['science', 'reasoning', 'general knowledge']
+
+🎯 Processing: arc_challenge (arc_challenge)
+   Current tags: ['science', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'arc_challenge'...
+   ✅ Found partial match with 'arc': ['science', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['science', 'reasoning', 'general knowledge']
+
+🎯 Processing: sciq (sciq)
+   Current tags: ['long context', 'science', 'reasoning']
+   🧠 Using intelligent mapping to determine tags for 'sciq'...
+   ✅ Determined from README analysis: ['long context', 'science', 'reasoning']
+   ✅ Intelligent tags: ['long context', 'science', 'reasoning']
+
+🎯 Processing: social_i_qa (social_i_qa)
+   Current tags: ['reasoning', 'general knowledge', 'science']
+   🧠 Using intelligent mapping to determine tags for 'social_i_qa'...
+   ⚠️  Using fallback tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: gsm8k (gsm8k)
+   Current tags: ['reasoning', 'creative writing', 'mathematics']
+   🧠 Using intelligent mapping to determine tags for 'gsm8k'...
+   ✅ Found exact match: ['mathematics', 'reasoning', 'science']
+   ✅ Intelligent tags: ['mathematics', 'reasoning', 'science']
+
+🎯 Processing: math_qa (math_qa)
+   Current tags: ['mathematics', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'math_qa'...
+   ✅ Found partial match with 'math': ['mathematics', 'reasoning', 'science']
+   ✅ Intelligent tags: ['mathematics', 'reasoning', 'science']
+
+🎯 Processing: hendrycks_math (hendrycks_math)
+   Current tags: ['long context', 'mathematics', 'coding']
+   🧠 Using intelligent mapping to determine tags for 'hendrycks_math'...
+   ✅ Found partial match with 'math': ['mathematics', 'reasoning', 'science']
+   ✅ Intelligent tags: ['mathematics', 'reasoning', 'science']
+
+🎯 Processing: arithmetic (arithmetic)
+   Current tags: ['general knowledge', 'long context', 'mathematics']
+   🧠 Using intelligent mapping to determine tags for 'arithmetic'...
+   ✅ Determined from README analysis: ['mathematics', 'long context', 'reasoning']
+   ✅ Intelligent tags: ['mathematics', 'long context', 'reasoning']
+
+🎯 Processing: asdiv (asdiv)
+   Current tags: ['long context', 'creative writing', 'mathematics']
+   🧠 Using intelligent mapping to determine tags for 'asdiv'...
+   ✅ Determined from README analysis: ['mathematics', 'adversarial robustness', 'long context']
+   ✅ Intelligent tags: ['mathematics', 'adversarial robustness', 'long context']
+
+🎯 Processing: humaneval (humaneval)
+   Current tags: ['long context', 'creative writing', 'coding']
+   🧠 Using intelligent mapping to determine tags for 'humaneval'...
+   ✅ Found exact match: ['coding', 'reasoning', 'mathematics']
+   ✅ Intelligent tags: ['coding', 'reasoning', 'mathematics']
+
+🎯 Processing: mbpp (mbpp)
+   Current tags: ['general knowledge', 'long context', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'mbpp'...
+   ✅ Found exact match: ['coding', 'reasoning', 'mathematics']
+   ✅ Intelligent tags: ['coding', 'reasoning', 'mathematics']
+
+🎯 Processing: toxigen (toxigen)
+   Current tags: ['long context', 'toxicity', 'adversarial robustness']
+   🧠 Using intelligent mapping to determine tags for 'toxigen'...
+   ✅ Determined from README analysis: ['adversarial robustness', 'long context', 'reasoning']
+   ✅ Intelligent tags: ['adversarial robustness', 'long context', 'reasoning']
+
+🎯 Processing: crows_pairs (crows_pairs)
+   Current tags: ['long context', 'multilingual', 'history']
+   🧠 Using intelligent mapping to determine tags for 'crows_pairs'...
+   ✅ Found exact match: ['bias', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['bias', 'reasoning', 'general knowledge']
+
+🎯 Processing: hendrycks_ethics (hendrycks_ethics)
+   Current tags: ['general knowledge', 'long context', 'law']
+   🧠 Using intelligent mapping to determine tags for 'hendrycks_ethics'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: anli (anli)
+   Current tags: ['reasoning', 'long context', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'anli'...
+   ✅ Found exact match: ['adversarial robustness', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['adversarial robustness', 'reasoning', 'general knowledge']
+
+🎯 Processing: xnli (xnli)
+   Current tags: ['long context', 'multilingual', 'reasoning']
+   🧠 Using intelligent mapping to determine tags for 'xnli'...
+   ✅ Found exact match: ['multilingual', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['multilingual', 'reasoning', 'general knowledge']
+
+🎯 Processing: xcopa (xcopa)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'xcopa'...
+   ✅ Found exact match: ['multilingual', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['multilingual', 'reasoning', 'general knowledge']
+
+🎯 Processing: xstorycloze (xstorycloze)
+   Current tags: ['long context', 'creative writing', 'science']
+   🧠 Using intelligent mapping to determine tags for 'xstorycloze'...
+   ✅ Determined from README analysis: ['multilingual', 'long context', 'creative writing']
+   ✅ Intelligent tags: ['multilingual', 'long context', 'creative writing']
+
+🎯 Processing: xwinograd (xwinograd)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'xwinograd'...
+   ✅ Found exact match: ['multilingual', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['multilingual', 'reasoning', 'general knowledge']
+
+🎯 Processing: paws_x (paws_x)
+   Current tags: ['multilingual', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'paws_x'...
+   ⚠️  Using fallback tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: mmmlu (mmmlu)
+   Current tags: ['multilingual', 'general knowledge', 'reasoning']
+   🧠 Using intelligent mapping to determine tags for 'mmmlu'...
+   ✅ Found partial match with 'mmlu': ['general knowledge', 'science', 'reasoning']
+   ✅ Intelligent tags: ['general knowledge', 'science', 'reasoning']
+
+🎯 Processing: mgsm (mgsm)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'mgsm'...
+   ✅ Found exact match: ['multilingual', 'mathematics', 'reasoning']
+   ✅ Intelligent tags: ['multilingual', 'mathematics', 'reasoning']
+
+🎯 Processing: belebele (belebele)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'belebele'...
+   ✅ Determined from README analysis: ['multilingual', 'adversarial robustness', 'long context']
+   ✅ Intelligent tags: ['multilingual', 'adversarial robustness', 'long context']
+
+🎯 Processing: medqa (medqa)
+   Current tags: ['medical', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'medqa'...
+   ✅ Found exact match: ['medical', 'science', 'general knowledge']
+   ✅ Intelligent tags: ['medical', 'science', 'general knowledge']
+
+🎯 Processing: pubmedqa (pubmedqa)
+   Current tags: ['general knowledge', 'long context', 'medical']
+   🧠 Using intelligent mapping to determine tags for 'pubmedqa'...
+   ✅ Found exact match: ['medical', 'science', 'reasoning']
+   ✅ Intelligent tags: ['medical', 'science', 'reasoning']
+
+🎯 Processing: lambada (lambada)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'lambada'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'long context']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'long context']
+
+🎯 Processing: lambada_cloze (lambada_cloze)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'lambada_cloze'...
+   ✅ Found partial match with 'lambada': ['reasoning', 'general knowledge', 'long context']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'long context']
+
+🎯 Processing: lambada_multilingual (lambada_multilingual)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'lambada_multilingual'...
+   ✅ Found partial match with 'lambada': ['reasoning', 'general knowledge', 'long context']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'long context']
+
+🎯 Processing: wikitext (wikitext)
+   Current tags: ['long context', 'multilingual', 'reasoning']
+   🧠 Using intelligent mapping to determine tags for 'wikitext'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: narrativeqa (narrativeqa)
+   Current tags: ['long context', 'reasoning', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'narrativeqa'...
+   ✅ Found exact match: ['reasoning', 'long context', 'general knowledge']
+   ✅ Intelligent tags: ['reasoning', 'long context', 'general knowledge']
+
+🎯 Processing: scrolls (scrolls)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'scrolls'...
+   ✅ Found exact match: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: mctaco (mctaco)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'mctaco'...
+   ⚠️  Using fallback tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: prost (prost)
+   Current tags: ['reasoning', 'long context', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'prost'...
+   ✅ Determined from README analysis: ['long context', 'history', 'reasoning']
+   ✅ Intelligent tags: ['long context', 'history', 'reasoning']
+
+🎯 Processing: blimp (blimp)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'blimp'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: unscramble (unscramble)
+   Current tags: ['general knowledge', 'long context', 'multilingual']
+   🧠 Using intelligent mapping to determine tags for 'unscramble'...
+   ✅ Determined from README analysis: ['long context', 'reasoning', 'general knowledge']
+   ✅ Intelligent tags: ['long context', 'reasoning', 'general knowledge']
+
+🎯 Processing: wmt (wmt)
+   Current tags: ['multilingual', 'creative writing', 'general knowledge']
+   🧠 Using intelligent mapping to determine tags for 'wmt'...
+   ⚠️  Using fallback tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: big_bench (big_bench)
+   Current tags: ['general knowledge', 'reasoning', 'creative writing']
+   🧠 Using intelligent mapping to determine tags for 'big_bench'...
+   ⚠️  Using fallback tags: ['reasoning', 'general knowledge', 'science']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'science']
+
+🎯 Processing: babi (babi)
+   Current tags: ['reasoning', 'general knowledge', 'long context']
+   🧠 Using intelligent mapping to determine tags for 'babi'...
+   ✅ Found exact match: ['reasoning', 'general knowledge', 'long context']
+   ✅ Intelligent tags: ['reasoning', 'general knowledge', 'long context']
+
+📊 Update Summary:
+✅ Successful README updates: 71
+⚠️  Kept existing/default tags: 0
+
+📝 Generating updated only_benchmarks.py content...
+💾 Updated benchmarks saved to: updated_benchmarks.py
+
+📋 Example updates:
+   glue: ['reasoning', 'general knowledge', 'science']
+   superglue: ['reasoning', 'general knowledge', 'adversarial robustness']
+   cb: ['reasoning', 'general knowledge', 'science']
+   copa: ['reasoning', 'general knowledge', 'science']
+   multirc: ['reasoning', 'long context', 'general knowledge']
