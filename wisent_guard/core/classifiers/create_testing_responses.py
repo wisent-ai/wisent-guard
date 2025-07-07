@@ -67,10 +67,10 @@ class TestingResponseGenerator:
         self.num_layers = self.model.get_num_layers()
         print(f"   ✅ Model loaded with {self.num_layers} layers")
         
-        # Verify benchmarks directory exists
+        # Check benchmarks directory exists (warn but don't fail - auto-download will handle this)
         if not self.benchmarks_dir.exists():
-            raise FileNotFoundError(f"Benchmarks directory not found: {self.benchmarks_dir}\n"
-                                  f"Please run download_full_benchmarks.py first!")
+            print(f"⚠️  Benchmarks directory not found: {self.benchmarks_dir}")
+            print(f"   📥 Benchmark data will be downloaded automatically if needed")
     
     def get_available_benchmarks(self) -> List[str]:
         """Get list of available downloaded benchmarks."""

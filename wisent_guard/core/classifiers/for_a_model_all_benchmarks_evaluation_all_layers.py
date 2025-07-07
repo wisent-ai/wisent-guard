@@ -35,6 +35,7 @@ sys.path.insert(0, str(project_root))
 # Import existing infrastructure
 from generate_classifiers_all_layers_benchmarks import CLIBatchClassifierGenerator
 from create_testing_responses import TestingResponseGenerator
+from download_full_benchmarks import FullBenchmarkDownloader
 
 
 class ComprehensiveModelEvaluator:
@@ -76,6 +77,85 @@ class ComprehensiveModelEvaluator:
         print(f"   Classifiers: {self.classifiers_dir}")
         print(f"   Test responses: {self.test_responses_dir}")
         print(f"   Results: {self.results_dir}")
+    
+    def ensure_benchmarks_downloaded(self, force_redownload: bool = False) -> Dict[str, Any]:
+        """
+        Ensure benchmark data is downloaded and available.
+        
+        Args:
+            force_redownload: Force redownload even if benchmarks exist
+            
+        Returns:
+            Download results
+        """
+        benchmarks_dir = self.script_dir / "full_benchmarks" / "data"
+        
+        # Check if benchmarks already exist (unless forcing redownload)
+        if benchmarks_dir.exists() and not force_redownload:
+            existing_files = list(benchmarks_dir.glob("*.pkl"))
+            if existing_files:
+                print(f"\n✅ Benchmark data already exists ({len(existing_files)} files)")
+                print(f"   📁 Location: {benchmarks_dir}")
+                return {
+                    'already_existed': True,
+                    'downloaded': 0,
+                    'total_files': len(existing_files),
+                    'location': str(benchmarks_dir)
+                }
+        
+        print(f"\n📥 Benchmark data not found - downloading automatically...")
+        print(f"   📁 Will download to: {benchmarks_dir}")
+        
+        try:
+            # Initialize downloader
+            downloader = FullBenchmarkDownloader(download_dir=str(self.script_dir / "full_benchmarks"))
+            
+            # Download all benchmarks
+            print(f"🔄 Downloading all available benchmarks (this may take several minutes)...")
+            results = downloader.download_all_benchmarks(
+                benchmarks=None,  # Download all
+                force=force_redownload
+            )
+            
+            # Check results
+            if results['successful']:
+                print(f"✅ Successfully downloaded {len(results['successful'])} benchmarks!")
+                print(f"   📁 Location: {benchmarks_dir}")
+                return {
+                    'already_existed': False,
+                    'downloaded': len(results['successful']),
+                    'failed': len(results['failed']),
+                    'total_time': results['total_time'],
+                    'location': str(benchmarks_dir),
+                    'details': results
+                }
+            else:
+                print(f"❌ Failed to download benchmarks")
+                print(f"   Successful: {len(results['successful'])}")
+                print(f"   Failed: {len(results['failed'])}")
+                
+                if results['failed']:
+                    print(f"   Failed benchmarks: {results['failed'][:3]}...")
+                
+                # If some succeeded, continue anyway
+                if results['successful']:
+                    return {
+                        'already_existed': False,
+                        'downloaded': len(results['successful']),
+                        'failed': len(results['failed']),
+                        'total_time': results['total_time'],
+                        'location': str(benchmarks_dir),
+                        'details': results
+                    }
+                else:
+                    raise Exception(f"No benchmarks were successfully downloaded")
+                    
+        except Exception as e:
+            print(f"❌ Error downloading benchmarks: {e}")
+            print(f"\n💡 Manual solution:")
+            print(f"   cd {self.script_dir}")
+            print(f"   python download_full_benchmarks.py --all")
+            raise Exception(f"Failed to automatically download benchmarks: {e}")
     
     def get_available_benchmarks(self) -> List[str]:
         """Get list of available benchmarks."""
@@ -543,6 +623,9 @@ class ComprehensiveModelEvaluator:
         print(f"🚀 Starting Comprehensive Model Evaluation")
         print(f"{'='*80}")
         
+        # Step 0: Ensure benchmark data is downloaded
+        download_results = self.ensure_benchmarks_downloaded()
+        
         # Get available benchmarks and layers
         available_benchmarks = self.get_available_benchmarks()
         available_layers = self.get_model_layers()
@@ -566,6 +649,12 @@ class ComprehensiveModelEvaluator:
             print(f"   Test limit: {test_limit} samples per benchmark")
         if train_limit:
             print(f"   Training limit: {train_limit} samples per benchmark")
+        
+        # Report download status
+        if download_results['already_existed']:
+            print(f"   📁 Benchmark data: Available ({download_results['total_files']} files)")
+        else:
+            print(f"   📁 Benchmark data: Downloaded {download_results['downloaded']} benchmarks")
         
         # Step 1: Check classifier coverage
         coverage = self.check_classifier_coverage(benchmarks, layers)
@@ -594,6 +683,7 @@ class ComprehensiveModelEvaluator:
                 'test_limit': test_limit,
                 'train_limit': train_limit
             },
+            'download_results': download_results,
             'coverage_check': coverage,
             'training_results': training_results,
             'test_response_results': test_response_results,

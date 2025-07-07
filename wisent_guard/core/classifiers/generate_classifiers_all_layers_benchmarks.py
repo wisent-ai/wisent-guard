@@ -58,65 +58,10 @@ class CLIBatchClassifierGenerator:
         # Create classifier directory
         self.classifier_dir.mkdir(parents=True, exist_ok=True)
         
-        # Auto-download benchmarks if they don't exist
+        # Check benchmarks directory exists (warn but don't fail - auto-download will handle this)
         if not self.benchmarks_dir.exists():
-            print(f"   📥 Benchmarks directory not found: {self.benchmarks_dir}")
-            print(f"   🚀 Auto-downloading all benchmarks (this may take a few minutes)...")
-            self._auto_download_benchmarks()
-    
-    def _auto_download_benchmarks(self):
-        """Automatically download benchmarks if they don't exist."""
-        try:
-            # Import the downloader
-            from download_full_benchmarks import FullBenchmarkDownloader
-            
-            print(f"   📦 Initializing benchmark downloader...")
-            downloader = FullBenchmarkDownloader(download_dir="full_benchmarks")
-            
-            print(f"   📥 Downloading all available benchmarks...")
-            results = downloader.download_all_benchmarks(force=False)
-            
-            # Print summary
-            successful = len(results.get('successful', []))
-            failed = len(results.get('failed', []))
-            total_time = results.get('total_time', 0)
-            
-            print(f"   ✅ Benchmark download complete!")
-            print(f"      🎯 Successfully downloaded: {successful} benchmarks")
-            if failed > 0:
-                print(f"      ❌ Failed: {failed} benchmarks")
-            print(f"      ⏱️  Total time: {total_time/60:.1f} minutes")
-            
-            # Verify download worked
-            if not self.benchmarks_dir.exists():
-                raise FileNotFoundError(f"Benchmark download failed - directory still doesn't exist: {self.benchmarks_dir}")
-            
-            print(f"   🎉 Benchmarks ready for classifier training!")
-            
-        except ImportError as e:
-            raise FileNotFoundError(
-                f"❌ Could not import benchmark downloader: {e}\n"
-                f"\n🔧 To fix this, please install the required dependencies and download benchmarks:\n"
-                f"   pip install lm-eval[api]\n"
-                f"   python download_full_benchmarks.py --all\n"
-                f"\n🎯 Then re-run this script to continue classifier training."
-            )
-        except Exception as e:
-            if "No module named 'lm_eval'" in str(e):
-                raise FileNotFoundError(
-                    f"❌ Automatic benchmark download failed - missing lm_eval dependency\n"
-                    f"\n🔧 To fix this, please install the required dependencies and download benchmarks:\n"
-                    f"   pip install lm-eval[api]\n"
-                    f"   python download_full_benchmarks.py --all\n"
-                    f"\n🎯 Then re-run this script to continue classifier training."
-                )
-            else:
-                raise FileNotFoundError(
-                    f"❌ Automatic benchmark download failed: {e}\n"
-                    f"\n🔧 To fix this, please manually download benchmarks:\n"
-                    f"   python download_full_benchmarks.py --all\n"
-                    f"\n🎯 Then re-run this script to continue classifier training."
-                )
+            print(f"⚠️  Benchmarks directory not found: {self.benchmarks_dir}")
+            print(f"   📥 Benchmark data will be downloaded automatically if needed")
     
     def detect_model_layers(self) -> List[int]:
         """Detect all available model layers."""
