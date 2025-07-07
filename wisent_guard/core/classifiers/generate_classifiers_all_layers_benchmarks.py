@@ -146,14 +146,16 @@ class CLIBatchClassifierGenerator:
         print(f"         Command: {' '.join(cmd)}")
         
         try:
-            # Run CLI command
+            # Run CLI command with real-time output
             start_time = time.time()
+            print(f"         📺 Starting CLI command with real-time output...")
             result = subprocess.run(
                 cmd,
                 cwd=str(self.project_root),
-                capture_output=True,
-                text=True,
-                timeout=1800  # 30 minute timeout
+                # Remove capture_output=True to show real-time output
+                stdout=None,  # Output goes to console
+                stderr=None,  # Errors go to console
+                # No timeout - let it run as long as needed
             )
             execution_time = time.time() - start_time
             
@@ -171,9 +173,7 @@ class CLIBatchClassifierGenerator:
                     return {
                         'status': 'success',
                         'execution_time': execution_time,
-                        'classifier_path': actual_path,
-                        'stdout': result.stdout,
-                        'stderr': result.stderr
+                        'classifier_path': actual_path
                     }
                 else:
                     print(f"         ⚠️ CLI completed but no classifier file found")
@@ -184,29 +184,17 @@ class CLIBatchClassifierGenerator:
                         print(f"         Found files: {[f.name for f in files]}")
                     return {
                         'status': 'no_output',
-                        'execution_time': execution_time,
-                        'stdout': result.stdout,
-                        'stderr': result.stderr
+                        'execution_time': execution_time
                     }
             else:
                 print(f"         ❌ CLI failed (code {result.returncode})")
-                if result.stderr:
-                    print(f"         Error: {result.stderr[:200]}...")
+                print(f"         Error: See output above for details")
                 return {
                     'status': 'failed',
                     'execution_time': execution_time,
-                    'stdout': result.stdout,
-                    'stderr': result.stderr,
                     'return_code': result.returncode
                 }
                 
-        except subprocess.TimeoutExpired:
-            print(f"         ⏰ Command timed out after 30 minutes")
-            return {
-                'status': 'timeout',
-                'execution_time': 1800,
-                'error': 'Command timed out'
-            }
         except Exception as e:
             print(f"         ❌ Execution failed: {e}")
             return {
@@ -242,7 +230,6 @@ class CLIBatchClassifierGenerator:
             'layers_processed': [],
             'successful': [],
             'failed': [],
-            'timed_out': [],
             'errors': [],
             'no_output': [],
             'classifier_paths': [],
@@ -262,8 +249,6 @@ class CLIBatchClassifierGenerator:
             if cli_result['status'] == 'success':
                 results['successful'].append((layer, cli_result['execution_time']))
                 results['classifier_paths'].append(cli_result['classifier_path'])
-            elif cli_result['status'] == 'timeout':
-                results['timed_out'].append(layer)
             elif cli_result['status'] == 'failed':
                 results['failed'].append((layer, cli_result.get('return_code', -1)))
             elif cli_result['status'] == 'no_output':
@@ -277,7 +262,6 @@ class CLIBatchClassifierGenerator:
         print(f"\n   📊 Benchmark {benchmark_name} Summary:")
         print(f"      ✅ Successful: {len(results['successful'])}")
         print(f"      ❌ Failed: {len(results['failed'])}")
-        print(f"      ⏰ Timed out: {len(results['timed_out'])}")
         print(f"      ⚠️ No output: {len(results['no_output'])}")
         print(f"      🔥 Errors: {len(results['errors'])}")
         print(f"      ⏱️ Total time: {results['total_time']/60:.1f} minutes")
@@ -337,7 +321,6 @@ class CLIBatchClassifierGenerator:
             'benchmarks_processed': [],
             'total_successful': 0,
             'total_failed': 0,
-            'total_timed_out': 0,
             'total_errors': 0,
             'total_no_output': 0,
             'total_time': 0,
@@ -360,7 +343,6 @@ class CLIBatchClassifierGenerator:
                 overall_results['benchmarks_processed'].append(benchmark_name)
                 overall_results['total_successful'] += len(benchmark_results['successful'])
                 overall_results['total_failed'] += len(benchmark_results['failed'])
-                overall_results['total_timed_out'] += len(benchmark_results['timed_out'])
                 overall_results['total_errors'] += len(benchmark_results['errors'])
                 overall_results['total_no_output'] += len(benchmark_results['no_output'])
                 overall_results['all_classifier_paths'].extend(benchmark_results['classifier_paths'])
@@ -397,7 +379,6 @@ class CLIBatchClassifierGenerator:
         print(f"{'='*80}")
         print(f"✅ Total Successful: {results['total_successful']}")
         print(f"❌ Total Failed: {results['total_failed']}")
-        print(f"⏰ Total Timed Out: {results['total_timed_out']}")
         print(f"⚠️ Total No Output: {results['total_no_output']}")
         print(f"🔥 Total Errors: {results['total_errors']}")
         print(f"📊 Benchmarks Processed: {len(results['benchmarks_processed'])}")
@@ -437,8 +418,8 @@ def main():
                        help='Layers to generate classifiers for (default: all model layers)')
     parser.add_argument('--split-ratio', type=float, default=0.8,
                        help='Train/validation split ratio (default: 0.8)')
-    parser.add_argument('--limit', type=int, default=None,
-                       help='Limit number of samples per benchmark (default: all available)')
+    parser.add_argument('--limit', type=int, default=1000,
+                       help='Limit number of samples per benchmark (default: 1000)')
     parser.add_argument('--classifier-dir', type=str, default=None,
                        help='Directory to save classifiers (default: wisent_guard/core/classifiers/)')
     

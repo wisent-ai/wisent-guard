@@ -614,6 +614,10 @@ def main():
     """Main function for comprehensive model evaluation."""
     parser = argparse.ArgumentParser(description='Comprehensive model evaluation across all benchmarks and layers')
     parser.add_argument('model', help='Model name to evaluate')
+    parser.add_argument('--train-limit', type=int, default=1000,
+                       help='Limit training samples per benchmark (default: 1000)')
+    parser.add_argument('--test-limit', type=int, default=None,
+                       help='Limit test samples per benchmark (default: no limit)')
     
     args = parser.parse_args()
     
@@ -634,8 +638,8 @@ def main():
             benchmarks=None,          # All available benchmarks
             layers=None,              # All model layers
             train_missing=True,       # Train missing classifiers
-            test_limit=None,          # No limit on test samples
-            train_limit=None          # No limit on training samples
+            test_limit=args.test_limit,    # User-specified test limit
+            train_limit=args.train_limit   # User-specified training limit (default: 1000)
         )
         
         if results:

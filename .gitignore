@@ -102,7 +102,8 @@ models/*_classifier*
 models/*_vector*
 
 # Generated classifiers in wisent_guard/core/classifiers/
-wisent_guard/core/classifiers/meta_*
+# Note: Trained classifiers are now tracked in git (small files ~2-3MB total)
+# wisent_guard/core/classifiers/meta_*
 
 # Downloaded benchmarks (can be large)
 wisent_guard/core/classifiers/benchmarks/
