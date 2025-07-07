@@ -1,0 +1,10 @@
+{
+  "wsc273": {
+    "task_name": "wsc273",
+    "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+    "error": "Insufficient training data: 0 pairs found, minimum 4 required",
+    "training_samples": 0,
+    "minimum_required": 4,
+    "suggestion": "Increase dataset size, --limit parameter, or use --allow-small-dataset flag"
+  }
+}

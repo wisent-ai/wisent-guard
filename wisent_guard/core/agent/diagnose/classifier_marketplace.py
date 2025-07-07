@@ -52,7 +52,8 @@ class ClassifierMarketplace:
             "./models/",
             "./classifiers/", 
             "./wisent_guard/models/",
-            "./wisent_guard/classifiers/"
+            "./wisent_guard/classifiers/",
+            "./wisent_guard/core/classifiers/"
         ]
         self.available_classifiers: List[ClassifierListing] = []
         self._training_time_cache = {}
@@ -72,12 +73,23 @@ class ClassifierMarketplace:
             if not os.path.exists(search_path):
                 continue
                 
-            for filename in os.listdir(search_path):
-                if filename.endswith('.pkl'):
-                    filepath = os.path.join(search_path, filename)
+            # For wisent_guard/core/classifiers, search recursively for the nested structure
+            if "wisent_guard/core/classifiers" in search_path:
+                import glob
+                pattern = os.path.join(search_path, "**", "*.pkl")
+                classifier_files = glob.glob(pattern, recursive=True)
+                for filepath in classifier_files:
                     listing = self._create_classifier_listing(filepath)
                     if listing:
                         self.available_classifiers.append(listing)
+            else:
+                # Original behavior for other directories
+                for filename in os.listdir(search_path):
+                    if filename.endswith('.pkl'):
+                        filepath = os.path.join(search_path, filename)
+                        listing = self._create_classifier_listing(filepath)
+                        if listing:
+                            self.available_classifiers.append(listing)
         
         # Sort by quality score (best first)
         self.available_classifiers.sort(key=lambda x: x.quality_score, reverse=True)
@@ -147,6 +159,28 @@ class ClassifierMarketplace:
     
     def _parse_filename(self, filepath: str) -> Tuple[int, str]:
         """Parse layer and issue type from filename."""
+        filename = os.path.basename(filepath).lower()
+        
+        # Check if this is from wisent_guard/core/classifiers with nested structure
+        if "wisent_guard/core/classifiers" in filepath:
+            # Extract from path structure: wisent_guard/core/classifiers/{model}/{benchmark}/layer_{layer}.pkl
+            path_parts = filepath.split(os.sep)
+            
+            # Find the benchmark name (second to last directory)
+            if len(path_parts) >= 2:
+                benchmark_name = path_parts[-2]  # Directory containing the classifier file
+                
+                # Extract layer from filename like "layer_15.pkl"
+                import re
+                layer_match = re.search(r'layer_(\d+)\.pkl', filename)
+                layer = int(layer_match.group(1)) if layer_match else 15
+                
+                # Use benchmark name as issue type for generated classifiers
+                issue_type = f"quality_{benchmark_name}"
+                
+                return layer, issue_type
+        
+        # Original parsing logic for other classifiers
         filename = os.path.basename(filepath).lower()
         
         # Extract layer

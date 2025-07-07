@@ -101,6 +101,16 @@ models/*.joblib
 models/*_classifier*
 models/*_vector*
 
+# Generated classifiers in wisent_guard/core/classifiers/
+wisent_guard/core/classifiers/meta_*
+
+# Downloaded benchmarks (can be large)
+wisent_guard/core/classifiers/benchmarks/
+
+# Full benchmark downloads (complete datasets - very large)
+full_benchmarks/
+wisent_guard/core/classifiers/full_benchmarks/
+
 # Results and evaluation outputs
 results/
 evaluation_results/

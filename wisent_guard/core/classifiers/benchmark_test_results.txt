@@ -1,0 +1,40 @@
+✅ Available benchmarks:
+❌ Not available benchmarks:
+
+✅ arc_challenge
+✅ arc_easy
+✅ asdiv
+✅ boolq
+✅ cb
+✅ copa
+✅ coqa
+✅ drop
+✅ gsm8k
+✅ hellaswag
+✅ logiqa
+❌ math_qa
+✅ mmlu
+❌ mmmlu
+✅ multirc
+✅ mutual
+❌ naturalqs
+✅ openbookqa
+✅ piqa
+✅ prost
+✅ pubmedqa
+✅ race
+✅ record
+✅ sciq
+❌ squad2
+✅ swag
+✅ toxigen
+✅ triviaqa
+✅ truthfulqa_gen
+✅ truthfulqa_mc1
+✅ truthfulqa_mc2
+✅ webqs
+✅ wic
+✅ wikitext
+✅ winogrande
+✅ wsc
+✅ wsc273

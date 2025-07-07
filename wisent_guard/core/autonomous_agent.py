@@ -922,6 +922,9 @@ class AutonomousAgent:
             time_budget_minutes=self.time_budget_minutes or time_budget,
             max_benchmarks=self.max_benchmarks or 1
         )
+        
+        # Check timeout after benchmark selection
+        timeout_mgr.check_timeout()
         benchmark_names = [b['benchmark'] for b in task_analysis.relevant_benchmarks]
         print(f"   🎯 Selected benchmarks: {benchmark_names}")
         print(f"   ⏰ Remaining time: {timeout_mgr.get_remaining_time():.1f}s")

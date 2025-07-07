@@ -1477,8 +1477,8 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
     import subprocess
     import json
     
-    # Get updated benchmark information
-    benchmarks = update_all_benchmarks_from_readme()
+    # Use cached benchmark information (already updated at module load)
+    benchmarks = BENCHMARKS
     
     # Apply priority filtering
     if priority != "all" or fast_only or time_budget_minutes is not None:
@@ -2072,5 +2072,5 @@ if __name__ == "__main__":
         main()
 
 # Export the BENCHMARKS dictionary for use by other modules
-# This is created from CORE_BENCHMARKS with README information
-BENCHMARKS = update_all_benchmarks_from_readme()
+# Use CORE_BENCHMARKS directly to avoid expensive README processing during import
+BENCHMARKS = CORE_BENCHMARKS
