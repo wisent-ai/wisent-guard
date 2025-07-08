@@ -70,7 +70,8 @@ class ComprehensiveModelEvaluator:
         
         # Initialize infrastructure components
         self.classifier_generator = CLIBatchClassifierGenerator(model_name, str(self.base_dir))
-        self.response_generator = TestingResponseGenerator(model_name, str(self.test_responses_dir))
+        # Delay TestingResponseGenerator initialization to avoid loading model in parent process
+        self.response_generator = None  # Will be initialized when needed
         
         print(f"🔬 Comprehensive Model Evaluator")
         print(f"   Model: {model_name}")
@@ -309,10 +310,15 @@ class ComprehensiveModelEvaluator:
         if not missing_responses:
             print(f"   ✅ All test responses exist!")
             return {'generated': 0, 'already_existed': len(benchmarks)}
-        
+
         print(f"   ❌ Missing responses for {len(missing_responses)} benchmarks")
         print(f"   🔧 Generating test responses...")
         
+        # Initialize response generator only when needed (to avoid loading model in parent process)
+        if self.response_generator is None:
+            print(f"   📥 Initializing response generator...")
+            self.response_generator = TestingResponseGenerator(self.model_name, str(self.test_responses_dir))
+
         # Generate missing test responses
         results = self.response_generator.generate_all_testing_responses(
             benchmarks=missing_responses,

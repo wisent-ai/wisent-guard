@@ -70,10 +70,19 @@ class CLIBatchClassifierGenerator:
         # Import model to get layer count
         try:
             from wisent_guard.core.model import Model
+            import torch
             model = Model(self.model_name)
             num_layers = model.model.config.num_hidden_layers
             layers = list(range(num_layers))
             print(f"   🧠 Detected {num_layers} layers: {layers}")
+            
+            # CRITICAL: Release GPU memory to avoid CUDA OOM in subprocess calls
+            print(f"   🧹 Releasing GPU memory...")
+            del model.hf_model  # Delete the HuggingFace model
+            del model  # Delete the Model wrapper
+            torch.cuda.empty_cache()  # Clear CUDA cache
+            print(f"   ✅ GPU memory released")
+            
             return layers
         except Exception as e:
             print(f"   ⚠️ Failed to detect layers: {e}")
