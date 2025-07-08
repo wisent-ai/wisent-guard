@@ -45,7 +45,18 @@ def setup_parser() -> argparse.ArgumentParser:
 
 def setup_tasks_parser(parser):
     """Set up the tasks subcommand parser."""
-    parser.add_argument("task_names", help="Comma-separated list of task names, or path to CSV/JSON file with --from-csv/--from-json")
+    
+    # Task listing options (mutually exclusive with task execution)
+    list_group = parser.add_mutually_exclusive_group()
+    list_group.add_argument("--list-tasks", action="store_true", 
+                           help="List all 37 available benchmark tasks organized by priority (excludes 28 known problematic benchmarks)")
+    list_group.add_argument("--task-info", type=str, metavar="TASK_NAME",
+                           help="Show detailed information about a specific task")
+    
+    # Task execution argument (optional when using listing commands)
+    parser.add_argument("task_names", nargs='?',
+                       help="Comma-separated list of available task names (37 working benchmarks), or path to CSV/JSON file with --from-csv/--from-json")
+    
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")
     parser.add_argument("--shots", type=int, default=0, help="Number of few-shot examples")
@@ -275,6 +286,16 @@ def setup_tasks_parser(parser):
                         help="Path to save evaluation report")
     parser.add_argument("--continue-on-error", action="store_true",
                         help="Continue processing other tasks if one fails")
+    
+    # Benchmark caching arguments
+    parser.add_argument("--cache-benchmark", action="store_true",
+                        help="Cache the benchmark data locally for faster future access")
+    parser.add_argument("--use-cached", action="store_true",
+                        help="Use cached benchmark data if available (default: True)")
+    parser.add_argument("--force-download", action="store_true",
+                        help="Force fresh download even if cached version exists")
+    parser.add_argument("--cache-dir", type=str, default="./benchmark_cache",
+                        help="Directory to store cached benchmark data (default: ./benchmark_cache)")
 
 
 def parse_layers_from_arg(layer_arg: str, model=None) -> List[int]:

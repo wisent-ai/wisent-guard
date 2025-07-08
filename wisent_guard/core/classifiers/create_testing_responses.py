@@ -122,14 +122,32 @@ class TestingResponseGenerator:
         """
         activations = {}
         
+        if not text or not text.strip():
+            print(f"      ⚠️ Empty text provided for activation extraction")
+            return {layer: None for layer in range(self.num_layers)}
+        
         for layer_idx in range(self.num_layers):
             try:
                 layer = Layer(index=layer_idx, type="transformer")
                 layer_activations = self.model.extract_activations(text, layer)
-                activations[layer_idx] = layer_activations
+                
+                # Ensure we have a valid tensor
+                if layer_activations is not None and isinstance(layer_activations, torch.Tensor):
+                    # Convert to expected format - ensure we have a 2D tensor [batch_size, hidden_dim]
+                    if layer_activations.dim() == 1:
+                        layer_activations = layer_activations.unsqueeze(0)
+                    activations[layer_idx] = layer_activations
+                else:
+                    print(f"      ⚠️ Layer {layer_idx}: No activations returned")
+                    activations[layer_idx] = None
+                    
             except Exception as e:
                 print(f"      ⚠️ Failed to extract activations from layer {layer_idx}: {e}")
                 activations[layer_idx] = None
+        
+        # Count successful extractions
+        successful_layers = [k for k, v in activations.items() if v is not None]
+        print(f"      ✅ Successfully extracted activations from {len(successful_layers)}/{self.num_layers} layers")
         
         return activations
     
@@ -144,7 +162,7 @@ class TestingResponseGenerator:
         Returns:
             Dictionary with response data
         """
-        question = sample.get('question', sample.get('premise', sample.get('text', '')))
+        question = sample.get('question', sample.get('premise', sample.get('text', sample.get('query', sample.get('ctx', '')))))
         choices = sample.get('choices', sample.get('endings', []))
         correct_answer = sample.get('answer', sample.get('label', 0))
         
@@ -250,7 +268,7 @@ class TestingResponseGenerator:
         Returns:
             Dictionary with response data
         """
-        question = sample.get('question', sample.get('input', sample.get('text', '')))
+        question = sample.get('question', sample.get('input', sample.get('text', sample.get('query', sample.get('ctx', '')))))
         
         # Get correct answer(s)
         if 'answers' in sample:
@@ -465,6 +483,7 @@ class TestingResponseGenerator:
                 # Extract activations from all layers using existing Model methods
                 activation_text = response.get('activation_text', '')
                 if activation_text:
+                    print(f"      🧠 Extracting activations for sample {i+1} from text: '{activation_text[:50]}...'")
                     sample_activations = self.extract_activations_from_all_layers(activation_text)
                     
                     # Store activations for stacking
@@ -474,6 +493,9 @@ class TestingResponseGenerator:
                     
                     # Add activations to response
                     response['activations'] = sample_activations
+                else:
+                    print(f"      ⚠️ No activation text found for sample {i+1}")
+                    response['activations'] = {layer: None for layer in range(self.num_layers)}
                 
                 response['sample_index'] = i
                 responses.append(response)

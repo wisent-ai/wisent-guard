@@ -29,8 +29,253 @@ from .core.contrastive_pairs import (
     load_synthetic_pairs_cli
 )
 
+# Import caching infrastructure
+try:
+    from .core.classifiers.pipeline_steps.download_full_benchmarks import FullBenchmarkDownloader
+except ImportError:
+    FullBenchmarkDownloader = None
+
+# Import validated benchmark list and unavailable benchmarks filter
+try:
+    from .core.lm_harness_integration.only_benchmarks import CORE_BENCHMARKS
+    # Import UNAVAILABLE_BENCHMARKS from download script
+    try:
+        from .core.classifiers.pipeline_steps.download_full_benchmarks import FullBenchmarkDownloader
+        UNAVAILABLE_BENCHMARKS = FullBenchmarkDownloader.UNAVAILABLE_BENCHMARKS
+    except ImportError:
+        UNAVAILABLE_BENCHMARKS = set()
+except ImportError:
+    try:
+        # Alternative import path for development/testing
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, os.path.join(current_dir, 'core', 'lm-harness-integration'))
+        from only_benchmarks import CORE_BENCHMARKS
+        # Try to import UNAVAILABLE_BENCHMARKS
+        try:
+            sys.path.insert(0, os.path.join(current_dir, 'core', 'classifiers', 'pipeline_steps'))
+            from download_full_benchmarks import FullBenchmarkDownloader
+            UNAVAILABLE_BENCHMARKS = FullBenchmarkDownloader.UNAVAILABLE_BENCHMARKS
+        except ImportError:
+            UNAVAILABLE_BENCHMARKS = set()
+    except ImportError:
+        # Fallback - create minimal benchmark list
+        CORE_BENCHMARKS = {
+            "truthfulqa_mc1": {"task": "truthfulqa_mc1", "tags": ["hallucination"], "priority": "high"},
+            "hellaswag": {"task": "hellaswag", "tags": ["reasoning"], "priority": "high"},
+            "mmlu": {"task": "mmlu", "tags": ["knowledge"], "priority": "high"},
+        }
+        UNAVAILABLE_BENCHMARKS = set()
+        print("⚠️  Warning: Could not import CORE_BENCHMARKS, using minimal fallback list")
+
+# Filter to only available (working) benchmarks - this gives us the 37 validated benchmarks
+AVAILABLE_BENCHMARKS = {
+    name: config for name, config in CORE_BENCHMARKS.items() 
+    if name not in UNAVAILABLE_BENCHMARKS
+}
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+def get_valid_task_names() -> List[str]:
+    """Get list of all valid (available) task names from AVAILABLE_BENCHMARKS."""
+    return sorted(list(AVAILABLE_BENCHMARKS.keys()))
+
+
+def validate_task_name(task_name: str) -> bool:
+    """
+    Validate if a task name is in the approved AVAILABLE_BENCHMARKS list (37 working benchmarks).
+    
+    Args:
+        task_name: Name of the task to validate
+        
+    Returns:
+        True if task is valid, False otherwise
+    """
+    return task_name in AVAILABLE_BENCHMARKS
+
+
+def suggest_similar_tasks(invalid_task: str, max_suggestions: int = 5) -> List[str]:
+    """
+    Suggest similar task names for an invalid task using fuzzy matching.
+    
+    Args:
+        invalid_task: The invalid task name
+        max_suggestions: Maximum number of suggestions to return
+        
+    Returns:
+        List of suggested task names
+    """
+    from difflib import get_close_matches
+    
+    valid_tasks = get_valid_task_names()
+    suggestions = get_close_matches(invalid_task, valid_tasks, n=max_suggestions, cutoff=0.6)
+    return suggestions
+
+
+def print_valid_tasks_by_category():
+    """Print all valid (available) tasks organized by categories/tags."""
+    excluded_count = len(UNAVAILABLE_BENCHMARKS)
+    print(f"\n📋 VALID TASKS ({len(AVAILABLE_BENCHMARKS)} available out of {len(CORE_BENCHMARKS)} total):")
+    if excluded_count > 0:
+        print(f"    🚫 {excluded_count} benchmarks excluded (known unavailable/problematic)")
+    print("=" * 60)
+    
+    # Group by priority for better organization
+    by_priority = {"high": [], "medium": [], "low": [], "unknown": []}
+    
+    for name, config in AVAILABLE_BENCHMARKS.items():
+        priority = config.get("priority", "unknown")
+        by_priority[priority].append((name, config))
+    
+    for priority in ["high", "medium", "low", "unknown"]:
+        if by_priority[priority]:
+            emoji = "🚀" if priority == "high" else "⚡" if priority == "medium" else "🐌" if priority == "low" else "❓"
+            print(f"\n{emoji} {priority.upper()} PRIORITY ({len(by_priority[priority])} tasks):")
+            
+            for name, config in sorted(by_priority[priority]):
+                tags = ", ".join(config.get("tags", []))
+                print(f"   • {name:<20} - {tags}")
+    
+    print(f"\n💡 Usage: wisent-guard tasks --task-name <task_name>")
+    print(f"   Example: wisent-guard tasks --task-name truthfulqa_mc1")
+    
+    if excluded_count > 0:
+        print(f"\n🚫 EXCLUDED BENCHMARKS ({excluded_count} total):")
+        excluded_list = sorted(list(UNAVAILABLE_BENCHMARKS))
+        for i in range(0, len(excluded_list), 4):  # Show 4 per line
+            line_items = excluded_list[i:i+4]
+            print(f"   🚫 {', '.join(line_items)}")
+
+
+def print_task_info(task_name: str):
+    """Print detailed information about a specific task."""
+    if task_name not in AVAILABLE_BENCHMARKS:
+        if task_name in UNAVAILABLE_BENCHMARKS:
+            print(f"❌ Task '{task_name}' is known to be unavailable/problematic")
+            print(f"🚫 This benchmark is excluded from the {len(AVAILABLE_BENCHMARKS)} available benchmarks")
+        else:
+            print(f"❌ Task '{task_name}' not found in available benchmarks")
+        return
+    
+    config = AVAILABLE_BENCHMARKS[task_name]
+    print(f"\n📋 TASK INFO: {task_name}")
+    print("=" * 50)
+    print(f"🎯 Task ID: {config.get('task', task_name)}")
+    print(f"🏷️  Tags: {', '.join(config.get('tags', []))}")
+    print(f"⚡ Priority: {config.get('priority', 'unknown')}")
+    
+    if config.get('priority') == 'high':
+        print(f"   💡 Fast loading (< 13.5s) - optimal for agentic use")
+    elif config.get('priority') == 'medium':
+        print(f"   💡 Moderate loading (13.5-60s) - acceptable for agentic use")
+    elif config.get('priority') == 'low':
+        print(f"   💡 Slow loading (> 60s) - deprioritized for agentic use")
+    
+    if 'trust_remote_code' in config:
+        print(f"⚠️  Requires trust_remote_code: {config['trust_remote_code']}")
+
+
+def get_cache_path(task_name: str, cache_dir: str) -> str:
+    """Get the cache file path for a benchmark."""
+    import os
+    # Match the structure used by FullBenchmarkDownloader which saves to data/ subdirectory
+    return os.path.join(cache_dir, "data", f"{task_name}.pkl")
+
+
+def is_benchmark_cached(task_name: str, cache_dir: str) -> bool:
+    """Check if a benchmark is cached."""
+    import os
+    cache_path = get_cache_path(task_name, cache_dir)
+    return os.path.exists(cache_path)
+
+
+def load_cached_benchmark(task_name: str, cache_dir: str) -> Optional[List[Dict[str, Any]]]:
+    """Load cached benchmark data."""
+    import pickle
+    import os
+    
+    cache_path = get_cache_path(task_name, cache_dir)
+    if not os.path.exists(cache_path):
+        return None
+    
+    try:
+        with open(cache_path, 'rb') as f:
+            cached_data = pickle.load(f)
+        return cached_data
+    except Exception as e:
+        print(f"⚠️  Failed to load cached data: {e}")
+        return None
+
+
+def save_benchmark_to_cache(task_name: str, cache_dir: str, limit: Optional[int] = None, verbose: bool = False) -> bool:
+    """Save benchmark data to cache using the download infrastructure."""
+    import os
+    
+    if FullBenchmarkDownloader is None:
+        if verbose:
+            print("⚠️  Warning: Download infrastructure not available, cannot cache")
+        return False
+    
+    if task_name not in AVAILABLE_BENCHMARKS:
+        if verbose:
+            print(f"⚠️  Warning: {task_name} not in available benchmarks")
+        return False
+    
+    # Create cache directory
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    try:
+        if verbose:
+            print(f"💾 Caching benchmark {task_name}...")
+        
+        # Use the download infrastructure to get and cache the data
+        downloader = FullBenchmarkDownloader(download_dir=cache_dir)
+        benchmark_config = AVAILABLE_BENCHMARKS[task_name]
+        
+        # Download and save (this handles the full download and conversion)
+        result_path = downloader.download_complete_benchmark(
+            task_name, 
+            benchmark_config, 
+            force=True  # Force download since we want to cache
+        )
+        
+        if result_path:
+            if verbose:
+                print(f"✅ Successfully cached {task_name}")
+            return True
+        else:
+            if verbose:
+                print(f"❌ Failed to cache {task_name}")
+            return False
+            
+    except Exception as e:
+        if verbose:
+            print(f"❌ Error caching {task_name}: {e}")
+        return False
+
+
+def convert_cached_data_to_qa_pairs(cached_data: List[Dict[str, Any]], limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """Convert cached contrastive pairs back to QA pair format expected by the pipeline."""
+    qa_pairs = []
+    
+    for pair in cached_data:
+        # Convert contrastive pair back to QA format
+        # The cached data is in format: {"context": "", "good_response": "", "bad_response": "", "metadata": {}}
+        qa_pair = {
+            "question": pair.get("context", ""),
+            "correct_answer": pair.get("good_response", ""),
+            "incorrect_answer": pair.get("bad_response", ""),
+            "metadata": pair.get("metadata", {})
+        }
+        qa_pairs.append(qa_pair)
+        
+        if limit and len(qa_pairs) >= limit:
+            break
+    
+    return qa_pairs
 
 
 def _run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, verbose=False):
@@ -274,13 +519,18 @@ def run_task_pipeline(
     fast_only: bool = False,
     time_budget: float = None,
     max_benchmarks: int = None,
-    smart_selection: bool = False
+    smart_selection: bool = False,
+    # Benchmark caching parameters
+    cache_benchmark: bool = False,
+    use_cached: bool = True,
+    force_download: bool = False,
+    cache_dir: str = "./benchmark_cache"
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
     
     Args:
-        task_name: Name of the benchmark task or path to file
+        task_name: Name of available benchmark task or path to file (from 37 working benchmarks)
         model_name: Language model name
         layer: Layer for activation extraction
         shots: Number of few-shot examples
@@ -305,6 +555,45 @@ def run_task_pipeline(
     Returns:
         Dictionary with all results
     """
+    # VALIDATE TASK NAME - Only allow validated benchmarks from CORE_BENCHMARKS
+    if not (from_csv or from_json):
+        if not validate_task_name(task_name):
+            error_msg = f"Invalid task name: '{task_name}'"
+            suggestions = suggest_similar_tasks(task_name)
+            
+            if verbose:
+                print(f"❌ {error_msg}")
+                print(f"📋 Task '{task_name}' is not in the available benchmarks list.")
+                print(f"🔍 Only {len(AVAILABLE_BENCHMARKS)} working benchmarks are supported (out of {len(CORE_BENCHMARKS)} total).")
+                
+                # Check if it's an unavailable benchmark
+                if task_name in UNAVAILABLE_BENCHMARKS:
+                    print(f"🚫 This benchmark is known to be unavailable/problematic.")
+                
+                if suggestions:
+                    print(f"\n💡 Did you mean one of these?")
+                    for i, suggestion in enumerate(suggestions, 1):
+                        config = AVAILABLE_BENCHMARKS[suggestion]
+                        priority = config.get('priority', 'unknown')
+                        tags = ', '.join(config.get('tags', []))
+                        print(f"   {i}. {suggestion} ({priority} priority) - {tags}")
+                
+                print(f"\n📖 To see all valid tasks, run:")
+                print(f"   wisent-guard tasks --list-tasks")
+                print(f"\n📖 To see task details, run:")
+                print(f"   wisent-guard tasks --task-info <task_name>")
+            
+            return {
+                "task_name": task_name,
+                "error": error_msg,
+                "error_type": "invalid_task",
+                "valid_tasks_count": len(AVAILABLE_BENCHMARKS),
+                "total_benchmarks": len(CORE_BENCHMARKS),
+                "excluded_count": len(UNAVAILABLE_BENCHMARKS),
+                "suggestions": suggestions,
+                "help": "Use --list-tasks to see all valid task names"
+            }
+    
     logger.info(f"Running pipeline for task: {task_name}")
     
     # Initialize performance tracking
@@ -459,117 +748,164 @@ def run_task_pipeline(
                 print(f"📊 Data split: {len(qa_pairs)} training pairs, {len(test_qa_pairs_source)} test pairs")
             
         else:
-            # Traditional lm-harness task loading
+            # Traditional lm-harness task loading with caching support
             if verbose:
                 print(f"📚 Loading task data for {task_name}...")
             
-            # FIRST: Check if this is a group task and expand if needed
-            try:
-                from lm_eval import evaluator
-                
+            # CACHING LOGIC: Check for cached benchmark data first
+            cached_data = None
+            used_cache = False
+            
+            if use_cached and not force_download and is_benchmark_cached(task_name, cache_dir):
                 if verbose:
-                    print(f"🔍 Checking if '{task_name}' is a group task...")
+                    print(f"💾 Found cached benchmark data for {task_name}")
                 
-                # Use lm-eval's task expansion to detect group tasks
-                task_dict = evaluator.get_task_dict([task_name])
-                expanded_tasks = list(task_dict.keys())
-                
-                if len(expanded_tasks) > 1:
+                cached_data = load_cached_benchmark(task_name, cache_dir)
+                if cached_data:
                     if verbose:
-                        print(f"🎯 Detected GROUP task '{task_name}' with {len(expanded_tasks)} subtasks: {expanded_tasks[:5]}{'...' if len(expanded_tasks) > 5 else ''}")
-                        print(f"📚 Extracting samples from all subtasks...")
+                        print(f"✅ Loaded {len(cached_data)} cached contrastive pairs")
                     
-                    # Handle group task by combining samples from all subtasks
-                    all_qa_pairs = []
-                    
-                    for subtask_name in expanded_tasks:
-                        try:
-                            if verbose:
-                                print(f"   🔍 Loading subtask: {subtask_name}")
-                            
-                            # Load each subtask individually
-                            subtask_data = model.load_lm_eval_task(subtask_name, shots=shots, limit=limit)
-                            subtask_train_docs, _ = model.split_task_data(subtask_data, split_ratio=split_ratio, random_seed=seed)
-                            
-                            # Extract QA pairs from this subtask
-                            subtask_qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(subtask_name, subtask_data, subtask_train_docs)
-                            
-                            if verbose:
-                                print(f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}")
-                            
-                            # Add subtask identifier to each pair for tracking
-                            for pair in subtask_qa_pairs:
-                                pair['source_subtask'] = subtask_name
-                            
-                            all_qa_pairs.extend(subtask_qa_pairs)
-                            
-                        except Exception as e:
-                            if verbose:
-                                print(f"   ⚠️ Failed to load subtask {subtask_name}: {e}")
-                            continue
-                    
-                    if not all_qa_pairs:
-                        raise ValueError(f"No QA pairs could be extracted from any subtasks in group '{task_name}'")
-                    
-                    # Shuffle and limit the combined dataset
-                    import random
-                    random.seed(seed)
-                    random.shuffle(all_qa_pairs)
-                    
-                    if limit and len(all_qa_pairs) > limit:
-                        all_qa_pairs = all_qa_pairs[:limit]
-                    
-                    # Split for training (we'll use all for training since we extracted from train docs)
-                    qa_pairs = all_qa_pairs
-                    test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []  # Use 20% for testing
+                    # Convert cached data to QA pairs format
+                    all_qa_pairs = convert_cached_data_to_qa_pairs(cached_data, limit)
+                    used_cache = True
                     
                     if verbose:
-                        print(f"📊 Combined dataset: {len(qa_pairs)} total QA pairs from {len(expanded_tasks)} subtasks")
-                        
-                        # Show breakdown by subtask
-                        from collections import Counter
-                        subtask_counts = Counter(pair.get('source_subtask', 'unknown') for pair in qa_pairs)
-                        print(f"📋 Breakdown by subtask:")
-                        for subtask, count in subtask_counts.most_common():
-                            print(f"   • {subtask}: {count} pairs")
-                    
-                    # Set a flag to indicate we've already processed the group task
-                    group_task_processed = True
-                    group_task_qa_format = True  # Test data is already in QA format
-                    
+                        print(f"📊 Converted to {len(all_qa_pairs)} QA pairs")
+                        if limit and len(all_qa_pairs) >= limit:
+                            print(f"   📏 Limited to {limit} pairs as requested")
                 else:
                     if verbose:
-                        print(f"✅ '{task_name}' is an individual task, proceeding...")
+                        print(f"⚠️  Failed to load cached data, falling back to fresh download")
+            
+            if not used_cache:
+                # Load fresh data from lm-eval
+                if verbose:
+                    print(f"🔄 Loading fresh data from lm-eval...")
+                
+                # FIRST: Check if this is a group task and expand if needed
+                try:
+                    from lm_eval import evaluator
+                    
+                    if verbose:
+                        print(f"🔍 Checking if '{task_name}' is a group task...")
+                    
+                    # Use lm-eval's task expansion to detect group tasks
+                    task_dict = evaluator.get_task_dict([task_name])
+                    expanded_tasks = list(task_dict.keys())
+                    
+                    if len(expanded_tasks) > 1:
+                        if verbose:
+                            print(f"🎯 Detected GROUP task '{task_name}' with {len(expanded_tasks)} subtasks: {expanded_tasks[:5]}{'...' if len(expanded_tasks) > 5 else ''}")
+                            print(f"📚 Extracting samples from all subtasks...")
+                        
+                        # Handle group task by combining samples from all subtasks
+                        all_qa_pairs = []
+                        
+                        for subtask_name in expanded_tasks:
+                            try:
+                                if verbose:
+                                    print(f"   🔍 Loading subtask: {subtask_name}")
+                                
+                                # Load each subtask individually
+                                subtask_data = model.load_lm_eval_task(subtask_name, shots=shots, limit=limit)
+                                subtask_train_docs, _ = model.split_task_data(subtask_data, split_ratio=split_ratio, random_seed=seed)
+                                
+                                # Extract QA pairs from this subtask
+                                subtask_qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(subtask_name, subtask_data, subtask_train_docs)
+                                
+                                if verbose:
+                                    print(f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}")
+                                
+                                # Add subtask identifier to each pair for tracking
+                                for pair in subtask_qa_pairs:
+                                    pair['source_subtask'] = subtask_name
+                                
+                                all_qa_pairs.extend(subtask_qa_pairs)
+                                
+                            except Exception as e:
+                                if verbose:
+                                    print(f"   ⚠️ Failed to load subtask {subtask_name}: {e}")
+                                continue
+                        
+                        if not all_qa_pairs:
+                            raise ValueError(f"No QA pairs could be extracted from any subtasks in group '{task_name}'")
+                        
+                        # Shuffle and limit the combined dataset
+                        import random
+                        random.seed(seed)
+                        random.shuffle(all_qa_pairs)
+                        
+                        if limit and len(all_qa_pairs) > limit:
+                            all_qa_pairs = all_qa_pairs[:limit]
+                        
+                        # Split for training (we'll use all for training since we extracted from train docs)
+                        qa_pairs = all_qa_pairs
+                        test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []  # Use 20% for testing
+                        
+                        if verbose:
+                            print(f"📊 Combined dataset: {len(qa_pairs)} total QA pairs from {len(expanded_tasks)} subtasks")
+                            
+                            # Show breakdown by subtask
+                            from collections import Counter
+                            subtask_counts = Counter(pair.get('source_subtask', 'unknown') for pair in qa_pairs)
+                            print(f"📋 Breakdown by subtask:")
+                            for subtask, count in subtask_counts.most_common():
+                                print(f"   • {subtask}: {count} pairs")
+                        
+                        # Set a flag to indicate we've already processed the group task
+                        group_task_processed = True
+                        group_task_qa_format = True  # Test data is already in QA format
+                        
+                    else:
+                        if verbose:
+                            print(f"✅ '{task_name}' is an individual task, proceeding...")
+                        group_task_processed = False
+                        group_task_qa_format = False
+                
+                except Exception as e:
+                    if "Group task" in str(e):
+                        raise e  # Re-raise group task errors
+                    elif verbose:
+                        print(f"⚠️  Could not check if '{task_name}' is a group task: {e}")
+                        print(f"🔄 Proceeding with standard task loading...")
                     group_task_processed = False
                     group_task_qa_format = False
-            
-            except Exception as e:
-                if "Group task" in str(e):
-                    raise e  # Re-raise group task errors
-                elif verbose:
-                    print(f"⚠️  Could not check if '{task_name}' is a group task: {e}")
-                    print(f"🔄 Proceeding with standard task loading...")
-                group_task_processed = False
-                group_task_qa_format = False
-            
-            # Only load individual task if we haven't already processed a group task
-            if not group_task_processed:
-                task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
-                train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
-            
-                if verbose:
-                    print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
                 
-                # Extract QA pairs from training documents  
-                if verbose:
-                    print(f"\n📝 TRAINING DATA PREPARATION:")
-                    print(f"   • Loading {task_name} data with correct/incorrect answers...")
+                # Only load individual task if we haven't already processed a group task
+                if not group_task_processed:
+                    task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
+                    train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
                 
-                # Use the proper extraction method from ContrastivePairSet
-                # ContrastivePairSet import moved to top of file
-                qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+                    if verbose:
+                        print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
                     
-                test_qa_pairs_source = test_docs  # Keep original format for test docs
+                    # Extract QA pairs from training documents  
+                    if verbose:
+                        print(f"\n📝 TRAINING DATA PREPARATION:")
+                        print(f"   • Loading {task_name} data with correct/incorrect answers...")
+                    
+                    # Use the proper extraction method from ContrastivePairSet
+                    # ContrastivePairSet import moved to top of file
+                    qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+                        
+                    test_qa_pairs_source = test_docs  # Keep original format for test docs
+                
+                # CACHE SAVING: Save to cache if requested and we loaded fresh data
+                if cache_benchmark and not used_cache:
+                    if verbose:
+                        print(f"💾 Caching benchmark data for future use...")
+                    
+                    success = save_benchmark_to_cache(task_name, cache_dir, limit, verbose)
+                    if success and verbose:
+                        print(f"✅ Benchmark cached successfully!")
+                    elif verbose:
+                        print(f"⚠️  Failed to cache benchmark")
+            else:
+                # We used cached data, process it for the pipeline
+                qa_pairs = all_qa_pairs
+                test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []
+                group_task_processed = False
+                group_task_qa_format = True  # Cached data is already in QA format
         
         if verbose:
             print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
@@ -2379,12 +2715,51 @@ def _generate_test_scenarios(trait_description: str, num_scenarios: int, model) 
 
 def handle_tasks_command(args):
     """Handle the tasks command."""
+    # Handle special task listing commands
+    if hasattr(args, 'list_tasks') and args.list_tasks:
+        print_valid_tasks_by_category()
+        return
+    
+    if hasattr(args, 'task_info') and args.task_info:
+        print_task_info(args.task_info)
+        return
+    
     task_sources = []
     
     # Build list of task sources
     if hasattr(args, 'task_names') and args.task_names:
         # Parse comma-separated task names
-        task_sources.extend([name.strip() for name in args.task_names.split(',') if name.strip()])
+        task_names = [name.strip() for name in args.task_names.split(',') if name.strip()]
+        
+        # Validate each task name before processing
+        invalid_tasks = []
+        for task_name in task_names:
+            if not validate_task_name(task_name):
+                invalid_tasks.append(task_name)
+        
+        if invalid_tasks:
+            print(f"❌ Invalid task names: {', '.join(invalid_tasks)}")
+            print(f"📋 Only {len(AVAILABLE_BENCHMARKS)} working benchmarks are supported (out of {len(CORE_BENCHMARKS)} total).")
+            
+            # Show suggestions for invalid tasks
+            for invalid_task in invalid_tasks:
+                # Check if it's an unavailable benchmark
+                if invalid_task in UNAVAILABLE_BENCHMARKS:
+                    print(f"🚫 '{invalid_task}' is known to be unavailable/problematic.")
+                
+                suggestions = suggest_similar_tasks(invalid_task)
+                if suggestions:
+                    print(f"\n💡 Did you mean one of these instead of '{invalid_task}'?")
+                    for suggestion in suggestions[:3]:
+                        config = AVAILABLE_BENCHMARKS[suggestion]
+                        priority = config.get('priority', 'unknown')
+                        tags = ', '.join(config.get('tags', []))
+                        print(f"   • {suggestion} ({priority} priority) - {tags}")
+            
+            print(f"\n📖 To see all valid tasks: wisent-guard tasks --list-tasks")
+            sys.exit(1)
+        
+        task_sources.extend(task_names)
     
     if args.from_csv:
         task_sources.append(args.from_csv)
@@ -2393,7 +2768,8 @@ def handle_tasks_command(args):
         task_sources.append(args.from_json)
     
     if not task_sources:
-        print("❌ No task source specified. Use --task-name, --from-csv, or --from-json")
+        print("❌ No task source specified. Use --task-name, --from-csv, --from-json, --list-tasks, or --task-info")
+        print(f"\n📖 To see all {len(AVAILABLE_BENCHMARKS)} valid tasks: wisent-guard tasks --list-tasks")
         sys.exit(1)
     
     logger.info(f"Starting wisent-guard harness for sources: {task_sources}")
@@ -2532,9 +2908,14 @@ def handle_tasks_command(args):
                 load_test_activations=args.load_test_activations,
                 priority=args.priority,
                 fast_only=args.fast_only,
-                        time_budget=args.time_budget,
-        max_benchmarks=args.max_benchmarks,
-        smart_selection=args.smart_selection
+                time_budget=args.time_budget,
+                max_benchmarks=args.max_benchmarks,
+                smart_selection=args.smart_selection,
+                # Benchmark caching parameters
+                cache_benchmark=getattr(args, 'cache_benchmark', False),
+                use_cached=getattr(args, 'use_cached', True),
+                force_download=getattr(args, 'force_download', False),
+                cache_dir=getattr(args, 'cache_dir', './benchmark_cache')
             )
             
             all_results[source] = result
