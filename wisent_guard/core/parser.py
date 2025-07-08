@@ -52,10 +52,12 @@ def setup_tasks_parser(parser):
                            help="List all 37 available benchmark tasks organized by priority (excludes 28 known problematic benchmarks)")
     list_group.add_argument("--task-info", type=str, metavar="TASK_NAME",
                            help="Show detailed information about a specific task")
+    list_group.add_argument("--all", action="store_true",
+                           help="Run all 37 available benchmarks automatically")
     
-    # Task execution argument (optional when using listing commands)
+    # Task execution argument (optional when using listing commands or --all)
     parser.add_argument("task_names", nargs='?',
-                       help="Comma-separated list of available task names (37 working benchmarks), or path to CSV/JSON file with --from-csv/--from-json")
+                       help="Comma-separated list of available task names (37 working benchmarks), or path to CSV/JSON file with --from-csv/--from-json (not needed with --all)")
     
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")

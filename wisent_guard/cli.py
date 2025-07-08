@@ -2724,6 +2724,13 @@ def handle_tasks_command(args):
         print_task_info(args.task_info)
         return
     
+    # Handle --all flag: automatically use all available benchmarks
+    if hasattr(args, 'all') and args.all:
+        args.task_names = ','.join(sorted(AVAILABLE_BENCHMARKS.keys()))
+        print(f"🚀 Running ALL {len(AVAILABLE_BENCHMARKS)} available benchmarks:")
+        print(f"   {', '.join(sorted(AVAILABLE_BENCHMARKS.keys()))}")
+        print(f"   Using --limit {args.limit or 'unlimited'} samples per benchmark\n")
+    
     task_sources = []
     
     # Build list of task sources
