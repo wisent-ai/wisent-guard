@@ -524,7 +524,9 @@ def run_task_pipeline(
     cache_benchmark: bool = False,
     use_cached: bool = True,
     force_download: bool = False,
-    cache_dir: str = "./benchmark_cache"
+    cache_dir: str = "./benchmark_cache",
+    # Model reuse parameter for efficiency
+    model_instance: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
     Run the complete pipeline for a single task or file.
@@ -665,12 +667,18 @@ def run_task_pipeline(
             else:
                 print(f"   • Single layer mode: {layers[0]}")
         
-        # Time model loading
-        if latency_tracker:
-            with latency_tracker.time_operation("model_loading"):
-                model = Model(name=model_name, device=device)
+        # Use provided model instance or load new one
+        if model_instance is not None:
+            model = model_instance
+            if verbose:
+                print(f"   • Using pre-loaded model instance (reused across tasks)")
         else:
-            model = Model(name=model_name, device=device)
+            # Time model loading
+            if latency_tracker:
+                with latency_tracker.time_operation("model_loading"):
+                    model = Model(name=model_name, device=device)
+            else:
+                model = Model(name=model_name, device=device)
         
         layer_obj = Layer(index=layers[0], type="transformer")
         
@@ -2781,10 +2789,28 @@ def handle_tasks_command(args):
     
     logger.info(f"Starting wisent-guard harness for sources: {task_sources}")
     
+    # Load model once for efficiency when processing multiple tasks
+    shared_model = None
+    if len(task_sources) > 1:
+        print(f"\n🚀 Loading model once for {len(task_sources)} tasks (efficiency optimization)...")
+        try:
+            shared_model = Model(name=args.model, device=args.device)
+            print(f"✅ Model loaded successfully! Will reuse across all tasks.")
+        except Exception as e:
+            print(f"⚠️  Failed to pre-load model: {e}")
+            print(f"   Will load model individually for each task.")
+            shared_model = None
+    
     all_results = {}
     
-    for source in task_sources:
+    for i, source in enumerate(task_sources, 1):
         try:
+            # Show progress when processing multiple tasks
+            if len(task_sources) > 1:
+                print(f"\n{'='*60}")
+                print(f"📊 TASK {i}/{len(task_sources)}: {source.upper()}")
+                print(f"{'='*60}")
+            
             # Determine source type
             from_csv = source.endswith('.csv') or args.from_csv
             from_json = source.endswith('.json') or args.from_json
@@ -2922,7 +2948,9 @@ def handle_tasks_command(args):
                 cache_benchmark=getattr(args, 'cache_benchmark', False),
                 use_cached=getattr(args, 'use_cached', True),
                 force_download=getattr(args, 'force_download', False),
-                cache_dir=getattr(args, 'cache_dir', './benchmark_cache')
+                cache_dir=getattr(args, 'cache_dir', './benchmark_cache'),
+                # Model reuse parameter for efficiency
+                model_instance=shared_model
             )
             
             all_results[source] = result
