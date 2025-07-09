@@ -1899,11 +1899,28 @@ def run_task_pipeline(
         
         # Special handling for lm-eval-harness ground truth evaluation
         if ground_truth_method == "lm-eval-harness":
+            # Get the correct evaluation method for this task
+            def get_evaluation_method_for_task(task_name: str) -> str:
+                """Get the evaluation method for a task from the benchmark configuration."""
+                try:
+                    import json
+                    import os
+                    eval_methods_path = os.path.join(os.path.dirname(__file__), "parameters/benchmarks/benchmark_evaluation_methods.json")
+                    with open(eval_methods_path, 'r') as f:
+                        benchmark_methods = json.load(f)
+                        return benchmark_methods.get(task_name, "text-generation")
+                except Exception as e:
+                    if verbose:
+                        print(f"   ⚠️ Could not load benchmark evaluation methods: {e}")
+                    return "text-generation"
+            
+            evaluation_method = get_evaluation_method_for_task(task_name)
+            
             if verbose:
                 print(f"\n🔍 LM-EVAL-HARNESS GROUND TRUTH EVALUATION:")
                 print(f"   • Using lm-eval-harness tasks for direct classifier evaluation")
                 print(f"   • Task: {task_name}")
-                print(f"   • Evaluation method: log-likelihoods")
+                print(f"   • Evaluation method: {evaluation_method}")
                 print(f"   • Samples: {len(test_qa_pairs_source)}")
             
             # Get the trained classifier for evaluation
@@ -1923,11 +1940,11 @@ def run_task_pipeline(
                     "confidence": 0.0,
                     "details": "No trained classifier available for evaluation",
                     "task_name": task_name,
-                    "evaluation_method": "log-likelihoods"
+                    "evaluation_method": evaluation_method
                 }
             else:
                 # Use LMEvalHarnessGroundTruth for proper evaluation - pass token_aggregation
-                lm_eval_ground_truth = LMEvalHarnessGroundTruth(task_name, "log-likelihoods", model=model)
+                lm_eval_ground_truth = LMEvalHarnessGroundTruth(task_name, evaluation_method, model=model)
                 lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
                     classifier, 
                     task_name, 

@@ -109,29 +109,375 @@ class LMEvalHarnessGroundTruth:
     
     def _evaluate_text_generation(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:
         """Evaluate classifier using text generation approach."""
-        # Placeholder for text generation evaluation
-        # This would involve generating text and then classifying it
-        return {
-            "ground_truth": "UNKNOWN",
-            "method_used": "lm-eval-harness-text-generation",
-            "confidence": 0.0,
-            "details": "Text generation evaluation not yet implemented",
-            "task_name": task_name,
-            "evaluation_method": "text-generation"
-        }
+        try:
+            logger.info(f"🎯 TEXT GENERATION EVALUATION: {task_name}")
+            
+            # Use existing task loading infrastructure
+            task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
+            docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
+            
+            if not docs:
+                return self._error_result(f"No documents retrieved from task: {task_name}")
+            
+            logger.info(f"📝 Retrieved {len(docs)} documents from {task_name}")
+            
+            # Generate responses using the model
+            generated_responses = []
+            ground_truth_responses = []
+            
+            for i, doc in enumerate(docs):
+                try:
+                    # Extract question from document
+                    if hasattr(task_data, 'doc_to_text'):
+                        question = task_data.doc_to_text(doc)
+                    else:
+                        question = str(doc.get('question', doc.get('text', '')))
+                    
+                    # Generate response using model
+                    logger.info(f"🔸 Generating response for: {question[:100]}...")
+                    generated_response, _ = model.generate(
+                        prompt=question,
+                        layer_index=layer,
+                        max_new_tokens=150,
+                        temperature=0.1
+                    )
+                    
+                    # Extract ground truth answer
+                    if hasattr(task_data, 'doc_to_target'):
+                        ground_truth = task_data.doc_to_target(doc)
+                    else:
+                        ground_truth = str(doc.get('answer', doc.get('target', '')))
+                    
+                    generated_responses.append({
+                        'question': question,
+                        'generated_response': generated_response,
+                        'ground_truth': ground_truth,
+                        'doc': doc
+                    })
+                    
+                    logger.info(f"   📝 Generated: {generated_response[:100]}...")
+                    logger.info(f"   ✅ Ground truth: {ground_truth[:100]}...")
+                    
+                except Exception as e:
+                    logger.error(f"Error generating response for doc {i}: {e}")
+                    continue
+            
+            # Evaluate using lm-eval-harness metrics
+            logger.info(f"🎯 Evaluating {len(generated_responses)} generated responses using lm-eval metrics...")
+            
+            # Use lm-eval-harness's actual evaluation for this task
+            evaluation_results = self._evaluate_with_lm_eval_metrics(
+                task_name, 
+                generated_responses, 
+                task_data
+            )
+            
+            # Now classify the generated responses to see if classifier agrees
+            classification_results = []
+            for response_data in generated_responses:
+                try:
+                    # Create layer object first
+                    from .activations import Activations, ActivationAggregationMethod
+                    from .layer import Layer
+                    
+                    layer_obj = Layer(index=layer, type="transformer")
+                    
+                    # Extract activations from generated response
+                    activation_tensor = model.extract_activations(
+                        response_data['generated_response'], 
+                        layer_obj
+                    )
+                    activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
+                    
+                    activation_obj = Activations(
+                        tensor=activation_tensor,
+                        layer=layer_obj,
+                        aggregation_method=activation_method
+                    )
+                    
+                    # Get classifier prediction
+                    features = activation_obj.extract_features_for_classifier()
+                    
+                    # Handle different classifier return formats
+                    try:
+                        # Try predict_proba first (returns probabilities)
+                        features_numpy = features.cpu().numpy()
+                        logger.debug(f"🔧 Features shape: {features_numpy.shape}")
+                        
+                        prediction_proba = classifier.predict_proba([features_numpy])
+                        logger.debug(f"🔧 predict_proba returned: {prediction_proba} (type: {type(prediction_proba)})")
+                        
+                        # Handle different return formats
+                        if isinstance(prediction_proba, (list, tuple)):
+                            if len(prediction_proba) > 0:
+                                prediction = prediction_proba[0]
+                                logger.debug(f"🔧 Extracted from list/tuple: {prediction} (type: {type(prediction)})")
+                            else:
+                                prediction = 0.5  # Default neutral score
+                        else:
+                            prediction = prediction_proba
+                        
+                        # If prediction is array-like, get first element
+                        if hasattr(prediction, '__len__') and not isinstance(prediction, str):
+                            if len(prediction) > 0:
+                                prediction = prediction[0]
+                                logger.debug(f"🔧 Extracted from array: {prediction} (type: {type(prediction)})")
+                            else:
+                                prediction = 0.5
+                        
+                        # Ensure we have a float
+                        prediction = float(prediction)
+                        logger.debug(f"🔧 Final prediction: {prediction}")
+                        
+                    except Exception as proba_error:
+                        logger.warning(f"predict_proba failed: {proba_error}, trying predict...")
+                        
+                        # Fallback to predict method
+                        try:
+                            prediction = classifier.predict([features.cpu().numpy()])[0]
+                            prediction = float(prediction)
+                        except Exception as predict_error:
+                            logger.error(f"Both predict_proba and predict failed: {predict_error}")
+                            prediction = 0.5  # Default neutral score
+                    
+                    classification_results.append({
+                        'question': response_data['question'],
+                        'generated_response': response_data['generated_response'],
+                        'classifier_score': prediction,
+                        'classifier_truthful': prediction < 0.5  # Lower = more truthful
+                    })
+                    
+                    logger.info(f"📋 Generated Response Classification:")
+                    logger.info(f"   🔸 Question: {response_data['question'][:100]}...")
+                    logger.info(f"   🧠 Generated: {response_data['generated_response'][:100]}...")
+                    logger.info(f"   🎯 Classifier score: {prediction:.3f} (lower = more truthful)")
+                    logger.info(f"   ✅ Classifier judgment: {'TRUTHFUL' if prediction < 0.5 else 'UNTRUTHFUL'}")
+                    
+                except Exception as e:
+                    import traceback
+                    logger.error(f"Error classifying generated response: {e}")
+                    logger.error(f"Full traceback: {traceback.format_exc()}")
+                    classification_results.append({
+                        'question': response_data['question'],
+                        'generated_response': response_data['generated_response'],
+                        'classifier_score': 0.5,  # Default neutral score
+                        'classifier_truthful': False,
+                        'error': str(e)
+                    })
+                    continue
+            
+            return {
+                "ground_truth": "EVALUATED",
+                "method_used": "lm-eval-harness-text-generation",
+                "confidence": evaluation_results.get('accuracy', 0.0),
+                "details": f"Generated and evaluated {len(generated_responses)} responses using lm-eval metrics",
+                "task_name": task_name,
+                "evaluation_method": "text-generation",
+                "lm_eval_metrics": evaluation_results,
+                "classification_results": classification_results,
+                "total_samples": len(generated_responses)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in text generation evaluation: {e}")
+            return self._error_result(f"Text generation evaluation error: {str(e)}")
     
     def _evaluate_perplexity(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:
         """Evaluate classifier using perplexity approach."""
-        # Placeholder for perplexity evaluation
-        # This would involve computing perplexity and then classifying
-        return {
-            "ground_truth": "UNKNOWN",
-            "method_used": "lm-eval-harness-perplexity",
-            "confidence": 0.0,
-            "details": "Perplexity evaluation not yet implemented",
-            "task_name": task_name,
-            "evaluation_method": "perplexity"
-        }
+        try:
+            logger.info(f"🎯 PERPLEXITY EVALUATION: {task_name}")
+            
+            # Use existing task loading infrastructure
+            task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
+            docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
+            
+            if not docs:
+                return self._error_result(f"No documents retrieved from task: {task_name}")
+            
+            logger.info(f"📝 Retrieved {len(docs)} documents from {task_name}")
+            
+            # Calculate perplexity scores for different responses
+            perplexity_results = []
+            
+            for i, doc in enumerate(docs):
+                try:
+                    # Extract question/prompt and possible completions
+                    if hasattr(task_data, 'doc_to_text'):
+                        prompt = task_data.doc_to_text(doc)
+                    else:
+                        prompt = str(doc.get('question', doc.get('text', '')))
+                    
+                    # For multiple choice tasks, get all choices
+                    choices = []
+                    if hasattr(task_data, 'doc_to_choice'):
+                        choices = [task_data.doc_to_choice(doc, choice_idx) for choice_idx in range(len(doc.get('choices', [])))]
+                    elif 'choices' in doc:
+                        choices = doc['choices']
+                    else:
+                        # For non-multiple choice, generate a response and calculate its perplexity
+                        generated_response, _ = model.generate(
+                            prompt=prompt,
+                            layer_index=layer,
+                            max_new_tokens=100,
+                            temperature=0.1
+                        )
+                        choices = [generated_response]
+                    
+                    logger.info(f"🔸 Calculating perplexity for: {prompt[:100]}...")
+                    
+                    # Calculate perplexity for each choice
+                    choice_perplexities = []
+                    for choice_idx, choice in enumerate(choices):
+                        try:
+                            # Calculate perplexity of the choice given the prompt
+                            full_text = f"{prompt} {choice}"
+                            perplexity = self._calculate_perplexity(model, full_text)
+                            
+                            choice_perplexities.append({
+                                'choice_idx': choice_idx,
+                                'choice_text': choice,
+                                'perplexity': perplexity
+                            })
+                            
+                            logger.info(f"   📊 Choice {choice_idx}: {choice[:50]}... (perplexity: {perplexity:.3f})")
+                            
+                        except Exception as e:
+                            logger.error(f"Error calculating perplexity for choice {choice_idx}: {e}")
+                            continue
+                    
+                    # Get ground truth answer index
+                    ground_truth_idx = None
+                    if hasattr(task_data, 'doc_to_target'):
+                        ground_truth = task_data.doc_to_target(doc)
+                        try:
+                            ground_truth_idx = int(ground_truth)
+                        except:
+                            ground_truth_idx = None
+                    elif 'answer' in doc:
+                        ground_truth_idx = doc['answer']
+                    
+                    # Find the choice with lowest perplexity (most likely)
+                    if choice_perplexities:
+                        best_choice = min(choice_perplexities, key=lambda x: x['perplexity'])
+                        
+                        # Classify the best choice using the classifier
+                        classification_score = None
+                        try:
+                            # Create layer object first
+                            from .activations import Activations, ActivationAggregationMethod
+                            from .layer import Layer
+                            
+                            layer_obj = Layer(index=layer, type="transformer")
+                            
+                            # Extract activations from the best choice
+                            activation_tensor = model.extract_activations(
+                                best_choice['choice_text'], 
+                                layer_obj
+                            )
+                            activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
+                            
+                            activation_obj = Activations(
+                                tensor=activation_tensor,
+                                layer=layer_obj,
+                                aggregation_method=activation_method
+                            )
+                            
+                            # Get classifier prediction
+                            features = activation_obj.extract_features_for_classifier()
+                            
+                            # Handle different classifier return formats
+                            try:
+                                # Try predict_proba first (returns probabilities)
+                                prediction_proba = classifier.predict_proba([features.cpu().numpy()])
+                                
+                                # Handle different return formats
+                                if isinstance(prediction_proba, (list, tuple)):
+                                    if len(prediction_proba) > 0:
+                                        classification_score = prediction_proba[0]
+                                    else:
+                                        classification_score = 0.5  # Default neutral score
+                                else:
+                                    classification_score = prediction_proba
+                                
+                                # If prediction is array-like, get first element
+                                if hasattr(classification_score, '__len__') and not isinstance(classification_score, str):
+                                    if len(classification_score) > 0:
+                                        classification_score = classification_score[0]
+                                    else:
+                                        classification_score = 0.5
+                                
+                                # Ensure we have a float
+                                classification_score = float(classification_score)
+                                
+                            except Exception as proba_error:
+                                logger.warning(f"predict_proba failed: {proba_error}, trying predict...")
+                                
+                                # Fallback to predict method
+                                try:
+                                    classification_score = classifier.predict([features.cpu().numpy()])[0]
+                                    classification_score = float(classification_score)
+                                except Exception as predict_error:
+                                    logger.error(f"Both predict_proba and predict failed: {predict_error}")
+                                    classification_score = 0.5  # Default neutral score
+                            
+                        except Exception as e:
+                            logger.error(f"Error classifying best choice: {e}")
+                        
+                        result = {
+                            'question': prompt,
+                            'choices': choice_perplexities,
+                            'best_choice_idx': best_choice['choice_idx'],
+                            'best_choice_text': best_choice['choice_text'],
+                            'best_choice_perplexity': best_choice['perplexity'],
+                            'ground_truth_idx': ground_truth_idx,
+                            'classifier_score': classification_score,
+                            'perplexity_correct': best_choice['choice_idx'] == ground_truth_idx if ground_truth_idx is not None else None
+                        }
+                        
+                        perplexity_results.append(result)
+                        
+                        logger.info(f"📋 Perplexity Analysis:")
+                        logger.info(f"   🔸 Question: {prompt[:100]}...")
+                        logger.info(f"   📊 Best choice (lowest perplexity): {best_choice['choice_text'][:100]}...")
+                        logger.info(f"   🎯 Perplexity: {best_choice['perplexity']:.3f}")
+                        logger.info(f"   🧠 Classifier score: {classification_score:.3f} (lower = more truthful)" if classification_score is not None else "   🧠 Classifier score: N/A")
+                        logger.info(f"   ✅ Perplexity correct: {result['perplexity_correct']}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing doc {i}: {e}")
+                    continue
+            
+            # Calculate overall metrics
+            total_samples = len(perplexity_results)
+            correct_perplexity = sum(1 for r in perplexity_results if r['perplexity_correct'] == True)
+            perplexity_accuracy = correct_perplexity / total_samples if total_samples > 0 else 0.0
+            
+            # Average classifier score
+            classifier_scores = [r['classifier_score'] for r in perplexity_results if r['classifier_score'] is not None]
+            avg_classifier_score = sum(classifier_scores) / len(classifier_scores) if classifier_scores else None
+            
+            logger.info(f"📊 PERPLEXITY EVALUATION RESULTS:")
+            logger.info(f"   • Total samples: {total_samples}")
+            logger.info(f"   • Perplexity accuracy: {perplexity_accuracy:.3f}")
+            logger.info(f"   • Average classifier score: {avg_classifier_score:.3f}" if avg_classifier_score is not None else "   • Average classifier score: N/A")
+            
+            return {
+                "ground_truth": "EVALUATED",
+                "method_used": "lm-eval-harness-perplexity",
+                "confidence": perplexity_accuracy,
+                "details": f"Calculated perplexity for {total_samples} samples, accuracy: {perplexity_accuracy:.3f}",
+                "task_name": task_name,
+                "evaluation_method": "perplexity",
+                "perplexity_accuracy": perplexity_accuracy,
+                "average_classifier_score": avg_classifier_score,
+                "total_samples": total_samples,
+                "correct_perplexity": correct_perplexity,
+                "perplexity_results": perplexity_results[:10]  # First 10 for debugging
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in perplexity evaluation: {e}")
+            return self._error_result(f"Perplexity evaluation error: {str(e)}")
     
     def _get_evaluation_method_for_task(self, task_name: str) -> str:
         """Get the evaluation method for a task from the benchmark configuration."""
@@ -143,4 +489,240 @@ class LMEvalHarnessGroundTruth:
                 return benchmark_methods.get(task_name, "text-generation")
         except Exception as e:
             logger.debug(f"Could not load benchmark evaluation methods: {e}")
-            return "text-generation" 
+            return "text-generation"
+    
+    def _error_result(self, error_message: str) -> Dict[str, Any]:
+        """Return a standardized error result."""
+        return {
+            "ground_truth": "ERROR",
+            "method_used": "lm-eval-harness-error",
+            "confidence": 0.0,
+            "details": error_message,
+            "task_name": self.task_name,
+            "evaluation_method": self.evaluation_method
+        }
+    
+    def _map_token_aggregation_to_activation_method(self, token_aggregation: str):
+        """Map token aggregation string to activation method."""
+        from .activations import ActivationAggregationMethod
+        
+        mapping = {
+            "average": ActivationAggregationMethod.MEAN,
+            "mean": ActivationAggregationMethod.MEAN,
+            "last": ActivationAggregationMethod.LAST_TOKEN,
+            "max": ActivationAggregationMethod.MAX
+        }
+        
+        return mapping.get(token_aggregation.lower(), ActivationAggregationMethod.MEAN)
+    
+    def _calculate_perplexity(self, model, text: str) -> float:
+        """Calculate perplexity of text using the model."""
+        try:
+            import torch
+            import numpy as np
+            
+            # Use the model's prepare_activations method to get outputs
+            prepared = model.prepare_activations(text)
+            outputs = prepared['outputs']
+            inputs = prepared['inputs']
+            
+            # Get input IDs
+            input_ids = inputs['input_ids']
+            
+            # Get logits from the outputs
+            logits = outputs.logits
+            
+            # Compute log probabilities
+            log_probs = torch.log_softmax(logits, dim=-1)
+            
+            # Get log probabilities for actual tokens (shifted for next-token prediction)
+            # input_ids shape: [batch_size, sequence_length]
+            # logits shape: [batch_size, sequence_length, vocab_size]
+            # We need to match targets with predictions
+            
+            if input_ids.shape[1] > 1:
+                # Get log probabilities for the target tokens
+                target_ids = input_ids[0, 1:]  # Skip first token (no prediction for it)
+                prediction_logits = log_probs[0, :-1, :]  # Skip last prediction (no target for it)
+                
+                # Get log probabilities for actual tokens
+                token_log_probs = prediction_logits.gather(dim=-1, index=target_ids.unsqueeze(-1)).squeeze(-1)
+                
+                # Compute average log probability
+                avg_log_prob = token_log_probs.mean().item()
+                
+                # Compute perplexity
+                perplexity = np.exp(-avg_log_prob)
+            else:
+                # Single token, cannot compute perplexity
+                perplexity = float('inf')
+            
+            return perplexity
+            
+        except Exception as e:
+            logger.error(f"Error calculating perplexity: {e}")
+            return float('inf')
+    
+    def _evaluate_with_lm_eval_metrics(self, task_name: str, response_data: list, task_data) -> Dict[str, Any]:
+        """Evaluate responses using task-specific evaluation metrics."""
+        try:
+            correct = 0
+            total = len(response_data)
+            evaluation_details = []
+            
+            for response in response_data:
+                generated = response['generated_response']
+                ground_truth = response['ground_truth']
+                
+                # Task-specific evaluation logic
+                if task_name == "gsm8k":
+                    # GSM8K uses exact match on numerical answer
+                    is_correct = self._evaluate_gsm8k_response(generated, ground_truth)
+                elif task_name in ["arc_easy", "arc_challenge"]:
+                    # ARC uses exact match on choice letter/number
+                    is_correct = self._evaluate_arc_response(generated, ground_truth)
+                elif task_name == "hellaswag":
+                    # HellaSwag uses exact match on choice index
+                    is_correct = self._evaluate_hellaswag_response(generated, ground_truth)
+                else:
+                    # Default: string matching with some flexibility
+                    is_correct = self._evaluate_default_response(generated, ground_truth)
+                
+                if is_correct:
+                    correct += 1
+                
+                evaluation_details.append({
+                    'question': response['question'][:100],
+                    'generated': generated[:100],
+                    'ground_truth': ground_truth,
+                    'correct': is_correct
+                })
+                
+                logger.info(f"📊 Evaluation: {response['question'][:50]}...")
+                logger.info(f"   Generated: {generated[:50]}...")
+                logger.info(f"   Ground Truth: {ground_truth}")
+                logger.info(f"   Correct: {is_correct}")
+            
+            accuracy = correct / total if total > 0 else 0.0
+            
+            return {
+                'accuracy': accuracy,
+                'correct': correct,
+                'total': total,
+                'evaluation_details': evaluation_details[:5],  # First 5 for debugging
+                'task_name': task_name
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in metrics evaluation: {e}")
+            return {
+                'accuracy': 0.0,
+                'correct': 0,
+                'total': len(response_data),
+                'error': str(e)
+            }
+    
+    def _evaluate_gsm8k_response(self, generated: str, ground_truth: str) -> bool:
+        """Evaluate GSM8K response using numerical answer extraction."""
+        try:
+            import re
+            
+            # Extract numerical answer from generated response
+            # GSM8K answers are typically in format "#### 42" or just the number
+            generated_answer = self._extract_numerical_answer(generated)
+            ground_truth_answer = self._extract_numerical_answer(ground_truth)
+            
+            # Compare numerical values
+            if generated_answer is not None and ground_truth_answer is not None:
+                return abs(generated_answer - ground_truth_answer) < 1e-6
+            
+            # Fallback to string matching
+            return generated.strip().lower() == ground_truth.strip().lower()
+            
+        except Exception as e:
+            logger.error(f"Error evaluating GSM8K response: {e}")
+            return False
+    
+    def _extract_numerical_answer(self, text: str) -> float:
+        """Extract numerical answer from text."""
+        try:
+            import re
+            
+            # Look for #### pattern (GSM8K format)
+            pattern = r'####\s*([+-]?\d+(?:\.\d+)?)'
+            match = re.search(pattern, text)
+            if match:
+                return float(match.group(1))
+            
+            # Look for last number in text
+            numbers = re.findall(r'[+-]?\d+(?:\.\d+)?', text)
+            if numbers:
+                return float(numbers[-1])
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting numerical answer: {e}")
+            return None
+    
+    def _evaluate_arc_response(self, generated: str, ground_truth: str) -> bool:
+        """Evaluate ARC response using exact match."""
+        try:
+            # Normalize responses
+            gen_clean = generated.strip().lower()
+            gt_clean = ground_truth.strip().lower()
+            
+            # Direct match
+            if gen_clean == gt_clean:
+                return True
+            
+            # Check if generated contains the ground truth
+            if gt_clean in gen_clean:
+                return True
+            
+            # Check for choice letter/number patterns
+            import re
+            gen_match = re.search(r'[abcd]|\d+', gen_clean)
+            gt_match = re.search(r'[abcd]|\d+', gt_clean)
+            
+            if gen_match and gt_match:
+                return gen_match.group() == gt_match.group()
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error evaluating ARC response: {e}")
+            return False
+    
+    def _evaluate_hellaswag_response(self, generated: str, ground_truth: str) -> bool:
+        """Evaluate HellaSwag response using exact match."""
+        try:
+            # Normalize and compare
+            gen_clean = generated.strip().lower()
+            gt_clean = ground_truth.strip().lower()
+            
+            return gen_clean == gt_clean or gt_clean in gen_clean
+            
+        except Exception as e:
+            logger.error(f"Error evaluating HellaSwag response: {e}")
+            return False
+    
+    def _evaluate_default_response(self, generated: str, ground_truth: str) -> bool:
+        """Default evaluation using flexible string matching."""
+        try:
+            gen_clean = generated.strip().lower()
+            gt_clean = ground_truth.strip().lower()
+            
+            # Exact match
+            if gen_clean == gt_clean:
+                return True
+            
+            # Contains match
+            if gt_clean in gen_clean or gen_clean in gt_clean:
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error in default evaluation: {e}")
+            return False
