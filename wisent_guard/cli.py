@@ -81,6 +81,9 @@ logger = logging.getLogger(__name__)
 # Add import for LMEvalHarnessGroundTruth
 from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 
+# Add import for ModelConfigManager
+from .core.model_config_manager import ModelConfigManager
+
 
 def get_valid_task_names() -> List[str]:
     """Get list of all valid (available) task names from AVAILABLE_BENCHMARKS."""
@@ -562,6 +565,56 @@ def run_task_pipeline(
             print(f"🔄 Auto-setting ground truth method to 'lm-eval-harness' for task '{task_name}'")
             print(f"   • This task has been tested and validated to work with lm-eval-harness")
             print(f"   • To override this default, use --ground-truth-method <method>")
+    
+    # AUTO-LOAD MODEL CONFIGURATION (if available)
+    # Load saved optimal parameters for this model if they exist
+    from .core.model_config_manager import get_optimal_parameters
+    
+    # Check if we should load saved configuration
+    # Only load if parameters haven't been explicitly overridden by CLI arguments
+    load_saved_config = True
+    config_overrides = {}
+    
+    # Detect if user provided explicit layer argument (not default "15")
+    if layer != "15":  # Assuming "15" is the default
+        load_saved_config = False
+    
+    # Detect if user provided explicit token_aggregation (not default "average")
+    if token_aggregation != "average":
+        load_saved_config = False
+    
+    # Detect if user provided explicit detection_threshold (not default 0.6)
+    if detection_threshold != 0.6:
+        load_saved_config = False
+    
+    if load_saved_config:
+        optimal_params = get_optimal_parameters(model_name, task_name)
+        if optimal_params:
+            # Store original values for comparison
+            original_layer = layer
+            original_aggregation = token_aggregation
+            original_threshold = detection_threshold
+            
+            # Apply saved configuration
+            if 'classification_layer' in optimal_params:
+                layer = str(optimal_params['classification_layer'])
+                config_overrides['layer'] = f"{original_layer} → {layer}"
+            
+            if 'token_aggregation' in optimal_params:
+                token_aggregation = optimal_params['token_aggregation']
+                config_overrides['token_aggregation'] = f"{original_aggregation} → {token_aggregation}"
+            
+            if 'detection_threshold' in optimal_params:
+                detection_threshold = optimal_params['detection_threshold']
+                config_overrides['detection_threshold'] = f"{original_threshold} → {detection_threshold}"
+            
+            if verbose or config_overrides:
+                print(f"\n🔧 Auto-loaded saved configuration for model: {model_name}")
+                for param, change in config_overrides.items():
+                    print(f"   • {param}: {change}")
+                print(f"   • To override these defaults, specify parameters explicitly")
+                print(f"   • Config file: ~/.wisent-guard/model_configs/")
+                print()
     """
     Run the complete pipeline for a single task or file.
     
@@ -2912,6 +2965,8 @@ def main():
         handle_monitor_command(args)
     elif args.command == "agent":
         handle_agent_command(args)
+    elif args.command == "model-config":
+        handle_model_config_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -3426,6 +3481,198 @@ def handle_agent_command(args):
     
     # Run the async agent
     asyncio.run(run_agent())
+
+
+def handle_model_config_command(args):
+    """Handle the model-config command."""
+    try:
+        # Initialize ModelConfigManager with custom directory if specified
+        config_manager = ModelConfigManager(config_dir=args.config_dir)
+        
+        if args.config_action == "save":
+            handle_model_config_save(args, config_manager)
+        elif args.config_action == "list":
+            handle_model_config_list(args, config_manager)
+        elif args.config_action == "show":
+            handle_model_config_show(args, config_manager)
+        elif args.config_action == "remove":
+            handle_model_config_remove(args, config_manager)
+        elif args.config_action == "test":
+            handle_model_config_test(args, config_manager)
+        else:
+            print("❌ No action specified. Use 'save', 'list', 'show', 'remove', or 'test'")
+            sys.exit(1)
+    
+    except Exception as e:
+        print(f"❌ Error in model configuration command: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_model_config_save(args, config_manager):
+    """Handle saving model configuration."""
+    print(f"💾 Saving configuration for model: {args.model}")
+    
+    # Parse metrics if provided
+    optimization_metrics = None
+    if args.metrics:
+        try:
+            import json
+            optimization_metrics = json.loads(args.metrics)
+        except json.JSONDecodeError:
+            print(f"⚠️ Invalid JSON in --metrics, ignoring: {args.metrics}")
+    
+    # Save configuration
+    config_path = config_manager.save_model_config(
+        model_name=args.model,
+        classification_layer=args.classification_layer,
+        steering_layer=args.steering_layer,
+        token_aggregation=args.token_aggregation,
+        detection_threshold=args.detection_threshold,
+        optimization_method=args.optimization_method,
+        optimization_metrics=optimization_metrics
+    )
+    
+    print(f"\n🎯 Configuration saved successfully!")
+    print(f"   📁 Config file: {config_path}")
+    print(f"   🔧 Use 'wisent-guard model-config show {args.model}' to view")
+
+
+def handle_model_config_list(args, config_manager):
+    """Handle listing model configurations."""
+    configs = config_manager.list_model_configs()
+    
+    if not configs:
+        print("📝 No model configurations found.")
+        print(f"   💡 Use 'wisent-guard model-config save <model>' to create one")
+        return
+    
+    print(f"\n📋 MODEL CONFIGURATIONS ({len(configs)} total)")
+    print("=" * 80)
+    
+    for config in sorted(configs, key=lambda x: x.get("created_date", "")):
+        model_name = config["model_name"]
+        created = config["created_date"][:10] if config.get("created_date") else "unknown"
+        method = config["optimization_method"]
+        cls_layer = config["classification_layer"]
+        steer_layer = config["steering_layer"]
+        
+        print(f"\n🤖 {model_name}")
+        print(f"   📅 Created: {created}")
+        print(f"   🔧 Method: {method}")
+        print(f"   📊 Classification Layer: {cls_layer}")
+        print(f"   🎯 Steering Layer: {steer_layer}")
+        
+        if args.detailed:
+            config_file = config.get("config_file", "unknown")
+            print(f"   📁 File: {config_file}")
+
+
+def handle_model_config_show(args, config_manager):
+    """Handle showing specific model configuration."""
+    if not config_manager.has_model_config(args.model):
+        print(f"❌ No configuration found for model: {args.model}")
+        print(f"   💡 Use 'wisent-guard model-config save {args.model}' to create one")
+        return
+    
+    config = config_manager.load_model_config(args.model)
+    if not config:
+        print(f"❌ Failed to load configuration for model: {args.model}")
+        return
+    
+    optimal_params = config_manager.get_optimal_parameters(args.model, args.task)
+    
+    print(f"\n🤖 MODEL CONFIGURATION: {args.model}")
+    print("=" * 60)
+    print(f"📅 Created: {config.get('created_date', 'unknown')}")
+    print(f"🔧 Optimization Method: {config.get('optimization_method', 'unknown')}")
+    print(f"📝 Config Version: {config.get('config_version', 'unknown')}")
+    
+    print(f"\n🎯 OPTIMAL PARAMETERS:")
+    if optimal_params:
+        for key, value in optimal_params.items():
+            print(f"   • {key}: {value}")
+    else:
+        print("   ❌ No optimal parameters found")
+    
+    if args.task:
+        print(f"\n📊 TASK-SPECIFIC OVERRIDES ({args.task}):")
+        task_overrides = config.get("task_specific_overrides", {}).get(args.task, {})
+        if task_overrides:
+            for key, value in task_overrides.items():
+                print(f"   • {key}: {value}")
+        else:
+            print(f"   📝 No overrides for task '{args.task}'")
+    
+    optimization_metrics = config.get("optimization_metrics", {})
+    if optimization_metrics:
+        print(f"\n📈 OPTIMIZATION METRICS:")
+        for key, value in optimization_metrics.items():
+            print(f"   • {key}: {value}")
+
+
+def handle_model_config_remove(args, config_manager):
+    """Handle removing model configuration."""
+    if not config_manager.has_model_config(args.model):
+        print(f"❌ No configuration found for model: {args.model}")
+        return
+    
+    if not args.confirm:
+        response = input(f"🗑️  Remove configuration for '{args.model}'? (y/N): ").strip().lower()
+        if response not in ['y', 'yes']:
+            print("❌ Removal cancelled")
+            return
+    
+    if config_manager.remove_model_config(args.model):
+        print(f"✅ Configuration removed for model: {args.model}")
+    else:
+        print(f"❌ Failed to remove configuration for model: {args.model}")
+
+
+def handle_model_config_test(args, config_manager):
+    """Handle testing model configuration."""
+    if not config_manager.has_model_config(args.model):
+        print(f"❌ No configuration found for model: {args.model}")
+        print(f"   💡 Use 'wisent-guard model-config save {args.model}' to create one")
+        return
+    
+    optimal_params = config_manager.get_optimal_parameters(args.model, args.task)
+    if not optimal_params:
+        print(f"❌ No optimal parameters found for model: {args.model}")
+        return
+    
+    print(f"🧪 Testing configuration for model: {args.model}")
+    print(f"   📊 Task: {args.task}")
+    print(f"   🔢 Limit: {args.limit} samples")
+    print(f"   📊 Classification Layer: {optimal_params.get('classification_layer')}")
+    print(f"   🎯 Steering Layer: {optimal_params.get('steering_layer')}")
+    print(f"   🔧 Token Aggregation: {optimal_params.get('token_aggregation')}")
+    print(f"   📈 Detection Threshold: {optimal_params.get('detection_threshold')}")
+    
+    try:
+        # Run the task pipeline with loaded configuration
+        results = run_task_pipeline(
+            task_name=args.task,
+            model_name=args.model,
+            layer=str(optimal_params.get('classification_layer')),
+            limit=args.limit,
+            device=args.device,
+            token_aggregation=optimal_params.get('token_aggregation', 'average'),
+            detection_threshold=optimal_params.get('detection_threshold', 0.6),
+            verbose=args.verbose,
+            train_only=True  # Just test training, don't run full evaluation
+        )
+        
+        print(f"\n✅ Configuration test completed successfully!")
+        print(f"   📊 Results: {results}")
+        
+    except Exception as e:
+        print(f"\n❌ Configuration test failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
 
 
 def get_actual_task_name(benchmark_name: str) -> str:
