@@ -884,7 +884,12 @@ def run_task_pipeline(
                 
                 # Only load individual task if we haven't already processed a group task
                 if not group_task_processed:
-                    task_data = model.load_lm_eval_task(task_name, shots=shots, limit=limit)
+                    # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
+                    actual_task_name = get_actual_task_name(task_name)
+                    if verbose and actual_task_name != task_name:
+                        print(f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'")
+                    
+                    task_data = model.load_lm_eval_task(actual_task_name, shots=shots, limit=limit)
                     train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
                 
                     if verbose:
@@ -928,7 +933,82 @@ def run_task_pipeline(
                 print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
                 print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
 
-        # Validate dataset size before proceeding
+        # FIXED: For perplexity tasks, skip contrastive training and go directly to evaluation
+        if ground_truth_method == "lm-eval-harness":
+            # Check evaluation method for this task
+            def get_evaluation_method_for_task_early(task_name: str) -> str:
+                """Get the evaluation method for a task from the benchmark configuration."""
+                try:
+                    import json
+                    import os
+                    eval_methods_path = os.path.join(os.path.dirname(__file__), "parameters/benchmarks/benchmark_evaluation_methods.json")
+                    with open(eval_methods_path, 'r') as f:
+                        benchmark_methods = json.load(f)
+                        return benchmark_methods.get(task_name, "text-generation")
+                except Exception as e:
+                    if verbose:
+                        print(f"   ⚠️ Could not load benchmark evaluation methods: {e}")
+                    return "text-generation"
+            
+            evaluation_method = get_evaluation_method_for_task_early(task_name)
+            
+            if evaluation_method == "perplexity":
+                if verbose:
+                    print(f"\n🎯 PERPLEXITY TASK DETECTED: Skipping contrastive training")
+                    print(f"   • Task: {task_name}")
+                    print(f"   • Evaluation method: {evaluation_method}")
+                    print(f"   • Going directly to perplexity evaluation")
+                
+                # Create a minimal "dummy" classifier for the perplexity evaluation
+                from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+                
+                # Parse layers for evaluation
+                layers = parse_layers_from_arg(layer)
+                
+                # Use actual task name for evaluation
+                actual_eval_task_name = get_actual_task_name(task_name)
+                lm_eval_ground_truth = LMEvalHarnessGroundTruth(actual_eval_task_name, evaluation_method, model=model)
+                
+                # Run perplexity evaluation without classifier
+                lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
+                    classifier=None,  # No classifier needed for perplexity
+                    task_name=actual_eval_task_name,
+                    num_samples=len(test_qa_pairs_source),
+                    model=model,
+                    layer=layers[0],
+                    token_aggregation=token_aggregation
+                )
+                
+                if verbose:
+                    print(f"\n🎉 PERPLEXITY EVALUATION COMPLETED FOR {task_name.upper()}!")
+                    print(f"{'='*80}")
+                    print(f"📊 FINAL RESULTS:")
+                    print(f"   • Test samples: {len(test_qa_pairs_source)}")
+                    print(f"   • Evaluation method: {evaluation_method}")
+                    
+                    if 'perplexity_accuracy' in lm_eval_results:
+                        accuracy = lm_eval_results['perplexity_accuracy']
+                        print(f"   • Perplexity accuracy: {accuracy:.2%}")
+                    elif 'average_classifier_score' in lm_eval_results:
+                        avg_score = lm_eval_results['average_classifier_score']
+                        print(f"   • Average perplexity score: {avg_score:.3f}")
+                    else:
+                        print(f"   • Perplexity evaluation: Completed")
+                    print(f"{'='*80}")
+                
+                return {
+                    "task_name": task_name,
+                    "model_name": model_name,
+                    "layer": layer,
+                    "evaluation_method": evaluation_method,
+                    "evaluation_results": lm_eval_results,
+                    "num_test": len(test_qa_pairs_source),
+                    "ground_truth_method": "lm-eval-harness",
+                    "skipped_training": True,
+                    "reason": "Perplexity task does not require contrastive training"
+                }
+        
+        # Validate dataset size before proceeding (for non-perplexity tasks)
         min_training_samples = 4
         if len(qa_pairs) < min_training_samples:
             error_msg = f"Insufficient training data: {len(qa_pairs)} pairs found, minimum {min_training_samples} required"
@@ -1944,10 +2024,12 @@ def run_task_pipeline(
                 }
             else:
                 # Use LMEvalHarnessGroundTruth for proper evaluation - pass token_aggregation
-                lm_eval_ground_truth = LMEvalHarnessGroundTruth(task_name, evaluation_method, model=model)
+                # FIXED: Use actual task name for both constructor and evaluation
+                actual_eval_task_name = get_actual_task_name(task_name)
+                lm_eval_ground_truth = LMEvalHarnessGroundTruth(actual_eval_task_name, evaluation_method, model=model)
                 lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
                     classifier, 
-                    task_name, 
+                    actual_eval_task_name, 
                     num_samples=len(test_qa_pairs_source),
                     model=model,
                     layer=layers[0] if len(layers) > 1 else layers[0],
@@ -1956,13 +2038,31 @@ def run_task_pipeline(
                 
                 if verbose:
                     print(f"   ✅ LM-eval-harness evaluation completed")
-                    accuracy = lm_eval_results.get('accuracy', 'N/A')
+                    # Access accuracy from nested lm_eval_metrics
+                    lm_eval_metrics = lm_eval_results.get('lm_eval_metrics', {})
+                    accuracy = lm_eval_metrics.get('accuracy', 'N/A')
+                    correct_predictions = lm_eval_metrics.get('correct_predictions', 0)
+                    total_samples = lm_eval_metrics.get('total_samples', 0)
+                    
+                    # Throw hard error if evaluation failed
+                    if accuracy == 'N/A' or total_samples == 0:
+                        error_msg = f"""
+❌ EVALUATION FAILED FOR {task_name.upper()}!
+   • Accuracy: {accuracy}
+   • Correct predictions: {correct_predictions} 
+   • Total samples: {total_samples}
+   • Evaluation method: {evaluation_method}
+   
+This indicates the {evaluation_method} evaluation method is not working properly for {task_name}.
+Check the task configuration and implementation."""
+                        raise RuntimeError(error_msg)
+                    
                     if isinstance(accuracy, (int, float)):
                         print(f"   📊 Accuracy: {accuracy:.2%}")
                     else:
                         print(f"   📊 Accuracy: {accuracy}")
-                    print(f"   🎯 Correct predictions: {lm_eval_results.get('correct_predictions', 0)}")
-                    print(f"   📝 Total samples: {lm_eval_results.get('total_samples', 0)}")
+                    print(f"   🎯 Correct predictions: {correct_predictions}")
+                    print(f"   📝 Total samples: {total_samples}")
             
             # Update evaluation results with lm-eval-harness results
             evaluation_results = lm_eval_results
@@ -1970,8 +2070,9 @@ def run_task_pipeline(
             # For lm-eval-harness, we don't need to generate responses since we evaluate directly
             # on the multiple choice options from the task
             generated_responses = []
-            correct_classifications = lm_eval_results.get('correct_predictions', 0)
-            total_classifications = lm_eval_results.get('total_samples', 0)
+            lm_eval_metrics = lm_eval_results.get('lm_eval_metrics', {})
+            correct_classifications = lm_eval_metrics.get('correct_predictions', 0)
+            total_classifications = lm_eval_metrics.get('total_samples', 0)
             
             if verbose:
                 print(f"\n🎉 LM-EVAL-HARNESS EVALUATION COMPLETED FOR {task_name.upper()}!")
@@ -1988,7 +2089,8 @@ def run_task_pipeline(
                     print(f"   • Training accuracy: {training_accuracy}")
                 
                 # Fix classifier evaluation accuracy formatting
-                classifier_accuracy = lm_eval_results.get('accuracy', 'N/A')
+                lm_eval_metrics = lm_eval_results.get('lm_eval_metrics', {})
+                classifier_accuracy = lm_eval_metrics.get('accuracy', 'N/A')
                 if isinstance(classifier_accuracy, (int, float)):
                     print(f"   • Classifier evaluation accuracy: {classifier_accuracy:.2%}")
                 else:
@@ -2012,7 +2114,7 @@ def run_task_pipeline(
                 "num_train": len(contrastive_pairs),
                 "num_test": len(test_qa_pairs_source),
                 "sample_responses": generated_responses,
-                "classification_accuracy": lm_eval_results.get('accuracy', 0.0),
+                "classification_accuracy": lm_eval_metrics.get('accuracy', 0.0),
                 "correct_classifications": correct_classifications,
                 "total_classifications": total_classifications,
                 "ground_truth_method": "lm-eval-harness"
@@ -3293,6 +3395,21 @@ def handle_agent_command(args):
     
     # Run the async agent
     asyncio.run(run_agent())
+
+
+def get_actual_task_name(benchmark_name: str) -> str:
+    """
+    Resolve benchmark name to actual lm-eval task name.
+    
+    Args:
+        benchmark_name: The benchmark name from AVAILABLE_BENCHMARKS
+        
+    Returns:
+        The actual task name to use with lm-eval-harness
+    """
+    if benchmark_name in AVAILABLE_BENCHMARKS:
+        return AVAILABLE_BENCHMARKS[benchmark_name].get('task', benchmark_name)
+    return benchmark_name
 
 
 if __name__ == "__main__":

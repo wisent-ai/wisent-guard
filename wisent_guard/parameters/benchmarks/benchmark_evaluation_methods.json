@@ -13,7 +13,7 @@
   "math_qa": "text-generation",
   "mmlu": "log-likelihoods",
   "mmmlu": "log-likelihoods",
-  "multirc": "text-generation",
+  "multirc": "log-likelihoods",
   "mutual": "log-likelihoods",
   "naturalqs": "text-generation",
   "openbookqa": "log-likelihoods",

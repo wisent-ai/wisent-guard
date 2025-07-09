@@ -143,7 +143,11 @@ class LMEvalHarnessGroundTruth:
                     )
                     
                     # Extract ground truth answer
-                    if hasattr(task_data, 'doc_to_target'):
+                    # FIXED: For DROP task, use raw document data to preserve structured format
+                    if task_name == "drop":
+                        # Use raw answer field which contains the structured data
+                        ground_truth = doc.get('answer', {})
+                    elif hasattr(task_data, 'doc_to_target'):
                         ground_truth = task_data.doc_to_target(doc)
                     else:
                         ground_truth = str(doc.get('answer', doc.get('target', '')))
@@ -156,7 +160,9 @@ class LMEvalHarnessGroundTruth:
                     })
                     
                     logger.info(f"   📝 Generated: {generated_response[:100]}...")
-                    logger.info(f"   ✅ Ground truth: {ground_truth[:100]}...")
+                    # FIXED: Handle ground_truth as int or string for logging
+                    gt_str = str(ground_truth)
+                    logger.info(f"   ✅ Ground truth: {gt_str[:100]}...")
                     
                 except Exception as e:
                     logger.error(f"Error generating response for doc {i}: {e}")
@@ -584,6 +590,12 @@ class LMEvalHarnessGroundTruth:
                 elif task_name == "hellaswag":
                     # HellaSwag uses exact match on choice index
                     is_correct = self._evaluate_hellaswag_response(generated, ground_truth)
+                elif task_name == "mathqa":
+                    # MATH_QA uses exact match on choice index (0, 1, 2, 3)
+                    is_correct = self._evaluate_mathqa_response(generated, ground_truth)
+                elif task_name == "drop":
+                    # DROP uses structured answer format with numbers, spans, and dates
+                    is_correct = self._evaluate_drop_response(generated, ground_truth)
                 else:
                     # Default: string matching with some flexibility
                     is_correct = self._evaluate_default_response(generated, ground_truth)
@@ -607,8 +619,8 @@ class LMEvalHarnessGroundTruth:
             
             return {
                 'accuracy': accuracy,
-                'correct': correct,
-                'total': total,
+                'correct_predictions': correct,
+                'total_samples': total,
                 'evaluation_details': evaluation_details[:5],  # First 5 for debugging
                 'task_name': task_name
             }
@@ -617,12 +629,12 @@ class LMEvalHarnessGroundTruth:
             logger.error(f"Error in metrics evaluation: {e}")
             return {
                 'accuracy': 0.0,
-                'correct': 0,
-                'total': len(response_data),
+                'correct_predictions': 0,
+                'total_samples': len(response_data),
                 'error': str(e)
             }
     
-    def _evaluate_gsm8k_response(self, generated: str, ground_truth: str) -> bool:
+    def _evaluate_gsm8k_response(self, generated: str, ground_truth) -> bool:
         """Evaluate GSM8K response using numerical answer extraction."""
         try:
             import re
@@ -630,14 +642,14 @@ class LMEvalHarnessGroundTruth:
             # Extract numerical answer from generated response
             # GSM8K answers are typically in format "#### 42" or just the number
             generated_answer = self._extract_numerical_answer(generated)
-            ground_truth_answer = self._extract_numerical_answer(ground_truth)
+            ground_truth_answer = self._extract_numerical_answer(str(ground_truth))
             
             # Compare numerical values
             if generated_answer is not None and ground_truth_answer is not None:
                 return abs(generated_answer - ground_truth_answer) < 1e-6
             
             # Fallback to string matching
-            return generated.strip().lower() == ground_truth.strip().lower()
+            return generated.strip().lower() == str(ground_truth).strip().lower()
             
         except Exception as e:
             logger.error(f"Error evaluating GSM8K response: {e}")
@@ -665,12 +677,12 @@ class LMEvalHarnessGroundTruth:
             logger.error(f"Error extracting numerical answer: {e}")
             return None
     
-    def _evaluate_arc_response(self, generated: str, ground_truth: str) -> bool:
+    def _evaluate_arc_response(self, generated: str, ground_truth) -> bool:
         """Evaluate ARC response using exact match."""
         try:
             # Normalize responses
             gen_clean = generated.strip().lower()
-            gt_clean = ground_truth.strip().lower()
+            gt_clean = str(ground_truth).strip().lower()
             
             # Direct match
             if gen_clean == gt_clean:
@@ -694,12 +706,12 @@ class LMEvalHarnessGroundTruth:
             logger.error(f"Error evaluating ARC response: {e}")
             return False
     
-    def _evaluate_hellaswag_response(self, generated: str, ground_truth: str) -> bool:
+    def _evaluate_hellaswag_response(self, generated: str, ground_truth) -> bool:
         """Evaluate HellaSwag response using exact match."""
         try:
             # Normalize and compare
             gen_clean = generated.strip().lower()
-            gt_clean = ground_truth.strip().lower()
+            gt_clean = str(ground_truth).strip().lower()
             
             return gen_clean == gt_clean or gt_clean in gen_clean
             
@@ -707,21 +719,156 @@ class LMEvalHarnessGroundTruth:
             logger.error(f"Error evaluating HellaSwag response: {e}")
             return False
     
-    def _evaluate_default_response(self, generated: str, ground_truth: str) -> bool:
+    def _evaluate_mathqa_response(self, generated: str, ground_truth) -> bool:
+        """Evaluate MATH_QA response using choice matching."""
+        try:
+            import re
+            
+            # Ground truth is typically 0, 1, 2, or 3 (choice index)
+            gt_str = str(ground_truth).strip()
+            
+            # Look for choice patterns in generated response
+            gen_clean = generated.strip().lower()
+            
+            # Direct match with choice index
+            if gt_str in gen_clean:
+                return True
+            
+            # Look for choice letter patterns (a=0, b=1, c=2, d=3)
+            choice_map = {'a': '0', 'b': '1', 'c': '2', 'd': '3'}
+            for letter, index in choice_map.items():
+                if index == gt_str and letter in gen_clean:
+                    return True
+            
+            # Look for explicit choice pattern like "The answer is 1" or "Choice B"
+            choice_patterns = [
+                rf'\b{gt_str}\b',  # Exact number match
+                rf'choice\s*{choice_map.get(gt_str, gt_str)}',  # "choice 1"
+                rf'answer\s*is\s*{gt_str}',  # "answer is 1"
+                rf'option\s*{gt_str}',  # "option 1"
+            ]
+            
+            for pattern in choice_patterns:
+                if re.search(pattern, gen_clean):
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error evaluating MATH_QA response: {e}")
+            return False
+    
+    def _evaluate_drop_response(self, generated: str, ground_truth) -> bool:
+        """Evaluate DROP response using structured answer format."""
+        try:
+            import re
+            import json
+            
+            # Parse ground truth if it's a string representation of a dict
+            if isinstance(ground_truth, str):
+                try:
+                    # Try to parse as JSON first
+                    if ground_truth.startswith('{'):
+                        gt_dict = json.loads(ground_truth)
+                    else:
+                        # Handle malformed string representations
+                        return False
+                except:
+                    return False
+            elif isinstance(ground_truth, dict):
+                gt_dict = ground_truth
+            else:
+                return False
+            
+            gen_clean = generated.strip().lower()
+            
+            # Check number field
+            if 'number' in gt_dict and gt_dict['number']:
+                number_str = str(gt_dict['number']).strip()
+                if number_str:
+                    # Direct number match
+                    if number_str.lower() in gen_clean:
+                        return True
+                    
+                    # Try to extract numbers from generated response
+                    gen_numbers = re.findall(r'\b\d+\b', generated)
+                    if number_str in gen_numbers:
+                        return True
+                    
+                    # Word number matching (e.g., "two" vs "2")
+                    number_words = {
+                        '0': ['zero', 'none'], '1': ['one'], '2': ['two'], '3': ['three'],
+                        '4': ['four'], '5': ['five'], '6': ['six'], '7': ['seven'],
+                        '8': ['eight'], '9': ['nine'], '10': ['ten']
+                    }
+                    if number_str in number_words:
+                        for word in number_words[number_str]:
+                            if word in gen_clean:
+                                return True
+            
+            # Check spans field
+            if 'spans' in gt_dict and gt_dict['spans']:
+                spans = gt_dict['spans']
+                if isinstance(spans, list):
+                    for span in spans:
+                        span_clean = str(span).strip().lower()
+                        if span_clean and span_clean in gen_clean:
+                            return True
+                elif isinstance(spans, str):
+                    span_clean = spans.strip().lower()
+                    if span_clean and span_clean in gen_clean:
+                        return True
+            
+            # Check date field (less common but possible)
+            if 'date' in gt_dict and gt_dict['date']:
+                date_obj = gt_dict['date']
+                if isinstance(date_obj, dict):
+                    # Check individual date components
+                    for component in ['day', 'month', 'year']:
+                        if component in date_obj and date_obj[component]:
+                            date_val = str(date_obj[component]).strip().lower()
+                            if date_val and date_val in gen_clean:
+                                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error evaluating DROP response: {e}")
+            return False
+
+    def _evaluate_default_response(self, generated: str, ground_truth) -> bool:
         """Default evaluation using flexible string matching."""
         try:
             gen_clean = generated.strip().lower()
-            gt_clean = ground_truth.strip().lower()
             
-            # Exact match
-            if gen_clean == gt_clean:
-                return True
-            
-            # Contains match
-            if gt_clean in gen_clean or gen_clean in gt_clean:
-                return True
-            
-            return False
+            # Handle list ground truth (e.g., COQA format)
+            if isinstance(ground_truth, list):
+                # Check if generated response matches any of the acceptable answers
+                for gt_option in ground_truth:
+                    gt_clean = str(gt_option).strip().lower()
+                    
+                    # Exact match
+                    if gen_clean == gt_clean:
+                        return True
+                    
+                    # Contains match
+                    if gt_clean in gen_clean or gen_clean in gt_clean:
+                        return True
+                        
+                return False
+            else:
+                # Handle string ground truth
+                gt_clean = str(ground_truth).strip().lower()
+                
+                # Exact match
+                if gen_clean == gt_clean:
+                    return True
+                
+                # Contains match
+                if gt_clean in gen_clean or gen_clean in gt_clean:
+                    return True
+                
+                return False
             
         except Exception as e:
             logger.error(f"Error in default evaluation: {e}")

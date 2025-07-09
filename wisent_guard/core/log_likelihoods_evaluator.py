@@ -189,9 +189,11 @@ class LogLikelihoodsEvaluator:
                 "details": f"Evaluated {total_samples} samples with {total_correct} correct predictions",
                 "task_name": task_name,
                 "evaluation_method": "log-likelihoods",
-                "accuracy": accuracy,
-                "total_samples": total_samples,
-                "correct_predictions": total_correct,
+                "lm_eval_metrics": {
+                    "accuracy": accuracy,
+                    "correct_predictions": total_correct,
+                    "total_samples": total_samples
+                },
                 "sample_results": results[:10]  # First 10 for debugging
             }
             
@@ -309,5 +311,10 @@ class LogLikelihoodsEvaluator:
             "confidence": 0.0,
             "details": error_msg,
             "task_name": self.task_name or "unknown",
-            "evaluation_method": "log-likelihoods"
+            "evaluation_method": "log-likelihoods",
+            "lm_eval_metrics": {
+                "accuracy": 0.0,
+                "correct_predictions": 0,
+                "total_samples": 0
+            }
         } 

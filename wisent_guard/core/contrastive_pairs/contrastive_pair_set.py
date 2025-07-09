@@ -919,23 +919,36 @@ class ContrastivePairSet:
                 if not question or len(question.strip()) < 10:
                     continue
                 
-                # Extract correct and incorrect answers from mc1_targets
-                correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                correct_labels = doc.get('mc1_targets', {}).get('labels', [])
-                
-                # Find the correct answer
                 correct_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 1 and i < len(correct_answers):
-                        correct_answer = correct_answers[i]
-                        break
-                
-                # Find an incorrect answer
                 incorrect_answer = None
-                for i, label in enumerate(correct_labels):
-                    if label == 0 and i < len(correct_answers):
-                        incorrect_answer = correct_answers[i]
-                        break
+                
+                # Handle both generation and multiple choice formats
+                if 'mc1_targets' in doc or 'mc2_targets' in doc:
+                    # Multiple choice format (truthfulqa_mc1, truthfulqa_mc2)
+                    mc_targets = doc.get('mc1_targets', doc.get('mc2_targets', {}))
+                    choices = mc_targets.get('choices', [])
+                    labels = mc_targets.get('labels', [])
+                    
+                    # Find the correct answer
+                    for i, label in enumerate(labels):
+                        if label == 1 and i < len(choices):
+                            correct_answer = choices[i]
+                            break
+                    
+                    # Find an incorrect answer
+                    for i, label in enumerate(labels):
+                        if label == 0 and i < len(choices):
+                            incorrect_answer = choices[i]
+                            break
+                elif 'correct_answers' in doc and 'incorrect_answers' in doc:
+                    # Generation format (truthfulqa_gen)
+                    correct_answers_list = doc.get('correct_answers', [])
+                    incorrect_answers_list = doc.get('incorrect_answers', [])
+                    
+                    if correct_answers_list and incorrect_answers_list:
+                        # Use the first correct and first incorrect answer
+                        correct_answer = correct_answers_list[0]
+                        incorrect_answer = incorrect_answers_list[0]
                 
                 if correct_answer and incorrect_answer:
                     self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
@@ -1136,22 +1149,36 @@ class ContrastivePairSet:
                 incorrect_answer = None
                 
                 if 'truthfulqa' in task_name.lower() or 'truthful_qa' in task_name.lower():
-                    # TruthfulQA-specific extraction
-                    mc1_targets = doc.get('mc1_targets', {})
-                    correct_answers = mc1_targets.get('choices', [])
-                    correct_labels = mc1_targets.get('labels', [])
-                    
-                    # Find the correct answer
-                    for j, label in enumerate(correct_labels):
-                        if label == 1 and j < len(correct_answers):
-                            correct_answer = correct_answers[j]
-                            break
-                    
-                    # Find an incorrect answer
-                    for j, label in enumerate(correct_labels):
-                        if label == 0 and j < len(correct_answers):
-                            incorrect_answer = correct_answers[j]
-                            break
+                    # TruthfulQA-specific extraction - handle both generation and multiple choice formats
+                    if 'mc1_targets' in doc or 'mc2_targets' in doc:
+                        # Multiple choice format (truthfulqa_mc1, truthfulqa_mc2)
+                        mc_targets = doc.get('mc1_targets', doc.get('mc2_targets', {}))
+                        choices = mc_targets.get('choices', [])
+                        labels = mc_targets.get('labels', [])
+                        
+                        # Find the correct answer
+                        for j, label in enumerate(labels):
+                            if label == 1 and j < len(choices):
+                                correct_answer = choices[j]
+                                break
+                        
+                        # Find an incorrect answer
+                        for j, label in enumerate(labels):
+                            if label == 0 and j < len(choices):
+                                incorrect_answer = choices[j]
+                                break
+                    elif 'correct_answers' in doc and 'incorrect_answers' in doc:
+                        # Generation format (truthfulqa_gen)
+                        correct_answers_list = doc.get('correct_answers', [])
+                        incorrect_answers_list = doc.get('incorrect_answers', [])
+                        
+                        if correct_answers_list and incorrect_answers_list:
+                            # Use the first correct and first incorrect answer
+                            correct_answer = correct_answers_list[0]
+                            incorrect_answer = incorrect_answers_list[0]
+                    else:
+                        # Fallback for unknown TruthfulQA format
+                        continue
                             
                 elif task_name == 'hellaswag':
                     # HellaSwag-specific extraction
