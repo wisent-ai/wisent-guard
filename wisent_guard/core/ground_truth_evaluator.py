@@ -14,13 +14,15 @@ class GroundTruthMethod(Enum):
     MANUAL_REVIEW = "manual_review"
     NONE = "none"
     GOOD = "good"  # Everything is truthful (for debugging)
+    LM_EVAL_HARNESS = "lm-eval-harness"  # Use lm-eval-harness tasks for ground truth
 
 
 class GroundTruthEvaluator:
     """Handles ground truth evaluation for different tasks and methods."""
     
-    def __init__(self, method: GroundTruthMethod = GroundTruthMethod.NONE):
+    def __init__(self, method: GroundTruthMethod = GroundTruthMethod.NONE, task_name: Optional[str] = None):
         self.method = method
+        self.task_name = task_name
         
     def evaluate_response(
         self, 
@@ -56,6 +58,8 @@ class GroundTruthEvaluator:
             return self._evaluate_manual_review(response, expected_answer)
         elif self.method == GroundTruthMethod.GOOD:
             return self._evaluate_good(response, expected_answer)
+        elif self.method == GroundTruthMethod.LM_EVAL_HARNESS:
+            return self._evaluate_lm_eval_harness(response, expected_answer)
         else:
             return self._evaluate_none()
     
@@ -186,6 +190,21 @@ class GroundTruthEvaluator:
             "details": "Debug mode: everything labeled as truthful"
         }
 
+    def _evaluate_lm_eval_harness(self, response: str, expected_answer: str) -> Dict[str, Any]:
+        """Evaluate using lm-eval-harness framework."""
+        # Note: This method is a placeholder. The actual lm-eval-harness evaluation
+        # should be called with a classifier, not individual responses.
+        # Use LMEvalHarnessGroundTruth.evaluate_classifier_on_task() instead.
+        
+        return {
+            "ground_truth": "UNKNOWN",
+            "method_used": "lm-eval-harness",
+            "confidence": 0.0,
+            "details": "lm-eval-harness evaluation requires a classifier. Use LMEvalHarnessGroundTruth.evaluate_classifier_on_task() instead.",
+            "task_name": getattr(self, 'task_name', None) or "unknown",
+            "evaluation_method": "lm-eval-harness"
+        }
+
     def _evaluate_none(self) -> Dict[str, Any]:
         """No ground truth evaluation."""
         return {
@@ -233,11 +252,11 @@ class GroundTruthEvaluator:
         return results
     
     @classmethod
-    def from_string(cls, method_str: str) -> 'GroundTruthEvaluator':
+    def from_string(cls, method_str: str, task_name: Optional[str] = None) -> 'GroundTruthEvaluator':
         """Create evaluator from string representation."""
         try:
             method = GroundTruthMethod(method_str.lower())
-            return cls(method)
+            return cls(method, task_name)
         except ValueError:
             logger.warning(f"Unknown ground truth method: {method_str}. Using 'none'.")
-            return cls(GroundTruthMethod.NONE)
+            return cls(GroundTruthMethod.NONE, task_name)

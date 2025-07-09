@@ -78,6 +78,9 @@ AVAILABLE_BENCHMARKS = {
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Add import for LMEvalHarnessGroundTruth
+from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+
 
 def get_valid_task_names() -> List[str]:
     """Get list of all valid (available) task names from AVAILABLE_BENCHMARKS."""
@@ -1894,6 +1897,113 @@ def run_task_pipeline(
                 "success": True
             }
         
+        # Special handling for lm-eval-harness ground truth evaluation
+        if ground_truth_method == "lm-eval-harness":
+            if verbose:
+                print(f"\n🔍 LM-EVAL-HARNESS GROUND TRUTH EVALUATION:")
+                print(f"   • Using lm-eval-harness tasks for direct classifier evaluation")
+                print(f"   • Task: {task_name}")
+                print(f"   • Evaluation method: log-likelihoods")
+                print(f"   • Samples: {len(test_qa_pairs_source)}")
+            
+            # Get the trained classifier for evaluation
+            if len(layers) > 1:
+                # Multi-layer mode - use first layer's classifier
+                classifier = steering_methods[layers[0]].classifier if layers[0] in steering_methods else None
+            else:
+                # Single-layer mode
+                classifier = steering_method.classifier if hasattr(steering_method, 'classifier') else None
+            
+            if classifier is None:
+                if verbose:
+                    print(f"   ❌ No trained classifier found for evaluation")
+                lm_eval_results = {
+                    "ground_truth": "UNKNOWN",
+                    "method_used": "lm-eval-harness-error",
+                    "confidence": 0.0,
+                    "details": "No trained classifier available for evaluation",
+                    "task_name": task_name,
+                    "evaluation_method": "log-likelihoods"
+                }
+            else:
+                # Use LMEvalHarnessGroundTruth for proper evaluation - pass token_aggregation
+                lm_eval_ground_truth = LMEvalHarnessGroundTruth(task_name, "log-likelihoods", model=model)
+                lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
+                    classifier, 
+                    task_name, 
+                    num_samples=len(test_qa_pairs_source),
+                    model=model,
+                    layer=layers[0] if len(layers) > 1 else layers[0],
+                    token_aggregation=token_aggregation
+                )
+                
+                if verbose:
+                    print(f"   ✅ LM-eval-harness evaluation completed")
+                    accuracy = lm_eval_results.get('accuracy', 'N/A')
+                    if isinstance(accuracy, (int, float)):
+                        print(f"   📊 Accuracy: {accuracy:.2%}")
+                    else:
+                        print(f"   📊 Accuracy: {accuracy}")
+                    print(f"   🎯 Correct predictions: {lm_eval_results.get('correct_predictions', 0)}")
+                    print(f"   📝 Total samples: {lm_eval_results.get('total_samples', 0)}")
+            
+            # Update evaluation results with lm-eval-harness results
+            evaluation_results = lm_eval_results
+            
+            # For lm-eval-harness, we don't need to generate responses since we evaluate directly
+            # on the multiple choice options from the task
+            generated_responses = []
+            correct_classifications = lm_eval_results.get('correct_predictions', 0)
+            total_classifications = lm_eval_results.get('total_samples', 0)
+            
+            if verbose:
+                print(f"\n🎉 LM-EVAL-HARNESS EVALUATION COMPLETED FOR {task_name.upper()}!")
+                print(f"{'='*80}")
+                print(f"📊 FINAL RESULTS:")
+                print(f"   • Training samples: {len(contrastive_pairs)}")
+                print(f"   • Test samples: {len(test_qa_pairs_source)}")
+                
+                # Fix training accuracy formatting
+                training_accuracy = training_results.get('accuracy', 'N/A')
+                if isinstance(training_accuracy, (int, float)):
+                    print(f"   • Training accuracy: {training_accuracy:.2%}")
+                else:
+                    print(f"   • Training accuracy: {training_accuracy}")
+                
+                # Fix classifier evaluation accuracy formatting
+                classifier_accuracy = lm_eval_results.get('accuracy', 'N/A')
+                if isinstance(classifier_accuracy, (int, float)):
+                    print(f"   • Classifier evaluation accuracy: {classifier_accuracy:.2%}")
+                else:
+                    print(f"   • Classifier evaluation accuracy: {classifier_accuracy}")
+                
+                print(f"   • Correct predictions: {correct_classifications}")
+                print(f"   • Total evaluated: {total_classifications}")
+                print(f"{'='*80}")
+            
+            results = {
+                "task_name": task_name,
+                "model_name": model_name,
+                "layer": layer,
+                "original_layer": original_layer,
+                "token_aggregation": token_aggregation,
+                "original_token_aggregation": original_token_aggregation,
+                "optimization_performed": optimize,
+                "optimization_result": optimization_result,
+                "training_results": training_results,
+                "evaluation_results": evaluation_results,
+                "num_train": len(contrastive_pairs),
+                "num_test": len(test_qa_pairs_source),
+                "sample_responses": generated_responses,
+                "classification_accuracy": lm_eval_results.get('accuracy', 0.0),
+                "correct_classifications": correct_classifications,
+                "total_classifications": total_classifications,
+                "ground_truth_method": "lm-eval-harness"
+            }
+            
+            logger.info(f"LM-eval-harness evaluation completed for {task_name}")
+            return results
+        
         # Test the optimized classifier by generating responses and classifying them
         if optimize:
             if verbose:
@@ -3081,6 +3191,7 @@ def handle_agent_command(args):
                     print(f"   Final quality score: {result.final_quality_score:.3f}")
                     print(f"   Attempts needed: {result.attempts_needed}")
                     print(f"   Total time: {result.total_time_seconds:.1f}s")
+
                     
                     # Show classifier parameters used
                     classifier_params = result.classifier_params_used
