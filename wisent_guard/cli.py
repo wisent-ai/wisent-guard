@@ -548,14 +548,47 @@ def run_task_pipeline(
     
     # AUTOMATICALLY SET LM-EVAL-HARNESS AS DEFAULT FOR TESTED TASKS
     # These tasks have been thoroughly tested and validated to work with lm-eval-harness
+    # 🚨 UPDATED: All benchmarks now use extractor-based ground truth evaluation
     LM_EVAL_HARNESS_TASKS = {
+        # Original tested tasks
         "math_qa",      # Text-generation: 100% accuracy, working perfectly
         "webqs",        # Text-generation: 50% accuracy, working perfectly
         "truthfulqa_gen", # Text-generation: 100% accuracy, working perfectly
         "drop",         # Text-generation: 50% accuracy, working perfectly
         "record",       # Text-generation: 0% accuracy, working perfectly (expected for cloze task)
         "squad2",       # Text-generation: 100% accuracy, working perfectly
-        "wikitext"      # Perplexity: Working perfectly
+        "wikitext",     # Perplexity: Working perfectly
+        "winogrande",   # Text-generation: Testing for classification optimization
+        
+        # 🔧 NEW: All benchmarks with extractors now use lm-eval-harness ground truth
+        # Multiple choice benchmarks
+        "arc_challenge", "arc_easy",    # ARCExtractor
+        "hellaswag",                    # HellaSwagExtractor
+        "truthfulqa_mc1", "truthfulqa_mc2", # TruthfulQAExtractor
+        "mmlu", "mmmlu",                # MMLUExtractor
+        "piqa",                         # PIQAExtractor
+        "copa",                         # COPAExtractor
+        "openbookqa",                   # OpenBookQAExtractor
+        "race",                         # RACEExtractor
+        
+        # Boolean benchmarks
+        "boolq",                        # BoolQExtractor
+        
+        # Math benchmarks
+        "gsm8k",                        # GSM8KExtractor
+        "asdiv",                        # GSM8KExtractor (similar format)
+        
+        # QA benchmarks (already included: squad2, drop, webqs, record)
+        "coqa",                         # SQuAD2Extractor (similar format)
+        "naturalqs",                    # SQuAD2Extractor (similar format)
+        "triviaqa",                     # SQuAD2Extractor (similar format)
+        
+        # Additional benchmarks that map to existing extractors
+        "cb",                           # COPAExtractor (similar format)
+        "logiqa", "math_qa", "multirc", "mutual", "prost", "pubmedqa", "sciq", # MMLUExtractor (multiple choice)
+        "swag",                         # HellaSwagExtractor (similar format)
+        "toxigen", "wic",               # BoolQExtractor (binary classification)
+        "wsc", "wsc273",                # COPAExtractor (similar format)
     }
     
     # Auto-set ground truth method for tested tasks (unless explicitly overridden)
@@ -1016,6 +1049,14 @@ def run_task_pipeline(
                 print(f"      🔸 Question: {question_preview}")
                 print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
                 print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+        
+        # 🚨 HARD ERROR CHECK: QA pair extraction failure
+        if len(qa_pairs) == 0:
+            raise ValueError(f"❌ CRITICAL ERROR: QA pair extraction failed for task '{task_name}'!\n"
+                           f"   📊 Task loaded {len(train_docs) if 'train_docs' in locals() else 0} training documents\n"
+                           f"   🔍 But extracted 0 QA pairs from them\n"
+                           f"   💡 This indicates the task document structure is not recognized by the extraction logic\n"
+                           f"   🛠️  Check ContrastivePairSet.extract_qa_pairs_from_task_docs() for '{task_name}' support")
 
         # FIXED: For perplexity tasks, skip contrastive training and go directly to evaluation
         if ground_truth_method == "lm-eval-harness":
@@ -1148,6 +1189,14 @@ def run_task_pipeline(
         
         collector = ActivationCollectionLogic(model=model)
         contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs, prompt_strategy)
+        
+        # 🚨 HARD ERROR CHECK: No training data created
+        if len(contrastive_pairs) == 0:
+            raise ValueError(f"❌ CRITICAL ERROR: No contrastive pairs created for task '{task_name}'!\n"
+                           f"   📊 Input: {len(qa_pairs)} QA pairs\n"
+                           f"   🔍 Output: 0 contrastive pairs\n"
+                           f"   💡 This indicates the contrastive pair creation logic failed\n"
+                           f"   🛠️  Check ActivationCollectionLogic.create_batch_contrastive_pairs() method")
         
         if verbose:
             print(f"\n🔄 Created {len(contrastive_pairs)} contrastive pairs:")
@@ -1334,29 +1383,18 @@ def run_task_pipeline(
                             'correct_answer': doc['correct_answer']
                         })
                     else:
-                        # For lm-harness tasks, extract from document
-                        raw_question = doc.get('question', str(doc))
-                        if hasattr(task_data, 'doc_to_text'):
-                            formatted_question = task_data.doc_to_text(doc)
-                        else:
-                            formatted_question = raw_question
+                        # For lm-harness tasks, use comprehensive extraction method
+                        # ContrastivePairSet is already imported at the top of the file
                         
-                        # Extract correct answer for ground truth comparison
-                        correct_answers = doc.get('mc1_targets', {}).get('choices', [])
-                        correct_labels = doc.get('mc1_targets', {}).get('labels', [])
+                        # Extract QA pairs using the comprehensive method that handles all benchmarks
+                        qa_pairs_batch = ContrastivePairSet.extract_qa_pairs_from_task_docs(
+                            task_name, task_data, [doc]
+                        )
                         
-                        correct_answer = None
-                        for i, label in enumerate(correct_labels):
-                            if label == 1 and i < len(correct_answers):
-                                correct_answer = correct_answers[i]
-                                break
-                        
-                        if correct_answer:
-                            test_qa_pairs.append({
-                                'question': raw_question,
-                                'formatted_question': formatted_question,
-                                'correct_answer': correct_answer
-                            })
+                        if qa_pairs_batch:
+                            test_qa_pairs.extend(qa_pairs_batch)
+                        elif verbose:
+                            print(f"⚠️  Failed to extract test QA pair from benchmark {task_name}")
                         
                 except Exception as e:
                     continue
@@ -2934,14 +2972,24 @@ Check the task configuration and implementation."""
             return results
         
     except Exception as e:
-        logger.error(f"Error in pipeline for {task_name}: {e}")
+        # 🚨 ALL ERRORS ARE CRITICAL - HARD STOP THE ENTIRE PROGRAM
+        logger.error(f"💥 HARD STOP: Error in pipeline for {task_name}: {e}")
         # Stop tracking on error
         if memory_tracker:
             try:
                 memory_tracker.stop_monitoring()
             except:
                 pass
-        return {"task_name": task_name, "error": str(e)}
+        # Import traceback for full stack trace
+        import traceback
+        print(f"\n💥💥💥 HARD STOP - ERROR DETECTED 💥💥💥")
+        print(f"Task: {task_name}")
+        print(f"Error: {e}")
+        print(f"Full traceback:")
+        traceback.print_exc()
+        print(f"💥💥💥 STOPPING EXECUTION IMMEDIATELY 💥💥💥\n")
+        # HARD STOP - crash the program immediately
+        raise e
 
 
 def main():
@@ -2967,6 +3015,10 @@ def main():
         handle_agent_command(args)
     elif args.command == "model-config":
         handle_model_config_command(args)
+    elif args.command == "optimize-classification":
+        handle_classification_optimization_command(args)
+    elif args.command == "optimize-steering":
+        handle_steering_optimization_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -3673,6 +3725,173 @@ def handle_model_config_test(args, config_manager):
         if args.verbose:
             import traceback
             traceback.print_exc()
+
+
+def handle_classification_optimization_command(args):
+    """Handle the optimize-classification command."""
+    try:
+        print(f"🚀 Starting comprehensive classification optimization...")
+        print(f"   📊 Model: {args.model}")
+        print(f"   🔢 Limit per task: {args.limit}")
+        print(f"   📈 Optimization metric: {args.optimization_metric}")
+        print(f"   ⏱️  Max time per task: {args.max_time_per_task} minutes")
+        if args.save_logs_json:
+            print(f"   📄 Detailed logs will be saved to: {args.save_logs_json}")
+        if args.save_classifiers:
+            classifiers_dir = args.classifiers_dir or f"./optimized_classifiers/{args.model.replace('/', '_')}"
+            print(f"   💾 Classifiers will be saved to: {classifiers_dir}")
+        else:
+            print(f"   🚫 Classifier saving disabled")
+        
+        # Import and initialize classification optimizer
+        from .core.classification_optimizer import run_classification_optimization
+        
+        # Run the optimization
+        summary = run_classification_optimization(
+            model_name=args.model,
+            limit=args.limit,
+            device=args.device,
+            verbose=args.verbose,
+            tasks=args.tasks,
+            optimization_metric=args.optimization_metric,
+            max_time_per_task_minutes=args.max_time_per_task,
+            layer_range=args.layer_range,
+            aggregation_methods=args.aggregation_methods,
+            threshold_range=args.threshold_range,
+            save_results=not args.no_save,
+            results_file=args.results_file,
+            save_logs_json=args.save_logs_json,
+            save_classifiers=args.save_classifiers,
+            classifiers_dir=args.classifiers_dir
+        )
+        
+        print(f"\n✅ Classification optimization completed successfully!")
+        print(f"   📊 Optimized {summary.successful_optimizations}/{summary.total_tasks_tested} tasks")
+        print(f"   🎯 Best overall layer: {summary.overall_best_layer}")
+        print(f"   🔧 Best aggregation: {summary.overall_best_aggregation}")
+        print(f"   📈 Best threshold: {summary.overall_best_threshold}")
+        print(f"   ⏱️  Total time: {summary.total_time_minutes:.1f} minutes")
+        
+    except Exception as e:
+        print(f"❌ Classification optimization failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_steering_optimization_command(args):
+    """Handle the optimize-steering command."""
+    try:
+        print(f"🎯 Starting steering optimization...")
+        print(f"   📊 Model: {args.model}")
+        print(f"   🔧 Optimization type: {args.steering_action}")
+        
+        # Import steering optimizer
+        from .core.steering_optimizer import run_steering_optimization
+        
+        # Prepare arguments based on steering action
+        kwargs = {
+            'device': args.device,
+            'verbose': args.verbose
+        }
+        
+        if args.steering_action == "compare-methods":
+            print(f"   📋 Task: {args.task}")
+            print(f"   🔧 Methods: {args.methods}")
+            print(f"   🔢 Limit: {args.limit}")
+            
+            kwargs.update({
+                'methods_to_test': args.methods,
+                'limit': args.limit,
+                'max_time_minutes': args.max_time
+            })
+            
+            result = run_steering_optimization(
+                model_name=args.model,
+                optimization_type="method_comparison",
+                task_name=args.task,
+                **kwargs
+            )
+            
+        elif args.steering_action == "optimize-layer":
+            print(f"   📋 Task: {args.task}")
+            print(f"   🔧 Method: {args.method}")
+            print(f"   📊 Layer range: {args.layer_range or 'auto'}")
+            
+            kwargs.update({
+                'steering_method': args.method,
+                'layer_search_range': args.layer_range,
+                'strength': args.strength,
+                'limit': args.limit
+            })
+            
+            result = run_steering_optimization(
+                model_name=args.model,
+                optimization_type="layer",
+                task_name=args.task,
+                **kwargs
+            )
+            
+        elif args.steering_action == "optimize-strength":
+            print(f"   📋 Task: {args.task}")
+            print(f"   🔧 Method: {args.method}")
+            print(f"   📊 Layer: {args.layer or 'auto'}")
+            print(f"   ⚡ Strength range: {args.strength_range}")
+            
+            kwargs.update({
+                'steering_method': args.method,
+                'layer': args.layer,
+                'strength_range': tuple(args.strength_range),
+                'strength_steps': args.strength_steps,
+                'limit': args.limit
+            })
+            
+            result = run_steering_optimization(
+                model_name=args.model,
+                optimization_type="strength",
+                task_name=args.task,
+                **kwargs
+            )
+            
+        elif args.steering_action == "comprehensive":
+            print(f"   📋 Tasks: {args.tasks or 'auto (from classification config)'}")
+            print(f"   🔧 Methods: {args.methods}")
+            print(f"   🔢 Limit per task: {args.limit}")
+            
+            kwargs.update({
+                'tasks': args.tasks,
+                'methods': args.methods,
+                'limit': args.limit,
+                'max_time_per_task_minutes': args.max_time_per_task,
+                'save_results': not args.no_save
+            })
+            
+            result = run_steering_optimization(
+                model_name=args.model,
+                optimization_type="comprehensive",
+                **kwargs
+            )
+            
+        else:
+            print(f"❌ Unknown steering action: {args.steering_action}")
+            sys.exit(1)
+        
+        print(f"\n✅ Steering optimization completed successfully!")
+        # Add more specific success information based on result type
+        
+    except NotImplementedError as e:
+        print(f"⚠️  Steering optimization not yet implemented: {e}")
+        print(f"   📝 This is expected - steering optimization framework has been created")
+        print(f"   🔧 Implementation of actual optimization logic is needed")
+        print(f"   📋 See wisent_guard/core/steering_optimizer.py for TODOs")
+        
+    except Exception as e:
+        print(f"❌ Steering optimization failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 def get_actual_task_name(benchmark_name: str) -> str:

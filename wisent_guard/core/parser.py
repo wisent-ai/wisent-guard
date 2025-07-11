@@ -44,6 +44,16 @@ def setup_parser() -> argparse.ArgumentParser:
     model_config_parser = subparsers.add_parser("model-config", help="Manage model-specific optimal parameters")
     setup_model_config_parser(model_config_parser)
     
+    # Classification optimization command for finding optimal classification parameters
+    classification_optimizer_parser = subparsers.add_parser("optimize-classification", 
+                                                           help="Optimize classification parameters across all tasks")
+    setup_classification_optimizer_parser(classification_optimizer_parser)
+    
+    # Steering optimization command for finding optimal steering parameters
+    steering_optimizer_parser = subparsers.add_parser("optimize-steering",
+                                                     help="Optimize steering parameters for different methods")
+    setup_steering_optimizer_parser(steering_optimizer_parser)
+    
     return parser
 
 
@@ -370,19 +380,34 @@ def aggregate_token_scores(token_scores: List[float], method: str) -> float:
     if not token_scores:
         return 0.5
     
+    # Convert any tensor values to floats and filter out None values
+    clean_scores = []
+    for i, score in enumerate(token_scores):
+        if score is None:
+            raise ValueError(f"Token score at index {i} is None! This indicates a bug in the classifier output handling.")
+        elif hasattr(score, 'item'):  # Handle tensors
+            raise ValueError(f"Token score at index {i} is a tensor ({type(score)})! Expected float but got tensor: {score}")
+        elif not isinstance(score, (int, float)):
+            raise ValueError(f"Token score at index {i} has invalid type: {type(score)}. Expected float but got {type(score).__name__}: {score}")
+        else:
+            clean_scores.append(float(score))
+    
+    if not clean_scores:
+        return 0.5
+    
     if method == "average":
-        return sum(token_scores) / len(token_scores)
+        return sum(clean_scores) / len(clean_scores)
     elif method == "final":
-        return token_scores[-1]
+        return clean_scores[-1]
     elif method == "first":
-        return token_scores[0]
+        return clean_scores[0]
     elif method == "max":
-        return max(token_scores)
+        return max(clean_scores)
     elif method == "min":
-        return min(token_scores)
+        return min(clean_scores)
     else:
         # Default to average if unknown method
-        return sum(token_scores) / len(token_scores)
+        return sum(clean_scores) / len(clean_scores)
 
 
 def setup_generate_pairs_parser(parser):
@@ -577,6 +602,118 @@ def setup_agent_parser(parser):
                         help="Maximum attempts to achieve acceptable quality (default: 5)")
     parser.add_argument("--show-parameter-reasoning", action="store_true",
                         help="Display model's reasoning for parameter choices")
+
+
+def setup_classification_optimizer_parser(parser):
+    """Set up the classification-optimizer subcommand parser."""
+    parser.add_argument("model", type=str, help="Model name or path to optimize")
+    parser.add_argument("--limit", type=int, default=1000,
+                       help="Maximum samples per task (default: 1000)")
+    parser.add_argument("--optimization-metric", type=str, default="f1",
+                       choices=["f1", "accuracy", "precision", "recall"],
+                       help="Metric to optimize (default: f1)")
+    parser.add_argument("--max-time-per-task", type=float, default=15.0,
+                       help="Maximum time per task in minutes (default: 15.0)")
+    parser.add_argument("--layer-range", type=str, default=None,
+                       help="Layer range to test (e.g., '10-20', if None uses all layers)")
+    parser.add_argument("--aggregation-methods", type=str, nargs='+', 
+                       default=["average", "final", "first", "max", "min"],
+                       help="Token aggregation methods to test")
+    parser.add_argument("--threshold-range", type=float, nargs='+',
+                       default=[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                       help="Detection thresholds to test")
+    parser.add_argument("--device", type=str, default=None, help="Device to run on")
+    parser.add_argument("--results-file", type=str, default=None,
+                       help="Custom file path for saving results")
+    parser.add_argument("--no-save", action="store_true",
+                       help="Don't save results to model config")
+    parser.add_argument("--save-logs-json", type=str, default=None,
+                       help="Save detailed optimization logs to JSON file")
+    parser.add_argument("--save-classifiers", action="store_true", default=True,
+                       help="Save best classifiers for each task (default: True)")
+    parser.add_argument("--no-save-classifiers", dest="save_classifiers", action="store_false",
+                       help="Don't save classifiers (overrides --save-classifiers)")
+    parser.add_argument("--classifiers-dir", type=str, default=None,
+                       help="Directory to save classifiers (default: ./optimized_classifiers/model_name/)")
+    parser.add_argument("--tasks", type=str, nargs='+', default=None,
+                       help="Specific tasks to optimize (if None, uses all available tasks)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+
+
+def setup_steering_optimizer_parser(parser):
+    """Set up the steering-optimizer subcommand parser."""
+    # Create subparsers for different steering optimization types
+    steering_subparsers = parser.add_subparsers(dest="steering_action", help="Steering optimization actions")
+    
+    # Method comparison subcommand
+    method_parser = steering_subparsers.add_parser("compare-methods", 
+                                                  help="Compare different steering methods for a task")
+    method_parser.add_argument("model", type=str, help="Model name or path")
+    method_parser.add_argument("--task", type=str, default="truthfulqa_mc1",
+                             help="Task to optimize steering for (default: truthfulqa_mc1)")
+    method_parser.add_argument("--methods", type=str, nargs='+', 
+                             choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                             default=["CAA", "HPR"],
+                             help="Steering methods to compare")
+    method_parser.add_argument("--limit", type=int, default=100,
+                             help="Maximum samples for testing (default: 100)")
+    method_parser.add_argument("--max-time", type=float, default=30.0,
+                             help="Maximum optimization time in minutes (default: 30.0)")
+    
+    # Layer optimization subcommand
+    layer_parser = steering_subparsers.add_parser("optimize-layer",
+                                                help="Find optimal steering layer for a method")
+    layer_parser.add_argument("model", type=str, help="Model name or path")
+    layer_parser.add_argument("--task", type=str, default="truthfulqa_mc1",
+                            help="Task to optimize for (default: truthfulqa_mc1)")
+    layer_parser.add_argument("--method", type=str, default="CAA",
+                            choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                            help="Steering method to use (default: CAA)")
+    layer_parser.add_argument("--layer-range", type=str, default=None,
+                            help="Layer range to search (e.g., '10-20')")
+    layer_parser.add_argument("--strength", type=float, default=1.0,
+                            help="Fixed steering strength during layer search (default: 1.0)")
+    layer_parser.add_argument("--limit", type=int, default=100,
+                            help="Maximum samples for testing (default: 100)")
+    
+    # Strength optimization subcommand
+    strength_parser = steering_subparsers.add_parser("optimize-strength",
+                                                   help="Find optimal steering strength")
+    strength_parser.add_argument("model", type=str, help="Model name or path")
+    strength_parser.add_argument("--task", type=str, default="truthfulqa_mc1",
+                               help="Task to optimize for (default: truthfulqa_mc1)")
+    strength_parser.add_argument("--method", type=str, default="CAA",
+                               choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                               help="Steering method to use (default: CAA)")
+    strength_parser.add_argument("--layer", type=int, default=None,
+                               help="Steering layer to use (defaults to classification layer)")
+    strength_parser.add_argument("--strength-range", type=float, nargs=2, default=[0.1, 2.0],
+                               help="Min and max strength to test (default: 0.1 2.0)")
+    strength_parser.add_argument("--strength-steps", type=int, default=10,
+                               help="Number of strength values to test (default: 10)")
+    strength_parser.add_argument("--limit", type=int, default=100,
+                               help="Maximum samples for testing (default: 100)")
+    
+    # Comprehensive optimization subcommand
+    comprehensive_parser = steering_subparsers.add_parser("comprehensive",
+                                                        help="Run comprehensive steering optimization")
+    comprehensive_parser.add_argument("model", type=str, help="Model name or path")
+    comprehensive_parser.add_argument("--tasks", type=str, nargs='+', default=None,
+                                    help="Tasks to optimize (defaults to classification-optimized tasks)")
+    comprehensive_parser.add_argument("--methods", type=str, nargs='+', 
+                                    choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                                    default=["CAA", "HPR"],
+                                    help="Steering methods to test")
+    comprehensive_parser.add_argument("--limit", type=int, default=100,
+                                    help="Sample limit per task (default: 100)")
+    comprehensive_parser.add_argument("--max-time-per-task", type=float, default=20.0,
+                                    help="Time limit per task in minutes (default: 20.0)")
+    comprehensive_parser.add_argument("--no-save", action="store_true",
+                                    help="Don't save results to model config")
+    
+    # Common arguments for all steering optimization subcommands
+    parser.add_argument("--device", type=str, default=None, help="Device to run on")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
 
 def setup_model_config_parser(parser):

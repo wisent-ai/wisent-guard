@@ -199,7 +199,28 @@ class SafeInference:
                     if hasattr(self.steering_method, 'classifier') and self.steering_method.classifier:
                         try:
                             # Predict probability of being harmful (class 1)
-                            prob = self.steering_method.classifier.predict_proba([features.numpy()])[0][1]
+                            # Our classifier returns a single float, not an array like sklearn
+                            prob = self.steering_method.classifier.predict_proba([features.numpy()])
+                            # Handle both single float and array returns
+                            if isinstance(prob, (list, tuple)) or hasattr(prob, '__getitem__'):
+                                if len(prob) > 0:
+                                    if hasattr(prob[0], '__len__') and len(prob[0]) > 1:
+                                        prob = float(prob[0][1])  # Binary classification - positive class
+                                    else:
+                                        prob = float(prob[0])
+                                else:
+                                    prob = 0.5
+                            else:
+                                prob = float(prob)
+                            
+                            # Ensure we have a valid float
+                            if prob is None or not isinstance(prob, (int, float)):
+                                raise ValueError(f"Classifier returned invalid probability: {prob} (type: {type(prob)}). Expected float but got {type(prob).__name__}")
+                            
+                            # Additional validation
+                            if not (0.0 <= prob <= 1.0):
+                                raise ValueError(f"Classifier probability {prob} is out of valid range [0.0, 1.0]")
+                            
                             token_scores.append(float(prob))
                         except Exception as e:
                             logger.warning(f"Classifier error for token {token_idx}: {e}")
@@ -459,10 +480,25 @@ def generate_with_classification(model, prompt, layer, max_new_tokens, steering_
                         prob = steering_method.classifier.predict_proba([features.numpy()])
                         # Handle both single float and array returns
                         if isinstance(prob, (list, tuple)) or hasattr(prob, '__getitem__'):
-                            prob = float(prob[0]) if len(prob) > 0 else 0.5
+                            if len(prob) > 0:
+                                if hasattr(prob[0], '__len__') and len(prob[0]) > 1:
+                                    prob = float(prob[0][1])  # Binary classification - positive class
+                                else:
+                                    prob = float(prob[0])
+                            else:
+                                prob = 0.5
                         else:
                             prob = float(prob)
-                        token_scores.append(prob)
+                        
+                        # Ensure we have a valid float
+                        if prob is None or not isinstance(prob, (int, float)):
+                            raise ValueError(f"Classifier returned invalid probability: {prob} (type: {type(prob)}). Expected float but got {type(prob).__name__}")
+                        
+                        # Additional validation
+                        if not (0.0 <= prob <= 1.0):
+                            raise ValueError(f"Classifier probability {prob} is out of valid range [0.0, 1.0]")
+                            
+                        token_scores.append(float(prob))
                     except Exception as e:
                         if verbose:
                             print(f"      ⚠️  Classifier error for token {token_idx}: {e}")

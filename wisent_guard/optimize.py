@@ -26,14 +26,37 @@ def get_cache_path(cache_key: str) -> Path:
     return cache_dir / f"{cache_key}.json"
 
 def load_cached_results(cache_key: str) -> Optional[Dict[str, Any]]:
-    """Load cached optimization results if they exist."""
+    """Load cached optimization results if they exist and are valid."""
     cache_path = get_cache_path(cache_key)
     if cache_path.exists():
         try:
             with open(cache_path, 'r') as f:
-                return json.load(f)
+                cached_data = json.load(f)
+            
+            # Validate that cached results have valid (non-None) values
+            required_fields = ['best_layer', 'best_aggregation', 'best_classifier_type', 'best_threshold']
+            for field in required_fields:
+                if cached_data.get(field) is None:
+                    print(f"⚠️ Invalid cached results (field '{field}' is None), ignoring cache")
+                    # Delete the corrupted cache file
+                    cache_path.unlink()
+                    return None
+            
+            # Additional validation: ensure best_accuracy is reasonable
+            if cached_data.get('best_accuracy', 0.0) <= 0.0:
+                print(f"⚠️ Invalid cached results (accuracy {cached_data.get('best_accuracy', 0.0)}), ignoring cache")
+                cache_path.unlink()
+                return None
+            
+            return cached_data
+            
         except Exception as e:
             print(f"⚠️ Error loading cache: {e}")
+            # Delete corrupted cache file
+            try:
+                cache_path.unlink()
+            except:
+                pass
     return None
 
 def save_cached_results(cache_key: str, results: Dict[str, Any]) -> None:
@@ -168,8 +191,24 @@ def optimize_aggregation_on_ground_truth(
         print(f"   • Testing thresholds: {thresholds}")
         print(f"   • Total combinations: {len(layer_results) * len(aggregation_methods) * len(classifier_types) * len(thresholds)}")
         print(f"   • Ground truth method: {ground_truth_method}")
+        print(f"   • Test QA pairs: {len(test_qa_pairs)}")
+        if len(test_qa_pairs) > 0:
+            print(f"   • First test question: {test_qa_pairs[0].get('formatted_question', 'N/A')[:100]}...")
+        else:
+            print(f"   ❌ CRITICAL: NO TEST QA PAIRS! Cannot perform ground truth optimization.")
+            print(f"      This means test data loading failed completely.")
+    
+    # 🚨 HARD ERROR CHECK: No test data
+    if len(test_qa_pairs) == 0:
+        raise ValueError(f"❌ CRITICAL ERROR: No test QA pairs available for ground truth optimization!\n"
+                       f"   📊 Test data size: {len(test_qa_pairs)}\n"
+                       f"   💡 This indicates the test data loading phase failed.\n"
+                       f"   🛠️  Check test data extraction and QA pair formatting.")
     
     evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+    if verbose:
+        print(f"   • Ground truth evaluator: {evaluator.method.value}")
+        print(f"   • Evaluator initialized successfully")
     
     best_combination = {
         'layer': None,
@@ -252,17 +291,23 @@ def optimize_aggregation_on_ground_truth(
                 print(f"     🎭 Generating responses with {classifier_type} classifier...")
             
             question_results = []
-            for qa_pair in test_qa_pairs:
+            for i, qa_pair in enumerate(test_qa_pairs):
                 try:
                     question = qa_pair['formatted_question']
+                    if verbose:
+                        print(f"       📝 Processing question {i+1}/{len(test_qa_pairs)}: {question[:100]}...")
                     
                     # Generate response with token scores
-                    from .cli import generate_with_classification
+                    from .inference import generate_with_classification
                     
                     response_text, token_scores, _ = generate_with_classification(
                         model, question, layer_idx, max_new_tokens, 
-                        steering_method, "average", verbose=False  # Use any aggregation, we'll recalculate
+                        steering_method, "average", threshold=0.6, verbose=False  # Use any aggregation, we'll recalculate
                     )
+                    
+                    if verbose:
+                        print(f"       ✅ Generated response: {response_text[:100]}...")
+                        print(f"       📊 Token scores length: {len(token_scores) if token_scores else 'None'}")
                     
                     # Get ground truth label ONCE
                     gt_result = evaluator.evaluate_response(
@@ -271,19 +316,89 @@ def optimize_aggregation_on_ground_truth(
                     )
                     ground_truth_label = gt_result['ground_truth']
                     
+                    if verbose:
+                        print(f"       🎯 Ground truth: {ground_truth_label}")
+                        print(f"       🔍 Ground truth details: {gt_result}")
+                    
+                    # 🚨 HARD STOP: Ground truth evaluation failed
+                    if ground_truth_label == "UNKNOWN":
+                        print(f"\n💥💥💥 HARD STOP - GROUND TRUTH EVALUATION FAILED 💥💥💥")
+                        print(f"Question: {question[:200]}...")
+                        print(f"Response: {response_text[:200]}...")
+                        print(f"Expected Answer: {qa_pair.get('correct_answer', 'N/A')}")
+                        print(f"Ground Truth Method: {ground_truth_method}")
+                        print(f"Evaluator Details: {gt_result}")
+                        print(f"💡 Ground truth evaluation returned UNKNOWN instead of TRUTHFUL/HALLUCINATION")
+                        print(f"🛠️  This means the ground truth method cannot evaluate this type of response")
+                        print(f"💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
+                        
+                        # HARD STOP - crash the entire process immediately
+                        raise ValueError(f"❌ CRITICAL ERROR: Ground truth evaluation failed!\n"
+                                       f"   📊 Ground truth: {ground_truth_label}\n"
+                                       f"   📝 Question: {question[:100]}...\n"
+                                       f"   📝 Response: {response_text[:100]}...\n"
+                                       f"   📝 Expected: {qa_pair.get('correct_answer', 'N/A')}\n"
+                                       f"   📝 Method: {ground_truth_method}\n"
+                                       f"   📝 Details: {gt_result}\n"
+                                       f"   💡 Ground truth evaluation must return TRUTHFUL or HALLUCINATION for optimization to work\n"
+                                       f"   🛠️  Check if the ground truth method is appropriate for this task type")
+                    
+                    # 🚨 HARD STOP: Ground truth evaluation didn't return expected values
+                    if ground_truth_label not in ['TRUTHFUL', 'HALLUCINATION']:
+                        print(f"\n💥💥💥 HARD STOP - UNEXPECTED GROUND TRUTH LABEL 💥💥💥")
+                        print(f"Question: {question[:200]}...")
+                        print(f"Response: {response_text[:200]}...")
+                        print(f"Expected Answer: {qa_pair.get('correct_answer', 'N/A')}")
+                        print(f"Ground Truth Method: {ground_truth_method}")
+                        print(f"Actual Ground Truth Label: '{ground_truth_label}'")
+                        print(f"Evaluator Details: {gt_result}")
+                        print(f"💡 Ground truth evaluation returned '{ground_truth_label}' but optimization needs TRUTHFUL or HALLUCINATION")
+                        print(f"🛠️  This means the ground truth method is not compatible with optimization")
+                        print(f"💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
+                        
+                        # HARD STOP - crash the entire process immediately
+                        raise ValueError(f"❌ CRITICAL ERROR: Ground truth evaluation returned unexpected label!\n"
+                                       f"   📊 Ground truth: '{ground_truth_label}'\n"
+                                       f"   📝 Expected: 'TRUTHFUL' or 'HALLUCINATION'\n"
+                                       f"   📝 Question: {question[:100]}...\n"
+                                       f"   📝 Response: {response_text[:100]}...\n"
+                                       f"   📝 Expected: {qa_pair.get('correct_answer', 'N/A')}\n"
+                                       f"   📝 Method: {ground_truth_method}\n"
+                                       f"   📝 Details: {gt_result}\n"
+                                       f"   💡 Ground truth evaluation must return TRUTHFUL or HALLUCINATION for optimization to work\n"
+                                       f"   🛠️  Check if the ground truth method is appropriate for this task type")
+                    
                     if ground_truth_label in ['TRUTHFUL', 'HALLUCINATION']:
                         question_results.append({
                             'response': response_text,
                             'token_scores': token_scores,
                             'ground_truth': ground_truth_label
                         })
+                        if verbose:
+                            print(f"       ✅ Added to question_results")
+                    else:
+                        if verbose:
+                            print(f"       ⚠️ Skipping - ground truth not TRUTHFUL/HALLUCINATION: {ground_truth_label}")
                         
                 except Exception as e:
                     if verbose:
-                        print(f"         ⚠️ Error generating response: {e}")
+                        print(f"         ❌ Error generating response: {e}")
+                        import traceback
+                        print(f"         🔍 Full traceback: {traceback.format_exc()}")
                     continue
             
+            if verbose:
+                print(f"     📊 Total question_results for {classifier_type}: {len(question_results)}")
+            
             # Now test all combinations of aggregation + threshold on the SAME token scores
+            if verbose:
+                print(f"     🔄 Testing {len(aggregation_methods)} aggregations × {len(thresholds)} thresholds = {len(aggregation_methods) * len(thresholds)} combinations...")
+                
+            if len(question_results) == 0:
+                if verbose:
+                    print(f"     ❌ CRITICAL: No question_results for {classifier_type}! Cannot test combinations.")
+                continue
+                
             for aggregation in aggregation_methods:
                 for threshold in thresholds:
                     if verbose and len(thresholds) <= 3:  # Only show details for small threshold sets
@@ -295,7 +410,7 @@ def optimize_aggregation_on_ground_truth(
                     for result in question_results:
                         try:
                             # Apply aggregation method to existing token scores
-                            from .cli import aggregate_token_scores
+                            from .core.parser import aggregate_token_scores
                             aggregated_score = aggregate_token_scores(result['token_scores'], aggregation)
                             classification = "HALLUCINATION" if aggregated_score > threshold else "TRUTHFUL"
                             
@@ -338,6 +453,23 @@ def optimize_aggregation_on_ground_truth(
                                 'correct': correct_predictions,
                                 'total': total_predictions
                             })
+                    else:
+                        if verbose:
+                            print(f"         ⚠️ No predictions for {aggregation} + {threshold}")
+    
+    # 🚨 HARD ERROR CHECK: Optimization returned None values
+    if (best_combination['layer'] is None or 
+        best_combination['aggregation'] is None or 
+        best_combination['classifier_type'] is None or 
+        best_combination['threshold'] is None):
+        raise ValueError(f"❌ CRITICAL ERROR: Ground truth optimization found NO valid combinations!\n"
+                       f"   📊 Best combination: {best_combination}\n"
+                       f"   🔍 Tested {len(combination_results)} combinations total\n"
+                       f"   💡 This indicates either:\n"
+                       f"      • No test responses were generated successfully\n"
+                       f"      • Ground truth evaluation failed completely\n"
+                       f"      • All combinations scored 0.0 accuracy\n"
+                       f"   🛠️  Check generate_with_classification() and ground truth evaluation logic")
     
     if verbose:
         print(f"\n   🏆 BEST COMBINATION:")
@@ -420,8 +552,16 @@ def run_smart_optimization(
         model, collector, contrastive_pairs, device, verbose, optimize_layers=optimize_layers
     )
     
+    # 🚨 HARD ERROR CHECK: All layers failed to train
     if not layer_results:
-        raise ValueError("No layers could be trained successfully")
+        raise ValueError(f"❌ CRITICAL ERROR: All layers failed to train classifiers for task '{task_name}'!\n"
+                       f"   📊 Input: {len(contrastive_pairs)} contrastive pairs\n"
+                       f"   🔍 Layers tested: {optimize_layers}\n"
+                       f"   💡 This indicates either:\n"
+                       f"      • Insufficient training data quality\n"
+                       f"      • Model activation extraction issues\n"
+                       f"      • Classifier training configuration problems\n"
+                       f"   🛠️  Check optimize_layers_on_contrastive_pairs() training logic")
     
     # Step 2: Optimize aggregation methods + classifier types + thresholds using ground truth (validation data)
     aggregation_results = optimize_aggregation_on_ground_truth(
@@ -430,6 +570,15 @@ def run_smart_optimization(
     )
     
     best_combo = aggregation_results['best_combination']
+    
+    # Validate that we actually found a valid combination
+    if (best_combo['layer'] is None or 
+        best_combo['aggregation'] is None or 
+        best_combo['classifier_type'] is None or 
+        best_combo['threshold'] is None):
+        raise ValueError(f"Optimization failed to find valid parameters! best_combination: {best_combo}. "
+                        f"This indicates no valid combinations were tested successfully. "
+                        f"Check ground truth evaluation and classifier training.")
     
     # Prepare final results
     optimization_results = {

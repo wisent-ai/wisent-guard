@@ -928,18 +928,18 @@ class ContrastivePairSet:
                     mc_targets = doc.get('mc1_targets', doc.get('mc2_targets', {}))
                     choices = mc_targets.get('choices', [])
                     labels = mc_targets.get('labels', [])
-                    
-                    # Find the correct answer
+                
+                # Find the correct answer
                     for i, label in enumerate(labels):
                         if label == 1 and i < len(choices):
                             correct_answer = choices[i]
-                            break
-                    
-                    # Find an incorrect answer
+                        break
+                
+                # Find an incorrect answer
                     for i, label in enumerate(labels):
                         if label == 0 and i < len(choices):
                             incorrect_answer = choices[i]
-                            break
+                        break
                 elif 'correct_answers' in doc and 'incorrect_answers' in doc:
                     # Generation format (truthfulqa_gen)
                     correct_answers_list = doc.get('correct_answers', [])
@@ -1127,18 +1127,27 @@ class ContrastivePairSet:
         """
         qa_pairs = []
         
+
+        
         for i, doc in enumerate(docs):
             try:
                 # FIXED: For TruthfulQA, extract just the actual question, not the template
                 if 'truthfulqa' in task_name.lower() or 'truthful_qa' in task_name.lower():
                     # Use actual question, not the template with examples
                     question = doc.get('question', '')
+                elif task_name == 'winogrande':
+                    # For winogrande, use the sentence field directly
+                    question = doc.get('sentence', '')
                 else:
                     # For other tasks, use the template method
-                    if hasattr(task_data, 'doc_to_text'):
-                        question = task_data.doc_to_text(doc)
-                    else:
-                        question = doc.get('question', str(doc))
+                    try:
+                        if hasattr(task_data, 'doc_to_text'):
+                            question = task_data.doc_to_text(doc)
+                        else:
+                            question = doc.get('question', str(doc))
+                    except Exception as e:
+                        question = str(doc)
+                        
                 
                 # Skip if we don't have a proper question
                 if not question or len(question.strip()) < 10:
@@ -1147,6 +1156,7 @@ class ContrastivePairSet:
                 # Task-specific answer extraction
                 correct_answer = None
                 incorrect_answer = None
+                formatted_question = question  # Default to basic question
                 
                 if 'truthfulqa' in task_name.lower() or 'truthful_qa' in task_name.lower():
                     # TruthfulQA-specific extraction - handle both generation and multiple choice formats
@@ -1155,18 +1165,18 @@ class ContrastivePairSet:
                         mc_targets = doc.get('mc1_targets', doc.get('mc2_targets', {}))
                         choices = mc_targets.get('choices', [])
                         labels = mc_targets.get('labels', [])
-                        
-                        # Find the correct answer
+                    
+                    # Find the correct answer
                         for j, label in enumerate(labels):
                             if label == 1 and j < len(choices):
                                 correct_answer = choices[j]
-                                break
-                        
-                        # Find an incorrect answer
+                            break
+                    
+                    # Find an incorrect answer
                         for j, label in enumerate(labels):
                             if label == 0 and j < len(choices):
                                 incorrect_answer = choices[j]
-                                break
+                            break
                     elif 'correct_answers' in doc and 'incorrect_answers' in doc:
                         # Generation format (truthfulqa_gen)
                         correct_answers_list = doc.get('correct_answers', [])
@@ -1176,10 +1186,47 @@ class ContrastivePairSet:
                             # Use the first correct and first incorrect answer
                             correct_answer = correct_answers_list[0]
                             incorrect_answer = incorrect_answers_list[0]
+                            # For TruthfulQA, use the question as formatted_question
+                            formatted_question = question
                     else:
                         # Fallback for unknown TruthfulQA format
                         continue
                             
+                elif task_name == 'winogrande':
+                    # Use benchmark extractor for winogrande to get formatted_question  
+                    from ..benchmark_extractors import extract_contrastive_pair
+                    
+                    contrastive_data = extract_contrastive_pair(task_name, doc, task_data)
+                    
+                    if contrastive_data:
+                        question = contrastive_data['question']
+                        correct_answer = contrastive_data['correct_choice']
+                        incorrect_answer = contrastive_data['incorrect_choice']
+                        
+                        # Get the formatted question from the extractor
+                        from ..benchmark_extractors import get_extractor
+                        extractor = get_extractor(task_name)
+                        extractor_result = extractor.extract_qa_pair(doc, task_data)
+                        formatted_question = extractor_result.get('formatted_question', question) if extractor_result else question
+                    else:
+                        # Fallback to manual extraction if extractor fails
+                        option1 = doc.get('option1', '')
+                        option2 = doc.get('option2', '')
+                        answer = doc.get('answer', '')
+                        
+                        if option1 and option2 and answer:
+                            if answer == '1':
+                                correct_answer = option1
+                                incorrect_answer = option2
+                            elif answer == '2':
+                                correct_answer = option2
+                                incorrect_answer = option1
+                            else:
+                                continue
+                            formatted_question = question  # Use basic question as fallback
+                        else:
+                            continue
+                
                 elif task_name == 'hellaswag':
                     # HellaSwag-specific extraction
                     endings = doc.get('endings', [])
@@ -1199,45 +1246,96 @@ class ContrastivePairSet:
                             if i != label:
                                 incorrect_answer = ending
                                 break
-                                
+                        # For HellaSwag, use the question as formatted_question
+                        formatted_question = question
+                
                 else:
-                    # Generic extraction for other tasks
-                    # Try common answer fields
-                    if 'choices' in doc and 'label' in doc:
-                        choices = doc['choices']
-                        label = doc['label']
+                    # Use benchmark-specific extractors for all other tasks
+                    from ..benchmark_extractors import extract_contrastive_pair
+                    
+                    contrastive_data = extract_contrastive_pair(task_name, doc, task_data)
+                    
+                    if contrastive_data:
+                        question = contrastive_data['question']
+                        correct_answer = contrastive_data['correct_choice']
+                        incorrect_answer = contrastive_data['incorrect_choice']
                         
-                        # Convert string label to int if needed
-                        if isinstance(label, str):
-                            try:
-                                label = int(label)
-                            except ValueError:
-                                label = 0
+                        # Try to get formatted_question from the extractor
+                        try:
+                            from ..benchmark_extractors import get_extractor
+                            extractor = get_extractor(task_name)
+                            extractor_result = extractor.extract_qa_pair(doc, task_data)
+                            formatted_question = extractor_result.get('formatted_question', question) if extractor_result else question
+                        except:
+                            formatted_question = question  # Fallback to basic question
+                    else:
+                        # Fallback to generic extraction if extractor fails
                         
-                        if isinstance(label, int) and 0 <= label < len(choices):
-                            correct_answer = choices[label]
-                            # Use first different choice as incorrect
-                            for i, choice in enumerate(choices):
-                                if i != label:
-                                    incorrect_answer = choice
-                                    break
-                    elif 'answer' in doc:
-                        correct_answer = doc['answer']
-                        # For simple answer tasks, create a generic incorrect answer
-                        incorrect_answer = "This is incorrect"
-                    elif hasattr(task_data, 'doc_to_target'):
-                        correct_answer = task_data.doc_to_target(doc)
-                        incorrect_answer = "This is incorrect"
+                        # Try common answer fields
+                        if 'choices' in doc and 'label' in doc:
+                            choices = doc['choices']
+                            label = doc['label']
+                            
+                            # Convert string label to int if needed
+                            if isinstance(label, str):
+                                try:
+                                    label = int(label)
+                                except ValueError:
+                                    label = 0
+                            
+                            # Handle different choices formats
+                            if isinstance(choices, dict):
+                                # Choices is a dict with 'text' and 'label' keys (e.g., ARC)
+                                choice_texts = choices.get('text', [])
+                                if isinstance(label, int) and 0 <= label < len(choice_texts):
+                                    correct_answer = choice_texts[label]
+                                    # Use first different choice as incorrect
+                                    for j, choice in enumerate(choice_texts):
+                                        if j != label:
+                                            incorrect_answer = choice
+                                            break
+                            elif isinstance(choices, list):
+                                # Choices is a list (e.g., HellaSwag)
+                                if isinstance(label, int) and 0 <= label < len(choices):
+                                    correct_answer = choices[label]
+                                    # Use first different choice as incorrect
+                                    for j, choice in enumerate(choices):
+                                        if j != label:
+                                            incorrect_answer = choice
+                                            break
+
+                        elif 'answer' in doc:
+                            correct_answer = doc['answer']
+                            # For simple answer tasks, create a generic incorrect answer
+                            incorrect_answer = "This is incorrect"
+                        elif hasattr(task_data, 'doc_to_target'):
+                            correct_answer = task_data.doc_to_target(doc)
+                            incorrect_answer = "This is incorrect"
+                        else:
+                            # Skip if no extraction method works
+                            continue
                 
                 if correct_answer and incorrect_answer:
                     qa_pairs.append({
                         'question': question,
+                        'formatted_question': formatted_question,
                         'correct_answer': correct_answer,
                         'incorrect_answer': incorrect_answer
                     })
                     
             except Exception as e:
-                # Skip problematic docs
-                continue
+                # 🚨 HARD STOP - ANY ERROR IN QA EXTRACTION CRASHES THE ENTIRE PROCESS
+                print(f"\n💥💥💥 HARD STOP - ERROR IN QA EXTRACTION 💥💥💥")
+                print(f"Task: {task_name}")
+                print(f"Document index: {i}")
+                print(f"Error: {e}")
+                print(f"Document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
+                print(f"Full traceback:")
+                import traceback
+                traceback.print_exc()
+                print(f"💥💥💥 STOPPING EXECUTION IMMEDIATELY 💥💥💥\n")
+                
+                # HARD STOP - crash the entire process immediately
+                raise e
         
         return qa_pairs 
