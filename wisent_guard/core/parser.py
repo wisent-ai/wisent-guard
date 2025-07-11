@@ -333,9 +333,14 @@ def parse_layers_from_arg(layer_arg: str, model=None) -> List[int]:
     # Use existing parse_layer_range logic
     layers = parse_layer_range(layer_arg, model)
     if layers is None:
-        # "all" case - would need model to determine actual layers
-        # For now, return a reasonable default range
-        return list(range(8, 25))  # Common transformer range
+        # "all" case - auto-detect model layers
+        if model is not None:
+            from .hyperparameter_optimizer import detect_model_layers
+            total_layers = detect_model_layers(model)
+            return list(range(total_layers))
+        else:
+            # If no model provided, we cannot determine layers - this should not happen
+            raise ValueError("Cannot determine layer range without model instance")
     
     return layers
 

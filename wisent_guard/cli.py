@@ -449,7 +449,7 @@ def run_task_pipeline(
     ground_truth_method: str = "none",
     user_labels: List[str] = None,
     optimize: bool = False,
-    optimize_layers: str = "8-24",
+    optimize_layers: str = "all",
     optimize_metric: str = "f1",
     optimize_max_combinations: int = 100,
     verbose: bool = False,

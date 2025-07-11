@@ -535,7 +535,7 @@ class ClassificationOptimizer:
             from ..cli import run_task_pipeline
             
             # Convert layer_range string to optimize_layers format
-            optimize_layers_str = layer_range if layer_range else "8-24"  # Default range
+            optimize_layers_str = layer_range if layer_range else "all"  # Default: test all layers
             
             # Run optimization using the existing pipeline
             optimization_results = run_task_pipeline(

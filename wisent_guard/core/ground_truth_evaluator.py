@@ -27,7 +27,7 @@ class GroundTruthEvaluator:
     def evaluate_response(
         self, 
         response: str, 
-        expected_answer: str, 
+        expected_answer, 
         user_label: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -190,7 +190,7 @@ class GroundTruthEvaluator:
             "details": "Debug mode: everything labeled as truthful"
         }
 
-    def _evaluate_lm_eval_harness(self, response: str, expected_answer: str) -> Dict[str, Any]:
+    def _evaluate_lm_eval_harness(self, response: str, expected_answer) -> Dict[str, Any]:
         """Evaluate using lm-eval-harness framework with benchmark extractors."""
         try:
             # Import benchmark extractors for intelligent evaluation
@@ -232,7 +232,7 @@ class GroundTruthEvaluator:
                 "evaluation_method": "lm-eval-harness"
             }
     
-    def _evaluate_using_extractor(self, response: str, expected_answer: str, extractor, task_name: str) -> bool:
+    def _evaluate_using_extractor(self, response: str, expected_answer, extractor, task_name: str) -> bool:
         """Evaluate response using the appropriate benchmark extractor logic."""
         try:
             # Get the extractor class name to determine evaluation strategy
@@ -273,144 +273,262 @@ class GroundTruthEvaluator:
             # Fall back to flexible matching
             return self._evaluate_flexible_logic(response, expected_answer)
     
-    def _evaluate_winogrande_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_winogrande_logic(self, response: str, expected_answer) -> bool:
         """Winogrande: exact match with correct option."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # Direct match
-        if response_clean == expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers, try both string conversion and numeric comparison
+            expected_str = str(expected_answer)
+            if expected_str in response_clean or response_clean == expected_str:
+                return True
+            # Also try to extract numbers from response for numeric comparison
+            import re
+            response_numbers = re.findall(r'\b\d+\b', response)
+            if str(expected_answer) in response_numbers:
+                return True
+        else:
+            # String expected answer - use original logic
+            expected_clean = str(expected_answer).strip().lower()
             
-        # Check if response contains the expected answer
-        if expected_clean in response_clean:
-            return True
-            
+            # Direct match
+            if response_clean == expected_clean:
+                return True
+                
+            # Check if response contains the expected answer
+            if expected_clean in response_clean:
+                return True
+                
         return False
     
-    def _evaluate_truthfulqa_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_truthfulqa_logic(self, response: str, expected_answer) -> bool:
         """TruthfulQA: more flexible matching since responses can be paraphrased."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # Direct match
-        if response_clean == expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers, convert to string and do flexible matching
+            expected_str = str(expected_answer)
+            if expected_str in response_clean or response_clean == expected_str:
+                return True
+            # Also try numeric extraction
+            import re
+            response_numbers = re.findall(r'\b\d+\b', response)
+            if str(expected_answer) in response_numbers:
+                return True
+        else:
+            # String expected answer - use original flexible logic
+            expected_clean = str(expected_answer).strip().lower()
             
-        # Check if response contains the expected answer
-        if expected_clean in response_clean:
-            return True
-            
-        # Check if expected answer contains the response (for shorter responses)
-        if response_clean in expected_clean:
-            return True
-            
+            # Direct match
+            if response_clean == expected_clean:
+                return True
+                
+            # Check if response contains the expected answer
+            if expected_clean in response_clean:
+                return True
+                
+            # Check if expected answer contains the response (for shorter responses)
+            if response_clean in expected_clean:
+                return True
+                
         return False
     
-    def _evaluate_multiple_choice_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_multiple_choice_logic(self, response: str, expected_answer) -> bool:
         """Multiple choice: exact match with correct option."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # Direct match
-        if response_clean == expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers (choice indices), try multiple approaches
+            expected_str = str(expected_answer)
             
-        # Check if response contains the expected answer
-        if expected_clean in response_clean:
-            return True
+            # Direct numeric match
+            if expected_str in response_clean or response_clean == expected_str:
+                return True
+                
+            # Extract numbers from response for comparison
+            import re
+            response_numbers = re.findall(r'\b\d+\b', response)
+            if str(expected_answer) in response_numbers:
+                return True
+                
+            # Try letter matching (0->A, 1->B, 2->C, etc.)
+            if expected_answer < 26:  # Reasonable choice limit
+                expected_letter = chr(65 + expected_answer).lower()  # 0->a, 1->b, etc.
+                if expected_letter in response_clean:
+                    return True
+        else:
+            # String expected answer - use original logic
+            expected_clean = str(expected_answer).strip().lower()
             
+            # Direct match
+            if response_clean == expected_clean:
+                return True
+                
+            # Check if response contains the expected answer
+            if expected_clean in response_clean:
+                return True
+                
         return False
     
-    def _evaluate_boolean_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_boolean_logic(self, response: str, expected_answer) -> bool:
         """Boolean: match True/False with various representations."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # Direct match
-        if response_clean == expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers (0/1), convert to boolean logic
+            if expected_answer == 1:
+                return response_clean in ["true", "yes", "1", "correct"]
+            elif expected_answer == 0:
+                return response_clean in ["false", "no", "0", "incorrect"]
+            else:
+                # For other integers, try direct numeric comparison
+                return str(expected_answer) in response_clean
+        else:
+            # String expected answer - use original logic
+            expected_clean = str(expected_answer).strip().lower()
             
-        # Handle various boolean representations
-        if expected_clean == "true":
-            return response_clean in ["true", "yes", "1", "correct"]
-        elif expected_clean == "false":
-            return response_clean in ["false", "no", "0", "incorrect"]
-            
+            # Direct match
+            if response_clean == expected_clean:
+                return True
+                
+            # Handle various boolean representations
+            if expected_clean == "true":
+                return response_clean in ["true", "yes", "1", "correct"]
+            elif expected_clean == "false":
+                return response_clean in ["false", "no", "0", "incorrect"]
+                
         return False
     
-    def _evaluate_numerical_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_numerical_logic(self, response: str, expected_answer) -> bool:
         """Numerical: extract and compare numbers."""
         try:
-            # Extract numbers from response
-            import re
-            response_numbers = re.findall(r'-?\d+\.?\d*', response)
-            expected_numbers = re.findall(r'-?\d+\.?\d*', expected_answer)
-            
-            if not response_numbers or not expected_numbers:
-                return False
+            # 🚨 TYPE-SAFE: Handle both integers and strings
+            if isinstance(expected_answer, (int, float)):
+                # For numeric expected answers, do direct numeric comparison
+                import re
+                response_numbers = re.findall(r'-?\d+\.?\d*', response)
                 
-            # Compare the last number in each (often the final answer)
-            response_num = float(response_numbers[-1])
-            expected_num = float(expected_numbers[-1])
-            
-            return abs(response_num - expected_num) < 0.01  # Allow small floating point errors
+                if not response_numbers:
+                    return False
+                    
+                # Compare the last number in response with expected number
+                response_num = float(response_numbers[-1])
+                expected_num = float(expected_answer)
+                
+                return abs(response_num - expected_num) < 0.01  # Allow small floating point errors
+            else:
+                # String expected answer - extract numbers from both
+                import re
+                response_numbers = re.findall(r'-?\d+\.?\d*', response)
+                expected_numbers = re.findall(r'-?\d+\.?\d*', str(expected_answer))
+                
+                if not response_numbers or not expected_numbers:
+                    return False
+                    
+                # Compare the last number in each (often the final answer)
+                response_num = float(response_numbers[-1])
+                expected_num = float(expected_numbers[-1])
+                
+                return abs(response_num - expected_num) < 0.01  # Allow small floating point errors
             
         except (ValueError, IndexError):
             # Fall back to string comparison
-            return response.strip().lower() == expected_answer.strip().lower()
+            return response.strip().lower() == str(expected_answer).strip().lower()
     
-    def _evaluate_qa_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_qa_logic(self, response: str, expected_answer) -> bool:
         """QA tasks: flexible matching for natural language answers."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # Handle "No answer" case
-        if expected_clean == "no answer":
-            return response_clean in ["no answer", "no", "none", "unknown", "unanswerable"]
-        
-        # Direct match
-        if response_clean == expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers, try numeric and string matching
+            expected_str = str(expected_answer)
+            if expected_str in response_clean or response_clean == expected_str:
+                return True
+            # Also try numeric extraction
+            import re
+            response_numbers = re.findall(r'\b\d+\b', response)
+            if str(expected_answer) in response_numbers:
+                return True
+        else:
+            # String expected answer - use original flexible logic
+            expected_clean = str(expected_answer).strip().lower()
             
-        # Check if response contains the expected answer
-        if expected_clean in response_clean:
-            return True
+            # Handle "No answer" case
+            if expected_clean == "no answer":
+                return response_clean in ["no answer", "no", "none", "unknown", "unanswerable"]
             
-        # Check if expected answer contains the response
-        if response_clean in expected_clean:
-            return True
-            
+            # Direct match
+            if response_clean == expected_clean:
+                return True
+                
+            # Check if response contains the expected answer
+            if expected_clean in response_clean:
+                return True
+                
+            # Check if expected answer contains the response
+            if response_clean in expected_clean:
+                return True
+                
         return False
     
-    def _evaluate_text_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_text_logic(self, response: str, expected_answer) -> bool:
         """Text/perplexity tasks: flexible text matching."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # For text tasks, use substring matching
-        if expected_clean in response_clean or response_clean in expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers, try string conversion
+            expected_str = str(expected_answer)
+            return expected_str in response_clean or response_clean == expected_str
+        else:
+            # String expected answer - use original logic
+            expected_clean = str(expected_answer).strip().lower()
             
+            # For text tasks, use substring matching
+            if expected_clean in response_clean or response_clean in expected_clean:
+                return True
+                
         return False
     
-    def _evaluate_flexible_logic(self, response: str, expected_answer: str) -> bool:
+    def _evaluate_flexible_logic(self, response: str, expected_answer) -> bool:
         """Flexible matching for unknown benchmark types."""
         response_clean = response.strip().lower()
-        expected_clean = expected_answer.strip().lower()
         
-        # Direct match
-        if response_clean == expected_clean:
-            return True
+        # 🚨 TYPE-SAFE: Handle both integers and strings
+        if isinstance(expected_answer, int):
+            # For integer expected answers, try multiple matching approaches
+            expected_str = str(expected_answer)
             
-        # Check if response contains the expected answer
-        if expected_clean in response_clean:
-            return True
+            # Direct string match
+            if response_clean == expected_str or expected_str in response_clean:
+                return True
+                
+            # Extract numbers from response for numeric comparison
+            import re
+            response_numbers = re.findall(r'\b\d+\b', response)
+            if str(expected_answer) in response_numbers:
+                return True
+        else:
+            # String expected answer - use original flexible logic
+            expected_clean = str(expected_answer).strip().lower()
             
-        # Check if expected answer contains the response
-        if response_clean in expected_clean:
-            return True
-            
+            # Direct match
+            if response_clean == expected_clean:
+                return True
+                
+            # Check if response contains the expected answer
+            if expected_clean in response_clean:
+                return True
+                
+            # Check if expected answer contains the response
+            if response_clean in expected_clean:
+                return True
+                
         return False
 
     def _evaluate_none(self) -> Dict[str, Any]:
@@ -425,7 +543,7 @@ class GroundTruthEvaluator:
     def evaluate_batch(
         self, 
         responses: List[str], 
-        expected_answers: List[str],
+        expected_answers: List,
         user_labels: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """

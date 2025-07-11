@@ -166,7 +166,7 @@ class ClassifierCreator:
     def optimize_classifier_for_performance(
         self,
         issue_type: str,
-        layer_range: Tuple[int, int] = (8, 24),
+        layer_range: Tuple[int, int] = None,
         classifier_types: List[str] = None,
         target_metric: str = "f1",
         min_target_score: float = 0.7
@@ -176,7 +176,7 @@ class ClassifierCreator:
         
         Args:
             issue_type: Type of issue to detect
-            layer_range: Range of layers to test (start, end)
+            layer_range: Range of layers to test (start, end). If None, auto-detect all model layers
             classifier_types: Types of classifiers to test
             target_metric: Metric to optimize for
             min_target_score: Minimum acceptable score
@@ -188,6 +188,13 @@ class ClassifierCreator:
         
         if classifier_types is None:
             classifier_types = ["logistic", "mlp"]
+        
+        # Auto-detect layer range if not provided
+        if layer_range is None:
+            from ..hyperparameter_optimizer import detect_model_layers
+            total_layers = detect_model_layers(self.model)
+            layer_range = (0, total_layers - 1)
+            print(f"   📊 Auto-detected {total_layers} layers, testing range {layer_range[0]}-{layer_range[1]}")
         
         best_result = None
         best_score = 0.0
