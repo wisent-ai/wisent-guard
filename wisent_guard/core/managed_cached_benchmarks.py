@@ -1,346 +1,535 @@
 """
-Managed Cached Benchmarks Service
+Managed Cached Benchmarks service for intelligent dataset downloading and caching.
 
-This service intelligently manages benchmark dataset downloading and caching based on
-the requested limit parameter. It ensures we only download what we need and reuse
-existing cached data when possible.
-
-Key Features:
-- Downloads only the requested number of samples (limit parameter)
-- Reuses cached data when limit <= cached samples
-- Incrementally downloads more data when limit > cached samples
-- Maintains metadata about cached sample counts
-- Supports per-task caching with different limits
+This service controls how much of each benchmark is downloaded based on the limit parameter:
+- If limit=5, download only 5 samples
+- If limit=3 and we have 5 cached, reuse cached samples
+- If limit=10 and we have 5 cached, download 5 more
+- Hard errors for unsupported benchmarks, no fallbacks
 """
 
 import os
 import json
-import hashlib
-import pickle
-from typing import Dict, List, Any, Optional, Tuple
-from pathlib import Path
 import logging
+import time
+from typing import Dict, Any, List, Optional, Iterator
+from pathlib import Path
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from .benchmark_extractors import get_extractor, EXTRACTORS
 
 logger = logging.getLogger(__name__)
 
 
+class BenchmarkError(Exception):
+    """Base exception for benchmark-related errors."""
+    pass
+
+
+class UnsupportedBenchmarkError(BenchmarkError):
+    """Raised when benchmark has no adapter."""
+    pass
+
+
+class SampleNormalizationError(BenchmarkError):
+    """Raised when sample normalization fails."""
+    pass
+
+
+class InsufficientSamplesError(BenchmarkError):
+    """Raised when benchmark doesn't have enough samples."""
+    pass
+
+
+class CacheCorruptionError(BenchmarkError):
+    """Raised when cache data is corrupted."""
+    pass
+
+
+@dataclass
+class CacheInfo:
+    """Information about cached benchmark data."""
+    task_name: str
+    samples_count: int
+    last_updated: datetime
+    cache_version: str
+    chunks: List[str]  # List of chunk filenames
+
+
+@dataclass
+class CacheMetadata:
+    """Global cache metadata."""
+    version: str
+    created_at: datetime
+    last_cleanup: datetime
+    tasks: Dict[str, CacheInfo]
+
+
 class ManagedCachedBenchmarks:
     """
-    Manages intelligent caching of benchmark datasets based on sample limits.
+    Service for intelligent benchmark downloading and caching.
+    
+    Features:
+    - Downloads only what's needed based on limit parameter
+    - Reuses cached data when possible
+    - Incremental downloads for growing limits
+    - Hard errors for unsupported benchmarks
+    - Chunk-based storage for efficiency
     """
     
-    def __init__(self, cache_dir: str = "./managed_benchmark_cache"):
+    CACHE_VERSION = "1.0"
+    CHUNK_SIZE = 25  # Samples per chunk
+    MAX_CACHE_AGE_DAYS = 30
+    SUPPORTED_BENCHMARKS = set(EXTRACTORS.keys())
+    
+    def __init__(self, cache_dir: str = "./benchmark_cache"):
         """
-        Initialize the managed cached benchmarks service.
+        Initialize the managed cache service.
         
         Args:
             cache_dir: Directory to store cached benchmark data
         """
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_dir.mkdir(exist_ok=True)
         
-        # Metadata file to track cached sample counts
-        self.metadata_file = self.cache_dir / "cache_metadata.json"
-        self.metadata = self._load_metadata()
+        self.metadata_file = self.cache_dir / "metadata.json"
+        self._metadata = self._load_metadata()
         
-    def _load_metadata(self) -> Dict[str, Any]:
-        """Load cache metadata from disk."""
-        if self.metadata_file.exists():
+        # Validate all supported benchmarks have extractors
+        self._validate_extractor_registry()
+    
+    def _validate_extractor_registry(self):
+        """Ensure every supported benchmark has a working extractor."""
+        for benchmark in self.SUPPORTED_BENCHMARKS:
             try:
-                with open(self.metadata_file, 'r') as f:
-                    return json.load(f)
+                extractor = get_extractor(benchmark)
+                if not hasattr(extractor, 'extract_qa_pair'):
+                    raise AttributeError(f"Extractor for {benchmark} missing extract_qa_pair method")
             except Exception as e:
-                logger.warning(f"Failed to load cache metadata: {e}")
-        
-        return {"tasks": {}, "version": "1.0"}
+                raise BenchmarkError(
+                    f"Invalid extractor for supported benchmark '{benchmark}': {e}"
+                )
     
-    def _save_metadata(self):
-        """Save cache metadata to disk."""
-        try:
-            with open(self.metadata_file, 'w') as f:
-                json.dump(self.metadata, f, indent=2)
-        except Exception as e:
-            logger.error(f"Failed to save cache metadata: {e}")
-    
-    def _get_task_cache_path(self, task_name: str) -> Path:
-        """Get the cache file path for a specific task."""
-        # Use hash to handle special characters in task names
-        task_hash = hashlib.md5(task_name.encode()).hexdigest()[:8]
-        safe_name = "".join(c for c in task_name if c.isalnum() or c in "_-")[:50]
-        return self.cache_dir / f"{safe_name}_{task_hash}.pkl"
-    
-    def _get_cached_sample_count(self, task_name: str) -> int:
-        """Get the number of cached samples for a task."""
-        return self.metadata.get("tasks", {}).get(task_name, {}).get("sample_count", 0)
-    
-    def _update_task_metadata(self, task_name: str, sample_count: int, task_info: Dict[str, Any]):
-        """Update metadata for a cached task."""
-        if "tasks" not in self.metadata:
-            self.metadata["tasks"] = {}
-        
-        self.metadata["tasks"][task_name] = {
-            "sample_count": sample_count,
-            "task_info": task_info,
-            "last_updated": self._get_current_timestamp()
-        }
-        self._save_metadata()
-    
-    def _get_current_timestamp(self) -> str:
-        """Get current timestamp as string."""
-        from datetime import datetime
-        return datetime.now().isoformat()
-    
-    def _download_task_samples(self, task_name: str, limit: int) -> List[Dict[str, Any]]:
+    def get_task_samples(self, task_name: str, limit: int, force_fresh: bool = False) -> List[Dict[str, Any]]:
         """
-        Download samples from a task using lm-eval-harness.
+        Get samples for a task, using intelligent caching.
         
         Args:
-            task_name: Name of the task to download
-            limit: Maximum number of samples to download
-            
-        Returns:
-            List of sample documents
-        """
-        try:
-            # Import lm-eval components
-            from lm_eval import tasks
-            from lm_eval.tasks import get_task_dict
-            
-            logger.info(f"📥 Downloading {limit} samples from {task_name}...")
-            
-            # Get task
-            task_dict = get_task_dict([task_name])
-            if task_name not in task_dict:
-                raise ValueError(f"Task {task_name} not found in lm-eval registry")
-            
-            task = task_dict[task_name]
-            
-            # Get documents from the most appropriate split
-            docs = []
-            
-            # Try different splits in order of preference
-            if hasattr(task, 'has_validation_docs') and task.has_validation_docs():
-                docs = list(task.validation_docs())
-            elif hasattr(task, 'has_test_docs') and task.has_test_docs():
-                docs = list(task.test_docs())
-            elif hasattr(task, 'has_training_docs') and task.has_training_docs():
-                docs = list(task.training_docs())
-            else:
-                raise RuntimeError(f"No documents available for task {task_name}")
-            
-            # Limit the number of documents
-            if limit > 0:
-                docs = docs[:limit]
-            
-            logger.info(f"✅ Downloaded {len(docs)} samples from {task_name}")
-            return docs
-            
-        except Exception as e:
-            logger.error(f"Failed to download samples from {task_name}: {e}")
-            raise
-    
-    def _load_cached_samples(self, task_name: str, limit: int) -> Optional[List[Dict[str, Any]]]:
-        """
-        Load cached samples for a task.
-        
-        Args:
-            task_name: Name of the task
+            task_name: Name of the benchmark task
             limit: Number of samples needed
+            force_fresh: Force fresh download even if cached
             
         Returns:
-            List of cached samples or None if not available
+            List of normalized sample dictionaries
+            
+        Raises:
+            UnsupportedBenchmarkError: If task has no extractor
+            InsufficientSamplesError: If benchmark doesn't have enough samples
+            SampleNormalizationError: If sample extraction fails
         """
-        cache_path = self._get_task_cache_path(task_name)
+        # Hard error for unsupported benchmarks
+        if task_name not in self.SUPPORTED_BENCHMARKS:
+            raise UnsupportedBenchmarkError(
+                f"No extractor found for benchmark '{task_name}'. "
+                f"Supported benchmarks: {sorted(self.SUPPORTED_BENCHMARKS)}"
+            )
         
-        if not cache_path.exists():
-            return None
-        
-        try:
-            with open(cache_path, 'rb') as f:
-                cached_data = pickle.load(f)
-            
-            samples = cached_data.get("samples", [])
-            
-            # Return only the requested number of samples
-            return samples[:limit] if limit > 0 else samples
-            
-        except Exception as e:
-            logger.error(f"Failed to load cached samples for {task_name}: {e}")
-            return None
-    
-    def _save_cached_samples(self, task_name: str, samples: List[Dict[str, Any]], task_info: Dict[str, Any]):
-        """
-        Save samples to cache.
-        
-        Args:
-            task_name: Name of the task
-            samples: List of sample documents
-            task_info: Metadata about the task
-        """
-        cache_path = self._get_task_cache_path(task_name)
-        
-        try:
-            cached_data = {
-                "task_name": task_name,
-                "samples": samples,
-                "task_info": task_info,
-                "cached_at": self._get_current_timestamp()
-            }
-            
-            with open(cache_path, 'wb') as f:
-                pickle.dump(cached_data, f)
-            
-            # Update metadata
-            self._update_task_metadata(task_name, len(samples), task_info)
-            
-            logger.info(f"💾 Cached {len(samples)} samples for {task_name}")
-            
-        except Exception as e:
-            logger.error(f"Failed to cache samples for {task_name}: {e}")
-            raise
-    
-    def get_task_samples(self, task_name: str, limit: int, force_download: bool = False) -> List[Dict[str, Any]]:
-        """
-        Get samples for a task with intelligent caching.
-        
-        Args:
-            task_name: Name of the task
-            limit: Number of samples needed
-            force_download: Force fresh download even if cached
-            
-        Returns:
-            List of sample documents
-        """
         if limit <= 0:
             return []
         
+        logger.info(f"Getting {limit} samples for task '{task_name}'")
+        
+        # Check cache status
         cached_count = self._get_cached_sample_count(task_name)
+        logger.info(f"Found {cached_count} cached samples for '{task_name}'")
         
-        logger.info(f"🔍 Task {task_name}: need {limit} samples, have {cached_count} cached")
+        if force_fresh:
+            logger.info(f"Force fresh download requested for '{task_name}'")
+            self._clear_task_cache(task_name)
+            cached_count = 0
         
-        if not force_download and cached_count >= limit:
-            # We have enough cached samples, use them
-            logger.info(f"✅ Using cached samples for {task_name} (have {cached_count}, need {limit})")
-            cached_samples = self._load_cached_samples(task_name, limit)
-            if cached_samples is not None:
-                return cached_samples
-            else:
-                logger.warning(f"⚠️ Failed to load cached samples for {task_name}, downloading fresh")
+        # Decision logic
+        if cached_count >= limit:
+            # Case 1: We have enough - load from cache
+            logger.info(f"Loading {limit} samples from cache for '{task_name}'")
+            return self._load_cached_samples(task_name, limit)
         
-        # Need to download more samples
-        if cached_count < limit:
-            logger.info(f"📥 Downloading {limit} samples for {task_name} (cached: {cached_count})")
+        elif cached_count > 0 and limit <= cached_count * 2:
+            # Case 2: We have some, need a bit more - incremental download
+            needed = limit - cached_count
+            logger.info(f"Incremental download: need {needed} more samples for '{task_name}'")
+            
+            new_samples = self._download_samples(task_name, needed, start_offset=cached_count)
+            self._append_to_cache(task_name, new_samples)
+            
+            return self._load_cached_samples(task_name, limit)
+        
         else:
-            logger.info(f"🔄 Force downloading {limit} samples for {task_name}")
-        
-        # Download the requested number of samples
-        samples = self._download_task_samples(task_name, limit)
-        
-        # Cache the downloaded samples
-        task_info = {
-            "original_limit": limit,
-            "download_method": "lm_eval_harness"
-        }
-        self._save_cached_samples(task_name, samples, task_info)
-        
-        return samples
+            # Case 3: Major mismatch - fresh download
+            logger.info(f"Fresh download: getting {limit} samples for '{task_name}'")
+            self._clear_task_cache(task_name)
+            
+            new_samples = self._download_samples(task_name, limit, start_offset=0)
+            self._save_to_cache(task_name, new_samples)
+            
+            return new_samples
     
-    def get_cache_status(self, task_name: str) -> Dict[str, Any]:
+    def _get_cached_sample_count(self, task_name: str) -> int:
+        """Get number of cached samples for a task."""
+        if task_name not in self._metadata.tasks:
+            return 0
+        return self._metadata.tasks[task_name].samples_count
+    
+    def _download_samples(self, task_name: str, limit: int, start_offset: int = 0) -> List[Dict[str, Any]]:
         """
-        Get cache status for a task.
+        Download samples from a benchmark task.
         
         Args:
-            task_name: Name of the task
+            task_name: Name of the benchmark
+            limit: Number of samples to download
+            start_offset: Offset to start downloading from
             
         Returns:
-            Dictionary with cache status information
+            List of normalized samples
         """
-        cached_count = self._get_cached_sample_count(task_name)
-        cache_path = self._get_task_cache_path(task_name)
+        logger.info(f"Downloading {limit} samples for '{task_name}' (offset: {start_offset})")
         
-        status = {
-            "task_name": task_name,
-            "cached_samples": cached_count,
-            "cache_exists": cache_path.exists(),
-            "cache_path": str(cache_path)
-        }
+        # Get extractor (hard error if not found)
+        extractor = get_extractor(task_name)
         
-        if task_name in self.metadata.get("tasks", {}):
-            task_meta = self.metadata["tasks"][task_name]
-            status.update({
-                "last_updated": task_meta.get("last_updated"),
-                "task_info": task_meta.get("task_info", {})
+        # Load raw task from lm-eval
+        try:
+            task = self._load_lm_eval_task(task_name)
+        except Exception as e:
+            raise BenchmarkError(f"Failed to load task '{task_name}' from lm-eval: {e}")
+        
+        # Get sample iterator
+        try:
+            sample_iterator = self._get_task_sample_iterator(task, start_offset + limit)
+        except Exception as e:
+            raise BenchmarkError(f"Failed to get samples from task '{task_name}': {e}")
+        
+        # Skip to start offset
+        for _ in range(start_offset):
+            try:
+                next(sample_iterator)
+            except StopIteration:
+                raise InsufficientSamplesError(
+                    f"Task '{task_name}' only has {start_offset} samples, "
+                    f"cannot skip to offset {start_offset}"
+                )
+        
+        # Extract samples
+        samples = []
+        for i in range(limit):
+            try:
+                raw_sample = next(sample_iterator)
+            except StopIteration:
+                raise InsufficientSamplesError(
+                    f"Task '{task_name}' only has {start_offset + i} samples, "
+                    f"but {start_offset + limit} were requested"
+                )
+            
+            # Extract QA pair using extractor
+            try:
+                qa_pair = extractor.extract_qa_pair(raw_sample, task)
+                if qa_pair is None:
+                    raise ValueError("Extractor returned None")
+            except Exception as e:
+                raise SampleNormalizationError(
+                    f"Failed to normalize sample {start_offset + i} from '{task_name}': {e}"
+                )
+            
+            samples.append({
+                "id": f"sample_{start_offset + i:03d}",
+                "raw_data": raw_sample,
+                "normalized": qa_pair,
+                "extracted_at": datetime.now().isoformat()
             })
         
-        return status
+        logger.info(f"Successfully downloaded {len(samples)} samples for '{task_name}'")
+        return samples
     
-    def clear_task_cache(self, task_name: str):
-        """
-        Clear cache for a specific task.
-        
-        Args:
-            task_name: Name of the task to clear
-        """
-        cache_path = self._get_task_cache_path(task_name)
-        
-        if cache_path.exists():
-            cache_path.unlink()
-            logger.info(f"🗑️ Cleared cache for {task_name}")
-        
-        # Remove from metadata
-        if task_name in self.metadata.get("tasks", {}):
-            del self.metadata["tasks"][task_name]
-            self._save_metadata()
+    def _load_lm_eval_task(self, task_name: str):
+        """Load task from lm-eval-harness."""
+        try:
+            from lm_eval.tasks import get_task_dict
+            
+            task_dict = get_task_dict([task_name])
+            if task_name not in task_dict:
+                raise ValueError(f"Task '{task_name}' not found in lm-eval")
+            
+            return task_dict[task_name]
+        except ImportError as e:
+            raise BenchmarkError("lm-evaluation-harness not available") from e
     
-    def clear_all_cache(self):
-        """Clear all cached data."""
-        for cache_file in self.cache_dir.glob("*.pkl"):
-            cache_file.unlink()
+    def _get_task_sample_iterator(self, task, limit: int) -> Iterator[Dict[str, Any]]:
+        """Get iterator over task samples."""
+        # Try different document sources in order of preference
+        if hasattr(task, 'validation_docs') and task.has_validation_docs():
+            docs = task.validation_docs()
+        elif hasattr(task, 'test_docs') and task.has_test_docs():
+            docs = task.test_docs()
+        elif hasattr(task, 'training_docs') and task.has_training_docs():
+            docs = task.training_docs()
+        else:
+            raise BenchmarkError(f"No document source available for task")
         
-        self.metadata = {"tasks": {}, "version": "1.0"}
+        # Convert to iterator and limit
+        doc_iter = iter(docs)
+        for i, doc in enumerate(doc_iter):
+            if i >= limit:
+                break
+            yield doc
+    
+    def _save_to_cache(self, task_name: str, samples: List[Dict[str, Any]]):
+        """Save samples to cache in chunks."""
+        task_dir = self.cache_dir / task_name
+        task_dir.mkdir(exist_ok=True)
+        
+        # Save in chunks
+        chunks = []
+        for i in range(0, len(samples), self.CHUNK_SIZE):
+            chunk_samples = samples[i:i + self.CHUNK_SIZE]
+            chunk_filename = f"samples_{i+1}_to_{i+len(chunk_samples)}.json"
+            chunk_path = task_dir / chunk_filename
+            
+            with open(chunk_path, 'w') as f:
+                json.dump(chunk_samples, f, indent=2)
+            
+            chunks.append(chunk_filename)
+        
+        # Update metadata
+        cache_info = CacheInfo(
+            task_name=task_name,
+            samples_count=len(samples),
+            last_updated=datetime.now(),
+            cache_version=self.CACHE_VERSION,
+            chunks=chunks
+        )
+        
+        self._metadata.tasks[task_name] = cache_info
         self._save_metadata()
         
-        logger.info("🗑️ Cleared all cached benchmark data")
+        logger.info(f"Saved {len(samples)} samples to cache for '{task_name}' in {len(chunks)} chunks")
     
-    def get_cache_summary(self) -> Dict[str, Any]:
-        """
-        Get a summary of all cached tasks.
+    def _append_to_cache(self, task_name: str, new_samples: List[Dict[str, Any]]):
+        """Append new samples to existing cache."""
+        if task_name not in self._metadata.tasks:
+            return self._save_to_cache(task_name, new_samples)
         
-        Returns:
-            Dictionary with cache summary
-        """
-        summary = {
-            "total_tasks": len(self.metadata.get("tasks", {})),
-            "total_samples": sum(
-                task_info.get("sample_count", 0) 
-                for task_info in self.metadata.get("tasks", {}).values()
-            ),
-            "cache_dir": str(self.cache_dir),
-            "tasks": {}
-        }
+        task_dir = self.cache_dir / task_name
+        cache_info = self._metadata.tasks[task_name]
         
-        for task_name, task_info in self.metadata.get("tasks", {}).items():
-            summary["tasks"][task_name] = {
-                "sample_count": task_info.get("sample_count", 0),
-                "last_updated": task_info.get("last_updated"),
+        # Load existing samples
+        existing_samples = self._load_all_cached_samples(task_name)
+        
+        # Combine and re-save in chunks
+        all_samples = existing_samples + new_samples
+        self._save_to_cache(task_name, all_samples)
+    
+    def _load_cached_samples(self, task_name: str, limit: int) -> List[Dict[str, Any]]:
+        """Load cached samples up to limit."""
+        if task_name not in self._metadata.tasks:
+            return []
+        
+        cache_info = self._metadata.tasks[task_name]
+        task_dir = self.cache_dir / task_name
+        
+        samples = []
+        samples_loaded = 0
+        
+        for chunk_filename in cache_info.chunks:
+            if samples_loaded >= limit:
+                break
+            
+            chunk_path = task_dir / chunk_filename
+            if not chunk_path.exists():
+                raise CacheCorruptionError(f"Missing chunk file: {chunk_path}")
+            
+            try:
+                with open(chunk_path, 'r') as f:
+                    chunk_samples = json.load(f)
+            except Exception as e:
+                raise CacheCorruptionError(f"Corrupted chunk file {chunk_path}: {e}")
+            
+            # Add samples until we reach the limit
+            for sample in chunk_samples:
+                if samples_loaded >= limit:
+                    break
+                samples.append(sample)
+                samples_loaded += 1
+        
+        logger.info(f"Loaded {len(samples)} cached samples for '{task_name}'")
+        return samples
+    
+    def _load_all_cached_samples(self, task_name: str) -> List[Dict[str, Any]]:
+        """Load all cached samples for a task."""
+        if task_name not in self._metadata.tasks:
+            return []
+        
+        cache_info = self._metadata.tasks[task_name]
+        return self._load_cached_samples(task_name, cache_info.samples_count)
+    
+    def _clear_task_cache(self, task_name: str):
+        """Clear cache for a specific task."""
+        task_dir = self.cache_dir / task_name
+        
+        if task_dir.exists():
+            import shutil
+            shutil.rmtree(task_dir)
+        
+        if task_name in self._metadata.tasks:
+            del self._metadata.tasks[task_name]
+            self._save_metadata()
+        
+        logger.info(f"Cleared cache for task '{task_name}'")
+    
+    def _load_metadata(self) -> CacheMetadata:
+        """Load cache metadata."""
+        if not self.metadata_file.exists():
+            return CacheMetadata(
+                version=self.CACHE_VERSION,
+                created_at=datetime.now(),
+                last_cleanup=datetime.now(),
+                tasks={}
+            )
+        
+        try:
+            with open(self.metadata_file, 'r') as f:
+                data = json.load(f)
+            
+            # Convert datetime strings back to datetime objects
+            tasks = {}
+            for task_name, task_data in data.get('tasks', {}).items():
+                tasks[task_name] = CacheInfo(
+                    task_name=task_data['task_name'],
+                    samples_count=task_data['samples_count'],
+                    last_updated=datetime.fromisoformat(task_data['last_updated']),
+                    cache_version=task_data['cache_version'],
+                    chunks=task_data['chunks']
+                )
+            
+            return CacheMetadata(
+                version=data.get('version', self.CACHE_VERSION),
+                created_at=datetime.fromisoformat(data['created_at']),
+                last_cleanup=datetime.fromisoformat(data['last_cleanup']),
+                tasks=tasks
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to load cache metadata: {e}")
+            return CacheMetadata(
+                version=self.CACHE_VERSION,
+                created_at=datetime.now(),
+                last_cleanup=datetime.now(),
+                tasks={}
+            )
+    
+    def _save_metadata(self):
+        """Save cache metadata."""
+        # Convert to serializable format
+        tasks_data = {}
+        for task_name, cache_info in self._metadata.tasks.items():
+            tasks_data[task_name] = {
+                'task_name': cache_info.task_name,
+                'samples_count': cache_info.samples_count,
+                'last_updated': cache_info.last_updated.isoformat(),
+                'cache_version': cache_info.cache_version,
+                'chunks': cache_info.chunks
             }
         
-        return summary
+        data = {
+            'version': self._metadata.version,
+            'created_at': self._metadata.created_at.isoformat(),
+            'last_cleanup': self._metadata.last_cleanup.isoformat(),
+            'tasks': tasks_data
+        }
+        
+        with open(self.metadata_file, 'w') as f:
+            json.dump(data, f, indent=2)
+    
+    def cache_status(self) -> Dict[str, Any]:
+        """Get comprehensive cache status."""
+        total_samples = sum(info.samples_count for info in self._metadata.tasks.values())
+        total_size = sum(
+            sum((self.cache_dir / task_name / chunk).stat().st_size 
+                for chunk in info.chunks 
+                if (self.cache_dir / task_name / chunk).exists())
+            for task_name, info in self._metadata.tasks.items()
+        )
+        
+        return {
+            'cache_version': self._metadata.version,
+            'total_tasks': len(self._metadata.tasks),
+            'total_samples': total_samples,
+            'total_size_bytes': total_size,
+            'total_size_mb': round(total_size / (1024 * 1024), 2),
+            'created_at': self._metadata.created_at.isoformat(),
+            'last_cleanup': self._metadata.last_cleanup.isoformat(),
+            'tasks': {
+                task_name: {
+                    'samples_count': info.samples_count,
+                    'last_updated': info.last_updated.isoformat(),
+                    'chunks': len(info.chunks)
+                }
+                for task_name, info in self._metadata.tasks.items()
+            }
+        }
+    
+    def cleanup_cache(self, max_age_days: int = None):
+        """Clean up old cache entries."""
+        if max_age_days is None:
+            max_age_days = self.MAX_CACHE_AGE_DAYS
+        
+        cutoff_date = datetime.now() - timedelta(days=max_age_days)
+        tasks_to_remove = []
+        
+        for task_name, cache_info in self._metadata.tasks.items():
+            if cache_info.last_updated < cutoff_date:
+                tasks_to_remove.append(task_name)
+        
+        for task_name in tasks_to_remove:
+            self._clear_task_cache(task_name)
+        
+        self._metadata.last_cleanup = datetime.now()
+        self._save_metadata()
+        
+        logger.info(f"Cleaned up {len(tasks_to_remove)} old cache entries")
+        return len(tasks_to_remove)
+    
+    def preload_tasks(self, task_limits: Dict[str, int]):
+        """Preload multiple tasks with specified limits."""
+        results = {}
+        
+        for task_name, limit in task_limits.items():
+            try:
+                samples = self.get_task_samples(task_name, limit)
+                results[task_name] = {
+                    'status': 'success',
+                    'samples_loaded': len(samples),
+                    'requested_limit': limit
+                }
+                logger.info(f"Preloaded {len(samples)} samples for '{task_name}'")
+            except Exception as e:
+                results[task_name] = {
+                    'status': 'error',
+                    'error': str(e),
+                    'requested_limit': limit
+                }
+                logger.error(f"Failed to preload '{task_name}': {e}")
+        
+        return results
 
 
-# Global instance for easy access
+# Global instance
 _managed_cache = None
 
 
-def get_managed_cache(cache_dir: str = "./managed_benchmark_cache") -> ManagedCachedBenchmarks:
+def get_managed_cache(cache_dir: str = "./benchmark_cache") -> ManagedCachedBenchmarks:
     """Get the global managed cache instance."""
     global _managed_cache
     if _managed_cache is None:
         _managed_cache = ManagedCachedBenchmarks(cache_dir)
-    return _managed_cache
-
-
-def clear_managed_cache():
-    """Clear the global managed cache instance."""
-    global _managed_cache
-    _managed_cache = None 
+    return _managed_cache 

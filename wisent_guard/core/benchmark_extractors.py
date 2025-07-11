@@ -12,6 +12,11 @@ import re
 logger = logging.getLogger(__name__)
 
 
+class UnsupportedBenchmarkError(Exception):
+    """Raised when benchmark has no extractor."""
+    pass
+
+
 class BenchmarkExtractor:
     """Base class for benchmark-specific extractors."""
     
@@ -1131,18 +1136,16 @@ EXTRACTORS = {
 
 
 def get_extractor(benchmark_name: str) -> BenchmarkExtractor:
-    """Get the appropriate extractor for a benchmark."""
-    # Try exact match first
+    """Get the appropriate extractor for a benchmark with hard error for unsupported tasks."""
+    # Try exact match only - no fallbacks
     if benchmark_name in EXTRACTORS:
         return EXTRACTORS[benchmark_name]()
     
-    # Try partial matches
-    for key, extractor_class in EXTRACTORS.items():
-        if key in benchmark_name.lower():
-            return extractor_class()
-    
-    # Default fallback
-    return DefaultExtractor()
+    # Hard error for unsupported benchmarks
+    raise UnsupportedBenchmarkError(
+        f"No extractor found for benchmark '{benchmark_name}'. "
+        f"Supported benchmarks: {sorted(EXTRACTORS.keys())}"
+    )
 
 
 def extract_qa_pair(benchmark_name: str, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:

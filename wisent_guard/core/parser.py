@@ -54,10 +54,6 @@ def setup_parser() -> argparse.ArgumentParser:
                                                      help="Optimize steering parameters for different methods")
     setup_steering_optimizer_parser(steering_optimizer_parser)
     
-    # Cache management command
-    cache_parser = subparsers.add_parser("cache", help="Manage benchmark cache")
-    setup_cache_parser(cache_parser)
-    
     return parser
 
 
@@ -308,22 +304,20 @@ def setup_tasks_parser(parser):
                         help="Continue processing other tasks if one fails")
     
     # Benchmark caching arguments
-    parser.add_argument("--cache-benchmark", action="store_true",
-                        help="Cache the benchmark data locally for faster future access")
-    parser.add_argument("--use-cached", action="store_true",
+    parser.add_argument("--cache-benchmark", action="store_true", default=True,
+                        help="Cache the benchmark data locally for faster future access (default: True)")
+    parser.add_argument("--no-cache", dest="cache_benchmark", action="store_false",
+                        help="Disable benchmark caching")
+    parser.add_argument("--use-cached", action="store_true", default=True,
                         help="Use cached benchmark data if available (default: True)")
     parser.add_argument("--force-download", action="store_true",
                         help="Force fresh download even if cached version exists")
     parser.add_argument("--cache-dir", type=str, default="./benchmark_cache",
                         help="Directory to store cached benchmark data (default: ./benchmark_cache)")
-    
-    # Managed cache arguments
-    parser.add_argument("--use-managed-cache", action="store_true", default=True,
-                        help="Use intelligent managed caching that only downloads needed samples (default: True)")
-    parser.add_argument("--no-managed-cache", dest="use_managed_cache", action="store_false",
-                        help="Disable managed caching and use traditional full-dataset caching")
-    parser.add_argument("--managed-cache-dir", type=str, default="./managed_benchmark_cache",
-                        help="Directory to store managed cache data (default: ./managed_benchmark_cache)")
+    parser.add_argument("--cache-status", action="store_true",
+                        help="Show cache status and exit")
+    parser.add_argument("--cleanup-cache", type=int, metavar="DAYS",
+                        help="Clean up cache entries older than DAYS days")
 
 
 def parse_layers_from_arg(layer_arg: str, model=None) -> List[int]:
@@ -655,14 +649,6 @@ def setup_classification_optimizer_parser(parser):
     parser.add_argument("--tasks", type=str, nargs='+', default=None,
                        help="Specific tasks to optimize (if None, uses all available tasks)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
-    
-    # Managed cache arguments
-    parser.add_argument("--use-managed-cache", action="store_true", default=True,
-                       help="Use intelligent managed caching that only downloads needed samples (default: True)")
-    parser.add_argument("--no-managed-cache", dest="use_managed_cache", action="store_false",
-                       help="Disable managed caching and use traditional full-dataset caching")
-    parser.add_argument("--managed-cache-dir", type=str, default="./managed_benchmark_cache",
-                       help="Directory to store managed cache data (default: ./managed_benchmark_cache)")
 
 
 def setup_steering_optimizer_parser(parser):
@@ -739,31 +725,6 @@ def setup_steering_optimizer_parser(parser):
     # Common arguments for all steering optimization subcommands
     parser.add_argument("--device", type=str, default=None, help="Device to run on")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
-
-
-def setup_cache_parser(parser):
-    """Set up the cache management subcommand parser."""
-    # Create subparsers for different cache actions
-    cache_subparsers = parser.add_subparsers(dest="cache_action", help="Cache management actions")
-    
-    # Status subcommand
-    status_parser = cache_subparsers.add_parser("status", help="Show cache status")
-    status_parser.add_argument("--task", type=str, help="Show status for specific task")
-    
-    # Clear subcommand
-    clear_parser = cache_subparsers.add_parser("clear", help="Clear cache")
-    clear_parser.add_argument("--task", type=str, help="Clear cache for specific task")
-    clear_parser.add_argument("--confirm", action="store_true", help="Skip confirmation prompt")
-    
-    # Preload subcommand
-    preload_parser = cache_subparsers.add_parser("preload", help="Preload samples for a task")
-    preload_parser.add_argument("task", type=str, help="Task name to preload")
-    preload_parser.add_argument("--limit", type=int, default=100, help="Number of samples to preload")
-    preload_parser.add_argument("--force-download", action="store_true", help="Force fresh download")
-    
-    # Common arguments for all cache subcommands
-    parser.add_argument("--cache-dir", type=str, default="./managed_benchmark_cache",
-                       help="Cache directory to manage (default: ./managed_benchmark_cache)")
 
 
 def setup_model_config_parser(parser):
