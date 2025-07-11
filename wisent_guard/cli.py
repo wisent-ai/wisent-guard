@@ -28,6 +28,7 @@ from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli, 
     load_synthetic_pairs_cli
 )
+from .core.managed_cached_benchmarks import get_managed_cache
 
 # Import caching infrastructure
 try:
@@ -527,10 +528,13 @@ def run_task_pipeline(
     max_benchmarks: int = None,
     smart_selection: bool = False,
     # Benchmark caching parameters
-    cache_benchmark: bool = False,
+    cache_benchmark: bool = True,
     use_cached: bool = True,
     force_download: bool = False,
     cache_dir: str = "./benchmark_cache",
+    # Managed caching parameters
+    use_managed_cache: bool = True,
+    managed_cache_dir: str = "./managed_benchmark_cache",
     # Model reuse parameter for efficiency
     model_instance: Optional[Any] = None
 ) -> Dict[str, Any]:
@@ -876,163 +880,218 @@ def run_task_pipeline(
                 print(f"📊 Data split: {len(qa_pairs)} training pairs, {len(test_qa_pairs_source)} test pairs")
             
         else:
-            # Traditional lm-harness task loading with caching support
+            # Traditional lm-harness task loading with managed caching support
             if verbose:
                 print(f"📚 Loading task data for {task_name}...")
             
-            # CACHING LOGIC: Check for cached benchmark data first
-            cached_data = None
-            used_cache = False
+            # MANAGED CACHING LOGIC: Use intelligent sample-based caching
+            used_managed_cache = False
             
-            if use_cached and not force_download and is_benchmark_cached(task_name, cache_dir):
-                if verbose:
-                    print(f"💾 Found cached benchmark data for {task_name}")
-                
-                cached_data = load_cached_benchmark(task_name, cache_dir)
-                if cached_data:
-                    if verbose:
-                        print(f"✅ Loaded {len(cached_data)} cached contrastive pairs")
-                    
-                    # Convert cached data to QA pairs format
-                    all_qa_pairs = convert_cached_data_to_qa_pairs(cached_data, limit)
-                    used_cache = True
-                    
-                    if verbose:
-                        print(f"📊 Converted to {len(all_qa_pairs)} QA pairs")
-                        if limit and len(all_qa_pairs) >= limit:
-                            print(f"   📏 Limited to {limit} pairs as requested")
-                else:
-                    if verbose:
-                        print(f"⚠️  Failed to load cached data, falling back to fresh download")
-            
-            if not used_cache:
-                # Load fresh data from lm-eval
-                if verbose:
-                    print(f"🔄 Loading fresh data from lm-eval...")
-                
-                # FIRST: Check if this is a group task and expand if needed
+            if use_managed_cache and not force_download:
                 try:
-                    from lm_eval import evaluator
+                    managed_cache = get_managed_cache(managed_cache_dir)
                     
                     if verbose:
-                        print(f"🔍 Checking if '{task_name}' is a group task...")
+                        cache_status = managed_cache.get_cache_status(task_name)
+                        print(f"🔍 Managed cache status for {task_name}: {cache_status['cached_samples']} samples cached")
                     
-                    # Use lm-eval's task expansion to detect group tasks
-                    task_dict = evaluator.get_task_dict([task_name])
-                    expanded_tasks = list(task_dict.keys())
+                    # Get samples using managed cache (only downloads what's needed)
+                    cached_docs = managed_cache.get_task_samples(
+                        task_name=task_name,
+                        limit=limit or 1000,  # Use limit or default to 1000
+                        force_download=force_download
+                    )
                     
-                    if len(expanded_tasks) > 1:
+                    if cached_docs:
                         if verbose:
-                            print(f"🎯 Detected GROUP task '{task_name}' with {len(expanded_tasks)} subtasks: {expanded_tasks[:5]}{'...' if len(expanded_tasks) > 5 else ''}")
-                            print(f"📚 Extracting samples from all subtasks...")
+                            print(f"✅ Loaded {len(cached_docs)} samples from managed cache")
                         
-                        # Handle group task by combining samples from all subtasks
-                        all_qa_pairs = []
+                        # Create a mock task object for compatibility
+                        from types import SimpleNamespace
+                        task_data = SimpleNamespace()
+                        task_data.docs = cached_docs
                         
-                        for subtask_name in expanded_tasks:
-                            try:
-                                if verbose:
-                                    print(f"   🔍 Loading subtask: {subtask_name}")
-                                
-                                # Load each subtask individually
-                                subtask_data = model.load_lm_eval_task(subtask_name, shots=shots, limit=limit)
-                                subtask_train_docs, _ = model.split_task_data(subtask_data, split_ratio=split_ratio, random_seed=seed)
-                                
-                                # Extract QA pairs from this subtask
-                                subtask_qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(subtask_name, subtask_data, subtask_train_docs)
-                                
-                                if verbose:
-                                    print(f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}")
-                                
-                                # Add subtask identifier to each pair for tracking
-                                for pair in subtask_qa_pairs:
-                                    pair['source_subtask'] = subtask_name
-                                
-                                all_qa_pairs.extend(subtask_qa_pairs)
-                                
-                            except Exception as e:
-                                if verbose:
-                                    print(f"   ⚠️ Failed to load subtask {subtask_name}: {e}")
-                                continue
-                        
-                        if not all_qa_pairs:
-                            raise ValueError(f"No QA pairs could be extracted from any subtasks in group '{task_name}'")
-                        
-                        # Shuffle and limit the combined dataset
+                        # Split the cached docs
                         import random
                         random.seed(seed)
-                        random.shuffle(all_qa_pairs)
+                        shuffled_docs = cached_docs.copy()
+                        random.shuffle(shuffled_docs)
                         
-                        if limit and len(all_qa_pairs) > limit:
-                            all_qa_pairs = all_qa_pairs[:limit]
-                        
-                        # Split for training (we'll use all for training since we extracted from train docs)
-                        qa_pairs = all_qa_pairs
-                        test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []  # Use 20% for testing
+                        split_point = int(len(shuffled_docs) * split_ratio)
+                        train_docs = shuffled_docs[:split_point]
+                        test_docs = shuffled_docs[split_point:]
                         
                         if verbose:
-                            print(f"📊 Combined dataset: {len(qa_pairs)} total QA pairs from {len(expanded_tasks)} subtasks")
-                            
-                            # Show breakdown by subtask
-                            from collections import Counter
-                            subtask_counts = Counter(pair.get('source_subtask', 'unknown') for pair in qa_pairs)
-                            print(f"📋 Breakdown by subtask:")
-                            for subtask, count in subtask_counts.most_common():
-                                print(f"   • {subtask}: {count} pairs")
+                            print(f"📊 Data split from managed cache: {len(train_docs)} training docs, {len(test_docs)} test docs")
                         
-                        # Set a flag to indicate we've already processed the group task
-                        group_task_processed = True
-                        group_task_qa_format = True  # Test data is already in QA format
+                        # Extract QA pairs from training documents
+                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+                        test_qa_pairs_source = test_docs
                         
+                        used_managed_cache = True
+                        
+                        if verbose:
+                            print(f"📝 Extracted {len(qa_pairs)} QA pairs from managed cache")
+                    
+                except Exception as e:
+                    if verbose:
+                        print(f"⚠️ Managed cache failed for {task_name}: {e}")
+                        print(f"🔄 Falling back to traditional loading...")
+            
+            if not used_managed_cache:
+                # FALLBACK: Traditional caching logic
+                cached_data = None
+                used_cache = False
+                
+                if use_cached and not force_download and is_benchmark_cached(task_name, cache_dir):
+                    if verbose:
+                        print(f"💾 Found cached benchmark data for {task_name}")
+                    
+                    cached_data = load_cached_benchmark(task_name, cache_dir)
+                    if cached_data:
+                        if verbose:
+                            print(f"✅ Loaded {len(cached_data)} cached contrastive pairs")
+                        
+                        # Convert cached data to QA pairs format
+                        all_qa_pairs = convert_cached_data_to_qa_pairs(cached_data, limit)
+                        used_cache = True
+                        
+                        if verbose:
+                            print(f"📊 Converted to {len(all_qa_pairs)} QA pairs")
+                            if limit and len(all_qa_pairs) >= limit:
+                                print(f"   📏 Limited to {limit} pairs as requested")
                     else:
                         if verbose:
-                            print(f"✅ '{task_name}' is an individual task, proceeding...")
+                            print(f"⚠️  Failed to load cached data, falling back to fresh download")
+                
+                if not used_cache:
+                    # Load fresh data from lm-eval
+                    if verbose:
+                        print(f"🔄 Loading fresh data from lm-eval...")
+                    
+                    # FIRST: Check if this is a group task and expand if needed
+                    try:
+                        from lm_eval import evaluator
+                        
+                        if verbose:
+                            print(f"🔍 Checking if '{task_name}' is a group task...")
+                        
+                        # Use lm-eval's task expansion to detect group tasks
+                        task_dict = evaluator.get_task_dict([task_name])
+                        expanded_tasks = list(task_dict.keys())
+                        
+                        if len(expanded_tasks) > 1:
+                            if verbose:
+                                print(f"🎯 Detected GROUP task '{task_name}' with {len(expanded_tasks)} subtasks: {expanded_tasks[:5]}{'...' if len(expanded_tasks) > 5 else ''}")
+                                print(f"📚 Extracting samples from all subtasks...")
+                            
+                            # Handle group task by combining samples from all subtasks
+                            all_qa_pairs = []
+                            
+                            for subtask_name in expanded_tasks:
+                                try:
+                                    if verbose:
+                                        print(f"   🔍 Loading subtask: {subtask_name}")
+                                    
+                                    # Load each subtask individually
+                                    subtask_data = model.load_lm_eval_task(subtask_name, shots=shots, limit=limit)
+                                    subtask_train_docs, _ = model.split_task_data(subtask_data, split_ratio=split_ratio, random_seed=seed)
+                                    
+                                    # Extract QA pairs from this subtask
+                                    subtask_qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(subtask_name, subtask_data, subtask_train_docs)
+                                    
+                                    if verbose:
+                                        print(f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}")
+                                    
+                                    # Add subtask identifier to each pair for tracking
+                                    for pair in subtask_qa_pairs:
+                                        pair['source_subtask'] = subtask_name
+                                    
+                                    all_qa_pairs.extend(subtask_qa_pairs)
+                                    
+                                except Exception as e:
+                                    if verbose:
+                                        print(f"   ⚠️ Failed to load subtask {subtask_name}: {e}")
+                                    continue
+                            
+                            if not all_qa_pairs:
+                                raise ValueError(f"No QA pairs could be extracted from any subtasks in group '{task_name}'")
+                            
+                            # Shuffle and limit the combined dataset
+                            import random
+                            random.seed(seed)
+                            random.shuffle(all_qa_pairs)
+                            
+                            if limit and len(all_qa_pairs) > limit:
+                                all_qa_pairs = all_qa_pairs[:limit]
+                            
+                            # Split for training (we'll use all for training since we extracted from train docs)
+                            qa_pairs = all_qa_pairs
+                            test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []  # Use 20% for testing
+                            
+                            if verbose:
+                                print(f"📊 Combined dataset: {len(qa_pairs)} total QA pairs from {len(expanded_tasks)} subtasks")
+                                
+                                # Show breakdown by subtask
+                                from collections import Counter
+                                subtask_counts = Counter(pair.get('source_subtask', 'unknown') for pair in qa_pairs)
+                                print(f"📋 Breakdown by subtask:")
+                                for subtask, count in subtask_counts.most_common():
+                                    print(f"   • {subtask}: {count} pairs")
+                            
+                            # Set a flag to indicate we've already processed the group task
+                            group_task_processed = True
+                            group_task_qa_format = True  # Test data is already in QA format
+                            
+                        else:
+                            if verbose:
+                                print(f"✅ '{task_name}' is an individual task, proceeding...")
+                            group_task_processed = False
+                            group_task_qa_format = False
+                    
+                    except Exception as e:
+                        if "Group task" in str(e):
+                            raise e  # Re-raise group task errors
+                        elif verbose:
+                            print(f"⚠️  Could not check if '{task_name}' is a group task: {e}")
+                            print(f"🔄 Proceeding with standard task loading...")
                         group_task_processed = False
                         group_task_qa_format = False
-                
-                except Exception as e:
-                    if "Group task" in str(e):
-                        raise e  # Re-raise group task errors
-                    elif verbose:
-                        print(f"⚠️  Could not check if '{task_name}' is a group task: {e}")
-                        print(f"🔄 Proceeding with standard task loading...")
-                    group_task_processed = False
-                    group_task_qa_format = False
-                
-                # Only load individual task if we haven't already processed a group task
-                if not group_task_processed:
-                    # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
-                    actual_task_name = get_actual_task_name(task_name)
-                    if verbose and actual_task_name != task_name:
-                        print(f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'")
                     
-                    task_data = model.load_lm_eval_task(actual_task_name, shots=shots, limit=limit)
-                    train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
-                
-                    if verbose:
-                        print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
-                    
-                    # Extract QA pairs from training documents  
-                    if verbose:
-                        print(f"\n📝 TRAINING DATA PREPARATION:")
-                        print(f"   • Loading {task_name} data with correct/incorrect answers...")
-                    
-                    # Use the proper extraction method from ContrastivePairSet
-                    # ContrastivePairSet import moved to top of file
-                    qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+                    # Only load individual task if we haven't already processed a group task
+                    if not group_task_processed:
+                        # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
+                        actual_task_name = get_actual_task_name(task_name)
+                        if verbose and actual_task_name != task_name:
+                            print(f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'")
                         
-                    test_qa_pairs_source = test_docs  # Keep original format for test docs
-                
-                # CACHE SAVING: Save to cache if requested and we loaded fresh data
-                if cache_benchmark and not used_cache:
-                    if verbose:
-                        print(f"💾 Caching benchmark data for future use...")
+                        task_data = model.load_lm_eval_task(actual_task_name, shots=shots, limit=limit)
+                        train_docs, test_docs = model.split_task_data(task_data, split_ratio=split_ratio, random_seed=seed)
                     
-                    success = save_benchmark_to_cache(task_name, cache_dir, limit, verbose)
-                    if success and verbose:
-                        print(f"✅ Benchmark cached successfully!")
-                    elif verbose:
-                        print(f"⚠️  Failed to cache benchmark")
+                        if verbose:
+                            print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
+                        
+                        # Extract QA pairs from training documents  
+                        if verbose:
+                            print(f"\n📝 TRAINING DATA PREPARATION:")
+                            print(f"   • Loading {task_name} data with correct/incorrect answers...")
+                        
+                        # Use the proper extraction method from ContrastivePairSet
+                        # ContrastivePairSet import moved to top of file
+                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
+                            
+                        test_qa_pairs_source = test_docs  # Keep original format for test docs
+                    
+                    # CACHE SAVING: Save to cache if requested and we loaded fresh data
+                    if cache_benchmark and not used_cache:
+                        if verbose:
+                            print(f"💾 Caching benchmark data for future use...")
+                        
+                        success = save_benchmark_to_cache(task_name, cache_dir, limit, verbose)
+                        if success and verbose:
+                            print(f"✅ Benchmark cached successfully!")
+                        elif verbose:
+                            print(f"⚠️  Failed to cache benchmark")
             else:
                 # We used cached data, process it for the pipeline
                 qa_pairs = all_qa_pairs
@@ -1415,29 +1474,36 @@ def run_task_pipeline(
                 optimize_layers=optimize_layers
             )
             
-            # Extract the best parameters from optimization
-            if optimization_result.get('optimization_performed', False):
-                layer = optimization_result.get('best_layer', layer)
-                token_aggregation = optimization_result.get('best_aggregation', token_aggregation)
-                optimized_classifier_type = optimization_result.get('best_classifier_type', classifier_type)
-                optimized_threshold = optimization_result.get('best_threshold', 0.6)
-                if verbose:
-                    print(f"✅ Hyperparameter optimization completed!")
-                    print(f"   • Best layer: {layer} + {token_aggregation} aggregation")
-                    print(f"   • Best classifier: {optimized_classifier_type}")
-                    print(f"   • Best threshold: {optimized_threshold}")
-            else:
-                if verbose:
-                    print(f"⚠️ Optimization failed, using default layer {layer}")
-                optimized_classifier_type = classifier_type
-                optimized_threshold = 0.6
-                optimization_result = {
-                    'best_layer': layer,
-                    'best_aggregation': token_aggregation,
-                    'best_classifier_type': optimized_classifier_type,
-                    'best_threshold': optimized_threshold,
-                    'optimization_performed': False
-                }
+                    # Extract the best parameters from optimization
+        if optimization_result.get('optimization_performed', False):
+            layer = optimization_result.get('best_layer', layer)
+            token_aggregation = optimization_result.get('best_aggregation', token_aggregation)
+            optimized_classifier_type = optimization_result.get('best_classifier_type', classifier_type)
+            optimized_threshold = optimization_result.get('best_threshold', 0.6)
+            
+            # 🚨 FIX: Update layers array to use optimized layer for ground truth evaluation
+            optimized_layer_int = int(layer) if isinstance(layer, str) else layer
+            layers = [optimized_layer_int]  # Update layers array with optimized layer
+            layer_obj = Layer(index=optimized_layer_int, type="transformer")  # Update layer object too
+            
+            if verbose:
+                print(f"✅ Hyperparameter optimization completed!")
+                print(f"   • Best layer: {layer} + {token_aggregation} aggregation")
+                print(f"   • Best classifier: {optimized_classifier_type}")
+                print(f"   • Best threshold: {optimized_threshold}")
+                print(f"   • Updated layers array: {layers}")
+        else:
+            if verbose:
+                print(f"⚠️ Optimization failed, using default layer {layer}")
+            optimized_classifier_type = classifier_type
+            optimized_threshold = 0.6
+            optimization_result = {
+                'best_layer': layer,
+                'best_aggregation': token_aggregation,
+                'best_classifier_type': optimized_classifier_type,
+                'best_threshold': optimized_threshold,
+                'optimization_performed': False
+            }
         
         # Extract activations from the choice tokens using the (possibly optimized) layer
         optimization_note = f" (optimized)" if optimize and layer != original_layer else ""
@@ -3019,6 +3085,8 @@ def main():
         handle_classification_optimization_command(args)
     elif args.command == "optimize-steering":
         handle_steering_optimization_command(args)
+    elif args.command == "cache":
+        handle_cache_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -3316,6 +3384,9 @@ def handle_tasks_command(args):
                 use_cached=getattr(args, 'use_cached', True),
                 force_download=getattr(args, 'force_download', False),
                 cache_dir=getattr(args, 'cache_dir', './benchmark_cache'),
+                # Managed caching parameters
+                use_managed_cache=getattr(args, 'use_managed_cache', True),
+                managed_cache_dir=getattr(args, 'managed_cache_dir', './managed_benchmark_cache'),
                 # Model reuse parameter for efficiency
                 model_instance=shared_model
             )
@@ -3907,6 +3978,67 @@ def get_actual_task_name(benchmark_name: str) -> str:
     if benchmark_name in AVAILABLE_BENCHMARKS:
         return AVAILABLE_BENCHMARKS[benchmark_name].get('task', benchmark_name)
     return benchmark_name
+
+
+def handle_cache_command(args):
+    """Handle the cache management command."""
+    from .core.managed_cached_benchmarks import get_managed_cache
+    
+    managed_cache = get_managed_cache(args.cache_dir)
+    
+    if args.cache_action == "status":
+        if args.task:
+            # Show status for specific task
+            status = managed_cache.get_cache_status(args.task)
+            print(f"📊 Cache Status for {args.task}:")
+            print(f"   • Cached samples: {status['cached_samples']}")
+            print(f"   • Cache exists: {status['cache_exists']}")
+            print(f"   • Cache path: {status['cache_path']}")
+            if 'last_updated' in status:
+                print(f"   • Last updated: {status['last_updated']}")
+        else:
+            # Show overall cache summary
+            summary = managed_cache.get_cache_summary()
+            print(f"📊 Managed Cache Summary:")
+            print(f"   • Total tasks: {summary['total_tasks']}")
+            print(f"   • Total samples: {summary['total_samples']}")
+            print(f"   • Cache directory: {summary['cache_dir']}")
+            
+            if summary['tasks']:
+                print(f"\n📋 Cached Tasks:")
+                for task_name, task_info in summary['tasks'].items():
+                    print(f"   • {task_name}: {task_info['sample_count']} samples")
+    
+    elif args.cache_action == "clear":
+        if args.task:
+            # Clear specific task
+            managed_cache.clear_task_cache(args.task)
+            print(f"✅ Cleared cache for {args.task}")
+        else:
+            # Clear all cache
+            if args.confirm or input("Are you sure you want to clear all cache? (y/N): ").lower() == 'y':
+                managed_cache.clear_all_cache()
+                print("✅ Cleared all cache")
+            else:
+                print("❌ Cache clear cancelled")
+    
+    elif args.cache_action == "preload":
+        if not args.task:
+            print("❌ --task is required for preload action")
+            return
+        
+        limit = args.limit or 100
+        print(f"📥 Preloading {limit} samples for {args.task}...")
+        
+        try:
+            samples = managed_cache.get_task_samples(
+                task_name=args.task,
+                limit=limit,
+                force_download=args.force_download
+            )
+            print(f"✅ Successfully preloaded {len(samples)} samples for {args.task}")
+        except Exception as e:
+            print(f"❌ Failed to preload {args.task}: {e}")
 
 
 if __name__ == "__main__":

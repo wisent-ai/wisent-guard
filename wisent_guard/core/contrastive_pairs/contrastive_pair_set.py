@@ -929,17 +929,17 @@ class ContrastivePairSet:
                     choices = mc_targets.get('choices', [])
                     labels = mc_targets.get('labels', [])
                 
-                # Find the correct answer
-                    for i, label in enumerate(labels):
-                        if label == 1 and i < len(choices):
-                            correct_answer = choices[i]
-                        break
-                
-                # Find an incorrect answer
-                    for i, label in enumerate(labels):
-                        if label == 0 and i < len(choices):
-                            incorrect_answer = choices[i]
-                        break
+                    # Find the correct answer
+                    for j, label in enumerate(labels):
+                        if label == 1 and j < len(choices):
+                            correct_answer = choices[j]
+                            break
+                    
+                    # Find an incorrect answer
+                    for j, label in enumerate(labels):
+                        if label == 0 and j < len(choices):
+                            incorrect_answer = choices[j]
+                            break
                 elif 'correct_answers' in doc and 'incorrect_answers' in doc:
                     # Generation format (truthfulqa_gen)
                     correct_answers_list = doc.get('correct_answers', [])
@@ -1170,13 +1170,13 @@ class ContrastivePairSet:
                         for j, label in enumerate(labels):
                             if label == 1 and j < len(choices):
                                 correct_answer = choices[j]
-                            break
+                                break
                     
                     # Find an incorrect answer
                         for j, label in enumerate(labels):
                             if label == 0 and j < len(choices):
                                 incorrect_answer = choices[j]
-                            break
+                                break
                     elif 'correct_answers' in doc and 'incorrect_answers' in doc:
                         # Generation format (truthfulqa_gen)
                         correct_answers_list = doc.get('correct_answers', [])
