@@ -3125,26 +3125,71 @@ def handle_tasks_command(args):
     
     # Handle cache management commands first
     if hasattr(args, 'cache_status') and args.cache_status:
-        from .core.managed_cached_benchmarks import get_managed_cache
-        managed_cache = get_managed_cache(args.cache_dir)
-        status = managed_cache.cache_status()
+        import os
+        import json
+        from pathlib import Path
+        
+        cache_dir = Path(args.cache_dir)
+        data_dir = cache_dir / "data"
+        metadata_dir = cache_dir / "metadata"
         
         print(f"📊 CACHE STATUS")
         print(f"{'='*50}")
         print(f"Cache directory: {args.cache_dir}")
-        print(f"Cache version: {status['cache_version']}")
-        print(f"Total tasks: {status['total_tasks']}")
-        print(f"Total samples: {status['total_samples']}")
-        print(f"Total size: {status['total_size_mb']} MB")
-        print(f"Created: {status['created_at']}")
-        print(f"Last cleanup: {status['last_cleanup']}")
         
-        if status['tasks']:
-            print(f"\n📋 CACHED TASKS:")
-            for task_name, task_info in status['tasks'].items():
-                print(f"  • {task_name}: {task_info['samples_count']} samples ({task_info['chunks']} chunks)")
+        if not cache_dir.exists():
+            print(f"❌ Cache directory does not exist")
+            return
+            
+        if not data_dir.exists() or not metadata_dir.exists():
+            print(f"❌ Cache structure incomplete (missing data or metadata directories)")
+            return
+        
+        # Read existing cache format
+        total_tasks = 0
+        total_size_bytes = 0
+        cached_tasks = {}
+        
+        for metadata_file in metadata_dir.glob("*_metadata.json"):
+            try:
+                with open(metadata_file, 'r') as f:
+                    metadata = json.load(f)
+                
+                task_name = metadata.get('task_name', metadata_file.stem.replace('_metadata', ''))
+                data_file = data_dir / f"{task_name}.pkl"
+                
+                if data_file.exists():
+                    file_size = data_file.stat().st_size
+                    total_size_bytes += file_size
+                    total_tasks += 1
+                    
+                    cached_tasks[task_name] = {
+                        'samples': metadata.get('total_samples', 'unknown'),
+                        'size_mb': file_size / (1024 * 1024),
+                        'download_time': metadata.get('download_timestamp', 'unknown'),
+                        'processing_time': metadata.get('processing_time_seconds', 'unknown')
+                    }
+            except Exception as e:
+                print(f"⚠️  Warning: Could not read metadata for {metadata_file}: {e}")
+        
+        print(f"Total tasks: {total_tasks}")
+        print(f"Total size: {total_size_bytes / (1024 * 1024):.1f} MB")
+        print()
+        
+        if cached_tasks:
+            print(f"📋 CACHED TASKS:")
+            # Sort by size for better display
+            sorted_tasks = sorted(cached_tasks.items(), key=lambda x: x[1]['size_mb'], reverse=True)
+            for task_name, task_info in sorted_tasks:
+                samples = task_info['samples']
+                size_mb = task_info['size_mb']
+                download_time = task_info['download_time']
+                if isinstance(download_time, str) and download_time != 'unknown':
+                    # Extract just the date part
+                    download_time = download_time.split('T')[0]
+                print(f"   📁 {task_name}: {samples} samples, {size_mb:.1f} MB (downloaded {download_time})")
         else:
-            print(f"\n📋 No cached tasks found")
+            print(f"📋 No cached tasks found")
         return
     
     if hasattr(args, 'cleanup_cache') and args.cleanup_cache is not None:
