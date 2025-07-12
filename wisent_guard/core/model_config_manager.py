@@ -147,6 +147,33 @@ class ModelConfigManager:
         config_path = self._get_config_path(model_name)
         return os.path.exists(config_path)
     
+    def update_model_config(self, model_name: str, config_data: Dict[str, Any]) -> str:
+        """
+        Update an existing model configuration.
+        
+        Args:
+            model_name: Name/path of the model
+            config_data: Updated configuration dictionary
+            
+        Returns:
+            Path to the saved config file
+        """
+        config_path = self._get_config_path(model_name)
+        
+        # Update timestamp
+        config_data["updated_date"] = datetime.now().isoformat()
+        
+        try:
+            with open(config_path, 'w') as f:
+                json.dump(config_data, f, indent=2)
+            
+            logger.info(f"✅ Model configuration updated: {config_path}")
+            return config_path
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update model configuration: {e}")
+            raise
+    
     def get_optimal_parameters(
         self, 
         model_name: str, 
@@ -175,6 +202,37 @@ class ModelConfigManager:
             optimal_params.update(task_overrides)
         
         return optimal_params
+    
+    def get_optimal_sample_size(
+        self,
+        model_name: str,
+        task_name: str,
+        layer: int
+    ) -> Optional[int]:
+        """
+        Get optimal sample size for a specific task and layer.
+        
+        Args:
+            model_name: Name/path of the model
+            task_name: Task name
+            layer: Layer index
+            
+        Returns:
+            Optimal sample size or None if not found
+        """
+        config = self.load_model_config(model_name)
+        if not config:
+            return None
+            
+        # Check if optimal_sample_sizes exists
+        if "optimal_sample_sizes" not in config:
+            return None
+            
+        # Navigate the nested structure: optimal_sample_sizes[task][layer]
+        task_sizes = config["optimal_sample_sizes"].get(task_name, {})
+        sample_size = task_sizes.get(str(layer), None)
+        
+        return sample_size
     
     def list_model_configs(self) -> List[Dict[str, Any]]:
         """

@@ -1138,6 +1138,9 @@ class ContrastivePairSet:
                 elif task_name == 'winogrande':
                     # For winogrande, use the sentence field directly
                     question = doc.get('sentence', '')
+                elif task_name == 'wsc273':
+                    # For wsc273, use the text field which contains the actual sentence
+                    question = doc.get('text', '')
                 else:
                     # For other tasks, use the template method
                     try:
@@ -1150,7 +1153,8 @@ class ContrastivePairSet:
                         
                 
                 # Skip if we don't have a proper question
-                if not question or len(question.strip()) < 10:
+                # Ensure question is a string before calling strip()
+                if not question or not isinstance(question, str) or len(question.strip()) < 10:
                     continue
                 
                 # Task-specific answer extraction
@@ -1200,8 +1204,8 @@ class ContrastivePairSet:
                     
                     if contrastive_data:
                         question = contrastive_data['question']
-                        correct_answer = contrastive_data['correct_choice']
-                        incorrect_answer = contrastive_data['incorrect_choice']
+                        correct_answer = contrastive_data.get('correct_answer', contrastive_data.get('correct_choice'))
+                        incorrect_answer = contrastive_data.get('incorrect_answer', contrastive_data.get('incorrect_choice'))
                         
                         # Get the formatted question from the extractor
                         from ..benchmark_extractors import get_extractor
@@ -1226,6 +1230,35 @@ class ContrastivePairSet:
                             formatted_question = question  # Use basic question as fallback
                         else:
                             continue
+                
+                elif task_name == 'wsc273':
+                    # WSC273-specific extraction
+                    # wsc273 has: text, pronoun, pronoun_loc, quote, quote_loc, options, label
+                    options = doc.get('options', [])
+                    label = doc.get('label', 0)
+                    
+                    if len(options) >= 2:
+                        # Convert label to int if needed
+                        if isinstance(label, str):
+                            try:
+                                label = int(label)
+                            except ValueError:
+                                label = 0
+                        
+                        # Label is the index of the correct option
+                        if 0 <= label < len(options):
+                            correct_answer = options[label]
+                            # Use the other option as incorrect
+                            incorrect_answer = options[1 - label] if len(options) == 2 else options[0 if label != 0 else 1]
+                        else:
+                            # Fallback
+                            correct_answer = options[0]
+                            incorrect_answer = options[1]
+                        
+                        formatted_question = question
+                    else:
+                        # Skip if we don't have proper options
+                        continue
                 
                 elif task_name == 'hellaswag':
                     # HellaSwag-specific extraction
@@ -1257,8 +1290,8 @@ class ContrastivePairSet:
                     
                     if contrastive_data:
                         question = contrastive_data['question']
-                        correct_answer = contrastive_data['correct_choice']
-                        incorrect_answer = contrastive_data['incorrect_choice']
+                        correct_answer = contrastive_data.get('correct_answer', contrastive_data.get('correct_choice'))
+                        incorrect_answer = contrastive_data.get('incorrect_answer', contrastive_data.get('incorrect_choice'))
                         
                         # Try to get formatted_question from the extractor
                         try:

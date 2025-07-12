@@ -249,7 +249,7 @@ class ClassificationOptimizer:
         self,
         limit: int = 1000,
         optimization_metric: str = "f1",
-        max_time_per_task_minutes: float = 15.0,
+        max_time_per_task_minutes: Optional[float] = None,
         layer_range: Optional[str] = None,
         aggregation_methods: Optional[List[str]] = None,
         threshold_range: Optional[List[float]] = None,
@@ -315,7 +315,10 @@ class ClassificationOptimizer:
         logger.info(f"   📋 Tasks: {len(self.available_tasks)} available tasks")
         logger.info(f"   🔢 Limit per task: {limit}")
         logger.info(f"   📈 Metric: {optimization_metric}")
-        logger.info(f"   ⏱️  Max time per task: {max_time_per_task_minutes:.1f} minutes")
+        if max_time_per_task_minutes is not None:
+            logger.info(f"   ⏱️  Max time per task: {max_time_per_task_minutes:.1f} minutes")
+        else:
+            logger.info(f"   ⏱️  Max time per task: No limit")
         
         if detailed_logger:
             detailed_logger.log_global(
@@ -585,8 +588,20 @@ class ClassificationOptimizer:
         best_layer = optimization_result.get("best_layer", 15)
         best_aggregation = optimization_result.get("best_aggregation", "average")
         best_threshold = optimization_result.get("best_threshold", 0.6)
-        best_f1 = training_results.get("f1", 0.0)
-        best_accuracy = training_results.get("accuracy", 0.0)
+        # Ensure numeric values (handle string inputs like 'N/A')
+        f1_value = training_results.get("f1", 0.0)
+        accuracy_value = training_results.get("accuracy", 0.0)
+        
+        # Convert to float, handling 'N/A' and other non-numeric values
+        try:
+            best_f1 = float(f1_value) if f1_value != 'N/A' else 0.0
+        except (ValueError, TypeError):
+            best_f1 = 0.0
+            
+        try:
+            best_accuracy = float(accuracy_value) if accuracy_value != 'N/A' else 0.0
+        except (ValueError, TypeError):
+            best_accuracy = 0.0
         
         optimization_time = time.time() - task_start_time
         

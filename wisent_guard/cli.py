@@ -753,6 +753,34 @@ def run_task_pipeline(
         current_memory = get_memory_info()
         print(f"\n💾 Current Memory Usage: {format_memory_usage(current_memory)}")
     
+    # AUTO-LOAD STEERING CONFIGURATION if steering mode is enabled but no method specified
+    if steering_mode and not load_steering_vector:
+        # Try to load optimal steering configuration
+        from .core.steering_optimizer import get_optimal_steering_params
+        optimal_steering = get_optimal_steering_params(model_name, task_name)
+        
+        if optimal_steering and optimal_steering.get('method'):
+            # Use optimal parameters if no explicit override
+            if steering_method == "CAA" and optimal_steering.get('method') != "CAA":
+                steering_method = optimal_steering['method']
+                if verbose:
+                    print(f"\n🔧 Auto-loaded optimal steering method: {steering_method}")
+            
+            # Auto-load optimal steering layer if available and not explicitly overridden
+            if optimal_steering.get('layer') is not None and steering_mode:
+                # Only skip auto-loading if user explicitly specified a non-default layer
+                original_layer = layer
+                layer = str(optimal_steering['layer'])
+                if verbose and original_layer != layer:
+                    print(f"🔧 Auto-loaded optimal steering layer: {layer} (was {original_layer})")
+            
+            if steering_strength == 1.0 and optimal_steering.get('strength'):  # Default strength
+                steering_strength = optimal_steering['strength']
+                if verbose:
+                    print(f"🔧 Auto-loaded optimal steering strength: {steering_strength}")
+        elif verbose:
+            print(f"\n💡 No optimized steering config found. Run 'wisent-guard optimize-steering auto {model_name}' to optimize.")
+    
     display_name = task_name if not (from_csv or from_json) else f"file:{task_name}"
     
     if verbose:
@@ -868,9 +896,24 @@ def run_task_pipeline(
             import random
             random.seed(seed)
             random.shuffle(all_qa_pairs)
+            # Apply reasonable limits to prevent huge datasets
+            MAX_TRAIN_SAMPLES = 1000
+            MAX_TEST_SAMPLES = 200
+            
             split_point = int(len(all_qa_pairs) * split_ratio)
             qa_pairs = all_qa_pairs[:split_point]  # Training data
             test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
+            
+            # Apply limits
+            if len(qa_pairs) > MAX_TRAIN_SAMPLES:
+                qa_pairs = qa_pairs[:MAX_TRAIN_SAMPLES]
+                if verbose:
+                    print(f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples")
+            
+            if len(test_qa_pairs_source) > MAX_TEST_SAMPLES:
+                test_qa_pairs_source = test_qa_pairs_source[:MAX_TEST_SAMPLES]
+                if verbose:
+                    print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples")
             
             if verbose:
                 print(f"📊 Data split: {len(qa_pairs)} training pairs, {len(test_qa_pairs_source)} test pairs")
@@ -966,9 +1009,24 @@ def run_task_pipeline(
                         if limit and len(all_qa_pairs) > limit:
                             all_qa_pairs = all_qa_pairs[:limit]
                         
-                        # Split for training (we'll use all for training since we extracted from train docs)
-                        qa_pairs = all_qa_pairs
-                        test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []  # Use 20% for testing
+                        # Split for training and testing with reasonable limits
+                        MAX_TRAIN_SAMPLES = 1000
+                        MAX_TEST_SAMPLES = 200
+                        
+                        split_point = int(len(all_qa_pairs) * split_ratio)
+                        qa_pairs = all_qa_pairs[:split_point]  # Training data
+                        test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
+                        
+                        # Apply limits
+                        if len(qa_pairs) > MAX_TRAIN_SAMPLES:
+                            qa_pairs = qa_pairs[:MAX_TRAIN_SAMPLES]
+                            if verbose:
+                                print(f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples")
+                        
+                        if len(test_qa_pairs_source) > MAX_TEST_SAMPLES:
+                            test_qa_pairs_source = test_qa_pairs_source[:MAX_TEST_SAMPLES]
+                            if verbose:
+                                print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples")
                         
                         if verbose:
                             print(f"📊 Combined dataset: {len(qa_pairs)} total QA pairs from {len(expanded_tasks)} subtasks")
@@ -1060,8 +1118,24 @@ def run_task_pipeline(
                         print(f"⚠️  Failed to cache benchmark")
             else:
                 # We used cached data, process it for the pipeline
-                qa_pairs = all_qa_pairs
-                test_qa_pairs_source = all_qa_pairs[:len(all_qa_pairs)//5] if all_qa_pairs else []
+                # Properly split the data using the split ratio with limits
+                MAX_TRAIN_SAMPLES = 1000
+                MAX_TEST_SAMPLES = 200
+                
+                split_point = int(len(all_qa_pairs) * split_ratio)
+                qa_pairs = all_qa_pairs[:split_point]  # Training data
+                test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
+                
+                # Apply limits
+                if len(qa_pairs) > MAX_TRAIN_SAMPLES:
+                    qa_pairs = qa_pairs[:MAX_TRAIN_SAMPLES]
+                    if verbose:
+                        print(f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples")
+                
+                if len(test_qa_pairs_source) > MAX_TEST_SAMPLES:
+                    test_qa_pairs_source = test_qa_pairs_source[:MAX_TEST_SAMPLES]
+                    if verbose:
+                        print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples")
                 group_task_processed = False
                 group_task_qa_format = True  # Cached data is already in QA format
         
@@ -1073,7 +1147,8 @@ def run_task_pipeline(
                 question_preview = qa_pair['question'][:100] + "..." if len(qa_pair['question']) > 100 else qa_pair['question']
                 print(f"      🔸 Question: {question_preview}")
                 print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
-                print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+                if 'incorrect_answer' in qa_pair:
+                    print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
         
         # 🚨 HARD ERROR CHECK: QA pair extraction failure
         if len(qa_pairs) == 0:
@@ -1400,8 +1475,8 @@ def run_task_pipeline(
             test_qa_pairs = []
             for doc in test_qa_pairs_source:
                 try:
-                    if from_csv or from_json:
-                        # For CSV/JSON, doc is already a qa_pair dict
+                    if from_csv or from_json or group_task_qa_format:
+                        # For CSV/JSON/cached data, doc is already a qa_pair dict
                         test_qa_pairs.append({
                             'question': doc['question'],
                             'formatted_question': doc['question'], 
@@ -1441,7 +1516,7 @@ def run_task_pipeline(
             )
             
                     # Extract the best parameters from optimization
-        if optimization_result.get('optimization_performed', False):
+        if optimization_result and optimization_result.get('optimization_performed', False):
             layer = optimization_result.get('best_layer', layer)
             token_aggregation = optimization_result.get('best_aggregation', token_aggregation)
             optimized_classifier_type = optimization_result.get('best_classifier_type', classifier_type)
@@ -1535,6 +1610,16 @@ def run_task_pipeline(
             # Import steering methods
             from .core.steering_method import CAA, HPR, DAC, BiPO, KSteering
             from .core.normalization import VectorNormalizationMethod
+            
+            # Ensure task_data is available for steering evaluation
+            # If not already loaded (e.g., from CSV/JSON), load it now
+            if not 'task_data' in locals():
+                # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
+                actual_task_name = get_actual_task_name(task_name)
+                if verbose and actual_task_name != task_name:
+                    print(f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'")
+                
+                task_data = model.load_lm_eval_task(actual_task_name, shots=shots, limit=limit)
             
             # Convert string to enum
             try:
@@ -1895,11 +1980,91 @@ def run_task_pipeline(
             final_classifier_type = classifier_type
             final_threshold = 0.6
         
-        # Train classifiers for each layer
+        # Check if we should try to load pre-trained classifiers automatically
+        loaded_classifiers = False
+        if not load_classifier and not train_only:  # Only auto-load if not explicitly loading or training
+            # Try to load classifiers from the standard optimization directory
+            safe_model_name = model_name.replace("/", "_").replace(":", "_")
+            auto_load_dir = f"./optimized_classifiers/{safe_model_name}"
+            auto_load_path = os.path.join(auto_load_dir, f"{task_name}_classifier")
+            
+            # Check if classifier files exist for the required layers
+            classifier_exists = True
+            if is_multi_layer:
+                for layer_idx in layers:
+                    check_path = f"{auto_load_path}_layer_{layer_idx}.pkl"
+                    if not os.path.exists(check_path):
+                        classifier_exists = False
+                        break
+            else:
+                check_path = f"{auto_load_path}_layer_{layers[0]}.pkl"
+                classifier_exists = os.path.exists(check_path)
+            
+            if classifier_exists:
+                if verbose:
+                    print(f"\n📦 Found pre-trained classifiers, loading automatically...")
+                    print(f"   • Loading from: {auto_load_path}")
+                
+                load_classifier = auto_load_path
+                loaded_classifiers = True
+        
+        # Train classifiers for each layer (or load if specified)
         steering_methods = {}
         layer_training_results = {}
         
-        if is_multi_layer:
+        # If we have classifiers to load, load them instead of training
+        if load_classifier:
+            from .core.model_persistence import ModelPersistence
+            
+            try:
+                if is_multi_layer:
+                    # Load multiple classifiers
+                    classifiers_data = ModelPersistence.load_multi_layer_classifiers(load_classifier, layers)
+                    for layer_idx, (classifier, metadata) in classifiers_data.items():
+                        steering_type = SteeringType.LOGISTIC if metadata.get('classifier_type', 'logistic') == 'logistic' else SteeringType.MLP
+                        steering_method = SteeringMethod(method_type=steering_type, threshold=metadata.get('detection_threshold', 0.6), device=device)
+                        steering_method.classifier = classifier
+                        steering_methods[layer_idx] = steering_method
+                        
+                        # Create dummy training results for loaded classifiers
+                        layer_training_results[layer_idx] = {
+                            'accuracy': metadata.get('training_accuracy', 'N/A'),
+                            'f1': metadata.get('f1_score', 'N/A'),
+                            'loaded': True
+                        }
+                        
+                        if verbose:
+                            print(f"      ✅ Layer {layer_idx}: Loaded (accuracy={metadata.get('training_accuracy', 'N/A')})")
+                else:
+                    # Load single classifier
+                    classifier, metadata = ModelPersistence.load_classifier(load_classifier, layers[0])
+                    steering_type = SteeringType.LOGISTIC if metadata.get('classifier_type', 'logistic') == 'logistic' else SteeringType.MLP
+                    steering_method = SteeringMethod(method_type=steering_type, threshold=metadata.get('detection_threshold', 0.6), device=device)
+                    steering_method.classifier = classifier
+                    steering_methods[layers[0]] = steering_method
+                    
+                    layer_training_results[layers[0]] = {
+                        'accuracy': metadata.get('training_accuracy', 'N/A'),
+                        'f1': metadata.get('f1_score', 'N/A'),
+                        'loaded': True
+                    }
+                    
+                    if verbose:
+                        print(f"      ✅ Loaded classifier for layer {layers[0]} (accuracy={metadata.get('training_accuracy', 'N/A')})")
+                
+                if loaded_classifiers and verbose:
+                    print(f"   🎉 Using cached classifiers for faster inference!")
+                    
+            except Exception as e:
+                if verbose:
+                    print(f"   ⚠️  Failed to load classifiers: {e}")
+                    print(f"   🔄 Falling back to training new classifiers...")
+                load_classifier = None  # Reset to allow training
+                steering_methods = {}
+                layer_training_results = {}
+        
+        # Only train if we didn't successfully load classifiers
+        if not steering_methods and is_multi_layer:
             if verbose:
                 print(f"\n🎯 TRAINING MULTI-LAYER CLASSIFIERS:")
                 print(f"   • Layers: {layers}")
@@ -1988,7 +2153,7 @@ def run_task_pipeline(
                         "layer_results": layer_training_results,
                         "error_type": "multi_layer_training_failure"
                     }
-        else:
+        elif not steering_methods:  # Only train if we didn't load classifiers
             # Single layer mode (original logic)
             if verbose:
                 print(f"\n🎯 TRAINING CLASSIFIER:")
@@ -2042,6 +2207,17 @@ def run_task_pipeline(
                     "error_type": "training_failure",
                     "suggestion": "Check data quality or try a different classifier type"
                 }
+        else:
+            # Classifiers were already loaded
+            if verbose:
+                print(f"\n✅ Using pre-loaded classifiers (skipped training)")
+            # Ensure we have the primary steering method and training results set
+            if is_multi_layer and layers[0] in steering_methods:
+                steering_method = steering_methods[layers[0]]
+                training_results = layer_training_results[layers[0]]
+            elif not is_multi_layer and layers[0] in steering_methods:
+                steering_method = steering_methods[layers[0]]
+                training_results = layer_training_results[layers[0]]
         
         # Save trained classifiers if requested
         saved_classifier_paths = []
@@ -2722,7 +2898,8 @@ Check the task configuration and implementation."""
                     print(f"\n   📋 Test Example {i+1}:")
                     print(f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}")
                     print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
-                    print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
+                    if 'incorrect_answer' in qa_pair:
+                        print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
             
             # Create test contrastive pairs using proper activation collection logic
             test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
@@ -3051,6 +3228,10 @@ def main():
         handle_classification_optimization_command(args)
     elif args.command == "optimize-steering":
         handle_steering_optimization_command(args)
+    elif args.command == "optimize-sample-size":
+        handle_sample_size_optimization_command(args)
+    elif args.command == "full-optimize":
+        handle_full_optimization_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -3294,6 +3475,34 @@ def handle_tasks_command(args):
             # Parse layers
             layers = parse_layers_from_arg(args.layer)
             
+            # Determine the limit to use
+            limit_to_use = args.limit  # Default to user-provided limit
+            
+            # If no explicit limit provided, try to load optimal sample size
+            if limit_to_use is None:
+                # First check if we're using saved config (which determines the layer)
+                optimal_layer = None
+                if not (args.layer != "15" or args.token_aggregation != "average" or args.detection_threshold != 0.6):
+                    # We're using defaults, so check for saved config
+                    config_manager = ModelConfigManager()
+                    optimal_params = config_manager.get_optimal_parameters(args.model, source)
+                    if optimal_params and 'classification_layer' in optimal_params:
+                        optimal_layer = optimal_params['classification_layer']
+                else:
+                    # User provided explicit parameters, use the provided layer
+                    optimal_layer = int(layers[0]) if layers else None
+                
+                # Now get optimal sample size for this task and layer
+                if optimal_layer is not None:
+                    config_manager = ModelConfigManager()
+                    optimal_sample_size = config_manager.get_optimal_sample_size(
+                        args.model, source, optimal_layer
+                    )
+                    if optimal_sample_size:
+                        limit_to_use = optimal_sample_size
+                        if args.verbose:
+                            print(f"   📊 Using optimal sample size: {optimal_sample_size} (from config)")
+            
             # Parse steering methods
             steering_methods = []
             if args.steering_mode:
@@ -3339,7 +3548,7 @@ def handle_tasks_command(args):
                 layer=args.layer,
                 shots=args.shots,
                 split_ratio=args.split_ratio,
-                limit=args.limit,
+                limit=limit_to_use,
                 classifier_type=args.classifier_type,
                 max_new_tokens=args.max_new_tokens,
                 device=args.device,
@@ -3905,7 +4114,49 @@ def handle_steering_optimization_command(args):
             'verbose': args.verbose
         }
         
-        if args.steering_action == "compare-methods":
+        if args.steering_action == "auto":
+            print(f"   🚀 Auto mode: Optimizing based on classification config")
+            if args.task:
+                print(f"   📋 Task: {args.task}")
+            else:
+                print(f"   📋 Tasks: All classification-optimized tasks")
+            print(f"   🔧 Methods: {args.methods}")
+            print(f"   🔢 Limit: {args.limit}")
+            print(f"   ⏱️  Max time: {args.max_time} minutes")
+            
+            kwargs.update({
+                'methods_to_test': args.methods,
+                'limit': args.limit,
+                'max_time_minutes': args.max_time,
+                'strength_range': args.strength_range
+            })
+            
+            result = run_steering_optimization(
+                model_name=args.model,
+                optimization_type="auto",
+                task_name=args.task,
+                **kwargs
+            )
+            
+            # Display results
+            if 'error' in result:
+                print(f"\n❌ Error: {result['error']}")
+                sys.exit(1)
+            
+            print(f"\n✅ Steering optimization complete!")
+            if result.get('overall_best'):
+                best = result['overall_best']
+                print(f"\n🏆 Overall best configuration:")
+                print(f"   Task: {best['task']}")
+                print(f"   Method: {best['best_method']}")
+                print(f"   Layer: {best['best_layer']}")
+                print(f"   Strength: {best['best_strength']}")
+                print(f"   Score: {best['score']:.3f}")
+            
+            if result.get('config_saved'):
+                print(f"\n💾 Configuration saved to: {result['config_path']}")
+            
+        elif args.steering_action == "compare-methods":
             print(f"   📋 Task: {args.task}")
             print(f"   🔧 Methods: {args.methods}")
             print(f"   🔢 Limit: {args.limit}")
@@ -3997,6 +4248,284 @@ def handle_steering_optimization_command(args):
         
     except Exception as e:
         print(f"❌ Steering optimization failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_sample_size_optimization_command(args):
+    """Handle the optimize-sample-size command."""
+    try:
+        # Check if we should verify parameters match existing config
+        if not args.force:
+            from .core.model_config_manager import ModelConfigManager
+            config_manager = ModelConfigManager()
+            model_config = config_manager.load_model_config(args.model)
+            
+            if model_config:
+                optimal_params = model_config.get("optimal_parameters", {})
+                task_overrides = model_config.get("task_specific_overrides", {}).get(args.task, {})
+                
+                # Check if parameters match
+                config_layer = task_overrides.get("classification_layer", optimal_params.get("classification_layer"))
+                config_aggregation = task_overrides.get("token_aggregation", optimal_params.get("token_aggregation", "average"))
+                config_threshold = task_overrides.get("detection_threshold", optimal_params.get("detection_threshold", 0.5))
+                
+                mismatches = []
+                if config_layer is not None and config_layer != args.layer:
+                    mismatches.append(f"Layer: config has {config_layer}, you specified {args.layer}")
+                if config_aggregation != args.token_aggregation:
+                    mismatches.append(f"Token aggregation: config has '{config_aggregation}', you specified '{args.token_aggregation}'")
+                if abs(config_threshold - args.threshold) > 0.01:
+                    mismatches.append(f"Threshold: config has {config_threshold}, you specified {args.threshold}")
+                
+                if mismatches:
+                    print(f"⚠️  Parameter mismatch with existing classifier configuration!")
+                    print(f"   Model config for {args.model} has different parameters:")
+                    for mismatch in mismatches:
+                        print(f"   • {mismatch}")
+                    print(f"\n   Options:")
+                    print(f"   1. Run 'wisent-guard optimize-classification {args.model} --task {args.task}' first")
+                    print(f"   2. Use parameters from config: --layer {config_layer} --token-aggregation {config_aggregation} --threshold {config_threshold}")
+                    print(f"   3. Force optimization with your parameters using --force")
+                    print(f"\n   Sample size optimization should use the same parameters as your actual classifier!")
+                    sys.exit(1)
+        
+        print(f"📏 Starting sample size optimization...")
+        print(f"   📊 Model: {args.model}")
+        print(f"   📋 Task: {args.task}")
+        print(f"   📊 Layer: {args.layer}")
+        print(f"   📊 Token aggregation: {args.token_aggregation}")
+        print(f"   📊 Threshold: {args.threshold}")
+        print(f"   🔢 Sample sizes: {args.sample_sizes}")
+        print(f"   📊 Test split: {args.test_split * 100:.0f}%")
+        if args.limit:
+            print(f"   📊 Dataset limit: {args.limit}")
+        
+        # Import sample size optimizer
+        from .core.sample_size_optimizer import run_sample_size_optimization
+        
+        # Run optimization
+        results = run_sample_size_optimization(
+            model_name=args.model,
+            task_name=args.task,
+            layer=args.layer,
+            token_aggregation=args.token_aggregation,
+            threshold=args.threshold,
+            test_split=args.test_split,
+            sample_sizes=args.sample_sizes,
+            dataset_limit=args.limit,
+            device=args.device,
+            verbose=args.verbose,
+            save_plot=args.save_plot,
+            save_to_config=not args.no_save_config
+        )
+        
+        # Display results
+        print(f"\n✅ Sample size optimization completed!")
+        print(f"   🎯 Optimal sample size: {results['optimal_sample_size']}")
+        
+        # Show performance summary
+        print(f"\n📊 Performance Summary:")
+        print(f"{'Sample Size':>12} {'Accuracy':>10} {'F1 Score':>10} {'Time (s)':>10}")
+        print(f"{'-'*12} {'-'*10} {'-'*10} {'-'*10}")
+        
+        for result in results['results']:
+            size = result['sample_size']
+            acc = result['metrics']['accuracy']
+            f1 = result['metrics']['f1']
+            time = result['training_time']
+            print(f"{size:>12} {acc:>10.3f} {f1:>10.3f} {time:>10.2f}")
+        
+        if not args.no_save_config:
+            print(f"\n💾 Optimal sample size saved to model config")
+            print(f"   • This will be used as default --limit for {args.task} on layer {args.layer}")
+        
+    except Exception as e:
+        print(f"❌ Sample size optimization failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_full_optimization_command(args):
+    """Handle the full-optimize command."""
+    try:
+        print(f"🚀 Starting full optimization pipeline...")
+        print(f"   📊 Model: {args.model}")
+        
+        # Get list of tasks to optimize
+        if args.tasks:
+            tasks = args.tasks
+        else:
+            # Use all available tasks
+            tasks = get_valid_task_names()
+            print(f"   📋 Tasks: All {len(tasks)} available benchmarks")
+        
+        # Step 1: Classification optimization (unless skipped)
+        if not args.skip_classification:
+            print(f"\n📈 Step 1: Classification Parameter Optimization")
+            print(f"   🔢 Sample limit: {args.classification_limit}")
+            
+            from .core.classification_optimizer import run_classification_optimization
+            
+            classification_results = run_classification_optimization(
+                model_name=args.model,
+                limit=args.classification_limit,
+                device=args.device,
+                verbose=args.verbose,
+                tasks=tasks,
+                save_results=True,
+                save_classifiers=True  # Save classifiers during optimization
+            )
+            
+            print(f"\n✅ Classification optimization completed!")
+            print(f"   📊 Optimized {classification_results.successful_optimizations}/{classification_results.total_tasks_tested} tasks")
+        else:
+            print(f"\n⏭️  Skipping classification optimization (using existing config)")
+        
+        # Step 2: Sample size optimization (unless skipped)
+        if not args.skip_sample_size:
+            print(f"\n📏 Step 2: Sample Size Optimization")
+            print(f"   🔢 Testing sample sizes: {args.sample_sizes}")
+            print(f"   📊 Dataset limit: {args.sample_size_limit}")
+            
+            # Load model config to get optimal parameters
+            from .core.model_config_manager import ModelConfigManager
+            config_manager = ModelConfigManager()
+            model_config = config_manager.load_model_config(args.model)
+            
+            if not model_config:
+                print(f"\n❌ Error: No model configuration found!")
+                print(f"   • Run classification optimization first or use --skip-sample-size")
+                sys.exit(1)
+            
+            # Run sample size optimization for each task
+            from .core.sample_size_optimizer import run_sample_size_optimization
+            
+            sample_size_results = {}
+            for task in tasks:
+                print(f"\n   📋 Optimizing sample size for {task}...")
+                
+                # Get task-specific parameters
+                task_params = model_config.get("task_specific_overrides", {}).get(task, {})
+                optimal_params = model_config.get("optimal_parameters", {})
+                
+                layer = task_params.get("classification_layer", optimal_params.get("classification_layer", 0))
+                aggregation = task_params.get("token_aggregation", optimal_params.get("token_aggregation", "average"))
+                threshold = task_params.get("detection_threshold", optimal_params.get("detection_threshold", 0.5))
+                
+                print(f"      • Using layer {layer}, {aggregation} aggregation, threshold {threshold}")
+                
+                try:
+                    results = run_sample_size_optimization(
+                        model_name=args.model,
+                        task_name=task,
+                        layer=layer,
+                        token_aggregation=aggregation,
+                        threshold=threshold,
+                        sample_sizes=args.sample_sizes,
+                        dataset_limit=args.sample_size_limit,
+                        device=args.device,
+                        verbose=False,  # Less verbose for batch processing
+                        save_plot=args.save_plots,
+                        save_to_config=True
+                    )
+                    
+                    sample_size_results[task] = results
+                    print(f"      ✅ Optimal sample size: {results['optimal_sample_size']}")
+                    
+                except Exception as e:
+                    print(f"      ❌ Failed: {e}")
+                    sample_size_results[task] = {"error": str(e)}
+            
+            # Summary
+            successful = sum(1 for r in sample_size_results.values() if "error" not in r)
+            print(f"\n✅ Sample size optimization completed!")
+            print(f"   📊 Successfully optimized {successful}/{len(tasks)} tasks")
+        else:
+            print(f"\n⏭️  Skipping sample size optimization")
+        
+        # Step 3: Train final classifiers with optimal sample sizes
+        if not args.skip_classifier_training:
+            print(f"\n🎨 Step 3: Training Final Classifiers with Optimal Sample Sizes")
+            print(f"   💾 This ensures classifiers are cached for instant use")
+            
+            # Reload model config to get all optimal parameters
+            model_config = config_manager.load_model_config(args.model)
+            
+            if model_config:
+                # Get classifier save directory
+                safe_model_name = args.model.replace("/", "_").replace(":", "_")
+                classifier_dir = f"./optimized_classifiers/{safe_model_name}"
+                os.makedirs(classifier_dir, exist_ok=True)
+                
+                classifiers_trained = 0
+                for task in tasks:
+                    try:
+                        print(f"\n   🎯 Training classifier for {task}...")
+                        
+                        # Get task-specific parameters
+                        task_params = model_config.get("task_specific_overrides", {}).get(task, {})
+                        optimal_params = model_config.get("optimal_parameters", {})
+                        
+                        layer = task_params.get("classification_layer", optimal_params.get("classification_layer", 0))
+                        aggregation = task_params.get("token_aggregation", optimal_params.get("token_aggregation", "average"))
+                        threshold = task_params.get("detection_threshold", optimal_params.get("detection_threshold", 0.5))
+                        
+                        # Get optimal sample size
+                        optimal_sample_size = config_manager.get_optimal_sample_size(args.model, task, layer)
+                        if not optimal_sample_size:
+                            optimal_sample_size = 200  # Default fallback
+                        
+                        print(f"      • Layer {layer}, {aggregation} aggregation, threshold {threshold}")
+                        print(f"      • Using {optimal_sample_size} training samples")
+                        
+                        # Build classifier save path
+                        classifier_path = os.path.join(classifier_dir, f"{task}_classifier")
+                        
+                        # Run the pipeline in train-only mode with optimal parameters
+                        result = run_task_pipeline(
+                            task_name=task,
+                            model_name=args.model,
+                            layer=str(layer),
+                            limit=optimal_sample_size,
+                            token_aggregation=aggregation,
+                            detection_threshold=threshold,
+                            train_only=True,
+                            save_classifier=classifier_path,
+                            device=args.device,
+                            verbose=False,
+                            seed=42
+                        )
+                        
+                        if result and not result.get('error'):
+                            print(f"      ✅ Classifier saved successfully")
+                            classifiers_trained += 1
+                        else:
+                            print(f"      ❌ Failed: {result.get('error', 'Unknown error')}")
+                            
+                    except Exception as e:
+                        print(f"      ❌ Error training classifier: {e}")
+                
+                print(f"\n✅ Classifier training completed!")
+                print(f"   📊 Trained and cached {classifiers_trained}/{len(tasks)} classifiers")
+                print(f"   📁 Saved to: {classifier_dir}")
+        else:
+            print(f"\n⏭️  Skipping classifier training")
+        
+        print(f"\n🎉 Full optimization pipeline completed!")
+        print(f"   💾 All configurations saved to model config")
+        print(f"   🎨 Classifiers pre-trained and cached")
+        print(f"   🚀 Ready to use optimized parameters with 'wisent-guard tasks'")
+        print(f"\n   Example usage:")
+        print(f"   $ wisent-guard tasks {tasks[0] if tasks else 'truthfulqa_mc1'} --model {args.model}")
+        print(f"   (Will automatically use optimal parameters and cached classifier)")
+        
+    except Exception as e:
+        print(f"\n❌ Full optimization failed: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()

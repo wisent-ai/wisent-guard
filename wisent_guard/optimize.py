@@ -161,6 +161,7 @@ def optimize_aggregation_on_ground_truth(
     layer_results: Dict[int, Dict[str, Any]],
     test_qa_pairs: List[Dict],
     ground_truth_method: str,
+    task_name: str,
     max_new_tokens: int,
     device: str,
     verbose: bool = False,
@@ -205,7 +206,7 @@ def optimize_aggregation_on_ground_truth(
                        f"   💡 This indicates the test data loading phase failed.\n"
                        f"   🛠️  Check test data extraction and QA pair formatting.")
     
-    evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+    evaluator = GroundTruthEvaluator.from_string(ground_truth_method, task_name=task_name)
     if verbose:
         print(f"   • Ground truth evaluator: {evaluator.method.value}")
         print(f"   • Evaluator initialized successfully")
@@ -565,7 +566,7 @@ def run_smart_optimization(
     
     # Step 2: Optimize aggregation methods + classifier types + thresholds using ground truth (validation data)
     aggregation_results = optimize_aggregation_on_ground_truth(
-        model, collector, contrastive_pairs, layer_results, test_qa_pairs, ground_truth_method, max_new_tokens, device, verbose,
+        model, collector, contrastive_pairs, layer_results, test_qa_pairs, ground_truth_method, task_name, max_new_tokens, device, verbose,
         classifier_types=classifier_types, thresholds=thresholds
     )
     

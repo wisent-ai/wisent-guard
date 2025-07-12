@@ -37,7 +37,7 @@ class FullBenchmarkDownloader:
         'social_i_qa', 'hendrycks_math', 'arithmetic', 'humaneval', 'mbpp',
         'crows_pairs', 'hendrycks_ethics', 'anli', 'xnli', 'xcopa', 
         'xstorycloze', 'xwinograd', 'paws_x', 'mgsm', 'belebele', 'medqa',
-        'lambada', 'lambada_cloze', 'lambada_multilingual', 'blimp', 
+        'lambada_cloze', 'lambada_multilingual', 'blimp', 
         'unscramble', 'big_bench'
     }
     

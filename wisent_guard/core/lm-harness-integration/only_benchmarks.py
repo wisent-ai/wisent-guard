@@ -374,6 +374,37 @@ CORE_BENCHMARKS = {
         "tags": ["reasoning", "general knowledge", "science"],
         "priority": "low"  # 129.8s - slow for agentic use
     },
+    # GLUE individual tasks
+    "mrpc": {
+        "task": "mrpc",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
+    "qnli": {
+        "task": "qnli",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
+    "qqp": {
+        "task": "qqp",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
+    "rte": {
+        "task": "rte",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
+    "sst": {
+        "task": "sst2",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
+    "wnli": {
+        "task": "wnli",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
     "superglue": {
         "task": "superglue", 
         "tags": ["reasoning", "general knowledge", "science"],
@@ -493,6 +524,16 @@ CORE_BENCHMARKS = {
         "task": "squadv2",  # Fixed: correct task name
         "tags": ["reasoning", "general knowledge", "long context"],
         "priority": "medium"  # 16.4s - moderate for agentic use
+    },
+    "mc_taco": {
+        "task": "mc_taco",
+        "tags": ["reasoning", "general knowledge", "science"],
+        "priority": "high"
+    },
+    "quac": {
+        "task": "quac",
+        "tags": ["reasoning", "general knowledge", "long context"],
+        "priority": "high"
     },
     "triviaqa": {
         "task": "triviaqa",

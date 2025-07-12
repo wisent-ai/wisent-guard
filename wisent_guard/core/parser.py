@@ -54,6 +54,16 @@ def setup_parser() -> argparse.ArgumentParser:
                                                      help="Optimize steering parameters for different methods")
     setup_steering_optimizer_parser(steering_optimizer_parser)
     
+    # Sample size optimization command for finding optimal training sample sizes
+    sample_size_optimizer_parser = subparsers.add_parser("optimize-sample-size",
+                                                        help="Find optimal training sample size for classifiers")
+    setup_sample_size_optimizer_parser(sample_size_optimizer_parser)
+    
+    # Full optimization command that runs both classification and sample size optimization
+    full_optimizer_parser = subparsers.add_parser("full-optimize",
+                                                 help="Run full optimization: classification parameters then sample size")
+    setup_full_optimizer_parser(full_optimizer_parser)
+    
     return parser
 
 
@@ -656,6 +666,24 @@ def setup_steering_optimizer_parser(parser):
     # Create subparsers for different steering optimization types
     steering_subparsers = parser.add_subparsers(dest="steering_action", help="Steering optimization actions")
     
+    # Auto optimization subcommand (NEW - runs after classification optimization)
+    auto_parser = steering_subparsers.add_parser("auto",
+                                                help="Automatically optimize steering based on classification config")
+    auto_parser.add_argument("model", type=str, help="Model name or path")
+    auto_parser.add_argument("--task", type=str, default=None,
+                           help="Specific task to optimize (defaults to all classification-optimized tasks)")
+    auto_parser.add_argument("--methods", type=str, nargs='+',
+                           choices=["CAA", "HPR", "DAC", "BiPO", "KSteering"],
+                           default=["CAA", "HPR"],
+                           help="Steering methods to test (default: CAA, HPR)")
+    auto_parser.add_argument("--limit", type=int, default=100,
+                           help="Maximum samples for testing (default: 100)")
+    auto_parser.add_argument("--max-time", type=float, default=60.0,
+                           help="Maximum time in minutes (default: 60)")
+    auto_parser.add_argument("--strength-range", type=float, nargs='+',
+                           default=[0.5, 1.0, 1.5, 2.0],
+                           help="Steering strengths to test (default: 0.5 1.0 1.5 2.0)")
+    
     # Method comparison subcommand
     method_parser = steering_subparsers.add_parser("compare-methods", 
                                                   help="Compare different steering methods for a task")
@@ -779,3 +807,60 @@ def setup_model_config_parser(parser):
     parser.add_argument("--config-dir", type=str, default=None,
                        help="Custom directory for configuration files (default: ~/.wisent-guard/model_configs/)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+
+
+def setup_sample_size_optimizer_parser(parser):
+    """Set up the sample-size-optimizer subcommand parser."""
+    parser.add_argument("model", type=str, help="Model name or path to optimize")
+    parser.add_argument("--task", type=str, required=True,
+                       help="Task to optimize for (REQUIRED)")
+    parser.add_argument("--layer", type=int, required=True,
+                       help="Layer index to use (REQUIRED - must match your classifier config)")
+    parser.add_argument("--token-aggregation", type=str, required=True,
+                       choices=["average", "final", "first", "max", "min"],
+                       help="Token aggregation method (REQUIRED - must match your classifier config)")
+    parser.add_argument("--threshold", type=float, required=True,
+                       help="Detection threshold (REQUIRED - must match your classifier config)")
+    parser.add_argument("--sample-sizes", type=int, nargs='+',
+                       default=[1, 2, 5, 10, 20, 50, 100, 200, 500],
+                       help="Sample sizes to test (default: 1 2 5 10 20 50 100 200 500)")
+    parser.add_argument("--test-split", type=float, default=0.2,
+                       help="Fraction of data to use for testing (default: 0.2)")
+    parser.add_argument("--limit", type=int, default=None,
+                       help="Maximum number of samples to load from dataset (default: 1000)")
+    parser.add_argument("--save-plot", action="store_true",
+                       help="Save performance plot")
+    parser.add_argument("--no-save-config", action="store_true",
+                       help="Don't save optimal sample size to model config")
+    parser.add_argument("--device", type=str, default=None,
+                       help="Device to run on")
+    parser.add_argument("--verbose", action="store_true",
+                       help="Enable verbose output")
+    parser.add_argument("--force", action="store_true",
+                       help="Force optimization even without matching classifier parameters")
+
+
+def setup_full_optimizer_parser(parser):
+    """Set up the full-optimize subcommand parser."""
+    parser.add_argument("model", type=str, help="Model name or path to optimize")
+    parser.add_argument("--tasks", type=str, nargs='+', 
+                       help="Tasks to optimize (default: all 37 available tasks)")
+    parser.add_argument("--classification-limit", type=int, default=200,
+                       help="Sample limit for classification optimization (default: 200)")
+    parser.add_argument("--sample-size-limit", type=int, default=1000,
+                       help="Sample limit for sample size optimization (default: 1000)")
+    parser.add_argument("--sample-sizes", type=int, nargs='+',
+                       default=[5, 10, 20, 50, 100, 200, 500],
+                       help="Sample sizes to test (default: 5 10 20 50 100 200 500)")
+    parser.add_argument("--skip-classification", action="store_true",
+                       help="Skip classification optimization and use existing config")
+    parser.add_argument("--skip-sample-size", action="store_true",
+                       help="Skip sample size optimization")
+    parser.add_argument("--skip-classifier-training", action="store_true",
+                       help="Skip final classifier training step")
+    parser.add_argument("--device", type=str, default=None,
+                       help="Device to run on")
+    parser.add_argument("--verbose", action="store_true",
+                       help="Enable verbose output")
+    parser.add_argument("--save-plots", action="store_true",
+                       help="Save plots for both optimizations")

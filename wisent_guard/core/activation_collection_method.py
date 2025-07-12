@@ -240,10 +240,15 @@ class ActivationCollectionLogic:
         """
         pairs = []
         for qa_pair in qa_pairs:
+            # Handle both field names for backward compatibility
+            incorrect = qa_pair.get('incorrect_answer') or qa_pair.get('incorrect_choice')
+            if not incorrect:
+                raise KeyError(f"Missing 'incorrect_answer' field in qa_pair: {qa_pair.keys()}")
+            
             pair = self.create_contrastive_pair(
                 question=qa_pair['question'],
                 correct_answer=qa_pair['correct_answer'],
-                incorrect_answer=qa_pair['incorrect_answer'],
+                incorrect_answer=incorrect,
                 prompt_strategy=prompt_strategy
             )
             pairs.append(pair)

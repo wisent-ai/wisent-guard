@@ -307,7 +307,83 @@ class LMEvalHarnessGroundTruth:
             
             for i, doc in enumerate(docs):
                 try:
-                    # Extract question/prompt and possible completions
+                    # For WikiText and other pure language modeling tasks
+                    if task_name == "wikitext":
+                        # Get the full text for perplexity calculation
+                        text = doc.get('page', doc.get('text', ''))
+                        if not text:
+                            logger.warning(f"No text found in WikiText document {i}")
+                            continue
+                        
+                        logger.info(f"🔸 Calculating perplexity for WikiText document {i} ({len(text)} chars)...")
+                        
+                        # Calculate perplexity on the full text
+                        perplexity = self._calculate_perplexity(model, text)
+                        
+                        # Extract activations from the text for classifier
+                        try:
+                            from .activations import Activations, ActivationAggregationMethod
+                            from .layer import Layer
+                            
+                            layer_obj = Layer(index=layer, type="transformer")
+                            
+                            # Use a truncated version for activation extraction if text is too long
+                            activation_text = text[:1000] if len(text) > 1000 else text
+                            activation_tensor = model.extract_activations(activation_text, layer_obj)
+                            activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
+                            
+                            activation_obj = Activations(
+                                tensor=activation_tensor,
+                                layer=layer_obj,
+                                aggregation_method=activation_method
+                            )
+                            
+                            # Get classifier prediction
+                            features = activation_obj.extract_features_for_classifier()
+                            
+                            # Handle different classifier return formats
+                            try:
+                                prediction_proba = classifier.predict_proba([features.cpu().numpy()])
+                                
+                                if isinstance(prediction_proba, (list, tuple)) and len(prediction_proba) > 0:
+                                    classification_score = float(prediction_proba[0])
+                                else:
+                                    classification_score = float(prediction_proba)
+                                    
+                                if hasattr(classification_score, '__len__') and not isinstance(classification_score, str):
+                                    classification_score = float(classification_score[0])
+                                    
+                            except Exception as proba_error:
+                                logger.warning(f"predict_proba failed: {proba_error}, trying predict...")
+                                try:
+                                    classification_score = float(classifier.predict([features.cpu().numpy()])[0])
+                                except Exception as predict_error:
+                                    logger.error(f"Both predict_proba and predict failed: {predict_error}")
+                                    classification_score = 0.5
+                            
+                        except Exception as e:
+                            logger.error(f"Error classifying WikiText document: {e}")
+                            classification_score = None
+                        
+                        result = {
+                            'document_idx': i,
+                            'text_preview': text[:200] + "..." if len(text) > 200 else text,
+                            'text_length': len(text),
+                            'perplexity': perplexity,
+                            'classifier_score': classification_score
+                        }
+                        
+                        perplexity_results.append(result)
+                        
+                        logger.info(f"📋 WikiText Perplexity Analysis:")
+                        logger.info(f"   📊 Document {i}: {len(text)} chars")
+                        logger.info(f"   🎯 Perplexity: {perplexity:.3f}")
+                        if classification_score is not None:
+                            logger.info(f"   🧠 Classifier score: {classification_score:.3f} (lower = more truthful)")
+                        
+                        continue  # Skip the rest of the loop for WikiText
+                    
+                    # Extract question/prompt and possible completions for other tasks
                     if hasattr(task_data, 'doc_to_text'):
                         prompt = task_data.doc_to_text(doc)
                     else:
@@ -455,23 +531,40 @@ class LMEvalHarnessGroundTruth:
             
             # Calculate overall metrics
             total_samples = len(perplexity_results)
-            correct_perplexity = sum(1 for r in perplexity_results if r['perplexity_correct'] == True)
-            perplexity_accuracy = correct_perplexity / total_samples if total_samples > 0 else 0.0
             
-            # Average classifier score
-            classifier_scores = [r['classifier_score'] for r in perplexity_results if r['classifier_score'] is not None]
-            avg_classifier_score = sum(classifier_scores) / len(classifier_scores) if classifier_scores else None
+            if task_name == "wikitext":
+                # For WikiText, we don't have correct/incorrect, just perplexity values
+                perplexities = [r['perplexity'] for r in perplexity_results if r['perplexity'] != float('inf')]
+                avg_perplexity = sum(perplexities) / len(perplexities) if perplexities else float('inf')
+                
+                # Average classifier score
+                classifier_scores = [r['classifier_score'] for r in perplexity_results if r['classifier_score'] is not None]
+                avg_classifier_score = sum(classifier_scores) / len(classifier_scores) if classifier_scores else None
+                
+                perplexity_accuracy = 1.0 if avg_perplexity < 100 else 0.0  # Arbitrary threshold for "good" perplexity
+                correct_perplexity = sum(1 for r in perplexity_results if r['perplexity'] < 100)
+            else:
+                correct_perplexity = sum(1 for r in perplexity_results if r.get('perplexity_correct') == True)
+                perplexity_accuracy = correct_perplexity / total_samples if total_samples > 0 else 0.0
+                
+                # Average classifier score
+                classifier_scores = [r['classifier_score'] for r in perplexity_results if r['classifier_score'] is not None]
+                avg_classifier_score = sum(classifier_scores) / len(classifier_scores) if classifier_scores else None
             
             logger.info(f"📊 PERPLEXITY EVALUATION RESULTS:")
             logger.info(f"   • Total samples: {total_samples}")
-            logger.info(f"   • Perplexity accuracy: {perplexity_accuracy:.3f}")
+            if task_name == "wikitext":
+                logger.info(f"   • Average perplexity: {avg_perplexity:.3f}")
+                logger.info(f"   • Documents with perplexity < 100: {correct_perplexity}")
+            else:
+                logger.info(f"   • Perplexity accuracy: {perplexity_accuracy:.3f}")
             logger.info(f"   • Average classifier score: {avg_classifier_score:.3f}" if avg_classifier_score is not None else "   • Average classifier score: N/A")
             
-            return {
+            result_dict = {
                 "ground_truth": "EVALUATED",
                 "method_used": "lm-eval-harness-perplexity",
                 "confidence": perplexity_accuracy,
-                "details": f"Calculated perplexity for {total_samples} samples, accuracy: {perplexity_accuracy:.3f}",
+                "details": f"Calculated perplexity for {total_samples} samples",
                 "task_name": task_name,
                 "evaluation_method": "perplexity",
                 "perplexity_accuracy": perplexity_accuracy,
@@ -480,6 +573,14 @@ class LMEvalHarnessGroundTruth:
                 "correct_perplexity": correct_perplexity,
                 "perplexity_results": perplexity_results[:10]  # First 10 for debugging
             }
+            
+            if task_name == "wikitext":
+                result_dict["average_perplexity"] = avg_perplexity
+                result_dict["details"] = f"Calculated perplexity for {total_samples} WikiText documents, avg perplexity: {avg_perplexity:.3f}"
+            else:
+                result_dict["details"] = f"Calculated perplexity for {total_samples} samples, accuracy: {perplexity_accuracy:.3f}"
+                
+            return result_dict
             
         except Exception as e:
             logger.error(f"Error in perplexity evaluation: {e}")
