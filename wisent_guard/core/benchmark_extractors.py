@@ -1290,6 +1290,49 @@ class WNLIExtractor(BenchmarkExtractor):
             return None
 
 
+class ASDivExtractor(BenchmarkExtractor):
+    """Extractor for ASDdiv arithmetic story problems."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None):
+        """Extract QA pair from ASDdiv document.
+        
+        ASDdiv contains arithmetic story problems where we need to generate
+        incorrect answers for contrastive learning.
+        """
+        # Get the problem text and solution
+        problem = doc.get('body', '') + ' ' + doc.get('question', '')
+        correct_answer = str(doc.get('answer', ''))
+        
+        # Generate incorrect answer by modifying the correct one
+        try:
+            correct_num = float(correct_answer)
+            # Generate a plausible wrong answer
+            import random
+            operation = random.choice([
+                lambda x: x + random.randint(1, 10),
+                lambda x: x - random.randint(1, 10),
+                lambda x: x * 2,
+                lambda x: x / 2 if x > 1 else x + 5
+            ])
+            incorrect_num = operation(correct_num)
+            
+            # Format to match original (int vs float)
+            if '.' not in correct_answer:
+                incorrect_answer = str(int(incorrect_num))
+            else:
+                incorrect_answer = str(round(incorrect_num, 2))
+                
+        except (ValueError, TypeError):
+            # If answer is not numeric, create a simple wrong answer
+            incorrect_answer = correct_answer + " (wrong)"
+        
+        return {
+            'question': problem.strip(),
+            'correct_answer': correct_answer,
+            'incorrect_answer': incorrect_answer
+        }
+
+
 class WikiTextExtractor(BenchmarkExtractor):
     """Extractor for WikiText benchmark (language modeling/perplexity tasks)."""
     
@@ -1900,6 +1943,7 @@ EXTRACTORS = {
     'winogrande': WinograndeExtractor,
     'arc_challenge': ARCExtractor,
     'arc_easy': ARCExtractor,
+    'asdiv': ASDivExtractor,
     'hellaswag': HellaSwagExtractor,
     'truthfulqa_mc1': TruthfulQAExtractor,
     'truthfulqa_mc2': TruthfulQAExtractor,

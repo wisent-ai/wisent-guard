@@ -9,7 +9,9 @@ import sys
 import os
 import json
 import csv
+import time
 import torch
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
@@ -601,7 +603,11 @@ def run_task_pipeline(
     
     # AUTO-LOAD MODEL CONFIGURATION (if available)
     # Load saved optimal parameters for this model if they exist
-    from .core.model_config_manager import get_optimal_parameters
+    from .core.model_config_manager import get_optimal_parameters, ModelConfigManager
+    
+    # Load model config for control vectors and other settings
+    config_manager = ModelConfigManager()
+    model_config = config_manager.load_model_config(model_name)
     
     # Check if we should load saved configuration
     # Only load if parameters haven't been explicitly overridden by CLI arguments
@@ -648,6 +654,35 @@ def run_task_pipeline(
                 print(f"   • To override these defaults, specify parameters explicitly")
                 print(f"   • Config file: ~/.wisent-guard/model_configs/")
                 print()
+        
+        # AUTO-LOAD CONTROL VECTOR: Check if a control vector exists for this task
+        control_vector_info = None
+        if task_name and model_config:
+            control_vectors = model_config.get("control_vectors", {})
+            if task_name in control_vectors:
+                vector_info = control_vectors[task_name]
+                vector_path = vector_info.get("path")
+                
+                if vector_path and os.path.exists(vector_path):
+                    try:
+                        # Load the control vector
+                        vector_data = torch.load(vector_path)
+                        control_vector_info = {
+                            'vector': vector_data['vector'],
+                            'layer': vector_data['layer'],
+                            'path': vector_path,
+                            'loaded': True
+                        }
+                        
+                        if verbose:
+                            print(f"\n🎮 Auto-loaded control vector for {task_name}")
+                            print(f"   • Layer: {vector_data['layer']}")
+                            print(f"   • Vector shape: {vector_data['vector'].shape}")
+                            print(f"   • Path: {vector_path}")
+                            print()
+                    except Exception as e:
+                        if verbose:
+                            print(f"⚠️  Failed to load control vector: {e}")
     """
     Run the complete pipeline for a single task or file.
     
@@ -2062,6 +2097,38 @@ def run_task_pipeline(
                 load_classifier = None  # Reset to allow training
                 steering_methods = {}
                 layer_training_results = {}
+        
+        # AUTO-USE CONTROL VECTOR: If we have a control vector and steering is not explicitly disabled, set it up
+        if control_vector_info and control_vector_info.get('loaded') and not (steering_mode and load_steering_vector):
+            try:
+                from .core.steering_methods.control_vector_steering import ControlVectorSteering
+                
+                # Create control vector steering method
+                cv_layer = control_vector_info['layer']
+                cv_steering = ControlVectorSteering(
+                    control_vector=control_vector_info['vector'],
+                    layer=cv_layer,
+                    device=device
+                )
+                
+                # Add to steering methods
+                if cv_layer in layers:
+                    steering_methods[cv_layer] = cv_steering
+                    layer_training_results[cv_layer] = {
+                        'accuracy': 'N/A',
+                        'f1': 'N/A',
+                        'loaded': True,
+                        'type': 'control_vector'
+                    }
+                    
+                    if verbose:
+                        print(f"\n🎮 Using auto-loaded control vector for layer {cv_layer}")
+                        print(f"   • Vector will be applied during generation")
+                        print(f"   • Use --skip-steering to disable")
+                
+            except Exception as e:
+                if verbose:
+                    print(f"⚠️  Failed to set up control vector steering: {e}")
         
         # Only train if we didn't successfully load classifiers
         if not steering_methods and is_multi_layer:
@@ -4364,10 +4431,64 @@ def handle_full_optimization_command(args):
             tasks = get_valid_task_names()
             print(f"   📋 Tasks: All {len(tasks)} available benchmarks")
         
+        # Create time estimator
+        from .core.time_estimator import OptimizationTimeEstimator
+        estimator = OptimizationTimeEstimator(args.model, tasks, verbose=args.verbose)
+        
+        # Get initial time estimate
+        total_time, phase_times = estimator.estimate_total_time(
+            classification_limit=args.classification_limit,
+            sample_sizes=args.sample_sizes,
+            sample_size_limit=args.sample_size_limit,
+            skip_classification=args.skip_classification,
+            skip_sample_size=args.skip_sample_size,
+            skip_classifier_training=args.skip_classifier_training,
+            skip_control_vectors=args.skip_control_vectors
+        )
+        
+        # Display time estimate
+        print(f"\n⏱️  ESTIMATED OPTIMIZATION TIME:")
+        print(f"   📊 Total estimated time: {estimator.format_time(total_time)}")
+        print(f"   🚀 Estimated completion: {estimator.format_eta(datetime.now() + timedelta(seconds=total_time))}")
+        
+        if args.verbose:
+            print(f"\n   📈 Phase breakdown:")
+            if not args.skip_classification:
+                print(f"      • Classification optimization: {estimator.format_time(phase_times['classification'])}")
+            if not args.skip_sample_size:
+                print(f"      • Sample size optimization: {estimator.format_time(phase_times['sample_size'])}")
+            if not args.skip_classifier_training:
+                print(f"      • Classifier training: {estimator.format_time(phase_times['classifier_training'])}")
+            if not args.skip_control_vectors:
+                print(f"      • Control vector training: {estimator.format_time(phase_times['control_vector'])}")
+        
+        print(f"\n   💡 Note: Actual time may vary based on system performance")
+        print(f"   🔄 Progress updates will be shown during optimization\n")
+        
+        # Start tracking
+        estimator.start_optimization()
+        
         # Step 1: Classification optimization (unless skipped)
         if not args.skip_classification:
             print(f"\n📈 Step 1: Classification Parameter Optimization")
             print(f"   🔢 Sample limit: {args.classification_limit}")
+            
+            estimator.start_phase("classification")
+            
+            # Create a custom progress callback
+            def classification_progress_callback(task_idx, task_name, status):
+                """Callback to track classification progress."""
+                if status == "completed":
+                    estimator.task_completed()
+                    progress = estimator.get_phase_progress()
+                    
+                    if progress:
+                        print(f"   ✅ [{progress['completed']}/{progress['total']}] {task_name} optimized")
+                        print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
+                              f"ETA: {estimator.format_eta(progress['eta'])} | "
+                              f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
+                elif status == "started":
+                    print(f"   🔄 [{task_idx+1}/{len(tasks)}] Optimizing {task_name}...")
             
             from .core.classification_optimizer import run_classification_optimization
             
@@ -4378,11 +4499,17 @@ def handle_full_optimization_command(args):
                 verbose=args.verbose,
                 tasks=tasks,
                 save_results=True,
-                save_classifiers=True  # Save classifiers during optimization
+                save_classifiers=True,  # Save classifiers during optimization
+                progress_callback=classification_progress_callback
             )
             
             print(f"\n✅ Classification optimization completed!")
             print(f"   📊 Optimized {classification_results.successful_optimizations}/{classification_results.total_tasks_tested} tasks")
+            
+            # Update overall progress
+            overall = estimator.get_overall_progress(phase_times)
+            if overall:
+                print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete")
         else:
             print(f"\n⏭️  Skipping classification optimization (using existing config)")
         
@@ -4391,6 +4518,8 @@ def handle_full_optimization_command(args):
             print(f"\n📏 Step 2: Sample Size Optimization")
             print(f"   🔢 Testing sample sizes: {args.sample_sizes}")
             print(f"   📊 Dataset limit: {args.sample_size_limit}")
+            
+            estimator.start_phase("sample_size")
             
             # Load model config to get optimal parameters
             from .core.model_config_manager import ModelConfigManager
@@ -4406,8 +4535,8 @@ def handle_full_optimization_command(args):
             from .core.sample_size_optimizer import run_sample_size_optimization
             
             sample_size_results = {}
-            for task in tasks:
-                print(f"\n   📋 Optimizing sample size for {task}...")
+            for idx, task in enumerate(tasks):
+                print(f"\n   📋 [{idx+1}/{len(tasks)}] Optimizing sample size for {task}...")
                 
                 # Get task-specific parameters
                 task_params = model_config.get("task_specific_overrides", {}).get(task, {})
@@ -4437,6 +4566,14 @@ def handle_full_optimization_command(args):
                     sample_size_results[task] = results
                     print(f"      ✅ Optimal sample size: {results['optimal_sample_size']}")
                     
+                    # Update progress
+                    estimator.task_completed()
+                    progress = estimator.get_phase_progress()
+                    if progress:
+                        print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
+                              f"ETA: {estimator.format_eta(progress['eta'])} | "
+                              f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
+                    
                 except Exception as e:
                     print(f"      ❌ Failed: {e}")
                     sample_size_results[task] = {"error": str(e)}
@@ -4445,6 +4582,12 @@ def handle_full_optimization_command(args):
             successful = sum(1 for r in sample_size_results.values() if "error" not in r)
             print(f"\n✅ Sample size optimization completed!")
             print(f"   📊 Successfully optimized {successful}/{len(tasks)} tasks")
+            
+            # Update overall progress
+            overall = estimator.get_overall_progress(phase_times)
+            if overall:
+                print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete | "
+                      f"ETA: {estimator.format_eta(overall['eta'])}")
         else:
             print(f"\n⏭️  Skipping sample size optimization")
         
@@ -4452,6 +4595,8 @@ def handle_full_optimization_command(args):
         if not args.skip_classifier_training:
             print(f"\n🎨 Step 3: Training Final Classifiers with Optimal Sample Sizes")
             print(f"   💾 This ensures classifiers are cached for instant use")
+            
+            estimator.start_phase("classifier_training")
             
             # Reload model config to get all optimal parameters
             model_config = config_manager.load_model_config(args.model)
@@ -4463,9 +4608,9 @@ def handle_full_optimization_command(args):
                 os.makedirs(classifier_dir, exist_ok=True)
                 
                 classifiers_trained = 0
-                for task in tasks:
+                for idx, task in enumerate(tasks):
                     try:
-                        print(f"\n   🎯 Training classifier for {task}...")
+                        print(f"\n   🎯 [{idx+1}/{len(tasks)}] Training classifier for {task}...")
                         
                         # Get task-specific parameters
                         task_params = model_config.get("task_specific_overrides", {}).get(task, {})
@@ -4506,6 +4651,14 @@ def handle_full_optimization_command(args):
                             classifiers_trained += 1
                         else:
                             print(f"      ❌ Failed: {result.get('error', 'Unknown error')}")
+                        
+                        # Update progress
+                        estimator.task_completed()
+                        progress = estimator.get_phase_progress()
+                        if progress:
+                            print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
+                                  f"ETA: {estimator.format_eta(progress['eta'])} | "
+                                  f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
                             
                     except Exception as e:
                         print(f"      ❌ Error training classifier: {e}")
@@ -4513,16 +4666,181 @@ def handle_full_optimization_command(args):
                 print(f"\n✅ Classifier training completed!")
                 print(f"   📊 Trained and cached {classifiers_trained}/{len(tasks)} classifiers")
                 print(f"   📁 Saved to: {classifier_dir}")
+                
+                # Update overall progress
+                overall = estimator.get_overall_progress(phase_times)
+                if overall:
+                    print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete | "
+                          f"ETA: {estimator.format_eta(overall['eta'])}")
         else:
             print(f"\n⏭️  Skipping classifier training")
+        
+        # Step 4: Train control vectors with optimal parameters
+        if not args.skip_control_vectors:
+            print(f"\n🎮 Step 4: Training Control Vectors for Steering")
+            print(f"   🧲 This enables model steering for improved truthfulness")
+            
+            estimator.start_phase("control_vector")
+            
+            # Reload model config to get all optimal parameters
+            model_config = config_manager.load_model_config(args.model)
+            
+            if model_config:
+                # Get control vector save directory
+                safe_model_name = args.model.replace("/", "_").replace(":", "_")
+                vector_dir = f"./control_vectors/{safe_model_name}"
+                os.makedirs(vector_dir, exist_ok=True)
+                
+                # Load the model for activation extraction
+                from .core.model import Model
+                model = Model(name=args.model, device=args.device)
+                
+                vectors_trained = 0
+                for idx, task in enumerate(tasks):
+                    try:
+                        print(f"\n   🎯 [{idx+1}/{len(tasks)}] Training control vector for {task}...")
+                        
+                        # Get task-specific parameters
+                        task_params = model_config.get("task_specific_overrides", {}).get(task, {})
+                        optimal_params = model_config.get("optimal_parameters", {})
+                        
+                        # Use steering layer if available, otherwise use classification layer
+                        steering_config = model_config.get("steering_optimization", {})
+                        task_steering = model_config.get("task_specific_steering", {}).get(task, {})
+                        
+                        layer = task_steering.get("layer", 
+                               steering_config.get("best_layer", 
+                               task_params.get("classification_layer", 
+                               optimal_params.get("classification_layer", 0))))
+                        
+                        # Get optimal sample size
+                        optimal_sample_size = config_manager.get_optimal_sample_size(args.model, task, layer)
+                        if not optimal_sample_size:
+                            optimal_sample_size = 200  # Default fallback
+                        
+                        print(f"      • Layer {layer}")
+                        print(f"      • Using {optimal_sample_size} training samples")
+                        
+                        # Load task data and create contrastive pairs
+                        actual_task_name = get_actual_task_name(task)
+                        task_data = model.load_lm_eval_task(actual_task_name, shots=0, limit=optimal_sample_size)
+                        
+                        from .core.agent.diagnose.tasks.task_manager import load_docs
+                        docs = load_docs(task_data, limit=optimal_sample_size)
+                        
+                        # Extract QA pairs
+                        from .core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
+                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task, task_data, docs)
+                        
+                        if not qa_pairs:
+                            print(f"      ❌ No QA pairs extracted")
+                            continue
+                        
+                        # Create contrastive pairs
+                        from .core.activation_collection_method import ActivationCollectionLogic
+                        from .core.contrastive_pairs.prompt_construction import PromptConstructionStrategy
+                        
+                        collector = ActivationCollectionLogic(model=model)
+                        prompt_strategy = PromptConstructionStrategy.MULTIPLE_CHOICE
+                        contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs, prompt_strategy)
+                        
+                        # Extract activations
+                        from .core import Layer
+                        layer_obj = Layer(index=layer)
+                        
+                        print(f"      • Extracting activations from {len(contrastive_pairs)} pairs...")
+                        
+                        # Create ContrastivePairSet from extracted pairs
+                        pair_set = ContrastivePairSet(name=f"{task}_control_vector")
+                        pair_set.pairs = contrastive_pairs
+                        
+                        # Extract activations for each pair
+                        for pair in pair_set.pairs:
+                            # Extract positive activations
+                            if pair.positive_response:
+                                pos_activations = model.extract_activations(
+                                    pair.positive_response.text, 
+                                    layer_obj
+                                )
+                                pair.positive_response.activations = pos_activations
+                            
+                            # Extract negative activations  
+                            if pair.negative_response:
+                                neg_activations = model.extract_activations(
+                                    pair.negative_response.text,
+                                    layer_obj
+                                )
+                                pair.negative_response.activations = neg_activations
+                        
+                        # Compute control vector
+                        control_vector = pair_set.compute_contrastive_vector(layer_obj)
+                        
+                        if control_vector is not None:
+                            # Save control vector
+                            vector_path = os.path.join(vector_dir, f"{task}_control_vector.pt")
+                            torch.save({
+                                'vector': control_vector,
+                                'layer': layer,
+                                'task': task,
+                                'sample_size': len(contrastive_pairs),
+                                'model_name': args.model,
+                                'timestamp': datetime.now().isoformat()
+                            }, vector_path)
+                            
+                            print(f"      ✅ Control vector saved successfully")
+                            vectors_trained += 1
+                            
+                            # Update model config with control vector info
+                            if "control_vectors" not in model_config:
+                                model_config["control_vectors"] = {}
+                            
+                            model_config["control_vectors"][task] = {
+                                "path": vector_path,
+                                "layer": layer,
+                                "sample_size": len(contrastive_pairs),
+                                "trained_date": datetime.now().isoformat()
+                            }
+                        else:
+                            print(f"      ❌ Failed to compute control vector")
+                        
+                        # Update progress
+                        estimator.task_completed()
+                        progress = estimator.get_phase_progress()
+                        if progress:
+                            print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
+                                  f"ETA: {estimator.format_eta(progress['eta'])} | "
+                                  f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
+                            
+                    except Exception as e:
+                        print(f"      ❌ Error training control vector: {e}")
+                        if args.verbose:
+                            import traceback
+                            traceback.print_exc()
+                
+                # Save updated model config
+                config_manager.save_model_config(args.model, model_config)
+                
+                print(f"\n✅ Control vector training completed!")
+                print(f"   📊 Trained and cached {vectors_trained}/{len(tasks)} control vectors")
+                print(f"   📁 Saved to: {vector_dir}")
+                
+                # Final overall progress
+                overall = estimator.get_overall_progress(phase_times)
+                if overall:
+                    total_time = time.time() - estimator.start_time
+                    print(f"\n   ⏱️  Total optimization time: {estimator.format_time(total_time)}")
+                    print(f"   📊 All phases 100% complete!")
+        else:
+            print(f"\n⏭️  Skipping control vector training")
         
         print(f"\n🎉 Full optimization pipeline completed!")
         print(f"   💾 All configurations saved to model config")
         print(f"   🎨 Classifiers pre-trained and cached")
+        print(f"   🎮 Control vectors trained and cached")
         print(f"   🚀 Ready to use optimized parameters with 'wisent-guard tasks'")
         print(f"\n   Example usage:")
         print(f"   $ wisent-guard tasks {tasks[0] if tasks else 'truthfulqa_mc1'} --model {args.model}")
-        print(f"   (Will automatically use optimal parameters and cached classifier)")
+        print(f"   (Will automatically use optimal parameters, cached classifier, and control vector)")
         
     except Exception as e:
         print(f"\n❌ Full optimization failed: {e}")

@@ -257,7 +257,8 @@ class ClassificationOptimizer:
         results_file: Optional[str] = None,
         save_logs_json: Optional[str] = None,
         save_classifiers: bool = True,
-        classifiers_dir: Optional[str] = None
+        classifiers_dir: Optional[str] = None,
+        progress_callback: Optional[callable] = None
     ) -> ClassificationOptimizationSummary:
         """
         Run comprehensive classification optimization across all available tasks.
@@ -274,6 +275,7 @@ class ClassificationOptimizer:
             save_logs_json: Path to save detailed logs as JSON
             save_classifiers: Whether to save the best classifier for each task (default: True)
             classifiers_dir: Directory to save classifiers (default: ./optimized_classifiers/model_name/)
+            progress_callback: Optional callback function(task_idx, task_name, status) for progress updates
             
         Returns:
             ClassificationOptimizationSummary with comprehensive results
@@ -350,6 +352,10 @@ class ClassificationOptimizer:
             
             task_start_time = time.time()
             
+            # Call progress callback with "started" status
+            if progress_callback:
+                progress_callback(i-1, task_name, "started")
+            
             if detailed_logger:
                 detailed_logger.log_task(
                     task_name,
@@ -385,6 +391,10 @@ class ClassificationOptimizer:
                 logger.info(f"   🔧 Best aggregation: {result.best_aggregation}")
                 logger.info(f"   📊 Best F1: {result.best_f1:.3f}")
                 logger.info(f"   ⏱️  Time: {result.optimization_time_seconds:.1f}s")
+                
+                # Call progress callback with "completed" status
+                if progress_callback:
+                    progress_callback(i-1, task_name, "completed")
                 
                 if detailed_logger:
                     detailed_logger.log_task(

@@ -858,6 +858,8 @@ def setup_full_optimizer_parser(parser):
                        help="Skip sample size optimization")
     parser.add_argument("--skip-classifier-training", action="store_true",
                        help="Skip final classifier training step")
+    parser.add_argument("--skip-control-vectors", action="store_true",
+                       help="Skip control vector training step")
     parser.add_argument("--device", type=str, default=None,
                        help="Device to run on")
     parser.add_argument("--verbose", action="store_true",
