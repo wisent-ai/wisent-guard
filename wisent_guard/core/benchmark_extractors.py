@@ -1969,7 +1969,6 @@ EXTRACTORS = {
     'sst2': SST2Extractor,  # GLUE SST2 sentiment analysis
     'wnli': WNLIExtractor,  # GLUE WNLI Winograd NLI
     # Add more specific extractors for other benchmarks
-    'asdiv': GSM8KExtractor,  # Math problems similar to GSM8K
     'cb': COPAExtractor,  # Similar format to COPA
     'coqa': SQuAD2Extractor,  # Similar QA format
     'drop': SQuAD2Extractor,  # Similar QA format
