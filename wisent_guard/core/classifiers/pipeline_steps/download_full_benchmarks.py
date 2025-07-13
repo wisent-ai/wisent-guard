@@ -41,6 +41,9 @@ class FullBenchmarkDownloader:
         'lambada_cloze',  # Not a valid lm-eval task
         'lambada_multilingual',  # Not a valid lm-eval task
         'big_bench',  # Use specific big-bench subtasks
+        'anli',  # Causes ground truth evaluation errors
+        'arithmetic',  # Causes ground truth evaluation errors
+        'coqa',  # Causes ground truth evaluation errors
     }
     
     def __init__(self, download_dir: str = "full_benchmarks"):

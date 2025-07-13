@@ -71,10 +71,28 @@ except ImportError:
         UNAVAILABLE_BENCHMARKS = set()
         print("⚠️  Warning: Could not import CORE_BENCHMARKS, using minimal fallback list")
 
-# Filter to only available (working) benchmarks - this gives us the 37 validated benchmarks
+# Define the whitelist of allowed tasks (from LM_EVAL_HARNESS_TASKS)
+ALLOWED_TASKS = {
+    # Original tested tasks
+    "math_qa", "webqs", "truthfulqa_gen", "drop", "record", "squad2", "wikitext", "winogrande",
+    # Multiple choice benchmarks
+    "arc_challenge", "arc_easy", "hellaswag", "truthfulqa_mc1", "truthfulqa_mc2", 
+    "mmlu", "mmmlu", "piqa", "copa", "openbookqa", "race",
+    # Boolean benchmarks
+    "boolq",
+    # Math benchmarks
+    "gsm8k", "asdiv",
+    # QA benchmarks
+    "coqa", "naturalqs", "triviaqa",
+    # Additional benchmarks
+    "cb", "logiqa", "multirc", "mutual", "prost", "pubmedqa", "sciq",
+    "swag", "toxigen", "wic", "wsc", "wsc273",
+}
+
+# Filter to only available (working) benchmarks - this gives us the validated benchmarks
 AVAILABLE_BENCHMARKS = {
     name: config for name, config in CORE_BENCHMARKS.items() 
-    if name not in UNAVAILABLE_BENCHMARKS
+    if name not in UNAVAILABLE_BENCHMARKS and name in ALLOWED_TASKS
 }
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
