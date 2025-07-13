@@ -33,7 +33,14 @@ class FullBenchmarkDownloader:
     
     # Benchmarks that are known to be unavailable or problematic
     UNAVAILABLE_BENCHMARKS = {
-        # Empty set - all benchmarks now have extractors!
+        # These tasks have extractors but don't exist as valid lm-eval tasks
+        'ai2_arc',  # Use arc_challenge and arc_easy instead
+        'glue',  # Use individual GLUE tasks (mrpc, qnli, etc.)
+        'superglue',  # Use individual SuperGLUE tasks
+        'lambada',  # Use lambada_openai or specific variants
+        'lambada_cloze',  # Not a valid lm-eval task
+        'lambada_multilingual',  # Not a valid lm-eval task
+        'big_bench',  # Use specific big-bench subtasks
     }
     
     def __init__(self, download_dir: str = "full_benchmarks"):
