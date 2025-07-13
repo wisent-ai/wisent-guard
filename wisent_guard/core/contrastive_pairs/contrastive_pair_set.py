@@ -1304,8 +1304,27 @@ class ContrastivePairSet:
                     else:
                         # Fallback to generic extraction if extractor fails
                         
+                        # For ARC tasks specifically, handle the case where extractor only returns QA pair
+                        if 'arc' in task_name.lower() and 'choices' in doc and 'answerKey' in doc:
+                            choices = doc.get('choices', {})
+                            choice_texts = choices.get('text', [])
+                            choice_labels = choices.get('label', [])
+                            answer_key = doc.get('answerKey', '')
+                            
+                            # Find correct answer
+                            for idx, label in enumerate(choice_labels):
+                                if label == answer_key and idx < len(choice_texts):
+                                    correct_answer = choice_texts[idx]
+                                    break
+                            
+                            # Find an incorrect answer
+                            for idx, label in enumerate(choice_labels):
+                                if label != answer_key and idx < len(choice_texts):
+                                    incorrect_answer = choice_texts[idx]
+                                    break
+                        
                         # Try common answer fields
-                        if 'choices' in doc and 'label' in doc:
+                        elif 'choices' in doc and 'label' in doc:
                             choices = doc['choices']
                             label = doc['label']
                             

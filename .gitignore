@@ -121,6 +121,9 @@ references/
 
 # Cache directories for our tools
 
+# Keys and secrets
+keys/
+
 # Experiment results
 wisent_guard/experiments/steering/steering_comparison_results/
 wisent_guard/experiments/steering/optimization_results/
