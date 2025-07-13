@@ -33,12 +33,7 @@ class FullBenchmarkDownloader:
     
     # Benchmarks that are known to be unavailable or problematic
     UNAVAILABLE_BENCHMARKS = {
-        'glue', 'superglue', 'headqa', 'qasper', 'qa4mre', 'ai2_arc', 
-        'social_i_qa', 'hendrycks_math', 'arithmetic', 'humaneval', 'mbpp',
-        'crows_pairs', 'hendrycks_ethics', 'anli', 'xnli', 'xcopa', 
-        'xstorycloze', 'xwinograd', 'paws_x', 'mgsm', 'belebele', 'medqa',
-        'lambada_cloze', 'lambada_multilingual', 'blimp', 
-        'unscramble', 'big_bench'
+        # Empty set - all benchmarks now have extractors!
     }
     
     def __init__(self, download_dir: str = "full_benchmarks"):

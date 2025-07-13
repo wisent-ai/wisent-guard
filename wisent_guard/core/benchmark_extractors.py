@@ -1791,6 +1791,509 @@ class LogiQAExtractor(BenchmarkExtractor):
             return None
 
 
+class LambadaExtractor(BenchmarkExtractor):
+    """Extractor for LAMBADA benchmarks (cloze and multilingual)."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        LAMBADA format:
+        - doc['text']: the text with a blank to fill
+        - doc['domain']: optional domain
+        """
+        try:
+            text = doc.get('text', '')
+            
+            if not text:
+                return None
+                
+            # Format the question
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Complete the following text: {text}"
+                
+            # For LAMBADA, we typically need to predict the last word
+            # The correct answer might be in a separate field or need to be extracted
+            correct_answer = doc.get('answer', doc.get('target', ''))
+            
+            # If no explicit answer, try to extract from text pattern
+            if not correct_answer and '_____' in text:
+                # This is a cloze-style task
+                correct_answer = "[MASK]"  # Placeholder for masked token
+                
+            return {
+                'question': f"Complete: {text}",
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting LAMBADA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for LAMBADA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            # For LAMBADA, create a plausible but incorrect completion
+            correct_answer = qa_pair['correct_answer']
+            incorrect_answer = "incorrect completion"  # Generic incorrect answer
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting LAMBADA contrastive pair: {e}")
+            return None
+
+
+class AI2ARCExtractor(BenchmarkExtractor):
+    """Extractor for AI2 ARC benchmark (different from arc_challenge/arc_easy)."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        AI2 ARC format - similar to ARC but might have different structure
+        """
+        # Reuse ARCExtractor logic
+        arc_extractor = ARCExtractor()
+        return arc_extractor.extract_qa_pair(doc, task_data)
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for AI2 ARC."""
+        arc_extractor = ARCExtractor()
+        return arc_extractor.extract_contrastive_pair(doc, task_data)
+
+
+class GLUEExtractor(BenchmarkExtractor):
+    """Extractor for GLUE benchmark suite."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        GLUE contains multiple tasks - delegate to specific extractors
+        """
+        # GLUE is a collection, not a single task
+        # This should not be called directly
+        return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for GLUE."""
+        return None
+
+
+class SuperGLUEExtractor(BenchmarkExtractor):
+    """Extractor for SuperGLUE benchmark suite."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        SuperGLUE contains multiple tasks - delegate to specific extractors
+        """
+        # SuperGLUE is a collection, not a single task
+        return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for SuperGLUE."""
+        return None
+
+
+class BigBenchExtractor(BenchmarkExtractor):
+    """Extractor for BIG-Bench tasks."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        BIG-Bench format varies by task
+        """
+        try:
+            # Try to extract using common patterns
+            question = doc.get('input', doc.get('question', doc.get('text', '')))
+            
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question
+                
+            # Try different answer patterns
+            correct_answer = doc.get('target', doc.get('answer', doc.get('output', '')))
+            
+            if not all([question, correct_answer]):
+                return None
+                
+            return {
+                'question': question,
+                'formatted_question': formatted_question,
+                'correct_answer': str(correct_answer)
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting BIG-Bench QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for BIG-Bench."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            # For BIG-Bench, create a generic incorrect answer
+            correct_answer = qa_pair['correct_answer']
+            incorrect_answer = "incorrect response"
+            
+            # If there are multiple choice options, try to find one
+            if 'choices' in doc:
+                choices = doc['choices']
+                for choice in choices:
+                    if str(choice) != correct_answer:
+                        incorrect_answer = str(choice)
+                        break
+                        
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting BIG-Bench contrastive pair: {e}")
+            return None
+
+
+class HumanEvalExtractor(BenchmarkExtractor):
+    """Extractor for HumanEval code generation benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        HumanEval format:
+        - doc['prompt']: the coding prompt
+        - doc['canonical_solution']: the solution
+        - doc['task_id']: task identifier
+        """
+        try:
+            prompt = doc.get('prompt', '')
+            solution = doc.get('canonical_solution', '')
+            task_id = doc.get('task_id', '')
+            
+            if not prompt:
+                return None
+                
+            # Format the question
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Task {task_id}:\n{prompt}"
+                
+            # The correct answer is the canonical solution
+            correct_answer = solution if solution else "def solution(): pass"
+            
+            return {
+                'question': prompt,
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting HumanEval QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for HumanEval."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            # For code generation, incorrect answer is syntactically valid but wrong code
+            correct_answer = qa_pair['correct_answer']
+            incorrect_answer = "def solution(): return None  # Incorrect implementation"
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting HumanEval contrastive pair: {e}")
+            return None
+
+
+class MBPPExtractor(BenchmarkExtractor):
+    """Extractor for MBPP (Mostly Basic Python Problems) benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        MBPP format:
+        - doc['text']: problem description
+        - doc['code']: solution code
+        - doc['test_list']: test cases
+        """
+        try:
+            text = doc.get('text', doc.get('prompt', ''))
+            code = doc.get('code', '')
+            
+            if not text:
+                return None
+                
+            # Format the question
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Write a function to: {text}"
+                
+            # The correct answer is the code solution
+            correct_answer = code if code else "def solution(): pass"
+            
+            return {
+                'question': text,
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting MBPP QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for MBPP."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            # For code generation, incorrect answer is syntactically valid but wrong code
+            correct_answer = qa_pair['correct_answer']
+            incorrect_answer = "def solution(): raise NotImplementedError()"
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting MBPP contrastive pair: {e}")
+            return None
+
+
+class ANLIExtractor(BenchmarkExtractor):
+    """Extractor for Adversarial NLI benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        ANLI format:
+        - doc['premise']: the premise
+        - doc['hypothesis']: the hypothesis
+        - doc['label']: entailment (0), neutral (1), contradiction (2)
+        """
+        try:
+            premise = doc.get('premise', '')
+            hypothesis = doc.get('hypothesis', '')
+            label = doc.get('label', -1)
+            
+            if not all([premise, hypothesis]) or label == -1:
+                return None
+                
+            # Format the question
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Premise: {premise}\nHypothesis: {hypothesis}\nRelationship?"
+                
+            # Map label to answer
+            label_map = {0: "entailment", 1: "neutral", 2: "contradiction"}
+            correct_answer = label_map.get(label, "unknown")
+            
+            return {
+                'question': f"Premise: {premise}\nHypothesis: {hypothesis}",
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting ANLI QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for ANLI."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            label = doc.get('label', -1)
+            label_map = {0: "entailment", 1: "neutral", 2: "contradiction"}
+            
+            correct_answer = label_map.get(label, "unknown")
+            
+            # Get an incorrect answer
+            incorrect_answer = None
+            for l, answer in label_map.items():
+                if l != label:
+                    incorrect_answer = answer
+                    break
+                    
+            if not incorrect_answer:
+                return None
+                
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting ANLI contrastive pair: {e}")
+            return None
+
+
+class MultilingualExtractor(BenchmarkExtractor):
+    """Base extractor for multilingual benchmarks (XNLI, XCOPA, etc)."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Generic multilingual format - tries common patterns
+        """
+        try:
+            # Try various question patterns
+            question = doc.get('question', doc.get('premise', doc.get('sentence', doc.get('text', ''))))
+            
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question
+                
+            # Try to find the answer
+            correct_answer = None
+            
+            # Pattern 1: label index with choices
+            if 'label' in doc and 'choices' in doc:
+                label = doc['label']
+                choices = doc['choices']
+                if label < len(choices):
+                    correct_answer = choices[label]
+                    
+            # Pattern 2: answer field
+            if not correct_answer:
+                correct_answer = doc.get('answer', doc.get('target', ''))
+                
+            # Pattern 3: choice1/choice2 with label (XCOPA style)
+            if not correct_answer and 'choice1' in doc and 'choice2' in doc:
+                label = doc.get('label', 0)
+                correct_answer = doc['choice1'] if label == 0 else doc['choice2']
+                
+            if not all([question, correct_answer]):
+                return None
+                
+            return {
+                'question': question,
+                'formatted_question': formatted_question,
+                'correct_answer': str(correct_answer)
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting multilingual QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for multilingual tasks."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            correct_answer = qa_pair['correct_answer']
+            incorrect_answer = None
+            
+            # Try to find an incorrect choice
+            if 'choices' in doc:
+                for choice in doc['choices']:
+                    if str(choice) != correct_answer:
+                        incorrect_answer = str(choice)
+                        break
+                        
+            # XCOPA style
+            elif 'choice1' in doc and 'choice2' in doc:
+                label = doc.get('label', 0)
+                incorrect_answer = doc['choice2'] if label == 0 else doc['choice1']
+                
+            if not incorrect_answer:
+                incorrect_answer = "incorrect answer"
+                
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting multilingual contrastive pair: {e}")
+            return None
+
+
+class ArithmeticExtractor(BenchmarkExtractor):
+    """Extractor for arithmetic tasks."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Arithmetic format:
+        - doc['question']: arithmetic problem
+        - doc['answer']: numerical answer
+        """
+        try:
+            question = doc.get('question', doc.get('problem', ''))
+            answer = doc.get('answer', doc.get('solution', ''))
+            
+            if not all([question, answer]):
+                return None
+                
+            # Format the question
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question
+                
+            return {
+                'question': question,
+                'formatted_question': formatted_question,
+                'correct_answer': str(answer)
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting arithmetic QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for arithmetic."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            correct_answer = qa_pair['correct_answer']
+            
+            # Create an incorrect answer by modifying the correct one
+            try:
+                num = float(correct_answer)
+                incorrect_answer = str(num + 1)
+            except ValueError:
+                incorrect_answer = "0"
+                
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting arithmetic contrastive pair: {e}")
+            return None
+
+
 class DefaultExtractor(BenchmarkExtractor):
     """Default extractor that tries common patterns."""
     
@@ -1994,6 +2497,34 @@ EXTRACTORS = {
     'wic': BoolQExtractor,  # Binary classification
     'wsc': COPAExtractor,  # Similar format to COPA
     'wsc273': COPAExtractor,  # Similar format to COPA
+    # New extractors for previously unsupported benchmarks
+    'lambada_cloze': LambadaExtractor,  # LAMBADA cloze task
+    'lambada_multilingual': LambadaExtractor,  # LAMBADA multilingual
+    'ai2_arc': AI2ARCExtractor,  # AI2 ARC (delegates to ARCExtractor)
+    'glue': GLUEExtractor,  # GLUE suite (should use specific tasks)
+    'superglue': SuperGLUEExtractor,  # SuperGLUE suite (should use specific tasks)
+    'big_bench': BigBenchExtractor,  # BIG-Bench tasks
+    'humaneval': HumanEvalExtractor,  # Code generation
+    'mbpp': MBPPExtractor,  # Python problems
+    'anli': ANLIExtractor,  # Adversarial NLI
+    'arithmetic': ArithmeticExtractor,  # Arithmetic tasks
+    'belebele': MultilingualExtractor,  # Multilingual reading comprehension
+    'blimp': DefaultExtractor,  # Linguistic minimal pairs
+    'crows_pairs': DefaultExtractor,  # Bias benchmark
+    'headqa': MMLUExtractor,  # Spanish healthcare QA (multiple choice)
+    'hendrycks_ethics': MMLUExtractor,  # Ethics benchmark (multiple choice)
+    'hendrycks_math': GSM8KExtractor,  # Math problems
+    'medqa': MMLUExtractor,  # Medical QA (multiple choice)
+    'mgsm': GSM8KExtractor,  # Multilingual GSM8K
+    'paws_x': DefaultExtractor,  # Paraphrase detection
+    'qa4mre': MMLUExtractor,  # QA for machine reading evaluation
+    'qasper': SQuAD2Extractor,  # QA on scientific papers
+    'social_i_qa': MMLUExtractor,  # Social commonsense QA
+    'unscramble': DefaultExtractor,  # Word unscrambling
+    'xcopa': MultilingualExtractor,  # Multilingual COPA
+    'xnli': MultilingualExtractor,  # Cross-lingual NLI
+    'xstorycloze': MultilingualExtractor,  # Multilingual story cloze
+    'xwinograd': MultilingualExtractor,  # Multilingual Winograd
 }
 
 
