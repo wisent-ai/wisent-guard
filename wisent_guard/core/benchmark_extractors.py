@@ -1331,6 +1331,10 @@ class ASDivExtractor(BenchmarkExtractor):
             'correct_answer': correct_answer,
             'incorrect_answer': incorrect_answer
         }
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for ASDdiv - just return the QA pair which already has both answers."""
+        return self.extract_qa_pair(doc, task_data)
 
 
 class WikiTextExtractor(BenchmarkExtractor):
