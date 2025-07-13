@@ -2500,6 +2500,8 @@ EXTRACTORS = {
     # New extractors for previously unsupported benchmarks
     'lambada_cloze': LambadaExtractor,  # LAMBADA cloze task
     'lambada_multilingual': LambadaExtractor,  # LAMBADA multilingual
+    'lambada_standard_cloze_yaml': LambadaExtractor,  # LAMBADA standard cloze variant
+    'lambada': LambadaExtractor,  # Generic LAMBADA
     'ai2_arc': AI2ARCExtractor,  # AI2 ARC (delegates to ARCExtractor)
     'glue': GLUEExtractor,  # GLUE suite (should use specific tasks)
     'superglue': SuperGLUEExtractor,  # SuperGLUE suite (should use specific tasks)
