@@ -1304,8 +1304,15 @@ class ContrastivePairSet:
                     else:
                         # Fallback to generic extraction if extractor fails
                         
+                        # For BoolQ tasks specifically
+                        if 'boolq' in task_name.lower() and 'answer' in doc:
+                            answer = doc.get('answer', False)
+                            correct_answer = "True" if answer else "False"
+                            incorrect_answer = "False" if answer else "True"
+                            formatted_question = question  # Use basic question as fallback
+                        
                         # For ARC tasks specifically, handle the case where extractor only returns QA pair
-                        if 'arc' in task_name.lower() and 'choices' in doc and 'answerKey' in doc:
+                        elif 'arc' in task_name.lower() and 'choices' in doc and 'answerKey' in doc:
                             choices = doc.get('choices', {})
                             choice_texts = choices.get('text', [])
                             choice_labels = choices.get('label', [])
