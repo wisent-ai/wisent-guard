@@ -1311,6 +1311,15 @@ class ContrastivePairSet:
                             incorrect_answer = "False" if answer else "True"
                             formatted_question = question  # Use basic question as fallback
                         
+                        # For COPA tasks specifically
+                        elif 'copa' in task_name.lower() and 'choice1' in doc and 'choice2' in doc:
+                            choice1 = doc.get('choice1', '')
+                            choice2 = doc.get('choice2', '')
+                            label = doc.get('label', 0)
+                            correct_answer = choice1 if label == 0 else choice2
+                            incorrect_answer = choice2 if label == 0 else choice1
+                            formatted_question = question  # Use basic question as fallback
+                        
                         # For ARC tasks specifically, handle the case where extractor only returns QA pair
                         elif 'arc' in task_name.lower() and 'choices' in doc and 'answerKey' in doc:
                             choices = doc.get('choices', {})
@@ -1371,8 +1380,13 @@ class ContrastivePairSet:
                             correct_answer = task_data.doc_to_target(doc)
                             incorrect_answer = "This is incorrect"
                         else:
-                            # Skip if no extraction method works
-                            continue
+                            # If we have a correct_answer from earlier extraction, generate incorrect
+                            if correct_answer and not incorrect_answer:
+                                # Generate a simple incorrect answer
+                                incorrect_answer = "Wrong answer"
+                            elif not correct_answer:
+                                # Skip if no extraction method works
+                                continue
                 
                 if correct_answer and incorrect_answer:
                     qa_pairs.append({
