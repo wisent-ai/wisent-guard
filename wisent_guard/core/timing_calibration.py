@@ -1,12 +1,10 @@
 """Runtime timing calibration for optimization time estimation"""
 import time
 import json
+import subprocess
+import sys
 from typing import Dict, Optional, Tuple
 from pathlib import Path
-import numpy as np
-
-from .hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
-from .model_config_manager import ModelConfigManager
 
 
 class TimingCalibrator:
@@ -15,124 +13,78 @@ class TimingCalibrator:
     def __init__(self, verbose: bool = True):
         self.verbose = verbose
         self.timings = {
-            "per_task_per_sample": None,  # seconds per task per sample
-            "per_layer": None,  # seconds per layer tested
-            "classifier_training_per_sample": None,  # seconds per training sample
-            "control_vector_per_layer": None,  # seconds per layer for control vectors
+            "training_time": None,  # Time for training command
+            "steering_time": None,  # Time for steering command
         }
     
-    def run_calibration(
-        self,
-        model_name: str,
-        calibration_tasks: list = None,
-        calibration_samples: int = 20,
-        calibration_layers: int = 2
-    ) -> Dict[str, float]:
+    def run_calibration(self, model_name: str) -> Dict[str, float]:
         """
-        Run calibration tests to measure actual timing.
+        Run calibration by measuring training and steering times.
+        Uses exactly one task, one layer, and 10 samples.
         
         Args:
             model_name: Model to calibrate timing for
-            calibration_tasks: Tasks to use for calibration (default: small subset)
-            calibration_samples: Number of samples to test with
-            calibration_layers: Number of layers to test
             
         Returns:
-            Dictionary of timing measurements
+            Dictionary with training_time and steering_time
         """
-        if calibration_tasks is None:
-            # Use a small, fast subset of tasks for calibration
-            calibration_tasks = ["arc_easy", "hellaswag"]
+        # Get model layer count
+        from . import Model
+        model = Model(name=model_name)
+        if hasattr(model, 'model') and hasattr(model.model, 'config'):
+            if hasattr(model.model.config, 'num_hidden_layers'):
+                total_layers = model.model.config.num_hidden_layers
+            elif hasattr(model.model.config, 'n_layer'):
+                total_layers = model.model.config.n_layer
+            else:
+                raise RuntimeError(f"Cannot determine number of layers for model {model_name}")
+        else:
+            raise RuntimeError(f"Cannot access model config for {model_name}")
+        
+        # Use middle layer for calibration
+        calibration_layer = total_layers // 2
         
         if self.verbose:
             print(f"\n🔧 Running timing calibration for {model_name}...")
-            print(f"   Tasks: {calibration_tasks}")
-            print(f"   Samples: {calibration_samples}")
-            print(f"   Layers: {calibration_layers}")
+            print(f"   Task: arc_easy")
+            print(f"   Layer: {calibration_layer}")
+            print(f"   Samples: 10")
         
-        # Get total layers in model
-        try:
-            from . import Model
-            model = Model(name=model_name)
-            if hasattr(model, 'model') and hasattr(model.model, 'config'):
-                if hasattr(model.model.config, 'num_hidden_layers'):
-                    total_layers = model.model.config.num_hidden_layers
-                elif hasattr(model.model.config, 'n_layer'):
-                    total_layers = model.model.config.n_layer
-                else:
-                    total_layers = 24  # Default estimate
-            else:
-                total_layers = 24  # Default estimate
-        except:
-            total_layers = 24  # Default estimate
+        # 1. Measure training time
+        if self.verbose:
+            print(f"\n📊 Measuring training time...")
         
-        # Sample a subset of layers for calibration
-        layer_indices = np.linspace(0, total_layers - 1, calibration_layers, dtype=int)
-        
-        # Measure classification optimization time
         start_time = time.time()
-        calibration_successful = False
         
-        # Run a small optimization using HyperparameterOptimizer
-        try:
-            from wisent_guard.core import Model
-            model = Model(name=model_name)
+        cmd = [
+            sys.executable, "-m", "wisent_guard.cli", 
+            "optimize-classification",
+            model_name,
+            "--tasks", "arc_easy",
+            "--limit", "10",
+            "--layer-range", f"{calibration_layer},{calibration_layer}",
+            "--no-save",
+            "--skip-timing-estimation"
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            raise RuntimeError(f"Training calibration failed:\n{result.stderr}")
             
-            # Create optimization config for calibration
-            config = OptimizationConfig(
-                layer_range=(layer_indices[0], layer_indices[-1]),
-                aggregation_methods=["average"],  # Just test one method for speed
-                threshold_range=[0.5],  # Just test one threshold for speed
-                max_time_per_task_seconds=60  # 1 minute max for calibration
-            )
-            
-            # Test optimization on one task
-            if calibration_tasks:
-                test_task = calibration_tasks[0]
-                optimizer = HyperparameterOptimizer(
-                    model=model,
-                    task_name=test_task,
-                    limit=calibration_samples,
-                    device=None,
-                    verbose=False
-                )
-                
-                # Run optimization
-                optimizer.optimize(config)
-                calibration_successful = True
-                
-        except Exception as e:
-            if self.verbose:
-                print(f"\n❌ Calibration failed: {e}")
-                print(f"   Using fallback timing estimates instead")
-            
-            # Use fallback timings if calibration fails
-            self.timings["per_task_per_sample"] = 0.05  # 50ms per sample (conservative)
-            self.timings["per_layer"] = 30.0  # 30s per layer (conservative)
-            self.timings["classifier_training_per_sample"] = 0.01
-            self.timings["control_vector_per_layer"] = 60.0
-            return self.timings
+        self.timings["training_time"] = time.time() - start_time
         
-        classification_time = time.time() - start_time
+        # 2. Skip steering calibration - it's too complex for quick calibration
+        # Users can run steering separately if needed
+        if self.verbose:
+            print(f"\n📊 Skipping steering calibration (too complex for quick estimate)")
         
-        # Only use measured time if calibration was successful
-        if not calibration_successful:
-            raise RuntimeError("Calibration failed - cannot use timing measurements")
+        self.timings["steering_time"] = None
         
-        # Calculate timing metrics
-        total_operations = len(calibration_tasks) * calibration_layers * calibration_samples
-        self.timings["per_task_per_sample"] = classification_time / (len(calibration_tasks) * calibration_samples)
-        self.timings["per_layer"] = classification_time / calibration_layers
-        
-        # Estimate other timings based on classification timing
-        # These are rough estimates based on typical ratios
-        self.timings["classifier_training_per_sample"] = self.timings["per_task_per_sample"] * 0.1
-        self.timings["control_vector_per_layer"] = self.timings["per_layer"] * 0.5
-        
-        if self.verbose and calibration_successful:
-            print(f"\n✅ Calibration complete in {classification_time:.1f}s")
-            print(f"   Per task per sample: {self.timings['per_task_per_sample']:.3f}s")
-            print(f"   Per layer: {self.timings['per_layer']:.3f}s")
+        if self.verbose:
+            print(f"\n✅ Calibration complete!")
+            print(f"   Training time: {self.timings['training_time']:.3f}s")
+            print(f"   Steering time: {self.timings['steering_time']:.3f}s")
         
         return self.timings
     
@@ -164,6 +116,8 @@ class TimingCalibrator:
         num_tasks: int,
         num_layers: int,
         samples_per_task: int = 1000,
+        sample_sizes: list = None,
+        sample_size_limit: int = 1000,
         include_sample_size_opt: bool = True,
         include_classifier_training: bool = True,
         include_control_vectors: bool = True,
@@ -172,48 +126,46 @@ class TimingCalibrator:
         """
         Estimate total optimization time based on calibration.
         
+        Linear scaling from base measurements: 1 task, 1 layer, 10 samples.
+        
         Returns:
             Tuple of (total_seconds, breakdown_dict)
         """
-        if self.timings["per_task_per_sample"] is None:
-            # Use fallback timings if no calibration available
-            self.timings = {
-                "per_task_per_sample": 0.005,
-                "per_layer": 5.0,
-                "classifier_training_per_sample": 0.002,
-                "control_vector_per_layer": 10.0,
-            }
+        if self.timings["training_time"] is None:
+            raise RuntimeError("No calibration data available. Run calibration first.")
+        
+        # Base measurements from calibration
+        base_training = self.timings["training_time"]  # Time for 1 task, 1 layer, 10 samples
+        base_steering = self.timings["steering_time"]  # Time for 1 task, 1 layer, 10 samples
         
         breakdown = {}
         
-        # Classification optimization time
-        classification_time = (
-            num_tasks * num_layers * samples_per_task * self.timings["per_task_per_sample"]
-        )
+        # Classification optimization: scales linearly with tasks, layers, and samples
+        classification_time = base_training * num_tasks * num_layers * (samples_per_task / 10)
         breakdown["classification"] = classification_time
         
-        # Sample size optimization (if enabled)
-        if include_sample_size_opt:
-            # Typically tests 3-5 different sample sizes
-            sample_size_time = num_tasks * 4 * 100 * self.timings["per_task_per_sample"]
+        # Sample size optimization: tests multiple sample sizes on ONE layer per task
+        if include_sample_size_opt and sample_sizes:
+            # Calculate average sample size from the provided list
+            avg_sample_size = sum(sample_sizes) / len(sample_sizes)
+            # Each test uses sample_size_limit samples from the dataset
+            sample_size_time = base_training * num_tasks * len(sample_sizes) * (min(avg_sample_size, sample_size_limit) / 10)
             breakdown["sample_size"] = sample_size_time
         else:
             breakdown["sample_size"] = 0
         
-        # Classifier training time (if enabled)
+        # Classifier training: one run per task with full samples
         if include_classifier_training:
-            # Training uses the optimized sample size
-            training_samples = min(samples_per_task, 500)  # Typically capped
-            classifier_time = num_tasks * training_samples * self.timings["classifier_training_per_sample"]
+            classifier_time = base_training * num_tasks * (samples_per_task / 10)
             breakdown["classifier_training"] = classifier_time
         else:
             breakdown["classifier_training"] = 0
         
-        # Control vector generation (if enabled)
-        if include_control_vectors:
+        # Control vector generation: skip if no steering calibration
+        if include_control_vectors and base_steering is not None:
             cv_layers = num_cv_layers or num_layers
-            cv_time = cv_layers * self.timings["control_vector_per_layer"]
-            breakdown["control_vectors"] = cv_time
+            control_vectors_time = base_steering * num_tasks * cv_layers * (samples_per_task / 10)
+            breakdown["control_vectors"] = control_vectors_time
         else:
             breakdown["control_vectors"] = 0
         

@@ -658,8 +658,8 @@ def setup_classification_optimizer_parser(parser):
                        help="Directory to save classifiers (default: ./optimized_classifiers/model_name/)")
     
     # Timing calibration options
-    parser.add_argument("--skip-calibration", action="store_true",
-                       help="Skip timing calibration and use fallback estimates")
+    parser.add_argument("--skip-timing-estimation", action="store_true",
+                       help="Skip timing estimation and proceed without time warnings")
     parser.add_argument("--calibration-file", type=str, default=None,
                        help="File to save/load calibration data")
     parser.add_argument("--calibrate-only", action="store_true",
@@ -876,8 +876,8 @@ def setup_full_optimizer_parser(parser):
                        help="Save plots for both optimizations")
     
     # Timing calibration options
-    parser.add_argument("--skip-calibration", action="store_true",
-                       help="Skip timing calibration and use fallback estimates")
+    parser.add_argument("--skip-timing-estimation", action="store_true",
+                       help="Skip timing estimation and proceed without time warnings")
     parser.add_argument("--calibration-file", type=str, default=None,
                        help="File to save/load calibration data")
     parser.add_argument("--calibrate-only", action="store_true",

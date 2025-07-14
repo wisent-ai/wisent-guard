@@ -4165,48 +4165,50 @@ def handle_classification_optimization_command(args):
         else:
             print(f"   🚫 Classifier saving disabled")
         
-        # Time estimation with calibration
-        from .core.time_estimator import OptimizationTimeEstimator
-        from pathlib import Path
-        
         # Get tasks list
         tasks = args.tasks or get_valid_task_names()
         
-        calibration_file = Path(args.calibration_file) if args.calibration_file else None
-        
-        estimator = OptimizationTimeEstimator(
-            model_name=args.model,
-            verbose=args.verbose,
-            skip_calibration=args.skip_calibration,
-            calibration_file=calibration_file,
-            calibrate_only=args.calibrate_only
-        )
-        
-        # If calibrate_only, exit after calibration
-        if args.calibrate_only:
-            print("\n✅ Calibration complete")
-            if calibration_file:
-                print(f"   💾 Calibration data saved to: {calibration_file}")
-            return
-        
-        # Estimate time for classification optimization
-        total_time, breakdown = estimator.estimate_classification_time(
-            num_tasks=len(tasks),
-            sample_limit=args.limit
-        )
-        
-        estimator.print_time_breakdown(total_time, breakdown)
-        
-        # Check if estimated time is over 1 hour and prompt for confirmation
-        if total_time > 3600:  # More than 1 hour
-            print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
-            response = input("   Do you want to continue? (y/n): ").strip().lower()
-            while response not in ['y', 'yes', 'n', 'no']:
-                response = input("   Please enter 'y' or 'n': ").strip().lower()
+        # Skip timing estimation if requested
+        if not args.skip_timing_estimation:
+            # Time estimation with calibration
+            from .core.time_estimator import OptimizationTimeEstimator
+            from pathlib import Path
             
-            if response in ['n', 'no']:
-                print("   ❌ Optimization cancelled by user.")
+            calibration_file = Path(args.calibration_file) if args.calibration_file else None
+            
+            estimator = OptimizationTimeEstimator(
+                model_name=args.model,
+                verbose=args.verbose,
+                skip_calibration=False,
+                calibration_file=calibration_file,
+                calibrate_only=args.calibrate_only
+            )
+            
+            # If calibrate_only, exit after calibration
+            if args.calibrate_only:
+                print("\n✅ Calibration complete")
+                if calibration_file:
+                    print(f"   💾 Calibration data saved to: {calibration_file}")
                 return
+            
+            # Estimate time for classification optimization
+            total_time, breakdown = estimator.estimate_classification_time(
+                num_tasks=len(tasks),
+                sample_limit=args.limit
+            )
+            
+            estimator.print_time_breakdown(total_time, breakdown)
+            
+            # Check if estimated time is over 1 hour and prompt for confirmation
+            if total_time > 3600:  # More than 1 hour
+                print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
+                response = input("   Do you want to continue? (y/n): ").strip().lower()
+                while response not in ['y', 'yes', 'n', 'no']:
+                    response = input("   Please enter 'y' or 'n': ").strip().lower()
+                
+                if response in ['n', 'no']:
+                    print("   ❌ Optimization cancelled by user.")
+                    return
         
         # Import and initialize classification optimizer
         from .core.classification_optimizer import run_classification_optimization
@@ -4511,60 +4513,61 @@ def handle_full_optimization_command(args):
             tasks = get_valid_task_names()
             print(f"   📋 Tasks: All {len(tasks)} available benchmarks")
         
-        # Create time estimator with calibration options
-        from .core.time_estimator import OptimizationTimeEstimator
-        from pathlib import Path
-        
-        calibration_file = Path(args.calibration_file) if args.calibration_file else None
-        
-        estimator = OptimizationTimeEstimator(
-            model_name=args.model,
-            verbose=args.verbose,
-            skip_calibration=args.skip_calibration,
-            calibration_file=calibration_file,
-            calibrate_only=args.calibrate_only
-        )
-        
-        # If calibrate_only, exit after calibration
-        if args.calibrate_only:
-            print("\n✅ Calibration complete")
-            if calibration_file:
-                print(f"   💾 Calibration data saved to: {calibration_file}")
-            return
-        
-        # Get time estimate based on calibration
-        total_time, phase_times = estimator.estimate_full_optimization_time(
-            num_tasks=len(tasks),
-            classification_limit=args.classification_limit,
-            include_sample_size_opt=not args.skip_sample_size,
-            include_classifier_training=not args.skip_classifier_training,
-            include_control_vectors=not args.skip_control_vectors
-        )
-        
-        # Display time estimate
-        estimator.print_time_breakdown(total_time, phase_times)
-        
-        if args.skip_calibration:
-            print(f"\n   💡 Note: Using fallback estimates. For more accurate timing, run without --skip-calibration")
-        else:
-            print(f"\n   💡 Note: Estimates based on calibration measurements")
-        
-        # Check if estimated time is over 1 hour and prompt for confirmation
-        if total_time > 3600:  # More than 1 hour
-            print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
-            print(f"   This optimization will take approximately {estimator.format_time(total_time)}.")
+        # Skip timing estimation if requested
+        if not args.skip_timing_estimation:
+            # Create time estimator with calibration options
+            from .core.time_estimator import OptimizationTimeEstimator
+            from pathlib import Path
             
-            # Prompt for confirmation
-            while True:
-                response = input("\n   Do you want to continue? (y/n): ").strip().lower()
-                if response == 'y' or response == 'yes':
-                    print(f"\n✅ Continuing with optimization...")
-                    break
-                elif response == 'n' or response == 'no':
-                    print(f"\n❌ Optimization cancelled by user.")
-                    sys.exit(0)
-                else:
-                    print(f"   Please enter 'y' for yes or 'n' for no.")
+            calibration_file = Path(args.calibration_file) if args.calibration_file else None
+            
+            estimator = OptimizationTimeEstimator(
+                model_name=args.model,
+                verbose=args.verbose,
+                skip_calibration=False,
+                calibration_file=calibration_file,
+                calibrate_only=args.calibrate_only
+            )
+            
+            # If calibrate_only, exit after calibration
+            if args.calibrate_only:
+                print("\n✅ Calibration complete")
+                if calibration_file:
+                    print(f"   💾 Calibration data saved to: {calibration_file}")
+                return
+            
+            # Get time estimate based on calibration
+            total_time, phase_times = estimator.estimate_full_optimization_time(
+                num_tasks=len(tasks),
+                classification_limit=args.classification_limit,
+                sample_sizes=args.sample_sizes,
+                sample_size_limit=args.sample_size_limit,
+                include_sample_size_opt=not args.skip_sample_size,
+                include_classifier_training=not args.skip_classifier_training,
+                include_control_vectors=not args.skip_control_vectors
+            )
+            
+            # Display time estimate
+            estimator.print_time_breakdown(total_time, phase_times)
+            
+            print(f"\n   💡 Note: Estimates based on calibration measurements")
+            
+            # Check if estimated time is over 1 hour and prompt for confirmation
+            if total_time > 3600:  # More than 1 hour
+                print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
+                print(f"   This optimization will take approximately {estimator.format_time(total_time)}.")
+                
+                # Prompt for confirmation
+                while True:
+                    response = input("\n   Do you want to continue? (y/n): ").strip().lower()
+                    if response == 'y' or response == 'yes':
+                        print(f"\n✅ Continuing with optimization...")
+                        break
+                    elif response == 'n' or response == 'no':
+                        print(f"\n❌ Optimization cancelled by user.")
+                        sys.exit(0)
+                    else:
+                        print(f"   Please enter 'y' for yes or 'n' for no.")
         
         # Step 1: Classification optimization (unless skipped)
         if not args.skip_classification:
