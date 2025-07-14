@@ -468,7 +468,7 @@ def run_task_pipeline(
     device: str = None,
     seed: int = 42,
     token_aggregation: str = "average",
-    ground_truth_method: str = "none",
+    ground_truth_method: str = "lm-eval-harness",
     user_labels: List[str] = None,
     optimize: bool = False,
     optimize_layers: str = "all",
@@ -613,13 +613,11 @@ def run_task_pipeline(
         "wsc", "wsc273",                # COPAExtractor (similar format)
     }
     
-    # Auto-set ground truth method for tested tasks (unless explicitly overridden)
-    if ground_truth_method == "none" and task_name.lower() in LM_EVAL_HARNESS_TASKS:
-        ground_truth_method = "lm-eval-harness"
-        if verbose:
-            print(f"🔄 Auto-setting ground truth method to 'lm-eval-harness' for task '{task_name}'")
-            print(f"   • This task has been tested and validated to work with lm-eval-harness")
-            print(f"   • To override this default, use --ground-truth-method <method>")
+    # Inform user about ground truth method for tested tasks
+    if ground_truth_method == "lm-eval-harness" and task_name.lower() in LM_EVAL_HARNESS_TASKS and verbose:
+        print(f"✅ Using 'lm-eval-harness' ground truth method for task '{task_name}'")
+        print(f"   • This task has been tested and validated to work with lm-eval-harness")
+        print(f"   • To use a different method, specify --ground-truth-method <method>")
     
     # AUTO-LOAD MODEL CONFIGURATION (if available)
     # Load saved optimal parameters for this model if they exist
@@ -4598,9 +4596,7 @@ def handle_full_optimization_command(args):
             print(f"\n✅ Classification optimization completed!")
             print(f"   📊 Optimized {classification_results.successful_optimizations}/{classification_results.total_tasks_tested} tasks")
             
-            # Update overall progress
-            if overall:
-                print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete")
+            # Update overall progress would go here if we had a progress tracker
         else:
             print(f"\n⏭️  Skipping classification optimization (using existing config)")
         

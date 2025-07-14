@@ -98,8 +98,8 @@ def setup_tasks_parser(parser):
                        default="average", help="How to aggregate token scores for classification")
     parser.add_argument("--ground-truth-method", type=str, 
                        choices=["none", "exact_match", "substring_match", "user_specified", "interactive", "manual_review", "good", "lm-eval-harness"],
-                       default="none", 
-                       help="Method for ground truth evaluation. 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'interactive' prompts for y/n labeling, 'manual_review' marks for review, 'good' marks everything as truthful (for debugging), 'lm-eval-harness' uses lm-eval-harness tasks for evaluation")
+                       default="lm-eval-harness", 
+                       help="Method for ground truth evaluation. 'lm-eval-harness' uses lm-eval-harness tasks for evaluation (default for most tasks), 'none' skips evaluation, 'exact_match' and 'substring_match' are problematic for free-form generation, 'user_specified' allows manual labeling, 'interactive' prompts for y/n labeling, 'manual_review' marks for review, 'good' marks everything as truthful (for debugging)")
     parser.add_argument("--user-labels", type=str, nargs="*", default=None,
                        help="User-specified ground truth labels for responses ('truthful' or 'hallucination'). Used with --ground-truth-method user_specified")
     
