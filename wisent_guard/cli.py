@@ -4568,28 +4568,16 @@ def handle_full_optimization_command(args):
                 else:
                     print(f"   Please enter 'y' for yes or 'n' for no.")
         
-        # Start tracking
-        estimator.start_optimization()
-        
         # Step 1: Classification optimization (unless skipped)
         if not args.skip_classification:
             print(f"\n📈 Step 1: Classification Parameter Optimization")
             print(f"   🔢 Sample limit: {args.classification_limit}")
             
-            estimator.start_phase("classification")
-            
-            # Create a custom progress callback
+            # Create a simple progress callback
             def classification_progress_callback(task_idx, task_name, status):
                 """Callback to track classification progress."""
                 if status == "completed":
-                    estimator.task_completed()
-                    progress = estimator.get_phase_progress()
-                    
-                    if progress:
-                        print(f"   ✅ [{progress['completed']}/{progress['total']}] {task_name} optimized")
-                        print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
-                              f"ETA: {estimator.format_eta(progress['eta'])} | "
-                              f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
+                    print(f"   ✅ [{task_idx+1}/{len(tasks)}] {task_name} optimized")
                 elif status == "started":
                     print(f"   🔄 [{task_idx+1}/{len(tasks)}] Optimizing {task_name}...")
             
@@ -4611,7 +4599,6 @@ def handle_full_optimization_command(args):
             print(f"   📊 Optimized {classification_results.successful_optimizations}/{classification_results.total_tasks_tested} tasks")
             
             # Update overall progress
-            overall = estimator.get_overall_progress(phase_times)
             if overall:
                 print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete")
         else:
@@ -4623,7 +4610,6 @@ def handle_full_optimization_command(args):
             print(f"   🔢 Testing sample sizes: {args.sample_sizes}")
             print(f"   📊 Dataset limit: {args.sample_size_limit}")
             
-            estimator.start_phase("sample_size")
             
             # Load model config to get optimal parameters
             from .core.model_config_manager import ModelConfigManager
@@ -4670,13 +4656,6 @@ def handle_full_optimization_command(args):
                     sample_size_results[task] = results
                     print(f"      ✅ Optimal sample size: {results['optimal_sample_size']}")
                     
-                    # Update progress
-                    estimator.task_completed()
-                    progress = estimator.get_phase_progress()
-                    if progress:
-                        print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
-                              f"ETA: {estimator.format_eta(progress['eta'])} | "
-                              f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
                     
                 except Exception as e:
                     print(f"      ❌ Failed: {e}")
@@ -4687,11 +4666,6 @@ def handle_full_optimization_command(args):
             print(f"\n✅ Sample size optimization completed!")
             print(f"   📊 Successfully optimized {successful}/{len(tasks)} tasks")
             
-            # Update overall progress
-            overall = estimator.get_overall_progress(phase_times)
-            if overall:
-                print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete | "
-                      f"ETA: {estimator.format_eta(overall['eta'])}")
         else:
             print(f"\n⏭️  Skipping sample size optimization")
         
@@ -4700,7 +4674,6 @@ def handle_full_optimization_command(args):
             print(f"\n🎨 Step 3: Training Final Classifiers with Optimal Sample Sizes")
             print(f"   💾 This ensures classifiers are cached for instant use")
             
-            estimator.start_phase("classifier_training")
             
             # Reload model config to get all optimal parameters
             model_config = config_manager.load_model_config(args.model)
@@ -4757,12 +4730,6 @@ def handle_full_optimization_command(args):
                             print(f"      ❌ Failed: {result.get('error', 'Unknown error')}")
                         
                         # Update progress
-                        estimator.task_completed()
-                        progress = estimator.get_phase_progress()
-                        if progress:
-                            print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
-                                  f"ETA: {estimator.format_eta(progress['eta'])} | "
-                                  f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
                             
                     except Exception as e:
                         print(f"      ❌ Error training classifier: {e}")
@@ -4772,10 +4739,6 @@ def handle_full_optimization_command(args):
                 print(f"   📁 Saved to: {classifier_dir}")
                 
                 # Update overall progress
-                overall = estimator.get_overall_progress(phase_times)
-                if overall:
-                    print(f"   ⏱️  Overall progress: {overall['percent_complete']:.1f}% complete | "
-                          f"ETA: {estimator.format_eta(overall['eta'])}")
         else:
             print(f"\n⏭️  Skipping classifier training")
         
@@ -4784,7 +4747,6 @@ def handle_full_optimization_command(args):
             print(f"\n🎮 Step 4: Training Control Vectors for Steering")
             print(f"   🧲 This enables model steering for improved truthfulness")
             
-            estimator.start_phase("control_vector")
             
             # Reload model config to get all optimal parameters
             model_config = config_manager.load_model_config(args.model)
@@ -4908,12 +4870,6 @@ def handle_full_optimization_command(args):
                             print(f"      ❌ Failed to compute control vector")
                         
                         # Update progress
-                        estimator.task_completed()
-                        progress = estimator.get_phase_progress()
-                        if progress:
-                            print(f"      ⏱️  Progress: {progress['completed']/progress['total']*100:.1f}% | "
-                                  f"ETA: {estimator.format_eta(progress['eta'])} | "
-                                  f"Remaining: {estimator.format_time(progress['estimated_remaining'])}")
                             
                     except Exception as e:
                         print(f"      ❌ Error training control vector: {e}")
@@ -4929,11 +4885,7 @@ def handle_full_optimization_command(args):
                 print(f"   📁 Saved to: {vector_dir}")
                 
                 # Final overall progress
-                overall = estimator.get_overall_progress(phase_times)
-                if overall:
-                    total_time = time.time() - estimator.start_time
-                    print(f"\n   ⏱️  Total optimization time: {estimator.format_time(total_time)}")
-                    print(f"   📊 All phases 100% complete!")
+                print(f"\n   📊 All phases completed!")
         else:
             print(f"\n⏭️  Skipping control vector training")
         
