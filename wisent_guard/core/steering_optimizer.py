@@ -298,7 +298,8 @@ class SteeringOptimizer:
         layer: Optional[int] = None,
         strength_range: Optional[Tuple[float, float]] = None,
         strength_steps: int = 10,
-        limit: int = 100
+        limit: int = 100,
+        method_params: Optional[Dict[str, Any]] = None
     ) -> SteeringOptimizationResult:
         """
         Find optimal steering strength for a specific method, layer, and task.
@@ -324,11 +325,127 @@ class SteeringOptimizer:
         logger.info(f"   Method: {steering_method.value}, Layer: {layer}")
         logger.info(f"   Strength range: {strength_range}, Steps: {strength_steps}")
         
-        # TODO: Implement strength optimization logic
-        raise NotImplementedError(
-            "Steering strength optimization not yet implemented. "
-            "This requires implementing steering effectiveness measurement "
-            "and systematic strength testing."
+        # Load steering parameters from config
+        import json
+        import os
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'steering_optimization_parameters.json')
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                steering_config = json.load(f)
+        else:
+            steering_config = {}
+        
+        # Get default layer if not provided
+        if layer is None:
+            layer = self._get_classification_layer(task_name)
+            logger.info(f"   Using classification layer: {layer}")
+        
+        # Default strength range from config or fallback
+        if strength_range is None:
+            default_strengths = steering_config.get('steering_strengths', {}).get('default', [0.5, 1.0, 1.5, 2.0])
+            strength_range = (min(default_strengths), max(default_strengths))
+        
+        # Generate strength values to test
+        import numpy as np
+        strengths = np.linspace(strength_range[0], strength_range[1], strength_steps)
+        
+        # Get method-specific parameters from config if not provided
+        if method_params is None:
+            method_configs = steering_config.get('steering_methods', [])
+            for config in method_configs:
+                if config['method'] == steering_method.value and config['name'] == steering_method.value:
+                    method_params = config.get('params', {})
+                    break
+            if method_params is None:
+                method_params = {}
+        
+        results = []
+        best_score = -float('inf')
+        best_strength = 0.0
+        
+        logger.info(f"   Testing {len(strengths)} strength values...")
+        
+        # Test each strength value
+        for strength in strengths:
+            try:
+                # Run evaluation with this strength
+                from ..cli import run_task_pipeline
+                
+                # Build kwargs for run_task_pipeline
+                pipeline_kwargs = {
+                    'task_name': task_name,
+                    'model_name': self.model_name,
+                    'limit': limit,
+                    'device': self.device,
+                    'verbose': False,
+                    'steering_mode': True,
+                    'steering_method': steering_method.value,
+                    'steering_strength': float(strength),
+                    'layer': str(layer),
+                    'output_mode': "likelihoods",  # Get likelihoods for evaluation
+                    'allow_small_dataset': True
+                }
+                
+                # Add method-specific parameters
+                for param, value in method_params.items():
+                    pipeline_kwargs[param] = value
+                
+                result = run_task_pipeline(**pipeline_kwargs)
+                
+                # Extract score from evaluation results
+                score = 0.0
+                steering_effect = 0.0
+                
+                if isinstance(result, dict):
+                    # Look for task-specific results
+                    task_result = result.get(task_name, {})
+                    eval_results = task_result.get('evaluation_results', {})
+                    
+                    # Get accuracy score
+                    score = eval_results.get('accuracy', 0.0)
+                    if isinstance(score, str) or score is None:
+                        score = 0.0
+                    
+                    # Calculate steering effect from likelihood changes
+                    baseline_likes = eval_results.get('baseline_likelihoods', [])
+                    steered_likes = eval_results.get('steered_likelihoods', [])
+                    
+                    if baseline_likes and steered_likes:
+                        changes = [abs(s - b) for s, b in zip(steered_likes, baseline_likes)]
+                        steering_effect = sum(changes) / len(changes) if changes else 0.0
+                
+                results.append({
+                    'strength': float(strength),
+                    'score': score,
+                    'steering_effect': steering_effect,
+                    'evaluation_results': eval_results if isinstance(result, dict) else {}
+                })
+                
+                if score > best_score:
+                    best_score = score
+                    best_strength = float(strength)
+                
+                logger.info(f"   Strength {strength:.2f}: score={score:.3f}, effect={steering_effect:.3f}")
+                
+            except Exception as e:
+                logger.error(f"   Error testing strength {strength}: {e}")
+                results.append({
+                    'strength': float(strength),
+                    'score': 0.0,
+                    'error': str(e)
+                })
+        
+        return SteeringOptimizationResult(
+            task_name=task_name,
+            best_steering_layer=layer,
+            best_steering_method=steering_method.value,
+            best_steering_strength=best_strength,
+            optimal_parameters={'strength': best_strength},
+            steering_effectiveness_score=best_score,
+            classification_accuracy_impact=best_score,  # Using same score for now
+            optimization_time_seconds=0.0,  # TODO: Track actual time
+            total_configurations_tested=len(results),
+            error_message=None
         )
     
     def optimize_method_specific_parameters(
@@ -707,6 +824,11 @@ def run_steering_optimization(
     elif optimization_type == "layer":
         if not task_name:
             raise ValueError("task_name required for layer optimization")
+        
+        # Convert string steering_method to enum if needed
+        if 'steering_method' in kwargs and isinstance(kwargs['steering_method'], str):
+            kwargs['steering_method'] = SteeringMethod[kwargs['steering_method']]
+        
         return optimizer.optimize_steering_layer(
             task_name=task_name,
             limit=limit,
@@ -715,6 +837,11 @@ def run_steering_optimization(
     elif optimization_type == "strength":
         if not task_name:
             raise ValueError("task_name required for strength optimization")
+        
+        # Convert string steering_method to enum if needed
+        if 'steering_method' in kwargs and isinstance(kwargs['steering_method'], str):
+            kwargs['steering_method'] = SteeringMethod[kwargs['steering_method']]
+        
         return optimizer.optimize_steering_strength(
             task_name=task_name,
             limit=limit,

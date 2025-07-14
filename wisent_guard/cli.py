@@ -4386,8 +4386,53 @@ def handle_steering_optimization_command(args):
             print(f"❌ Unknown steering action: {args.steering_action}")
             sys.exit(1)
         
-        print(f"\n✅ Steering optimization completed successfully!")
-        # Add more specific success information based on result type
+        # Display optimization results
+        if result and not isinstance(result, dict) or 'error' not in result:
+            if hasattr(result, 'best_steering_strength'):
+                # SteeringOptimizationResult
+                print(f"\n✅ Steering optimization completed successfully!")
+                print(f"\n🏆 OPTIMAL CONFIGURATION:")
+                print(f"   📋 Task: {result.task_name}")
+                print(f"   🔧 Method: {result.best_steering_method}")
+                print(f"   📊 Layer: {result.best_steering_layer}")
+                print(f"   ⚡ Strength: {result.best_steering_strength:.2f}")
+                print(f"   📈 Score: {result.steering_effectiveness_score:.3f}")
+                print(f"   🔍 Configurations tested: {result.total_configurations_tested}")
+                
+                # Save result to config if it's an improvement
+                if result.steering_effectiveness_score > 0:
+                    from .core.model_config_manager import ModelConfigManager
+                    config_manager = ModelConfigManager()
+                    model_config = config_manager.load_model_config(args.model) or {}
+                    
+                    # Update steering configuration
+                    if 'steering_optimization' not in model_config:
+                        model_config['steering_optimization'] = {}
+                    
+                    model_config['steering_optimization'].update({
+                        'best_method': result.best_steering_method,
+                        'best_layer': result.best_steering_layer,
+                        'best_strength': result.best_steering_strength,
+                        'optimization_date': datetime.now().isoformat()
+                    })
+                    
+                    # Task-specific steering config
+                    if 'task_specific_steering' not in model_config:
+                        model_config['task_specific_steering'] = {}
+                    
+                    model_config['task_specific_steering'][result.task_name] = {
+                        'method': result.best_steering_method,
+                        'layer': result.best_steering_layer,
+                        'strength': result.best_steering_strength,
+                        'score': result.steering_effectiveness_score
+                    }
+                    
+                    config_manager.save_model_config(args.model, model_config)
+                    print(f"\n💾 Results saved to model config")
+            else:
+                print(f"\n✅ Steering optimization completed successfully!")
+        else:
+            print(f"\n❌ Steering optimization failed")
         
     except NotImplementedError as e:
         print(f"⚠️  Steering optimization not yet implemented: {e}")
