@@ -4729,7 +4729,8 @@ def handle_full_optimization_command(args):
                             print(f"      ❌ Failed: {result.get('error', 'Unknown error')}")
                         
                         # Update progress
-                            
+                        pass
+                        
                     except Exception as e:
                         print(f"      ❌ Error training classifier: {e}")
                 
@@ -4738,6 +4739,7 @@ def handle_full_optimization_command(args):
                 print(f"   📁 Saved to: {classifier_dir}")
                 
                 # Update overall progress
+                pass
         else:
             print(f"\n⏭️  Skipping classifier training")
         
@@ -4869,7 +4871,8 @@ def handle_full_optimization_command(args):
                             print(f"      ❌ Failed to compute control vector")
                         
                         # Update progress
-                            
+                        pass
+                        
                     except Exception as e:
                         print(f"      ❌ Error training control vector: {e}")
                         if args.verbose:
