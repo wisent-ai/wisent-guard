@@ -198,7 +198,9 @@ class LogLikelihoodsEvaluator:
             }
             
         except Exception as e:
+            import traceback
             logger.error(f"Error evaluating classifier on task {task_name}: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return self._error_result(f"Evaluation error: {str(e)}")
     
     def _evaluate_classifier_on_sample(self, classifier, processed_pair, qa_pair: Dict[str, Any], activation_method) -> Dict[str, Any]:

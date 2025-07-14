@@ -33,17 +33,7 @@ class FullBenchmarkDownloader:
     
     # Benchmarks that are known to be unavailable or problematic
     UNAVAILABLE_BENCHMARKS = {
-        # These tasks have extractors but don't exist as valid lm-eval tasks
-        'ai2_arc',  # Use arc_challenge and arc_easy instead
-        'glue',  # Use individual GLUE tasks (mrpc, qnli, etc.)
-        'superglue',  # Use individual SuperGLUE tasks
-        'lambada',  # Use lambada_openai or specific variants
-        'lambada_cloze',  # Not a valid lm-eval task
-        'lambada_multilingual',  # Not a valid lm-eval task
-        'big_bench',  # Use specific big-bench subtasks
-        'anli',  # Causes ground truth evaluation errors
-        'arithmetic',  # Causes ground truth evaluation errors
-        'coqa',  # Causes ground truth evaluation errors
+        # Empty set - let all benchmarks be attempted and skip dynamically if they fail
     }
     
     def __init__(self, download_dir: str = "full_benchmarks"):
@@ -316,8 +306,12 @@ class FullBenchmarkDownloader:
     def _convert_sample_to_pairs(self, sample: Dict[str, Any], benchmark_name: str) -> List[Dict[str, Any]]:
         """Convert a single sample to contrastive pairs based on benchmark type."""
         
+        # MMMLU format (instruction, option_a, option_b, option_c, option_d, answer)
+        if "instruction" in sample and "option_a" in sample and "answer" in sample:
+            return self._convert_mmmlu_format(sample)
+        
         # Multiple Choice with explicit choices and numeric label (HellaSwag, SWAG, etc.)
-        if "endings" in sample and "label" in sample:
+        elif "endings" in sample and "label" in sample:
             return self._convert_multiple_choice_numeric(sample)
         
         # Multiple Choice with choices dict and answerKey (ARC, OpenBookQA, etc.)
@@ -355,6 +349,42 @@ class FullBenchmarkDownloader:
         else:
             print(f"         ⚠️ Unknown sample format: {list(sample.keys())}")
             return []
+    
+    def _convert_mmmlu_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert MMMLU format (instruction, option_a/b/c/d, answer)."""
+        instruction = sample.get("instruction", "")
+        option_a = sample.get("option_a", "")
+        option_b = sample.get("option_b", "")
+        option_c = sample.get("option_c", "")
+        option_d = sample.get("option_d", "")
+        answer = sample.get("answer", "")
+        
+        # Map answer letter to option
+        options = {
+            "A": option_a,
+            "B": option_b,
+            "C": option_c,
+            "D": option_d
+        }
+        
+        correct_answer = options.get(answer, option_a)  # Default to A if answer not found
+        
+        # Create pairs with each incorrect option
+        pairs = []
+        for letter, option in options.items():
+            if letter != answer and option:
+                pairs.append({
+                    "context": instruction,
+                    "good_response": correct_answer,
+                    "bad_response": option,
+                    "metadata": {
+                        "answer_key": answer,
+                        "sample_id": sample.get("id", ""),
+                        "benchmark_type": "mmmlu"
+                    }
+                })
+        
+        return pairs
     
     def _convert_multiple_choice_numeric(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert multiple choice with numeric label (HellaSwag, SWAG)."""
@@ -582,28 +612,51 @@ class FullBenchmarkDownloader:
         
         # Handle CoQA format with multiple questions
         if "questions" in sample and "answers" in sample:
-            questions = sample["questions"]
-            answers = sample["answers"]
+            questions_data = sample["questions"]
+            answers_data = sample["answers"]
             
-            for i, (q, a) in enumerate(zip(questions, answers)):
-                question_text = q.get("input_text", q.get("text", ""))
-                answer_text = a.get("input_text", a.get("text", ""))
+            # CoQA format has questions and answers as dicts with lists
+            if isinstance(questions_data, dict) and isinstance(answers_data, dict):
+                question_texts = questions_data.get("input_text", [])
+                answer_texts = answers_data.get("input_text", [])
                 
-                context = f"{story}\n\nQuestion: {question_text}"
-                
-                # Generate incorrect answer
-                incorrect_answer = "I cannot find this information in the passage."
-                
-                pairs.append({
-                    "context": context,
-                    "good_response": answer_text,
-                    "bad_response": incorrect_answer,
-                    "metadata": {
-                        "sample_id": sample.get("id", ""),
-                        "question_index": i,
-                        "benchmark_type": "reading_comprehension"
-                    }
-                })
+                for i, (q_text, a_text) in enumerate(zip(question_texts, answer_texts)):
+                    context = f"{story}\n\nQuestion: {q_text}"
+                    
+                    # Generate incorrect answer
+                    incorrect_answer = "I cannot find this information in the passage."
+                    
+                    pairs.append({
+                        "context": context,
+                        "good_response": a_text,
+                        "bad_response": incorrect_answer,
+                        "metadata": {
+                            "sample_id": sample.get("id", ""),
+                            "question_index": i,
+                            "benchmark_type": "reading_comprehension"
+                        }
+                    })
+            # Handle other formats where questions/answers might be lists directly
+            elif isinstance(questions_data, list) and isinstance(answers_data, list):
+                for i, (q, a) in enumerate(zip(questions_data, answers_data)):
+                    question_text = q.get("input_text", q.get("text", "")) if isinstance(q, dict) else str(q)
+                    answer_text = a.get("input_text", a.get("text", "")) if isinstance(a, dict) else str(a)
+                    
+                    context = f"{story}\n\nQuestion: {question_text}"
+                    
+                    # Generate incorrect answer
+                    incorrect_answer = "I cannot find this information in the passage."
+                    
+                    pairs.append({
+                        "context": context,
+                        "good_response": answer_text,
+                        "bad_response": incorrect_answer,
+                        "metadata": {
+                            "sample_id": sample.get("id", ""),
+                            "question_index": i,
+                            "benchmark_type": "reading_comprehension"
+                        }
+                    })
         
         return pairs
     

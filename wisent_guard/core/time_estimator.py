@@ -1,251 +1,151 @@
-"""
-Time estimation for optimization tasks.
-"""
-
+"""Time estimation for optimization operations using runtime calibration"""
 import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple, Optional
+from pathlib import Path
+
+from .timing_calibration import TimingCalibrator
 
 
 class OptimizationTimeEstimator:
-    """Estimates time for full optimization pipeline based on model and task counts."""
+    """Estimates time required for optimization operations using calibration"""
     
-    # Empirical timing data (in seconds per task)
-    TIMING_DATA = {
-        "distilgpt2": {
-            "classification": {
-                "base": 15,  # Base time per task
-                "per_sample": 0.1,  # Additional time per sample
-                "per_layer": 2,  # Additional time per layer tested
-            },
-            "sample_size": {
-                "base": 10,
-                "per_size_point": 5,  # Time per sample size tested
-                "per_sample": 0.05,
-            },
-            "classifier_training": {
-                "base": 8,
-                "per_sample": 0.02,
-            },
-            "control_vector": {
-                "base": 12,
-                "per_sample": 0.03,
-                "activation_extraction": 0.1,  # Per sample
-            }
-        },
-        # Default timings for unknown models
-        "default": {
-            "classification": {
-                "base": 20,
-                "per_sample": 0.15,
-                "per_layer": 3,
-            },
-            "sample_size": {
-                "base": 15,
-                "per_size_point": 8,
-                "per_sample": 0.08,
-            },
-            "classifier_training": {
-                "base": 10,
-                "per_sample": 0.03,
-            },
-            "control_vector": {
-                "base": 15,
-                "per_sample": 0.04,
-                "activation_extraction": 0.15,
-            }
-        }
+    # Fallback timing estimates (in seconds) - used when calibration is skipped
+    FALLBACK_TIMING = {
+        "per_task_per_sample": 0.005,  # ~5ms per sample per task
+        "per_layer": 5.0,  # ~5s per layer
+        "classifier_training_per_sample": 0.002,  # ~2ms per training sample
+        "control_vector_per_layer": 10.0,  # ~10s per layer
     }
     
-    def __init__(self, model_name: str, tasks: List[str], verbose: bool = True):
+    def __init__(
+        self, 
+        model_name: str, 
+        verbose: bool = True,
+        skip_calibration: bool = False,
+        calibration_file: Optional[Path] = None,
+        calibrate_only: bool = False
+    ):
         self.model_name = model_name
-        self.tasks = tasks
-        self.num_tasks = len(tasks)
         self.verbose = verbose
+        self.calibrator = TimingCalibrator(verbose=verbose)
         
-        # Get timing data for this model
-        self.timing = self.TIMING_DATA.get(model_name, self.TIMING_DATA["default"])
+        # Get number of layers in the model
+        try:
+            from . import Model
+            model = Model(name=model_name)
+            # Try to detect number of layers from model
+            if hasattr(model, 'model') and hasattr(model.model, 'config'):
+                if hasattr(model.model.config, 'num_hidden_layers'):
+                    self.total_layers = model.model.config.num_hidden_layers
+                elif hasattr(model.model.config, 'n_layer'):
+                    self.total_layers = model.model.config.n_layer
+                else:
+                    self.total_layers = 24  # Default estimate
+            else:
+                self.total_layers = 24  # Default estimate
+        except:
+            self.total_layers = 24  # Default estimate
         
-        # Track actual times for better estimates
-        self.actual_times = {
-            "classification": [],
-            "sample_size": [],
-            "classifier_training": [],
-            "control_vector": []
-        }
+        # Handle calibration
+        if calibration_file and calibration_file.exists():
+            # Load from file
+            if self.calibrator.load_from_file(calibration_file):
+                self.timing = self.calibrator.timings
+            else:
+                self.timing = self.FALLBACK_TIMING
+        elif skip_calibration:
+            # Use fallback timing
+            self.timing = self.FALLBACK_TIMING
+            if verbose:
+                print("⏭️  Skipping calibration, using fallback estimates")
+        else:
+            # Run calibration
+            self.timing = self.calibrator.run_calibration(model_name)
+            
+            # Save calibration if file path provided
+            if calibration_file:
+                self.calibrator.save_to_file(calibration_file)
         
-        self.start_time = None
-        self.phase_start_time = None
-        self.current_phase = None
-        self.completed_tasks = 0
-        
-    def estimate_total_time(
+        self.calibrate_only = calibrate_only
+    
+    def estimate_classification_time(
         self,
-        classification_limit: int = 200,
-        sample_sizes: List[int] = None,
-        sample_size_limit: int = 1000,
-        skip_classification: bool = False,
-        skip_sample_size: bool = False,
-        skip_classifier_training: bool = False,
-        skip_control_vectors: bool = False
+        num_tasks: int,
+        sample_limit: int = 200,
+        layers: Optional[list] = None
     ) -> Tuple[float, Dict[str, float]]:
         """
-        Estimate total time for full optimization.
+        Estimate time for classification optimization.
         
         Returns:
-            Tuple of (total_seconds, phase_breakdown)
+            Tuple of (total_seconds, breakdown)
         """
-        if sample_sizes is None:
-            sample_sizes = [5, 10, 20, 50, 100, 200, 500]
+        num_layers = len(layers) if layers else min(5, self.total_layers)
         
-        phase_times = {}
+        total_time, breakdown = self.calibrator.estimate_optimization_time(
+            num_tasks=num_tasks,
+            num_layers=num_layers,
+            samples_per_task=sample_limit,
+            include_sample_size_opt=False,
+            include_classifier_training=False,
+            include_control_vectors=False
+        )
         
-        # Classification optimization
-        if not skip_classification:
-            # Estimate layers to test (typically tests ~5 layers)
-            layers_to_test = 5
-            time_per_task = (
-                self.timing["classification"]["base"] +
-                self.timing["classification"]["per_sample"] * classification_limit +
-                self.timing["classification"]["per_layer"] * layers_to_test
-            )
-            phase_times["classification"] = time_per_task * self.num_tasks
-        else:
-            phase_times["classification"] = 0
-        
-        # Sample size optimization
-        if not skip_sample_size:
-            time_per_task = (
-                self.timing["sample_size"]["base"] +
-                self.timing["sample_size"]["per_size_point"] * len(sample_sizes) +
-                self.timing["sample_size"]["per_sample"] * sample_size_limit
-            )
-            phase_times["sample_size"] = time_per_task * self.num_tasks
-        else:
-            phase_times["sample_size"] = 0
-        
-        # Classifier training
-        if not skip_classifier_training:
-            # Assume optimal sample size ~200
-            avg_sample_size = 200
-            time_per_task = (
-                self.timing["classifier_training"]["base"] +
-                self.timing["classifier_training"]["per_sample"] * avg_sample_size
-            )
-            phase_times["classifier_training"] = time_per_task * self.num_tasks
-        else:
-            phase_times["classifier_training"] = 0
-        
-        # Control vector training
-        if not skip_control_vectors:
-            avg_sample_size = 200
-            time_per_task = (
-                self.timing["control_vector"]["base"] +
-                self.timing["control_vector"]["per_sample"] * avg_sample_size +
-                self.timing["control_vector"]["activation_extraction"] * avg_sample_size
-            )
-            phase_times["control_vector"] = time_per_task * self.num_tasks
-        else:
-            phase_times["control_vector"] = 0
-        
-        total_time = sum(phase_times.values())
-        
-        return total_time, phase_times
+        return total_time, {"classification": total_time}
     
-    def start_optimization(self):
-        """Mark the start of optimization."""
-        self.start_time = time.time()
+    def estimate_full_optimization_time(
+        self,
+        num_tasks: int,
+        classification_limit: int = 200,
+        include_sample_size_opt: bool = True,
+        include_classifier_training: bool = True,
+        include_control_vectors: bool = True
+    ) -> Tuple[float, Dict[str, float]]:
+        """
+        Estimate time for full optimization pipeline.
         
-    def start_phase(self, phase: str):
-        """Mark the start of a phase."""
-        self.current_phase = phase
-        self.phase_start_time = time.time()
-        self.completed_tasks = 0
+        Returns:
+            Tuple of (total_seconds, breakdown)
+        """
+        # Typical number of layers tested in classification
+        num_layers = min(5, self.total_layers)
         
-    def task_completed(self):
-        """Mark a task as completed and update estimates."""
-        if self.phase_start_time and self.current_phase:
-            elapsed = time.time() - self.phase_start_time
-            self.completed_tasks += 1
-            
-            # Calculate actual time per task
-            actual_per_task = elapsed / self.completed_tasks
-            self.actual_times[self.current_phase].append(actual_per_task)
-    
-    def get_phase_progress(self) -> Dict[str, any]:
-        """Get current phase progress and estimates."""
-        if not self.current_phase or not self.phase_start_time:
-            return {}
+        # Control vectors typically test more layers
+        cv_layers = min(10, self.total_layers)
         
-        elapsed = time.time() - self.phase_start_time
-        
-        # Use actual times if available
-        if self.actual_times[self.current_phase]:
-            avg_time_per_task = sum(self.actual_times[self.current_phase]) / len(self.actual_times[self.current_phase])
-        else:
-            # Use initial estimate
-            avg_time_per_task = elapsed / max(1, self.completed_tasks)
-        
-        remaining_tasks = self.num_tasks - self.completed_tasks
-        estimated_remaining = avg_time_per_task * remaining_tasks
-        
-        return {
-            "phase": self.current_phase,
-            "completed": self.completed_tasks,
-            "total": self.num_tasks,
-            "elapsed": elapsed,
-            "estimated_remaining": estimated_remaining,
-            "avg_time_per_task": avg_time_per_task,
-            "eta": datetime.now() + timedelta(seconds=estimated_remaining)
-        }
-    
-    def get_overall_progress(self, phase_times: Dict[str, float]) -> Dict[str, any]:
-        """Get overall optimization progress."""
-        if not self.start_time:
-            return {}
-        
-        total_elapsed = time.time() - self.start_time
-        
-        # Calculate completed time based on phases
-        completed_time = 0
-        for phase, estimated in phase_times.items():
-            if phase in self.actual_times and len(self.actual_times[phase]) > 0:
-                # Phase completed
-                completed_time += estimated
-            elif phase == self.current_phase and self.completed_tasks > 0:
-                # Current phase partially complete
-                progress = self.completed_tasks / self.num_tasks
-                completed_time += estimated * progress
-        
-        total_estimated = sum(phase_times.values())
-        remaining_time = max(0, total_estimated - completed_time)
-        
-        # Adjust based on actual vs estimated
-        if completed_time > 0:
-            actual_ratio = total_elapsed / max(1, completed_time)
-            remaining_time *= actual_ratio
-        
-        return {
-            "elapsed": total_elapsed,
-            "estimated_total": total_estimated,
-            "estimated_remaining": remaining_time,
-            "percent_complete": (completed_time / total_estimated * 100) if total_estimated > 0 else 0,
-            "eta": datetime.now() + timedelta(seconds=remaining_time)
-        }
+        return self.calibrator.estimate_optimization_time(
+            num_tasks=num_tasks,
+            num_layers=num_layers,
+            samples_per_task=classification_limit,
+            include_sample_size_opt=include_sample_size_opt,
+            include_classifier_training=include_classifier_training,
+            include_control_vectors=include_control_vectors,
+            num_cv_layers=cv_layers
+        )
     
     @staticmethod
     def format_time(seconds: float) -> str:
-        """Format seconds into human-readable time."""
+        """Format time in human-readable format"""
         if seconds < 60:
-            return f"{seconds:.0f}s"
+            return f"{seconds:.0f} seconds"
         elif seconds < 3600:
             minutes = seconds / 60
-            return f"{minutes:.1f}m"
+            return f"{minutes:.0f} minutes"
         else:
             hours = seconds / 3600
-            return f"{hours:.1f}h"
+            minutes = (seconds % 3600) / 60
+            if minutes > 0:
+                return f"{hours:.0f} hours {minutes:.0f} minutes"
+            else:
+                return f"{hours:.0f} hours"
     
-    @staticmethod
-    def format_eta(eta: datetime) -> str:
-        """Format ETA datetime."""
-        return eta.strftime("%H:%M:%S")
+    def print_time_breakdown(self, total_time: float, breakdown: Dict[str, float]):
+        """Print a formatted time breakdown"""
+        print(f"\n⏱️  ESTIMATED OPTIMIZATION TIME:")
+        print(f"   Total: {self.format_time(total_time)}")
+        
+        if len(breakdown) > 1:
+            print("\n   Breakdown:")
+            for phase, time_sec in breakdown.items():
+                if time_sec > 0:
+                    print(f"   - {phase.replace('_', ' ').title()}: {self.format_time(time_sec)}")

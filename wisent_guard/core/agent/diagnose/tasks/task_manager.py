@@ -99,7 +99,7 @@ def load_available_tasks() -> List[str]:
 
 def load_docs(task, limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
-    Load documents from the most appropriate split (validation → test → train).
+    Load documents from the most appropriate split (validation → test → train → fewshot).
     
     Args:
         task: Task object from lm_eval
@@ -110,14 +110,30 @@ def load_docs(task, limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     docs = []
     
+    # Try different doc sources in order of preference
     if task.has_validation_docs():
         docs = list(task.validation_docs())
     elif task.has_test_docs():
         docs = list(task.test_docs())
     elif task.has_training_docs():
         docs = list(task.training_docs())
+    elif hasattr(task, 'has_fewshot_docs') and task.has_fewshot_docs():
+        docs = list(task.fewshot_docs())
     else:
-        raise RuntimeError(f"No labelled docs available for task {task.NAME}")
+        # For tasks that use fewshot_split (like MMMLU), try to load from dataset directly
+        if hasattr(task, 'dataset') and hasattr(task, 'fewshot_split'):
+            try:
+                from datasets import load_dataset
+                dataset = load_dataset(
+                    task.dataset_path if hasattr(task, 'dataset_path') else task.dataset_name,
+                    task.dataset_config_name if hasattr(task, 'dataset_config_name') else None,
+                    split=task.fewshot_split
+                )
+                docs = [dict(item) for item in dataset]
+            except Exception as e:
+                raise RuntimeError(f"No labelled docs available for task {task.NAME}. Error loading fewshot split: {e}")
+        else:
+            raise RuntimeError(f"No labelled docs available for task {task.NAME}")
     
     if limit is not None and limit > 0:
         docs = docs[:limit]

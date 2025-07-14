@@ -656,6 +656,14 @@ def setup_classification_optimizer_parser(parser):
                        help="Don't save classifiers (overrides --save-classifiers)")
     parser.add_argument("--classifiers-dir", type=str, default=None,
                        help="Directory to save classifiers (default: ./optimized_classifiers/model_name/)")
+    
+    # Timing calibration options
+    parser.add_argument("--skip-calibration", action="store_true",
+                       help="Skip timing calibration and use fallback estimates")
+    parser.add_argument("--calibration-file", type=str, default=None,
+                       help="File to save/load calibration data")
+    parser.add_argument("--calibrate-only", action="store_true",
+                       help="Only run calibration and exit (saves to --calibration-file if provided)")
     parser.add_argument("--tasks", type=str, nargs='+', default=None,
                        help="Specific tasks to optimize (if None, uses all available tasks)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
@@ -866,3 +874,11 @@ def setup_full_optimizer_parser(parser):
                        help="Enable verbose output")
     parser.add_argument("--save-plots", action="store_true",
                        help="Save plots for both optimizations")
+    
+    # Timing calibration options
+    parser.add_argument("--skip-calibration", action="store_true",
+                       help="Skip timing calibration and use fallback estimates")
+    parser.add_argument("--calibration-file", type=str, default=None,
+                       help="File to save/load calibration data")
+    parser.add_argument("--calibrate-only", action="store_true",
+                       help="Only run calibration and exit (saves to --calibration-file if provided)")

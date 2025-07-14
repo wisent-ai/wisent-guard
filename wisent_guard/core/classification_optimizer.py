@@ -418,37 +418,54 @@ class ClassificationOptimizer:
                     })
                 
             except Exception as e:
-                # 🚨 HARD STOP - ANY ERROR IN ANY TASK CRASHES THE ENTIRE OPTIMIZATION
-                logger.error(f"💥 HARD STOP: Task {task_name} failed: {e}")
+                # Skip failing benchmark and log error
+                failed_count += 1
+                logger.error(f"⚠️  Task {task_name} failed (skipping): {e}")
                 
                 # Import traceback for full stack trace
                 import traceback
-                print(f"\n💥💥💥 HARD STOP - ERROR IN TASK OPTIMIZATION 💥💥💥")
-                print(f"Task: {task_name}")
-                print(f"Error: {e}")
-                print(f"Full traceback:")
-                traceback.print_exc()
-                print(f"💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
+                error_details = {
+                    "task_name": task_name,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                    "task_index": i,
+                    "total_tasks": len(self.available_tasks),
+                    "traceback": traceback.format_exc()
+                }
+                
+                # Log to error tracking file
+                self._log_failed_benchmark(error_details)
+                
+                print(f"\n⚠️  SKIPPING FAILED TASK: {task_name}")
+                print(f"   Error type: {type(e).__name__}")
+                print(f"   Error message: {str(e)}")
+                print(f"   See failed_benchmarks.json for details\n")
                 
                 if detailed_logger:
                     detailed_logger.log_task(
                         task_name,
-                        f"HARD STOP: Task failed: {str(e)}",
+                        f"Task failed (skipped): {str(e)}",
                         "error",
                         {
                             "success": False,
                             "error_message": str(e),
+                            "error_type": type(e).__name__,
                             "optimization_time_seconds": time.time() - task_start_time,
-                            "hard_stop": True
+                            "skipped": True
                         }
                     )
                     detailed_logger.set_task_progress(task_name, {
-                        "status": "hard_stop_error",
+                        "status": "failed_skipped",
                         "error": str(e)
                     })
                 
-                # HARD STOP - crash the entire optimization immediately
-                raise e
+                # Call progress callback with "failed" status
+                if progress_callback:
+                    progress_callback(i-1, task_name, "failed")
+                
+                # Continue to next task instead of raising
+                continue
         
         # Analyze results across all tasks
         total_time = time.time() - start_time
@@ -568,28 +585,16 @@ class ClassificationOptimizer:
                 allow_small_dataset=True
             )
         except Exception as e:
-            # 🚨 HARD STOP - ANY ERROR IN SINGLE TASK OPTIMIZATION CRASHES EVERYTHING
-            logger.error(f"💥 HARD STOP: Single task optimization failed for {task_name}: {e}")
-            
-            # Import traceback for full stack trace
-            import traceback
-            print(f"\n💥💥💥 HARD STOP - ERROR IN SINGLE TASK OPTIMIZATION 💥💥💥")
-            print(f"Task: {task_name}")
-            print(f"Error: {e}")
-            print(f"Full traceback:")
-            traceback.print_exc()
-            print(f"💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
-            
-            if detailed_logger:
-                detailed_logger.log_task(
-                    task_name,
-                    f"HARD STOP: Task optimization failed: {str(e)}",
-                    "error",
-                    {"error_type": type(e).__name__, "error_details": str(e), "hard_stop": True}
-                )
-            
-            # HARD STOP - crash the entire optimization immediately
+            # Re-raise the exception to be handled by the outer try-catch in optimize_all_tasks
+            # This allows the skip-and-continue logic to work properly
+            logger.debug(f"Single task optimization failed for {task_name}, re-raising to outer handler")
             raise e
+        
+        # Check if the optimization failed (e.g., evaluation returned error)
+        if optimization_results.get("error", False):
+            opt_result = optimization_results.get("optimization_result", {})
+            error_msg = opt_result.get("error", "Unknown error during optimization")
+            raise RuntimeError(f"Task optimization failed: {error_msg}")
         
         # Extract best results from run_task_pipeline optimization
         optimization_result = optimization_results.get("optimization_result", {})
@@ -889,6 +894,44 @@ class ClassificationOptimizer:
         
         logger.info(f"✅ Model configuration saved with {len(task_specific_overrides)} task-specific overrides")
     
+    def _log_failed_benchmark(self, error_details: Dict[str, Any]):
+        """
+        Log failed benchmark to a JSON file for tracking.
+        
+        Args:
+            error_details: Dictionary containing error information
+        """
+        # Get model directory from config manager
+        model_dir = os.path.join(os.path.expanduser("~/.wisent-guard/model_configs"), self.model_name)
+        os.makedirs(model_dir, exist_ok=True)
+        error_file = os.path.join(model_dir, "failed_benchmarks.json")
+        
+        # Load existing errors if file exists
+        if os.path.exists(error_file):
+            try:
+                with open(error_file, 'r') as f:
+                    errors_data = json.load(f)
+            except:
+                errors_data = {"failed_benchmarks": []}
+        else:
+            errors_data = {"failed_benchmarks": []}
+        
+        # Add new error
+        errors_data["failed_benchmarks"].append(error_details)
+        
+        # Update metadata
+        errors_data["metadata"] = {
+            "total_failures": len(errors_data["failed_benchmarks"]),
+            "last_updated": datetime.now().isoformat(),
+            "model_name": self.model_name
+        }
+        
+        # Save updated error log
+        with open(error_file, 'w') as f:
+            json.dump(errors_data, f, indent=2)
+        
+        logger.info(f"📝 Error logged to {error_file}")
+    
     def _print_optimization_summary(self, summary: ClassificationOptimizationSummary):
         """
         Print comprehensive optimization summary to console.
@@ -963,6 +1006,7 @@ def run_classification_optimization(
     device: str = None,
     verbose: bool = False,
     tasks: Optional[List[str]] = None,
+    skip_confirmation: bool = False,
     **kwargs
 ) -> ClassificationOptimizationSummary:
     """
@@ -974,6 +1018,7 @@ def run_classification_optimization(
         device: Device to use
         verbose: Enable verbose logging
         tasks: List of specific tasks to optimize (if None, uses all available tasks)
+        skip_confirmation: Skip confirmation prompt for long optimizations
         **kwargs: Additional arguments for optimization (including save_logs_json)
         
     Returns:
@@ -985,6 +1030,32 @@ def run_classification_optimization(
         verbose=verbose,
         tasks=tasks
     )
+    
+    # Estimate time if not skipping confirmation
+    if not skip_confirmation:
+        # Simple time estimation based on task count and limit
+        num_tasks = len(tasks) if tasks else len(optimizer.available_tasks)
+        estimated_seconds_per_task = 15 + (limit * 0.1)  # Base time + per-sample time
+        total_estimated_seconds = num_tasks * estimated_seconds_per_task
+        
+        # Check if over 1 hour
+        if total_estimated_seconds > 3600:
+            hours = total_estimated_seconds / 3600
+            print(f"\n⚠️  WARNING: Classification optimization estimated to take {hours:.1f} hours")
+            print(f"   • Tasks to optimize: {num_tasks}")
+            print(f"   • Samples per task: {limit}")
+            
+            import sys
+            while True:
+                response = input("\n   Do you want to continue? (y/n): ").strip().lower()
+                if response == 'y' or response == 'yes':
+                    print(f"\n✅ Continuing with optimization...")
+                    break
+                elif response == 'n' or response == 'no':
+                    print(f"\n❌ Optimization cancelled by user.")
+                    sys.exit(0)
+                else:
+                    print(f"   Please enter 'y' for yes or 'n' for no.")
     
     return optimizer.run_comprehensive_optimization(
         limit=limit,

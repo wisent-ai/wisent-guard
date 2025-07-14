@@ -8,6 +8,9 @@ import csv
 import pandas as pd
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any, Union
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ContrastivePairSet:
     def __init__(self, name, pairs=None, task_type=None):
@@ -1397,18 +1400,14 @@ class ContrastivePairSet:
                     })
                     
             except Exception as e:
-                # 🚨 HARD STOP - ANY ERROR IN QA EXTRACTION CRASHES THE ENTIRE PROCESS
-                print(f"\n💥💥💥 HARD STOP - ERROR IN QA EXTRACTION 💥💥💥")
-                print(f"Task: {task_name}")
-                print(f"Document index: {i}")
-                print(f"Error: {e}")
-                print(f"Document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
-                print(f"Full traceback:")
-                import traceback
-                traceback.print_exc()
-                print(f"💥💥💥 STOPPING EXECUTION IMMEDIATELY 💥💥💥\n")
-                
-                # HARD STOP - crash the entire process immediately
-                raise e
+                # Skip this document and continue with others
+                logger.warning(f"⚠️  Skipping document {i} in {task_name} due to extraction error: {e}")
+                if self.verbose:
+                    print(f"\n⚠️  WARNING: Failed to extract QA pair from document {i}")
+                    print(f"   Task: {task_name}")
+                    print(f"   Error: {e}")
+                    print(f"   Document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
+                    print(f"   Continuing with next document...\n")
+                continue
         
         return qa_pairs 

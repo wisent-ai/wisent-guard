@@ -73,13 +73,15 @@ class WinograndeExtractor(BenchmarkExtractor):
             # This is a bug in lm-eval-harness winogrande task configuration
             formatted_question = f"{question}\nA. {option1}\nB. {option2}"
                 
-            # Get correct answer
+            # Get correct and incorrect answers
             correct_answer = option1 if answer == '1' else option2
+            incorrect_answer = option2 if answer == '1' else option1
             
             return {
                 'question': question,
                 'formatted_question': formatted_question,
-                'correct_answer': correct_answer
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
             }
             
         except Exception as e:
@@ -487,11 +489,30 @@ class MMLUExtractor(BenchmarkExtractor):
         - doc['question']: the question
         - doc['choices']: list of choices (A, B, C, D)
         - doc['answer']: index of correct choice (0, 1, 2, 3)
+        
+        MMMLU format:
+        - doc['instruction']: the question
+        - doc['option_a'], doc['option_b'], doc['option_c'], doc['option_d']: choices
+        - doc['answer']: letter of correct choice (A, B, C, D)
         """
         try:
-            question = doc.get('question', '')
-            choices = doc.get('choices', [])
-            answer = doc.get('answer', 0)
+            # Check for MMMLU format first
+            if 'instruction' in doc and 'option_a' in doc:
+                question = doc.get('instruction', '')
+                choices = [
+                    doc.get('option_a', ''),
+                    doc.get('option_b', ''),
+                    doc.get('option_c', ''),
+                    doc.get('option_d', '')
+                ]
+                choices = [c for c in choices if c]  # Filter out empty choices
+                answer_letter = doc.get('answer', 'A')
+                answer = ord(answer_letter) - ord('A')  # Convert letter to index
+            else:
+                # Standard MMLU format
+                question = doc.get('question', '')
+                choices = doc.get('choices', [])
+                answer = doc.get('answer', 0)
             
             if not all([question, choices]) or answer >= len(choices):
                 return None
@@ -524,8 +545,21 @@ class MMLUExtractor(BenchmarkExtractor):
             if not qa_pair:
                 return None
                 
-            choices = doc.get('choices', [])
-            answer = doc.get('answer', 0)
+            # Check for MMMLU format first
+            if 'instruction' in doc and 'option_a' in doc:
+                choices = [
+                    doc.get('option_a', ''),
+                    doc.get('option_b', ''),
+                    doc.get('option_c', ''),
+                    doc.get('option_d', '')
+                ]
+                choices = [c for c in choices if c]  # Filter out empty choices
+                answer_letter = doc.get('answer', 'A')
+                answer = ord(answer_letter) - ord('A')  # Convert letter to index
+            else:
+                # Standard MMLU format
+                choices = doc.get('choices', [])
+                answer = doc.get('answer', 0)
             
             if answer >= len(choices):
                 return None
@@ -1287,6 +1321,114 @@ class WNLIExtractor(BenchmarkExtractor):
             
         except Exception as e:
             logger.debug(f"Error extracting WNLI contrastive pair: {e}")
+            return None
+
+
+class CoQAExtractor(BenchmarkExtractor):
+    """Extractor for CoQA conversational QA benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Extract QA pair from CoQA document.
+        
+        CoQA format:
+        - doc['story']: The context passage
+        - doc['questions']['input_text']: List of questions
+        - doc['answers']['input_text']: List of answers
+        - doc['questions']['turn_id']: Turn IDs
+        """
+        try:
+            story = doc.get('story', '')
+            questions_data = doc.get('questions', {})
+            answers_data = doc.get('answers', {})
+            
+            question_texts = questions_data.get('input_text', [])
+            answer_texts = answers_data.get('input_text', [])
+            turn_ids = questions_data.get('turn_id', [])
+            
+            if not all([story, question_texts, answer_texts]):
+                return None
+            
+            # Use the last question in the conversation for the current turn
+            # This is what lm-eval does in doc_to_text
+            if not question_texts:
+                return None
+                
+            # Build conversation history
+            conversation_history = []
+            for i in range(len(question_texts) - 1):  # All but the last
+                if i < len(answer_texts):
+                    conversation_history.append(f"Q: {question_texts[i]}")
+                    conversation_history.append(f"A: {answer_texts[i]}")
+            
+            # Current question is the last one
+            current_question = question_texts[-1]
+            
+            # Format the question with story and conversation history
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = story + "\n\n"
+                formatted_question += "\n".join(conversation_history)
+                if conversation_history:
+                    formatted_question += "\n\n"
+                formatted_question += f"Q: {current_question}\n\nA:"
+            
+            # Get the correct answer (last answer if available)
+            if hasattr(task_data, 'doc_to_target'):
+                target = task_data.doc_to_target(doc)
+                if isinstance(target, list) and target:
+                    correct_answer = target[0]
+                else:
+                    correct_answer = str(target) if target else "no"
+            else:
+                correct_answer = answer_texts[-1] if len(answer_texts) == len(question_texts) else "no"
+            
+            return {
+                'question': current_question,
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting CoQA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for CoQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            correct_answer = qa_pair['correct_answer']
+            
+            # Generate contextually appropriate incorrect answers
+            incorrect_answers = [
+                "I don't know",
+                "The passage doesn't say",
+                "Unable to answer from the given information",
+                "Not mentioned in the text"
+            ]
+            
+            # For yes/no questions, flip the answer
+            if correct_answer.lower() in ['yes', 'no']:
+                incorrect_answer = 'no' if correct_answer.lower() == 'yes' else 'yes'
+            # For short factual answers, use a generic incorrect response
+            elif len(correct_answer.split()) <= 3:
+                incorrect_answer = "unknown"
+            else:
+                # Use one of the template responses
+                incorrect_answer = incorrect_answers[0]
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting CoQA contrastive pair: {e}")
             return None
 
 
@@ -2241,12 +2383,28 @@ class ArithmeticExtractor(BenchmarkExtractor):
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """
         Arithmetic format:
+        - doc['context']: arithmetic problem with "Question: ... Answer:" format
+        - doc['completion']: numerical answer
+        Or legacy format:
         - doc['question']: arithmetic problem
         - doc['answer']: numerical answer
         """
         try:
-            question = doc.get('question', doc.get('problem', ''))
-            answer = doc.get('answer', doc.get('solution', ''))
+            # Try new format first (context/completion)
+            if 'context' in doc and 'completion' in doc:
+                context = doc['context']
+                answer = doc['completion'].strip()
+                
+                # Extract question from context
+                # Context format: "Question: What is (9 + 8) * 2?\nAnswer:"
+                if 'Question:' in context:
+                    question = context.split('Question:')[1].split('\nAnswer:')[0].strip()
+                else:
+                    question = context.replace('\nAnswer:', '').strip()
+            else:
+                # Try legacy format
+                question = doc.get('question', doc.get('problem', ''))
+                answer = doc.get('answer', doc.get('solution', ''))
             
             if not all([question, answer]):
                 return None
@@ -2459,6 +2617,7 @@ EXTRACTORS = {
     'gsm8k': GSM8KExtractor,
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
+    'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval
     'piqa': PIQAExtractor,
     'copa': COPAExtractor,
     'openbookqa': OpenBookQAExtractor,
@@ -2473,7 +2632,7 @@ EXTRACTORS = {
     'wnli': WNLIExtractor,  # GLUE WNLI Winograd NLI
     # Add more specific extractors for other benchmarks
     'cb': COPAExtractor,  # Similar format to COPA
-    'coqa': SQuAD2Extractor,  # Similar QA format
+    'coqa': CoQAExtractor,  # Conversational QA format
     'drop': SQuAD2Extractor,  # Similar QA format
     'logiqa': LogiQAExtractor,  # LogiQA logical reasoning format
     'logiqa2': LogiQAExtractor,  # LogiQA 2.0 uses same format
@@ -2532,9 +2691,13 @@ EXTRACTORS = {
 
 def get_extractor(benchmark_name: str) -> BenchmarkExtractor:
     """Get the appropriate extractor for a benchmark with hard error for unsupported tasks."""
-    # Try exact match only - no fallbacks
+    # Try exact match first
     if benchmark_name in EXTRACTORS:
         return EXTRACTORS[benchmark_name]()
+    
+    # Handle MMLU subtasks (e.g., mmlu_abstract_algebra, mmlu_biology, etc.)
+    if benchmark_name.startswith('mmlu_'):
+        return MMLUExtractor()
     
     # Hard error for unsupported benchmarks
     raise UnsupportedBenchmarkError(

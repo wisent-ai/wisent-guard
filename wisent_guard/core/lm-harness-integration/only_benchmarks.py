@@ -621,7 +621,7 @@ CORE_BENCHMARKS = {
         "priority": "low"  # 69.5s - slow for agentic use
     },
     "arithmetic": {
-        "task": "arithmetic",
+        "task": "arithmetic_1dc",  # Use specific subtask (1 digit + carry)
         "tags": ["mathematics", "long context", "reasoning"],
         "priority": "low"  # 63.8s - slow for agentic use
     },

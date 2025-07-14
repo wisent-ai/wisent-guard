@@ -81,12 +81,14 @@ ALLOWED_TASKS = {
     # Boolean benchmarks
     "boolq",
     # Math benchmarks
-    "gsm8k", "asdiv",
+    "gsm8k", "asdiv", "arithmetic",
     # QA benchmarks
     "coqa", "naturalqs", "triviaqa",
     # Additional benchmarks
     "cb", "logiqa", "multirc", "mutual", "prost", "pubmedqa", "sciq",
     "swag", "toxigen", "wic", "wsc", "wsc273",
+    # Adversarial benchmarks
+    "anli",
 }
 
 # Filter to only available (working) benchmarks - this gives us the validated benchmarks
@@ -856,6 +858,9 @@ def run_task_pipeline(
             print(f"   • Input: JSON file")
     
     try:
+        # Initialize control_vector_info to ensure it's in scope
+        control_vector_info = None
+        
         # Parse layers from argument
         layers = parse_layers_from_arg(layer)
         is_multi_layer = len(layers) > 1
@@ -2459,18 +2464,34 @@ def run_task_pipeline(
                     correct_predictions = lm_eval_metrics.get('correct_predictions', 0)
                     total_samples = lm_eval_metrics.get('total_samples', 0)
                     
-                    # Throw hard error if evaluation failed
+                    # Handle evaluation failure gracefully
                     if accuracy == 'N/A' or total_samples == 0:
                         error_msg = f"""
-❌ EVALUATION FAILED FOR {task_name.upper()}!
+⚠️  EVALUATION WARNING FOR {task_name.upper()}!
    • Accuracy: {accuracy}
    • Correct predictions: {correct_predictions} 
    • Total samples: {total_samples}
    • Evaluation method: {evaluation_method}
    
 This indicates the {evaluation_method} evaluation method is not working properly for {task_name}.
-Check the task configuration and implementation."""
-                        raise RuntimeError(error_msg)
+The task will be skipped in optimization."""
+                        print(error_msg)
+                        logger.warning(f"Evaluation failed for {task_name}: {error_msg}")
+                        
+                        # Return error result that will be caught by optimizer
+                        return {
+                            'training_results': {'accuracy': 0.0, 'f1': 0.0},
+                            'evaluation_results': {'accuracy': 0.0},
+                            'optimization_result': {
+                                'best_layer': layer,
+                                'best_aggregation': token_aggregation,
+                                'best_threshold': detection_threshold,
+                                'best_accuracy': 0.0,
+                                'best_f1': 0.0,
+                                'error': f"Evaluation failed: {evaluation_method} returned no results"
+                            },
+                            'error': True
+                        }
                     
                     if isinstance(accuracy, (int, float)):
                         print(f"   📊 Accuracy: {accuracy:.2%}")
@@ -4146,6 +4167,49 @@ def handle_classification_optimization_command(args):
         else:
             print(f"   🚫 Classifier saving disabled")
         
+        # Time estimation with calibration
+        from .core.time_estimator import OptimizationTimeEstimator
+        from pathlib import Path
+        
+        # Get tasks list
+        tasks = args.tasks or get_valid_task_names()
+        
+        calibration_file = Path(args.calibration_file) if args.calibration_file else None
+        
+        estimator = OptimizationTimeEstimator(
+            model_name=args.model,
+            verbose=args.verbose,
+            skip_calibration=args.skip_calibration,
+            calibration_file=calibration_file,
+            calibrate_only=args.calibrate_only
+        )
+        
+        # If calibrate_only, exit after calibration
+        if args.calibrate_only:
+            print("\n✅ Calibration complete")
+            if calibration_file:
+                print(f"   💾 Calibration data saved to: {calibration_file}")
+            return
+        
+        # Estimate time for classification optimization
+        total_time, breakdown = estimator.estimate_classification_time(
+            num_tasks=len(tasks),
+            sample_limit=args.limit
+        )
+        
+        estimator.print_time_breakdown(total_time, breakdown)
+        
+        # Check if estimated time is over 1 hour and prompt for confirmation
+        if total_time > 3600:  # More than 1 hour
+            print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
+            response = input("   Do you want to continue? (y/n): ").strip().lower()
+            while response not in ['y', 'yes', 'n', 'no']:
+                response = input("   Please enter 'y' or 'n': ").strip().lower()
+            
+            if response in ['n', 'no']:
+                print("   ❌ Optimization cancelled by user.")
+                return
+        
         # Import and initialize classification optimizer
         from .core.classification_optimizer import run_classification_optimization
         
@@ -4449,39 +4513,60 @@ def handle_full_optimization_command(args):
             tasks = get_valid_task_names()
             print(f"   📋 Tasks: All {len(tasks)} available benchmarks")
         
-        # Create time estimator
+        # Create time estimator with calibration options
         from .core.time_estimator import OptimizationTimeEstimator
-        estimator = OptimizationTimeEstimator(args.model, tasks, verbose=args.verbose)
+        from pathlib import Path
         
-        # Get initial time estimate
-        total_time, phase_times = estimator.estimate_total_time(
+        calibration_file = Path(args.calibration_file) if args.calibration_file else None
+        
+        estimator = OptimizationTimeEstimator(
+            model_name=args.model,
+            verbose=args.verbose,
+            skip_calibration=args.skip_calibration,
+            calibration_file=calibration_file,
+            calibrate_only=args.calibrate_only
+        )
+        
+        # If calibrate_only, exit after calibration
+        if args.calibrate_only:
+            print("\n✅ Calibration complete")
+            if calibration_file:
+                print(f"   💾 Calibration data saved to: {calibration_file}")
+            return
+        
+        # Get time estimate based on calibration
+        total_time, phase_times = estimator.estimate_full_optimization_time(
+            num_tasks=len(tasks),
             classification_limit=args.classification_limit,
-            sample_sizes=args.sample_sizes,
-            sample_size_limit=args.sample_size_limit,
-            skip_classification=args.skip_classification,
-            skip_sample_size=args.skip_sample_size,
-            skip_classifier_training=args.skip_classifier_training,
-            skip_control_vectors=args.skip_control_vectors
+            include_sample_size_opt=not args.skip_sample_size,
+            include_classifier_training=not args.skip_classifier_training,
+            include_control_vectors=not args.skip_control_vectors
         )
         
         # Display time estimate
-        print(f"\n⏱️  ESTIMATED OPTIMIZATION TIME:")
-        print(f"   📊 Total estimated time: {estimator.format_time(total_time)}")
-        print(f"   🚀 Estimated completion: {estimator.format_eta(datetime.now() + timedelta(seconds=total_time))}")
+        estimator.print_time_breakdown(total_time, phase_times)
         
-        if args.verbose:
-            print(f"\n   📈 Phase breakdown:")
-            if not args.skip_classification:
-                print(f"      • Classification optimization: {estimator.format_time(phase_times['classification'])}")
-            if not args.skip_sample_size:
-                print(f"      • Sample size optimization: {estimator.format_time(phase_times['sample_size'])}")
-            if not args.skip_classifier_training:
-                print(f"      • Classifier training: {estimator.format_time(phase_times['classifier_training'])}")
-            if not args.skip_control_vectors:
-                print(f"      • Control vector training: {estimator.format_time(phase_times['control_vector'])}")
+        if args.skip_calibration:
+            print(f"\n   💡 Note: Using fallback estimates. For more accurate timing, run without --skip-calibration")
+        else:
+            print(f"\n   💡 Note: Estimates based on calibration measurements")
         
-        print(f"\n   💡 Note: Actual time may vary based on system performance")
-        print(f"   🔄 Progress updates will be shown during optimization\n")
+        # Check if estimated time is over 1 hour and prompt for confirmation
+        if total_time > 3600:  # More than 1 hour
+            print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
+            print(f"   This optimization will take approximately {estimator.format_time(total_time)}.")
+            
+            # Prompt for confirmation
+            while True:
+                response = input("\n   Do you want to continue? (y/n): ").strip().lower()
+                if response == 'y' or response == 'yes':
+                    print(f"\n✅ Continuing with optimization...")
+                    break
+                elif response == 'n' or response == 'no':
+                    print(f"\n❌ Optimization cancelled by user.")
+                    sys.exit(0)
+                else:
+                    print(f"   Please enter 'y' for yes or 'n' for no.")
         
         # Start tracking
         estimator.start_optimization()
@@ -4518,7 +4603,8 @@ def handle_full_optimization_command(args):
                 tasks=tasks,
                 save_results=True,
                 save_classifiers=True,  # Save classifiers during optimization
-                progress_callback=classification_progress_callback
+                progress_callback=classification_progress_callback,
+                skip_confirmation=True  # Already asked for confirmation above
             )
             
             print(f"\n✅ Classification optimization completed!")
