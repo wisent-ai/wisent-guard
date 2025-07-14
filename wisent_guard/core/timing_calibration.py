@@ -71,6 +71,7 @@ class TimingCalibrator:
         
         # Measure classification optimization time
         start_time = time.time()
+        calibration_successful = False
         
         # Run a small optimization using HyperparameterOptimizer
         try:
@@ -97,16 +98,26 @@ class TimingCalibrator:
                 )
                 
                 # Run optimization
-                try:
-                    optimizer.optimize(config)
-                except Exception as e:
-                    if self.verbose:
-                        print(f"   ⚠️  Calibration task failed: {e}")
+                optimizer.optimize(config)
+                calibration_successful = True
+                
         except Exception as e:
             if self.verbose:
-                print(f"⚠️  Calibration error: {e}")
+                print(f"\n❌ Calibration failed: {e}")
+                print(f"   Using fallback timing estimates instead")
+            
+            # Use fallback timings if calibration fails
+            self.timings["per_task_per_sample"] = 0.05  # 50ms per sample (conservative)
+            self.timings["per_layer"] = 30.0  # 30s per layer (conservative)
+            self.timings["classifier_training_per_sample"] = 0.01
+            self.timings["control_vector_per_layer"] = 60.0
+            return self.timings
         
         classification_time = time.time() - start_time
+        
+        # Only use measured time if calibration was successful
+        if not calibration_successful:
+            raise RuntimeError("Calibration failed - cannot use timing measurements")
         
         # Calculate timing metrics
         total_operations = len(calibration_tasks) * calibration_layers * calibration_samples
@@ -118,7 +129,7 @@ class TimingCalibrator:
         self.timings["classifier_training_per_sample"] = self.timings["per_task_per_sample"] * 0.1
         self.timings["control_vector_per_layer"] = self.timings["per_layer"] * 0.5
         
-        if self.verbose:
+        if self.verbose and calibration_successful:
             print(f"\n✅ Calibration complete in {classification_time:.1f}s")
             print(f"   Per task per sample: {self.timings['per_task_per_sample']:.3f}s")
             print(f"   Per layer: {self.timings['per_layer']:.3f}s")
