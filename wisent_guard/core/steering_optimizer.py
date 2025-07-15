@@ -925,17 +925,17 @@ def run_auto_steering_optimization(
     use_classification_config: bool = True,
     max_time_minutes: float = 60.0,
     methods_to_test: Optional[List[str]] = None,
-    strength_range: Optional[List[float]] = None
+    strength_range: Optional[List[float]] = None,
+    layer_range: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Automatically optimize steering based on existing classification configuration.
+    Automatically optimize steering configuration.
     
-    This is the main entry point for users who have already optimized classification
-    and want to optimize steering with minimal configuration.
+    This function can work either standalone or building on existing classification config.
     
     Args:
         model_name: Model to optimize
-        task_name: Specific task to optimize (if None, optimizes all classification tasks)
+        task_name: Specific task to optimize (required if no classification config)
         limit: Sample limit per evaluation
         device: Device to use
         verbose: Enable verbose logging
@@ -943,6 +943,7 @@ def run_auto_steering_optimization(
         max_time_minutes: Maximum time for optimization
         methods_to_test: List of steering methods to test (defaults to ["CAA", "HPR"])
         strength_range: List of strengths to test (defaults to [0.5, 1.0, 1.5, 2.0])
+        layer_range: Explicit layer range to search (e.g. "0-5" or "0,2,4")
         
     Returns:
         Dictionary with optimization results and saved configuration paths
@@ -953,14 +954,13 @@ def run_auto_steering_optimization(
         verbose=verbose
     )
     
-    # Load classification config
+    # Load classification config if requested
     config_manager = ModelConfigManager()
-    classification_config = config_manager.load_model_config(model_name)
-    
-    if not classification_config and use_classification_config:
-        logger.warning(f"⚠️ No classification configuration found for {model_name}")
-        logger.info("💡 Run classification optimization first: wisent-guard optimize ...")
-        return {"error": "No classification configuration found"}
+    classification_config = None
+    if use_classification_config:
+        classification_config = config_manager.load_model_config(model_name)
+        if not classification_config:
+            logger.info("ℹ️  No classification config found, proceeding with standalone steering optimization")
     
     # Determine tasks to optimize
     if task_name:
@@ -969,9 +969,10 @@ def run_auto_steering_optimization(
         # Use all tasks that have been optimized for classification
         tasks_to_optimize = list(classification_config['task_specific_overrides'].keys())
         if not tasks_to_optimize:
-            tasks_to_optimize = ["truthfulqa_mc1"]  # Default
+            return {"error": "No task specified and no classification tasks found"}
     else:
-        tasks_to_optimize = ["truthfulqa_mc1"]  # Default
+        # Require explicit task name if no classification config
+        return {"error": "Task name required when not using classification config"}
     
     # Default methods and strengths
     if methods_to_test is None:
@@ -1009,10 +1010,10 @@ def run_auto_steering_optimization(
         if verbose:
             logger.info(f"\n📊 Optimizing steering for task: {task}")
         
-        # Determine layer range based on classification config
-        layer_range = None
-        if classification_config and use_classification_config:
-            # Check task-specific override first
+        # Determine layer range
+        task_layer_range = layer_range  # Use provided layer range
+        if not task_layer_range and classification_config and use_classification_config:
+            # Only use classification config if no explicit layer range provided
             task_overrides = classification_config.get('task_specific_overrides', {}).get(task, {})
             class_layer = task_overrides.get('classification_layer')
             
@@ -1022,16 +1023,23 @@ def run_auto_steering_optimization(
             
             if class_layer:
                 # Search around classification layer
-                layer_range = f"{max(1, class_layer-2)}-{class_layer+2}"
+                task_layer_range = f"{max(0, class_layer-2)}-{class_layer+2}"
                 if verbose:
-                    logger.info(f"   Using layer range around classification layer {class_layer}: {layer_range}")
+                    logger.info(f"   Using layer range around classification layer {class_layer}: {task_layer_range}")
+        
+        # If still no layer range, use default based on model type
+        if not task_layer_range:
+            # Default to searching early to middle layers
+            task_layer_range = "0-5"
+            if verbose:
+                logger.info(f"   Using default layer range: {task_layer_range}")
         
         # Run optimization for this task
         try:
             summary = optimizer.optimize_steering_method_comparison(
                 task_name=task,
                 methods_to_test=method_enums,
-                layer_range=layer_range,
+                layer_range=task_layer_range,
                 strength_range=strength_range,
                 limit=limit,
                 max_time_minutes=time_per_task

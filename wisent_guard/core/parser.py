@@ -702,6 +702,8 @@ def setup_steering_optimizer_parser(parser):
     auto_parser.add_argument("--strength-range", type=float, nargs='+',
                            default=[0.5, 1.0, 1.5, 2.0],
                            help="Steering strengths to test (default: 0.5 1.0 1.5 2.0)")
+    auto_parser.add_argument("--layer-range", type=str, default=None,
+                           help="Explicit layer range to search (e.g., '0-5' or '0,2,4'). If not specified, uses classification layer or defaults to 0-5")
     
     # Method comparison subcommand
     method_parser = steering_subparsers.add_parser("compare-methods", 

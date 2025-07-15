@@ -4314,7 +4314,8 @@ def handle_steering_optimization_command(args):
                 'methods_to_test': args.methods,
                 'limit': args.limit,
                 'max_time_minutes': args.max_time,
-                'strength_range': args.strength_range
+                'strength_range': args.strength_range,
+                'layer_range': args.layer_range
             })
             
             result = run_steering_optimization(
