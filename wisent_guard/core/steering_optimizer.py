@@ -15,6 +15,7 @@ import logging
 import json
 import time
 import os
+import numpy as np
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any, Union
 from dataclasses import dataclass, asdict
@@ -395,24 +396,83 @@ class SteeringOptimizer:
                 # Extract score from evaluation results
                 score = 0.0
                 steering_effect = 0.0
+                accuracy = 0.0
                 
                 if isinstance(result, dict):
-                    # Look for task-specific results
-                    task_result = result.get(task_name, {})
-                    eval_results = task_result.get('evaluation_results', {})
+                    # Get evaluation results - try both nested and direct access
+                    eval_results = None
                     
-                    # Get accuracy score
-                    score = eval_results.get('accuracy', 0.0)
-                    if isinstance(score, str) or score is None:
-                        score = 0.0
+                    # First try: result[task_name]['evaluation_results']
+                    task_result = result.get(task_name, {})
+                    if 'evaluation_results' in task_result:
+                        eval_results = task_result['evaluation_results']
+                    # Second try: result['evaluation_results'] (direct from run_task_pipeline)
+                    elif 'evaluation_results' in result:
+                        eval_results = result['evaluation_results']
+                    else:
+                        eval_results = {}
+                    
+                    # Get accuracy score (but don't use it as the primary metric)
+                    accuracy = eval_results.get('accuracy', 0.0)
+                    if isinstance(accuracy, str) or accuracy is None:
+                        accuracy = 0.0
                     
                     # Calculate steering effect from likelihood changes
                     baseline_likes = eval_results.get('baseline_likelihoods', [])
                     steered_likes = eval_results.get('steered_likelihoods', [])
                     
+                    if self.verbose:
+                        logger.debug(f"   Found {len(baseline_likes)} baseline and {len(steered_likes)} steered likelihoods")
+                        if baseline_likes and len(baseline_likes) > 0:
+                            logger.debug(f"   First few baseline likes: {baseline_likes[:3]}")
+                            logger.debug(f"   First few steered likes: {steered_likes[:3]}")
+                        logger.debug(f"   Full eval_results keys: {list(eval_results.keys())}")
+                        logger.debug(f"   Accuracy value: {eval_results.get('accuracy')}")
+                        
+                        # Check if we're getting the right data structure
+                        if isinstance(result, dict):
+                            logger.debug(f"   Result keys: {list(result.keys())}")
+                            if 'evaluation_results' in result:
+                                logger.debug(f"   Direct evaluation_results found")
+                    
                     if baseline_likes and steered_likes:
-                        changes = [abs(s - b) for s, b in zip(steered_likes, baseline_likes)]
-                        steering_effect = sum(changes) / len(changes) if changes else 0.0
+                        # Filter out inf and nan values
+                        valid_pairs = []
+                        for b, s in zip(baseline_likes, steered_likes):
+                            if np.isfinite(b) and np.isfinite(s):
+                                valid_pairs.append((b, s))
+                        
+                        if valid_pairs:
+                            changes = [abs(s - b) for b, s in valid_pairs]
+                            steering_effect = sum(changes) / len(changes) if changes else 0.0
+                            
+                            # Cap steering effect to prevent infinity
+                            steering_effect = min(steering_effect, 100.0)
+                            
+                            # Also calculate how many preferences changed
+                            preference_changes = 0
+                            for i in range(0, len(baseline_likes), 2):  # Assuming binary choices
+                                if i+1 < len(baseline_likes):
+                                    if np.isfinite(baseline_likes[i]) and np.isfinite(baseline_likes[i+1]) and \
+                                       np.isfinite(steered_likes[i]) and np.isfinite(steered_likes[i+1]):
+                                        baseline_pref = 0 if baseline_likes[i] > baseline_likes[i+1] else 1
+                                        steered_pref = 0 if steered_likes[i] > steered_likes[i+1] else 1
+                                        if baseline_pref != steered_pref:
+                                            preference_changes += 1
+                            
+                            # Use steering effect as the primary score
+                            score = steering_effect
+                            
+                            # Add bonus if accuracy is valid and good
+                            if np.isfinite(accuracy) and accuracy > 0.5:
+                                score += accuracy * 0.5
+                        else:
+                            # No valid likelihood pairs
+                            score = 0.0
+                            steering_effect = 0.0
+                    else:
+                        # Fallback to accuracy if no likelihood data
+                        score = accuracy if np.isfinite(accuracy) else 0.0
                 
                 results.append({
                     'strength': float(strength),
@@ -425,7 +485,7 @@ class SteeringOptimizer:
                     best_score = score
                     best_strength = float(strength)
                 
-                logger.info(f"   Strength {strength:.2f}: score={score:.3f}, effect={steering_effect:.3f}")
+                logger.info(f"   Strength {strength:.2f}: score={score:.3f}, effect={steering_effect:.3f}, accuracy={accuracy:.3f}")
                 
             except Exception as e:
                 logger.error(f"   Error testing strength {strength}: {e}")

@@ -103,20 +103,28 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                 if not requests:
                     return []
                 
+                print(f"\n🔍 LOGLIKELIHOOD CALLED with {len(requests)} requests")
+                print(f"   Steering methods: {len(self.steering_methods) if self.steering_methods else 0}")
+                print(f"   Steering strength: {self.steering_strength}")
+                
                 # Extract request arguments like other lm-harness models  
                 _requests = [req.args for req in requests]
                 results = []
                 
-                for request in _requests:
+                for i, request in enumerate(_requests):
+                    print(f"\n   📊 Processing request {i+1}/{len(_requests)}")
                     try:
                         # Extract context and continuation from the request
                         if len(request) >= 2:
-                            context = request[0]
+                            context = request[0] if request[0] is not None else ""
                             continuation = request[1]
+                            print(f"      Context: '{context[:50] if context else '(empty)'}...'")
+                            print(f"      Continuation: '{continuation}'")
                         else:
                             # Fallback parsing
                             context = ""
                             continuation = request[0] if request else ""
+                            print(f"      Fallback parsing - continuation only: '{continuation}'")
                         
                         # Combine context and continuation
                         full_text = context + continuation
@@ -131,6 +139,14 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                         # The continuation tokens are the difference
                         continuation_tokens = full_tokens[len(context_tokens):]
                         
+                        print(f"      🔍 TOKENIZATION DEBUG:")
+                        print(f"         Context: '{context[:50]}...' -> {len(context_tokens)} tokens")
+                        print(f"         Continuation: '{continuation[:50]}...' -> expected {len(continuation_tokens)} tokens")
+                        print(f"         Full text: '{full_text[:50]}...' -> {len(full_tokens)} tokens")
+                        print(f"         First 5 context tokens: {context_tokens[:5]}")
+                        print(f"         First 5 full tokens: {full_tokens[:5]}")
+                        print(f"         Continuation tokens: {continuation_tokens}")
+                        
                         if not continuation_tokens:
                             results.append((float('-inf'), False))
                             continue
@@ -140,114 +156,171 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                         
                         # Apply steering if needed
                         if self.steering_methods and self.layers:
-                            if verbose:
-                                print(f"   🔍 Setting up steering: methods={len(self.steering_methods)}, layers={self.layers}, strength={self.steering_strength}")
-                                for i, method in enumerate(self.steering_methods):
-                                    print(f"   🔍 Method {i}: {type(method)}, trained={getattr(method, 'is_trained', 'unknown')}, has_vector={hasattr(method, 'steering_vector')}")
+                            print(f"   🎯 APPLYING STEERING")
+                            print(f"      Methods: {len(self.steering_methods)}, layers: {self.layers}, strength: {self.steering_strength}")
+                            for i, method in enumerate(self.steering_methods):
+                                print(f"      Method {i}: {type(method).__name__}, trained: {getattr(method, 'is_trained', 'unknown')}")
+                                if hasattr(method, 'steering_vector') and method.steering_vector is not None:
+                                    print(f"      Vector shape: {method.steering_vector.shape}, norm: {torch.norm(method.steering_vector).item():.4f}")
                             
                             hooks = []
                             try:
-                                for layer_idx in self.layers:
-                                    layer = self.wisent_model.model.model.layers[layer_idx]
-                                    
-                                    def create_steering_hook(steering_method):
-                                        def steering_hook(module, input, output):
-                                            try:
-                                                # Handle different output formats from transformer layers
-                                                if isinstance(output, tuple):
-                                                    # Transformer layers often return (hidden_states, attention_weights)
-                                                    hidden_states = output[0]
-                                                else:
-                                                    hidden_states = output
+                                print(f"      🔧 Registering {len(self.layers)} hooks for layers: {self.layers}")
+                                
+                                # Create a closure to capture steering method and strength
+                                def create_steering_hook(steering_method):
+                                    def steering_hook(module, input, output):
+                                        try:
+                                            # Handle different output formats from transformer layers
+                                            if isinstance(output, tuple):
+                                                # Transformer layers often return (hidden_states, attention_weights)
+                                                hidden_states = output[0]
+                                            else:
+                                                hidden_states = output
+                                            
+                                            if verbose:
+                                                print(f"   🔍 Hook called at layer {layer_idx}, output type: {type(output)}, hidden_states shape: {hidden_states.shape if hasattr(hidden_states, 'shape') else 'no shape'}")
+                                            
+                                            if hasattr(hidden_states, 'shape') and len(hidden_states.shape) >= 3:
+                                                batch_size, seq_len, hidden_dim = hidden_states.shape
                                                 
                                                 if verbose:
-                                                    print(f"   🔍 Hook called at layer {layer_idx}, output type: {type(output)}, hidden_states shape: {hidden_states.shape if hasattr(hidden_states, 'shape') else 'no shape'}")
+                                                    print(f"   🔍 Hidden states shape valid: [{batch_size}, {seq_len}, {hidden_dim}]")
                                                 
-                                                if hasattr(hidden_states, 'shape') and len(hidden_states.shape) >= 3:
-                                                    batch_size, seq_len, hidden_dim = hidden_states.shape
+                                                # Handle KSteering differently from vector-based methods
+                                                if steering_method.__class__.__name__ == 'KSteering':
+                                                    if verbose:
+                                                        print(f"   🔍 KSteering detected, applying gradient-based steering")
+                                                    
+                                                    # KSteering uses apply_steering method directly
+                                                    steered_hidden_states = steering_method.apply_steering(hidden_states, strength=self.steering_strength)
                                                     
                                                     if verbose:
-                                                        print(f"   🔍 Hidden states shape valid: [{batch_size}, {seq_len}, {hidden_dim}]")
+                                                        print(f"   🎯 Successfully applied KSteering at layer {layer_idx}, strength={self.steering_strength}")
                                                     
-                                                    # Handle KSteering differently from vector-based methods
-                                                    if steering_method.__class__.__name__ == 'KSteering':
-                                                        if verbose:
-                                                            print(f"   🔍 KSteering detected, applying gradient-based steering")
+                                                    # Return the appropriate format (tuple or tensor)
+                                                    if isinstance(output, tuple):
+                                                        return (steered_hidden_states,) + output[1:]
+                                                    else:
+                                                        return steered_hidden_states
+                                                    
+                                                # Handle vector-based steering methods (CAA, HPR, DAC, BiPO)
+                                                elif hasattr(steering_method, 'steering_vector') and steering_method.steering_vector is not None:
+                                                    steering_vector = steering_method.steering_vector
+                                                    if verbose:
+                                                        print(f"   🔍 Steering vector found, shape: {steering_vector.shape}")
+                                                    
+                                                    if steering_vector.shape[-1] == hidden_dim:
+                                                        print(f"         🔄 HOOK CALLED at layer {layer_idx}")
+                                                        print(f"         Hidden states shape: {hidden_states.shape}")
+                                                        print(f"         Hidden norm before: {torch.norm(hidden_states, dim=-1).mean().item():.4f}")
                                                         
-                                                        # KSteering uses apply_steering method directly
+                                                        # Apply steering to the hidden states
                                                         steered_hidden_states = steering_method.apply_steering(hidden_states, strength=self.steering_strength)
                                                         
-                                                        if verbose:
-                                                            print(f"   🎯 Successfully applied KSteering at layer {layer_idx}, strength={self.steering_strength}")
+                                                        print(f"         Hidden norm after: {torch.norm(steered_hidden_states, dim=-1).mean().item():.4f}")
+                                                        print(f"         Applied strength: {self.steering_strength}")
+                                                        
+                                                        # Check for extreme values
+                                                        if torch.any(torch.isnan(steered_hidden_states)) or torch.any(torch.isinf(steered_hidden_states)):
+                                                            print(f"         ⚠️ WARNING: Steered hidden states contain NaN or Inf values!")
+                                                            print(f"         Max value: {steered_hidden_states.max().item()}")
+                                                            print(f"         Min value: {steered_hidden_states.min().item()}")
                                                         
                                                         # Return the appropriate format (tuple or tensor)
                                                         if isinstance(output, tuple):
+                                                            # Return tuple with steered hidden states
                                                             return (steered_hidden_states,) + output[1:]
                                                         else:
                                                             return steered_hidden_states
-                                                    
-                                                    # Handle vector-based steering methods (CAA, HPR, DAC, BiPO)
-                                                    elif hasattr(steering_method, 'steering_vector') and steering_method.steering_vector is not None:
-                                                        steering_vector = steering_method.steering_vector
-                                                        if verbose:
-                                                            print(f"   🔍 Steering vector found, shape: {steering_vector.shape}")
-                                                        
-                                                        if steering_vector.shape[-1] == hidden_dim:
-                                                            # Apply steering to the hidden states
-                                                            steered_hidden_states = steering_method.apply_steering(hidden_states, strength=self.steering_strength)
-                                                            if verbose:
-                                                                print(f"   🎯 Successfully applied steering at layer {layer_idx}, strength={self.steering_strength}")
-                                                            
-                                                            # Return the appropriate format (tuple or tensor)
-                                                            if isinstance(output, tuple):
-                                                                # Return tuple with steered hidden states
-                                                                return (steered_hidden_states,) + output[1:]
-                                                            else:
-                                                                return steered_hidden_states
-                                                        else:
-                                                            if verbose:
-                                                                print(f"   ⚠️ Dimension mismatch: vector {steering_vector.shape[-1]} vs hidden {hidden_dim}")
                                                     else:
                                                         if verbose:
-                                                            print(f"   ⚠️ No steering vector found on method {steering_method.__class__.__name__}")
+                                                            print(f"   ⚠️ Dimension mismatch: vector {steering_vector.shape[-1]} vs hidden {hidden_dim}")
                                                 else:
                                                     if verbose:
-                                                        print(f"   ⚠️ Invalid hidden states shape for steering")
-                                                
-                                                # Return original output if no steering applied
-                                                return output
-                                            except Exception as e:
+                                                        print(f"   ⚠️ No steering vector found on method {steering_method.__class__.__name__}")
+                                            else:
                                                 if verbose:
-                                                    print(f"   ⚠️ Steering hook failed: {e}")
-                                                return output
-                                        return steering_hook
+                                                    print(f"   ⚠️ Invalid hidden states shape for steering")
+                                            
+                                            # Return original output if no steering applied
+                                            return output
+                                        except Exception as e:
+                                            if verbose:
+                                                print(f"   ⚠️ Steering hook failed: {e}")
+                                            return output
+                                    return steering_hook
                                     
-                                    hook = layer.register_forward_hook(
-                                        create_steering_hook(self.steering_methods[0])
-                                    )
+                                # Add hooks directly for now (TODO: use model primitive when available)
+                                steering_hook_fn = create_steering_hook(self.steering_methods[0])
+                                for layer_idx in self.layers:
+                                    # Handle different model architectures
+                                    if hasattr(self.wisent_model.model, 'transformer'):
+                                        # GPT2 style
+                                        layer = self.wisent_model.model.transformer.h[layer_idx]
+                                    elif hasattr(self.wisent_model.model, 'model'):
+                                        # LLaMA style
+                                        layer = self.wisent_model.model.model.layers[layer_idx]
+                                    else:
+                                        raise ValueError(f"Unknown model architecture for {type(self.wisent_model.model)}")
+                                    
+                                    hook = layer.register_forward_hook(steering_hook_fn)
                                     hooks.append(hook)
+                                
+                                print(f"      ✅ {len(hooks)} hooks registered")
                                 
                                 # Forward pass with steering
                                 with torch.no_grad():
                                     outputs = self.wisent_model.model(input_ids)
                                     logits = outputs.logits
+                                    
+                                # Check logits immediately after forward pass
+                                print(f"      🔍 LOGITS CHECK (after steering):")
+                                print(f"         Shape: {logits.shape}")
+                                print(f"         Contains inf: {torch.any(torch.isinf(logits)).item()}")
+                                print(f"         Contains nan: {torch.any(torch.isnan(logits)).item()}")
+                                print(f"         Max: {logits.max().item():.2f}")
+                                print(f"         Min: {logits.min().item():.2f}")
+                                print(f"         Mean: {logits.mean().item():.2f}")
                                 
+                            except Exception as e:
+                                print(f"      ❌ ERROR in steering setup: {e}")
+                                import traceback
+                                traceback.print_exc()
                             finally:
                                 # Remove hooks
+                                print(f"      Removing {len(hooks)} hooks")
                                 for hook in hooks:
                                     hook.remove()
+                                print(f"      Hooks removed")
                         else:
                             # Forward pass without steering
                             with torch.no_grad():
                                 outputs = self.wisent_model.model(input_ids)
                                 logits = outputs.logits
+                                
+                            print(f"      🔍 LOGITS CHECK (no steering):")
+                            print(f"         Shape: {logits.shape}")
+                            print(f"         Contains inf: {torch.any(torch.isinf(logits)).item()}")
+                            print(f"         Contains nan: {torch.any(torch.isnan(logits)).item()}")
+                            print(f"         Max: {logits.max().item():.2f}")
+                            print(f"         Min: {logits.min().item():.2f}")
+                            print(f"         Mean: {logits.mean().item():.2f}")
                         
                         # Compute log-likelihood for continuation tokens
                         # We need the logits for positions corresponding to continuation tokens
                         continuation_start = len(context_tokens)
                         continuation_end = len(full_tokens)
                         
+                        print(f"\n   🔍 LOGLIKELIHOOD DEBUG:")
+                        print(f"      Context length: {len(context_tokens)}")
+                        print(f"      Full length: {len(full_tokens)}")
+                        print(f"      Continuation length: {len(continuation_tokens)}")
+                        print(f"      Logits shape: {logits.shape}")
+                        
                         if continuation_start >= logits.shape[1]:
+                            print(f"      ❌ Continuation start {continuation_start} >= logits seq length {logits.shape[1]}")
+                            print(f"      Returning -inf")
                             results.append((float('-inf'), False))
                             continue
                         
@@ -255,14 +328,52 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                         target_logits = logits[0, continuation_start-1:continuation_end-1]  # Shape: [cont_len, vocab_size]
                         target_tokens = torch.tensor(continuation_tokens, device=self.wisent_model.device)
                         
+                        print(f"      Target logits shape: {target_logits.shape}")
+                        print(f"      Target tokens shape: {target_tokens.shape}")
+                        print(f"      Target tokens: {target_tokens[:5].tolist()}")
+                        
+                        # Check for extreme logits
+                        print(f"      Logits max: {target_logits.max().item():.2f}")
+                        print(f"      Logits min: {target_logits.min().item():.2f}")
+                        print(f"      Logits mean: {target_logits.mean().item():.2f}")
+                        print(f"      Logits std: {target_logits.std().item():.2f}")
+                        
+                        # Check if logits contain extreme values
+                        if torch.any(torch.isinf(target_logits)) or torch.any(torch.isnan(target_logits)):
+                            print(f"      ⚠️ CRITICAL: Target logits already contain inf/nan!")
+                            print(f"      Inf count in logits: {torch.isinf(target_logits).sum().item()}")
+                            print(f"      NaN count in logits: {torch.isnan(target_logits).sum().item()}")
+                            
+                            # Find which positions have inf/nan
+                            inf_positions = torch.where(torch.isinf(target_logits))
+                            nan_positions = torch.where(torch.isnan(target_logits))
+                            print(f"      Inf positions: {inf_positions}")
+                            print(f"      NaN positions: {nan_positions}")
+                        
                         # Compute log probabilities
+                        print(f"      Computing log_softmax...")
                         log_probs = torch.log_softmax(target_logits, dim=-1)
                         
+                        # Check for inf/nan in log_probs
+                        if torch.any(torch.isinf(log_probs)) or torch.any(torch.isnan(log_probs)):
+                            print(f"      ⚠️ Log probs contain inf/nan!")
+                            print(f"      Inf count: {torch.isinf(log_probs).sum().item()}")
+                            print(f"      NaN count: {torch.isnan(log_probs).sum().item()}")
+                        
                         # Get log probability for each target token
+                        print(f"      Extracting token log probs for tokens: {target_tokens[:5].tolist()}")
                         token_log_probs = log_probs[range(len(continuation_tokens)), target_tokens]
+                        
+                        print(f"      Token log probs: {token_log_probs[:5].tolist()}")
+                        
+                        # Check each token probability individually
+                        for idx, (token_id, log_prob) in enumerate(zip(target_tokens[:5], token_log_probs[:5])):
+                            print(f"      Token {idx}: id={token_id}, log_prob={log_prob:.4f}, finite={torch.isfinite(log_prob).item()}")
                         
                         # Sum log probabilities (since log(a*b) = log(a) + log(b))
                         total_log_likelihood = token_log_probs.sum().item()
+                        
+                        print(f"      Total log likelihood: {total_log_likelihood}")
                         
                         results.append((total_log_likelihood, False))
                         
@@ -281,8 +392,11 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
         # STEP 1: Run evaluation WITHOUT steering for baseline
         if verbose:
             print(f"🔍 STEP 1: Getting unsteered baseline log-likelihoods...")
+            print(f"   Number of test pairs: {len(test_qa_pairs)}")
+            print(f"   Task: {task_data.config.task}")
         
         unsteered_model = SteeredModelWrapper(model, [], [], 0.0)  # No steering
+        print(f"   Created unsteered model with {len(unsteered_model.steering_methods)} methods, strength={unsteered_model.steering_strength}")
         task_dict = {task_data.config.task: task_data}
         
         baseline_results = evaluate(
@@ -298,10 +412,22 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
         if baseline_samples:
             sample = baseline_samples[0]  # First (and only) sample
             baseline_likelihoods = [resp[0][0] for resp in sample.get('resps', [])]
+            if verbose:
+                print(f"   Baseline sample count: {len(baseline_samples)}")
+                print(f"   First baseline likelihoods: {baseline_likelihoods[:3] if baseline_likelihoods else 'None'}")
+                print(f"   Sample ID/hash: {id(sample)}")  # Check if it's the same object
         
         # STEP 2: Run evaluation WITH steering  
         if verbose:
             print(f"🔍 STEP 2: Getting steered log-likelihoods...")
+            print(f"   Steering methods: {[m.__class__.__name__ for m in steering_methods] if steering_methods else 'None'}")
+            print(f"   Steering layers: {layers}")
+            print(f"   Steering strength: {steering_strength}")
+            if steering_methods and len(steering_methods) > 0:
+                print(f"   First method has vector: {hasattr(steering_methods[0], 'steering_vector') and steering_methods[0].steering_vector is not None}")
+                if hasattr(steering_methods[0], 'steering_vector') and steering_methods[0].steering_vector is not None:
+                    print(f"   Vector shape: {steering_methods[0].steering_vector.shape}")
+                    print(f"   Vector norm: {torch.norm(steering_methods[0].steering_vector).item():.4f}")
         
         steered_model = SteeredModelWrapper(model, steering_methods, layers, steering_strength)
         
@@ -399,22 +525,34 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                 hooks = []
                 try:
                     if steering_methods and layers:
-                        for layer_idx in layers:
-                            layer = model.model.model.layers[layer_idx]
-                            
-                            def create_steering_hook(steering_method):
-                                def steering_hook(module, input, output):
-                                    try:
-                                        # Handle different output formats from transformer layers
-                                        if isinstance(output, tuple):
-                                            hidden_states = output[0]
-                                        else:
-                                            hidden_states = output
+                        # Create a closure to capture steering method and strength
+                        def create_steering_hook(steering_method):
+                            def steering_hook(module, input, output):
+                                try:
+                                    # Handle different output formats from transformer layers
+                                    if isinstance(output, tuple):
+                                        hidden_states = output[0]
+                                    else:
+                                        hidden_states = output
+                                    
+                                    if hasattr(hidden_states, 'shape') and len(hidden_states.shape) >= 3:
+                                        # Handle KSteering differently from vector-based methods
+                                        if steering_method.__class__.__name__ == 'KSteering':
+                                            # KSteering uses apply_steering method directly
+                                            steered_hidden_states = steering_method.apply_steering(hidden_states, strength=steering_strength)
+                                            
+                                            # Return the appropriate format (tuple or tensor)
+                                            if isinstance(output, tuple):
+                                                return (steered_hidden_states,) + output[1:]
+                                            else:
+                                                return steered_hidden_states
                                         
-                                        if hasattr(hidden_states, 'shape') and len(hidden_states.shape) >= 3:
-                                            # Handle KSteering differently from vector-based methods
-                                            if steering_method.__class__.__name__ == 'KSteering':
-                                                # KSteering uses apply_steering method directly
+                                        # Handle vector-based steering methods (CAA, HPR, DAC, BiPO)
+                                        elif hasattr(steering_method, 'steering_vector') and steering_method.steering_vector is not None:
+                                            steering_vector = steering_method.steering_vector
+                                            
+                                            if steering_vector.shape[-1] == hidden_states.shape[-1]:
+                                                # Apply steering to the hidden states
                                                 steered_hidden_states = steering_method.apply_steering(hidden_states, strength=steering_strength)
                                                 
                                                 # Return the appropriate format (tuple or tensor)
@@ -422,31 +560,28 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                                                     return (steered_hidden_states,) + output[1:]
                                                 else:
                                                     return steered_hidden_states
-                                            
-                                            # Handle vector-based steering methods (CAA, HPR, DAC, BiPO)
-                                            elif hasattr(steering_method, 'steering_vector') and steering_method.steering_vector is not None:
-                                                steering_vector = steering_method.steering_vector
-                                                
-                                                if steering_vector.shape[-1] == hidden_states.shape[-1]:
-                                                    # Apply steering to the hidden states
-                                                    steered_hidden_states = steering_method.apply_steering(hidden_states, strength=steering_strength)
-                                                    
-                                                    # Return the appropriate format (tuple or tensor)
-                                                    if isinstance(output, tuple):
-                                                        return (steered_hidden_states,) + output[1:]
-                                                    else:
-                                                        return steered_hidden_states
-                                        
-                                        return output
-                                    except Exception as e:
-                                        if verbose:
-                                            print(f"      ⚠️ Steering hook failed during generation: {e}")
-                                        return output
+                                    
+                                    return output
+                                except Exception as e:
+                                    if verbose:
+                                        print(f"      ⚠️ Steering hook failed during generation: {e}")
+                                    return output
                                 return steering_hook
                             
-                            hook = layer.register_forward_hook(
-                                create_steering_hook(steering_methods[0])
-                            )
+                        # Add hooks directly for now (TODO: use model primitive when available)
+                        steering_hook_fn = create_steering_hook(steering_methods[0])
+                        for layer_idx in layers:
+                            # Handle different model architectures
+                            if hasattr(model.model, 'transformer'):
+                                # GPT2 style
+                                layer = model.model.transformer.h[layer_idx]
+                            elif hasattr(model.model, 'model'):
+                                # LLaMA style
+                                layer = model.model.model.layers[layer_idx]
+                            else:
+                                raise ValueError(f"Unknown model architecture for {type(model.model)}")
+                            
+                            hook = layer.register_forward_hook(steering_hook_fn)
                             hooks.append(hook)
                     
                     with torch.no_grad():

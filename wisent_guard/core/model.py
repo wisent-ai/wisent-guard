@@ -5,6 +5,7 @@ import re
 from typing import Optional, Union, List, Dict, Any, Tuple
 from enum import Enum
 from .contrastive_pairs import ContrastivePairSet
+from .user_model_config import user_model_configs
 
 class PromptFormat(Enum):
     LEGACY = "legacy"
@@ -56,15 +57,19 @@ class Model:
         self.layers = layers if layers is not None else []
         self.device = device or ("cuda" if torch.cuda.is_available() else "mps" if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else "cpu")
         
-        # Prompt formatting settings
-        self.user_token = "<|user|>"
-        self.assistant_token = "<|assistant|>"
+        # Prompt formatting settings - will be set based on model type
+        self.user_token = None
+        self.assistant_token = None
         self.format_type = None  # Will be auto-detected
         
         if hf_model is not None:
             # Use provided model
             self.hf_model = hf_model
             self.model = hf_model  # Keep backward compatibility
+            
+            # Auto-detect format type first
+            self.format_type = self._detect_format()
+            
             # Try to load tokenizer from the same name
             try:
                 self.tokenizer = AutoTokenizer.from_pretrained(name)
@@ -72,15 +77,23 @@ class Model:
                     self.tokenizer.pad_token = self.tokenizer.eos_token
             except:
                 self.tokenizer = None
+                
+            # Initialize tokens
+            self._initialize_tokens()
         else:
-            # Load model from scratch
+            # Check if model is supported before trying to load
             self.hf_model = None
             self.model = None
             self.tokenizer = None
+            
+            # Auto-detect format type first (this will raise error if unsupported)
+            self.format_type = self._detect_format()
+            
+            # Only load model after we know it's supported
             self._load_model_and_tokenizer()
-        
-        # Auto-detect format type
-        self.format_type = self._detect_format()
+            
+            # Initialize tokens after loading
+            self._initialize_tokens()
 
     def _load_model_and_tokenizer(self):
         """Load model and tokenizer from HuggingFace."""
@@ -111,6 +124,9 @@ class Model:
         
         Returns:
             PromptFormat enum indicating the format
+            
+        Raises:
+            ValueError: If model is not recognized and no user config exists
         """
         model_name = self.name.lower()
         
@@ -119,9 +135,46 @@ class Model:
             return PromptFormat.LLAMA31
         elif "mistral" in model_name:
             return PromptFormat.MISTRAL
-        else:
+        elif "gpt2" in model_name or "distilgpt2" in model_name:
             return PromptFormat.LEGACY
+        else:
+            # Check if we have a user-defined config
+            if user_model_configs.has_config(self.name):
+                # User has configured this model
+                return PromptFormat.LEGACY  # We'll handle tokens separately
+            else:
+                # Unknown model with no config
+                raise ValueError(
+                    f"Model '{self.name}' is not recognized and has no user configuration.\n"
+                    f"Please run 'wisent-guard configure-model {self.name}' to set up this model."
+                )
 
+    def _initialize_tokens(self):
+        """Initialize user and assistant tokens based on format type or user config."""
+        if self.format_type == PromptFormat.LLAMA31:
+            # Llama uses header-based format, not simple tokens
+            self.user_token = "user"  # Used in header
+            self.assistant_token = "assistant"
+        elif self.format_type == PromptFormat.MISTRAL:
+            # Mistral uses instruction format
+            self.user_token = "[INST]"
+            self.assistant_token = "[/INST]"
+        elif self.format_type == PromptFormat.LEGACY:
+            # Check for user-defined tokens
+            if user_model_configs.has_config(self.name):
+                tokens = user_model_configs.get_prompt_tokens(self.name)
+                if tokens:
+                    self.user_token = tokens.get("user_token", "<|user|>")
+                    self.assistant_token = tokens.get("assistant_token", "<|assistant|>")
+                else:
+                    # Default legacy tokens
+                    self.user_token = "<|user|>"
+                    self.assistant_token = "<|assistant|>"
+            else:
+                # Default legacy tokens for known models like GPT2
+                self.user_token = "<|user|>"
+                self.assistant_token = "<|assistant|>"
+    
     def set_prompt_tokens(self, user_token: str, assistant_token: str):
         """Set custom user and assistant tokens for legacy format."""
         self.user_token = user_token
@@ -971,9 +1024,20 @@ class ActivationHooks:
             return f"model.layers.{layer_idx}"
         elif model_type == "mpt":
             return f"transformer.blocks.{layer_idx}"
+        elif model_type == "gpt2":
+            return f"transformer.h.{layer_idx}"
         else:
-            # Generic approach - try common patterns
-            return f"model.layers.{layer_idx}"
+            # Check user config for custom models
+            if user_model_configs.has_config(self.name):
+                layer_info = user_model_configs.get_layer_access_info(self.name)
+                if layer_info and layer_info.get("layer_path_template"):
+                    return layer_info["layer_path_template"].format(idx=layer_idx)
+            
+            # No config found - raise error instead of guessing
+            raise ValueError(
+                f"Unknown model architecture for '{self.name}'.\n"
+                f"Please run 'wisent-guard configure-model {self.name}' to set up layer access."
+            )
     
     def _get_module_by_name(self, name: str) -> torch.nn.Module:
         """Retrieve a module from the model by its name."""
@@ -1062,6 +1126,31 @@ class ActivationHooks:
     def setup_hooks(self, layers: List[int]):
         """Set up hooks for specified layers."""
         self.register_hooks(layers)
+    
+    def add_steering_hooks(self, layers: List[int], steering_function) -> List:
+        """Add steering hooks to specified layers.
+        
+        Args:
+            layers: List of layer indices to add hooks to
+            steering_function: Function that takes (module, input, output) and returns modified output
+            
+        Returns:
+            List of registered hooks that can be removed later
+        """
+        hooks = []
+        
+        for layer_idx in layers:
+            layer_name = self._get_layer_name(self.model_type, layer_idx)
+            
+            try:
+                module = self._get_module_by_name(layer_name)
+                hook = module.register_forward_hook(steering_function)
+                hooks.append(hook)
+            except Exception as e:
+                # Log error but continue with other layers
+                print(f"Warning: Could not add steering hook to layer {layer_idx}: {e}")
+                
+        return hooks
     
     def has_activations(self) -> bool:
         """Check if we have collected any activations."""

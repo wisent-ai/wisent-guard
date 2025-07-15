@@ -130,3 +130,7 @@ wisent_guard/experiments/steering/optimization_results/
 
 # Device-specific benchmark files (contain hardware-specific timing data)
 device_benchmarks.json
+
+# User-defined model configurations (local to each user)
+.wisent-guard/
+user_model_configs.json

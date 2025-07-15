@@ -44,6 +44,10 @@ def setup_parser() -> argparse.ArgumentParser:
     model_config_parser = subparsers.add_parser("model-config", help="Manage model-specific optimal parameters")
     setup_model_config_parser(model_config_parser)
     
+    # Configure model command for setting up new/unsupported models
+    configure_model_parser = subparsers.add_parser("configure-model", help="Configure tokens and layer access for unsupported models")
+    setup_configure_model_parser(configure_model_parser)
+    
     # Classification optimization command for finding optimal classification parameters
     classification_optimizer_parser = subparsers.add_parser("optimize-classification", 
                                                            help="Optimize classification parameters across all tasks")
@@ -664,6 +668,13 @@ def setup_classification_optimizer_parser(parser):
                        help="File to save/load calibration data")
     parser.add_argument("--calibrate-only", action="store_true",
                        help="Only run calibration and exit (saves to --calibration-file if provided)")
+
+
+def setup_configure_model_parser(parser):
+    """Set up the configure-model subcommand parser."""
+    parser.add_argument("model", type=str, help="Model name to configure")
+    parser.add_argument("--force", action="store_true",
+                       help="Force reconfiguration even if model already has a config")
     parser.add_argument("--tasks", type=str, nargs='+', default=None,
                        help="Specific tasks to optimize (if None, uses all available tasks)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
@@ -882,3 +893,10 @@ def setup_full_optimizer_parser(parser):
                        help="File to save/load calibration data")
     parser.add_argument("--calibrate-only", action="store_true",
                        help="Only run calibration and exit (saves to --calibration-file if provided)")
+
+
+def setup_configure_model_parser(parser):
+    """Set up the configure-model subcommand parser."""
+    parser.add_argument("model", type=str, help="Model name to configure")
+    parser.add_argument("--force", action="store_true",
+                       help="Force reconfiguration even if model already has a config")

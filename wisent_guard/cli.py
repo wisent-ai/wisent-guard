@@ -30,6 +30,7 @@ from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli, 
     load_synthetic_pairs_cli
 )
+from .core.model_config_manager import ModelConfigManager
 
 # Import caching infrastructure
 try:
@@ -3328,6 +3329,8 @@ def main():
         handle_agent_command(args)
     elif args.command == "model-config":
         handle_model_config_command(args)
+    elif args.command == "configure-model":
+        handle_configure_model_command(args)
     elif args.command == "optimize-classification":
         handle_classification_optimization_command(args)
     elif args.command == "optimize-steering":
@@ -3982,6 +3985,40 @@ def handle_model_config_command(args):
         if args.verbose:
             import traceback
             traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_configure_model_command(args):
+    """Handle the configure-model command."""
+    from .core.user_model_config import user_model_configs
+    
+    model_name = args.model
+    
+    # Check if model already has a config
+    if user_model_configs.has_config(model_name) and not args.force:
+        print(f"ℹ️  Model '{model_name}' already has a configuration.")
+        print(f"   Use --force to reconfigure.")
+        
+        # Show current config
+        config = user_model_configs.get_config(model_name)
+        print(f"\n📋 Current configuration:")
+        print(f"   User token: {config.get('user_token')}")
+        print(f"   Assistant token: {config.get('assistant_token')}")
+        print(f"   Layer template: {config.get('layer_path_template')}")
+        return
+    
+    try:
+        # Prompt user for configuration
+        config = user_model_configs.prompt_and_save_config(model_name)
+        
+        print(f"\n✅ Model '{model_name}' configured successfully!")
+        print(f"   You can now use this model with wisent-guard.")
+        
+    except KeyboardInterrupt:
+        print("\n❌ Configuration cancelled.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Error configuring model: {e}")
         sys.exit(1)
 
 
