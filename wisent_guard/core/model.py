@@ -143,11 +143,19 @@ class Model:
                 # User has configured this model
                 return PromptFormat.LEGACY  # We'll handle tokens separately
             else:
-                # Unknown model with no config
-                raise ValueError(
-                    f"Model '{self.name}' is not recognized and has no user configuration.\n"
-                    f"Please run 'wisent-guard configure-model {self.name}' to set up this model."
-                )
+                # Unknown model with no config - prompt user to configure it
+                print(f"\n⚠️  Model '{self.name}' is not recognized.")
+                response = input("Would you like to configure it now? (y/n): ").strip().lower()
+                
+                if response == 'y':
+                    # Configure the model interactively
+                    config = user_model_configs.prompt_and_save_config(self.name)
+                    return PromptFormat.LEGACY  # User-configured models use legacy format
+                else:
+                    raise ValueError(
+                        f"Model '{self.name}' requires configuration.\n"
+                        f"Run 'wisent-guard configure-model {self.name}' to set it up."
+                    )
 
     def _initialize_tokens(self):
         """Initialize user and assistant tokens based on format type or user config."""
@@ -1033,10 +1041,20 @@ class ActivationHooks:
                 if layer_info and layer_info.get("layer_path_template"):
                     return layer_info["layer_path_template"].format(idx=layer_idx)
             
-            # No config found - raise error instead of guessing
+            # No config found - this shouldn't happen since we prompt during init
+            # but just in case, prompt again
+            print(f"\n⚠️  Model '{self.name}' layer configuration is missing.")
+            response = input("Would you like to configure it now? (y/n): ").strip().lower()
+            
+            if response == 'y':
+                config = user_model_configs.prompt_and_save_config(self.name)
+                layer_info = user_model_configs.get_layer_access_info(self.name)
+                if layer_info and layer_info.get("layer_path_template"):
+                    return layer_info["layer_path_template"].format(idx=layer_idx)
+            
             raise ValueError(
-                f"Unknown model architecture for '{self.name}'.\n"
-                f"Please run 'wisent-guard configure-model {self.name}' to set up layer access."
+                f"Model '{self.name}' requires layer configuration.\n"
+                f"Run 'wisent-guard configure-model {self.name}' to set it up."
             )
     
     def _get_module_by_name(self, name: str) -> torch.nn.Module:
