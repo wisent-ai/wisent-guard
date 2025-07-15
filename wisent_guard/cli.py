@@ -4203,7 +4203,7 @@ def handle_classification_optimization_command(args):
             print(f"   🚫 Classifier saving disabled")
         
         # Get tasks list
-        tasks = args.tasks or get_valid_task_names()
+        tasks = getattr(args, 'tasks', None) or get_valid_task_names()
         
         # Skip timing estimation if requested
         if not args.skip_timing_estimation:
@@ -4256,7 +4256,7 @@ def handle_classification_optimization_command(args):
             limit=args.limit,
             device=args.device,
             verbose=args.verbose,
-            tasks=args.tasks,
+            tasks=tasks,
             optimization_metric=args.optimization_metric,
             max_time_per_task_minutes=args.max_time_per_task,
             layer_range=args.layer_range,
@@ -4596,6 +4596,11 @@ def handle_full_optimization_command(args):
             tasks = get_valid_task_names()
             print(f"   📋 Tasks: All {len(tasks)} available benchmarks")
         
+        # Use specific limits if provided, otherwise fall back to general limit
+        classification_limit = args.classification_limit if args.classification_limit is not None else args.limit
+        sample_size_limit = args.sample_size_limit if args.sample_size_limit is not None else args.limit
+        steering_limit = args.steering_limit if args.steering_limit is not None else args.limit
+        
         # Skip timing estimation if requested
         if not args.skip_timing_estimation:
             # Create time estimator with calibration options
@@ -4622,9 +4627,9 @@ def handle_full_optimization_command(args):
             # Get time estimate based on calibration
             total_time, phase_times = estimator.estimate_full_optimization_time(
                 num_tasks=len(tasks),
-                classification_limit=args.classification_limit,
+                classification_limit=classification_limit,
                 sample_sizes=args.sample_sizes,
-                sample_size_limit=args.sample_size_limit,
+                sample_size_limit=sample_size_limit,
                 include_sample_size_opt=not args.skip_sample_size,
                 include_classifier_training=not args.skip_classifier_training,
                 include_control_vectors=not args.skip_control_vectors
@@ -4655,7 +4660,7 @@ def handle_full_optimization_command(args):
         # Step 1: Classification optimization (unless skipped)
         if not args.skip_classification:
             print(f"\n📈 Step 1: Classification Parameter Optimization")
-            print(f"   🔢 Sample limit: {args.classification_limit}")
+            print(f"   🔢 Sample limit: {classification_limit}")
             
             # Create a simple progress callback
             def classification_progress_callback(task_idx, task_name, status):
@@ -4669,7 +4674,7 @@ def handle_full_optimization_command(args):
             
             classification_results = run_classification_optimization(
                 model_name=args.model,
-                limit=args.classification_limit,
+                limit=classification_limit,
                 device=args.device,
                 verbose=args.verbose,
                 tasks=tasks,
@@ -4690,7 +4695,7 @@ def handle_full_optimization_command(args):
         if not args.skip_sample_size:
             print(f"\n📏 Step 2: Sample Size Optimization")
             print(f"   🔢 Testing sample sizes: {args.sample_sizes}")
-            print(f"   📊 Dataset limit: {args.sample_size_limit}")
+            print(f"   📊 Dataset limit: {sample_size_limit}")
             
             
             # Load model config to get optimal parameters
@@ -4728,7 +4733,7 @@ def handle_full_optimization_command(args):
                         token_aggregation=aggregation,
                         threshold=threshold,
                         sample_sizes=args.sample_sizes,
-                        dataset_limit=args.sample_size_limit,
+                        dataset_limit=sample_size_limit,
                         device=args.device,
                         verbose=False,  # Less verbose for batch processing
                         save_plot=args.save_plots,
@@ -4751,11 +4756,62 @@ def handle_full_optimization_command(args):
         else:
             print(f"\n⏭️  Skipping sample size optimization")
         
-        # Step 3: Train final classifiers with optimal sample sizes
+        # Step 3: Steering optimization
+        if not args.skip_steering:
+            print(f"\n🎯 Step 3: Steering Optimization")
+            print(f"   🔧 Methods: {args.steering_methods}")
+            print(f"   📊 Layer range: {args.steering_layer_range or 'auto'}")
+            print(f"   🔢 Sample limit: {steering_limit}")
+            
+            # Import steering optimizer
+            from .core.steering_optimizer import run_steering_optimization
+            
+            # Run auto steering optimization
+            # If specific tasks were provided, optimize only those
+            steering_task_name = None
+            if len(tasks) == 1:
+                steering_task_name = tasks[0]
+            
+            steering_results = run_steering_optimization(
+                model_name=args.model,
+                optimization_type="auto",
+                task_name=steering_task_name,  # Single task or None for all
+                limit=steering_limit,
+                device=args.device,
+                verbose=args.verbose,
+                use_classification_config=True,
+                methods_to_test=args.steering_methods,
+                strength_range=args.steering_strength_range,
+                layer_range=args.steering_layer_range,
+                max_time_minutes=args.max_time_per_task * len(tasks)  # Total time budget
+            )
+            
+            if 'error' not in steering_results:
+                print(f"\n✅ Steering optimization completed!")
+                if steering_results.get('overall_best'):
+                    best = steering_results['overall_best']
+                    print(f"   🏆 Overall best configuration:")
+                    print(f"      • Method: {best['best_method']}")
+                    print(f"      • Layer: {best['best_layer']}")
+                    print(f"      • Strength: {best['best_strength']}")
+                    print(f"      • Score: {best['score']:.3f}")
+                    
+                if steering_results.get('tasks_optimized'):
+                    print(f"   📊 Optimized {len(steering_results['tasks_optimized'])} tasks")
+            else:
+                print(f"   ❌ Steering optimization failed: {steering_results['error']}")
+        else:
+            print(f"\n⏭️  Skipping steering optimization")
+        
+        # Step 4: Train final classifiers with optimal sample sizes
         if not args.skip_classifier_training:
-            print(f"\n🎨 Step 3: Training Final Classifiers with Optimal Sample Sizes")
+            print(f"\n🎨 Step 4: Training Final Classifiers with Optimal Sample Sizes")
             print(f"   💾 This ensures classifiers are cached for instant use")
             
+            # Initialize config manager if not already done
+            if 'config_manager' not in locals():
+                from .core.model_config_manager import ModelConfigManager
+                config_manager = ModelConfigManager()
             
             # Reload model config to get all optimal parameters
             model_config = config_manager.load_model_config(args.model)
@@ -4826,9 +4882,9 @@ def handle_full_optimization_command(args):
         else:
             print(f"\n⏭️  Skipping classifier training")
         
-        # Step 4: Train control vectors with optimal parameters
+        # Step 5: Train control vectors with optimal parameters
         if not args.skip_control_vectors:
-            print(f"\n🎮 Step 4: Training Control Vectors for Steering")
+            print(f"\n🎮 Step 5: Training Control Vectors for Steering")
             print(f"   🧲 This enables model steering for improved truthfulness")
             
             

@@ -27,6 +27,77 @@ from .model_config_manager import ModelConfigManager
 logger = logging.getLogger(__name__)
 
 
+def get_default_steering_configs() -> List['SteeringMethodConfig']:
+    """Get default steering method configurations with parameter variations."""
+    return [
+        # CAA variations
+        SteeringMethodConfig(
+            name="CAA",
+            method=SteeringMethod.CAA,
+            params={}
+        ),
+        SteeringMethodConfig(
+            name="CAA_L2",
+            method=SteeringMethod.CAA,
+            params={"normalization_method": "l2_unit"}
+        ),
+        
+        # HPR variations
+        SteeringMethodConfig(
+            name="HPR",
+            method=SteeringMethod.HPR,
+            params={"hpr_beta": 1.0}
+        ),
+        SteeringMethodConfig(
+            name="HPR_Beta0.5",
+            method=SteeringMethod.HPR,
+            params={"hpr_beta": 0.5}
+        ),
+        
+        # BiPO variations
+        SteeringMethodConfig(
+            name="BiPO",
+            method=SteeringMethod.BIPO,
+            params={"bipo_beta": 0.1, "bipo_epochs": 50}
+        ),
+        SteeringMethodConfig(
+            name="BiPO_Beta0.05",
+            method=SteeringMethod.BIPO,
+            params={"bipo_beta": 0.05, "bipo_epochs": 50}
+        ),
+        
+        # KSteering variations
+        SteeringMethodConfig(
+            name="KSteering",
+            method=SteeringMethod.KSTEERING,
+            params={
+                "ksteering_alpha": 5.0,
+                "ksteering_target_labels": "0",
+                "ksteering_avoid_labels": ""
+            }
+        ),
+        SteeringMethodConfig(
+            name="KSteering_Alpha3",
+            method=SteeringMethod.KSTEERING,
+            params={
+                "ksteering_alpha": 3.0,
+                "ksteering_target_labels": "0",
+                "ksteering_avoid_labels": ""
+            }
+        ),
+        
+        # DAC variations
+        SteeringMethodConfig(
+            name="DAC",
+            method=SteeringMethod.DAC,
+            params={
+                "dac_dynamic_control": True,
+                "dac_entropy_threshold": 1.0
+            }
+        ),
+    ]
+
+
 class SteeringMethod(Enum):
     """Available steering methods for optimization."""
     CAA = "CAA"
@@ -34,6 +105,19 @@ class SteeringMethod(Enum):
     DAC = "DAC"
     BIPO = "BiPO"
     KSTEERING = "KSteering"
+
+
+@dataclass
+class SteeringMethodConfig:
+    """Configuration for a specific steering method with parameter variations."""
+    name: str  # Display name like "CAA_L2"
+    method: SteeringMethod
+    params: Dict[str, Any]  # Method-specific parameters
+    
+    def __post_init__(self):
+        """Ensure method is SteeringMethod enum."""
+        if isinstance(self.method, str):
+            self.method = SteeringMethod(self.method)
 
 
 @dataclass
@@ -101,7 +185,7 @@ class SteeringOptimizer:
     def optimize_steering_method_comparison(
         self,
         task_name: str,
-        methods_to_test: Optional[List[SteeringMethod]] = None,
+        methods_to_test: Optional[Union[List[SteeringMethod], List[SteeringMethodConfig]]] = None,
         layer_range: Optional[str] = None,
         strength_range: Optional[List[float]] = None,
         limit: int = 100,
@@ -123,13 +207,29 @@ class SteeringOptimizer:
         Returns:
             SteeringOptimizationSummary with method comparison results
         """
+        # Handle both old-style method list and new config list
         if methods_to_test is None:
-            methods_to_test = [SteeringMethod.CAA, SteeringMethod.HPR, SteeringMethod.KSTEERING]
+            # Use all default configurations
+            method_configs = get_default_steering_configs()
+        else:
+            method_configs = []
+            for item in methods_to_test:
+                if isinstance(item, SteeringMethodConfig):
+                    method_configs.append(item)
+                elif isinstance(item, SteeringMethod):
+                    # Convert simple method to config with default params
+                    method_configs.append(SteeringMethodConfig(
+                        name=item.value,
+                        method=item,
+                        params={}
+                    ))
+                else:
+                    logger.warning(f"Unknown method type: {type(item)}")
         
         if strength_range is None:
             strength_range = [0.5, 1.0, 1.5, 2.0]
             
-        logger.info(f"🎯 Comparing {len(methods_to_test)} steering methods for task: {task_name}")
+        logger.info(f"🎯 Comparing {len(method_configs)} steering method configurations for task: {task_name}")
         
         start_time = time.time()
         task_results = []
@@ -151,8 +251,8 @@ class SteeringOptimizer:
         best_overall_score = 0.0
         best_overall_config = None
         
-        # Test each method
-        for method in methods_to_test:
+        # Test each method configuration
+        for method_config in method_configs:
             method_results = []
             
             for layer in layers_to_test:
@@ -165,19 +265,22 @@ class SteeringOptimizer:
                         # Run evaluation for this configuration
                         score = self._evaluate_steering_configuration(
                             task_name=task_name,
-                            method=method,
+                            method=method_config.method,
                             layer=layer,
                             strength=strength,
                             limit=limit,
-                            split_ratio=split_ratio
+                            split_ratio=split_ratio,
+                            method_params=method_config.params
                         )
                         
                         configurations_tested += 1
                         config_result = {
-                            'method': method.value,
+                            'method': method_config.name,  # Use display name
+                            'method_type': method_config.method.value,
                             'layer': layer,
                             'strength': strength,
-                            'score': score
+                            'score': score,
+                            'params': method_config.params
                         }
                         method_results.append(config_result)
                         
@@ -186,12 +289,12 @@ class SteeringOptimizer:
                             best_overall_config = config_result
                             
                         if self.verbose:
-                            logger.info(f"   {method.value} L{layer} S{strength}: {score:.3f}")
+                            logger.info(f"   {method_config.name} L{layer} S{strength}: {score:.3f}")
                             
                     except Exception as e:
-                        logger.error(f"   Error testing {method.value} L{layer} S{strength}: {e}")
+                        logger.error(f"   Error testing {method_config.name} L{layer} S{strength}: {e}")
                         
-            all_results[method.value] = method_results
+            all_results[method_config.name] = method_results
         
         # Analyze results
         method_performance = {}
@@ -224,7 +327,8 @@ class SteeringOptimizer:
                 best_steering_strength=best_overall_config['strength'],
                 optimal_parameters={
                     'split_ratio': split_ratio,
-                    'limit': limit
+                    'limit': limit,
+                    **best_overall_config.get('params', {})
                 },
                 steering_effectiveness_score=best_overall_config['score'],
                 classification_accuracy_impact=0.0,  # Not measured here
@@ -677,10 +781,14 @@ class SteeringOptimizer:
         layer: int,
         strength: float,
         limit: int,
-        split_ratio: float
+        split_ratio: float,
+        method_params: Optional[Dict[str, Any]] = None
     ) -> float:
         """
         Evaluate a single steering configuration and return its effectiveness score.
+        
+        Args:
+            method_params: Additional method-specific parameters
         
         Returns:
             Effectiveness score (0.0 to 1.0)
@@ -689,21 +797,42 @@ class SteeringOptimizer:
             # Import CLI runner to test configuration
             from wisent_guard.cli import run_task_pipeline
             
+            # Prepare kwargs with method-specific parameters
+            kwargs = {
+                'task_name': task_name,
+                'model_name': self.model_name,
+                'layer': str(layer),
+                'limit': limit,
+                'steering_mode': True,
+                'steering_method': method.value,
+                'steering_strength': strength,
+                'split_ratio': split_ratio,
+                'device': self.device,
+                'verbose': False,
+                'allow_small_dataset': True
+            }
+            
+            # Add method-specific parameters
+            if method_params:
+                # Map parameter names to CLI argument names
+                param_mapping = {
+                    'normalization_method': 'normalization_method',
+                    'hpr_beta': 'hpr_beta',
+                    'dac_dynamic_control': 'dac_dynamic_control',
+                    'dac_entropy_threshold': 'dac_entropy_threshold',
+                    'bipo_beta': 'bipo_beta',
+                    'bipo_epochs': 'bipo_epochs',
+                    'ksteering_alpha': 'ksteering_alpha',
+                    'ksteering_target_labels': 'ksteering_target_labels',
+                    'ksteering_avoid_labels': 'ksteering_avoid_labels'
+                }
+                
+                for param_key, param_value in method_params.items():
+                    if param_key in param_mapping:
+                        kwargs[param_mapping[param_key]] = param_value
+            
             # Run steering evaluation
-            result = run_task_pipeline(
-                task_name=task_name,
-                model_name=self.model_name,
-                layer=str(layer),
-                limit=limit,
-                steering_mode=True,
-                load_steering_vector=task_name,  # This triggers steering vector loading
-                steering_method=method.value,
-                steering_strength=strength,
-                split_ratio=split_ratio,
-                device=self.device,
-                verbose=False,
-                allow_small_dataset=True
-            )
+            result = run_task_pipeline(**kwargs)
             
             # Extract evaluation score
             # Priority: accuracy > likelihood change > 0.0
@@ -965,34 +1094,60 @@ def run_auto_steering_optimization(
     # Determine tasks to optimize
     if task_name:
         tasks_to_optimize = [task_name]
-    elif classification_config and 'task_specific_overrides' in classification_config:
-        # Use all tasks that have been optimized for classification
-        tasks_to_optimize = list(classification_config['task_specific_overrides'].keys())
+    elif classification_config:
+        # First try task-specific overrides
+        if 'task_specific_overrides' in classification_config:
+            tasks_to_optimize = list(classification_config['task_specific_overrides'].keys())
+        
+        # If no task-specific overrides, check for tasks from optimization metrics
+        if not tasks_to_optimize and 'optimization_metrics' in classification_config:
+            # Try to get tasks from sample sizes
+            if 'optimal_sample_sizes' in classification_config:
+                tasks_to_optimize = list(classification_config['optimal_sample_sizes'].keys())
+        
         if not tasks_to_optimize:
-            return {"error": "No task specified and no classification tasks found"}
+            return {"error": "No task specified and no classification tasks found in config"}
     else:
         # Require explicit task name if no classification config
         return {"error": "Task name required when not using classification config"}
     
     # Default methods and strengths
     if methods_to_test is None:
-        methods_to_test = ["CAA", "HPR"]
+        # Use all default configurations
+        method_configs = get_default_steering_configs()
+    else:
+        # Convert string methods to configs
+        method_configs = []
+        for method in methods_to_test:
+            if method == "CAA":
+                # Add both CAA variations
+                method_configs.append(SteeringMethodConfig("CAA", SteeringMethod.CAA, {}))
+                method_configs.append(SteeringMethodConfig("CAA_L2", SteeringMethod.CAA, {"normalization_method": "l2_unit"}))
+            elif method == "HPR":
+                # Add both HPR variations
+                method_configs.append(SteeringMethodConfig("HPR", SteeringMethod.HPR, {"hpr_beta": 1.0}))
+                method_configs.append(SteeringMethodConfig("HPR_Beta0.5", SteeringMethod.HPR, {"hpr_beta": 0.5}))
+            elif method == "DAC":
+                method_configs.append(SteeringMethodConfig("DAC", SteeringMethod.DAC, {"dac_dynamic_control": True, "dac_entropy_threshold": 1.0}))
+            elif method == "BiPO":
+                # Add both BiPO variations
+                method_configs.append(SteeringMethodConfig("BiPO", SteeringMethod.BIPO, {"bipo_beta": 0.1, "bipo_epochs": 50}))
+                method_configs.append(SteeringMethodConfig("BiPO_Beta0.05", SteeringMethod.BIPO, {"bipo_beta": 0.05, "bipo_epochs": 50}))
+            elif method == "KSteering":
+                # Add both KSteering variations
+                method_configs.append(SteeringMethodConfig("KSteering", SteeringMethod.KSTEERING, {"ksteering_alpha": 5.0, "ksteering_target_labels": "0", "ksteering_avoid_labels": ""}))
+                method_configs.append(SteeringMethodConfig("KSteering_Alpha3", SteeringMethod.KSTEERING, {"ksteering_alpha": 3.0, "ksteering_target_labels": "0", "ksteering_avoid_labels": ""}))
+            else:
+                logger.warning(f"Unknown steering method: {method}")
+    
     if strength_range is None:
         strength_range = [0.5, 1.0, 1.5, 2.0]
-    
-    # Convert string methods to enum
-    method_enums = []
-    for method in methods_to_test:
-        try:
-            method_enums.append(SteeringMethod(method))
-        except ValueError:
-            logger.warning(f"Unknown steering method: {method}")
     
     if verbose:
         logger.info(f"🚀 Starting automatic steering optimization")
         logger.info(f"   Model: {model_name}")
         logger.info(f"   Tasks: {tasks_to_optimize}")
-        logger.info(f"   Methods: {methods_to_test}")
+        logger.info(f"   Method configurations: {[cfg.name for cfg in method_configs]}")
         logger.info(f"   Time limit: {max_time_minutes} minutes")
     
     results = {
@@ -1038,7 +1193,7 @@ def run_auto_steering_optimization(
         try:
             summary = optimizer.optimize_steering_method_comparison(
                 task_name=task,
-                methods_to_test=method_enums,
+                methods_to_test=method_configs,
                 layer_range=task_layer_range,
                 strength_range=strength_range,
                 limit=limit,
