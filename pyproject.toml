@@ -1,0 +1,21 @@
+[tool.pytest.ini_options]
+testpaths = ["wisent_guard/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "--ignore=bigcode-evaluation-harness", "--ignore=evaluation"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "mbpp: marks tests specific to MBPP task",
+    "gsm8k: marks tests specific to GSM8K task",
+    "task_pipeline: marks tests for task pipeline functionality",
+    "docker: marks tests for Docker-based execution",
+    "performance: marks tests for performance evaluation",
+    "cli: marks tests for CLI integration",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
