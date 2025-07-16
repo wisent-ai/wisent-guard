@@ -3,52 +3,40 @@ Command-line interface for wisent-guard lm-evaluation-harness integration.
 Clean implementation using enhanced core primitives.
 """
 
-import argparse
 import logging
 import sys
 import os
-import json
-import csv
-import time
 import torch
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
-from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
-from .core.hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
-from .core.classifier import Classifier
+from .core.ground_truth_evaluator import GroundTruthEvaluator
 from .core.activations import TestActivationCache
 from .optimize import (
     run_smart_optimization,
     run_interactive_optimization,
-    generate_with_all_layer_activations,
-    compute_classification_score,
 )
-from .core.detection_handling import DetectionHandler, DetectionAction
 from .core.save_results import (
     save_results_json,
     save_results_csv,
-    save_classification_results_csv,
     create_evaluation_report,
 )
 from .core.parser import (
     setup_parser,
-    parse_layer_range,
     aggregate_token_scores,
     parse_layers_from_arg,
 )
 from .inference import (
     generate_with_classification_and_handling,
-    generate_with_classification,
-    generate_with_multi_layer_classification,
     generate_with_multi_layer_classification_and_handling,
 )
 from .core.contrastive_pairs import (
-    ContrastivePairSet,
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
 )
+from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+from .core.model_config_manager import ModelConfigManager
 
 # Import caching infrastructure
 try:
@@ -175,12 +163,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Add import for LMEvalHarnessGroundTruth
-from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
-
-# Add import for ModelConfigManager
-from .core.model_config_manager import ModelConfigManager
-
 
 def get_valid_task_names() -> List[str]:
     """Get list of all valid (available) task names from AVAILABLE_BENCHMARKS."""
@@ -258,8 +240,8 @@ def print_valid_tasks_by_category():
                 tags = ", ".join(config.get("tags", []))
                 print(f"   • {name:<20} - {tags}")
 
-    print(f"\n💡 Usage: wisent-guard tasks --task-name <task_name>")
-    print(f"   Example: wisent-guard tasks --task-name truthfulqa_mc1")
+    print("\n💡 Usage: wisent-guard tasks --task-name <task_name>")
+    print("   Example: wisent-guard tasks --task-name truthfulqa_mc1")
 
     if excluded_count > 0:
         print(f"\n🚫 EXCLUDED BENCHMARKS ({excluded_count} total):")
@@ -289,11 +271,11 @@ def print_task_info(task_name: str):
     print(f"⚡ Priority: {config.get('priority', 'unknown')}")
 
     if config.get("priority") == "high":
-        print(f"   💡 Fast loading (< 13.5s) - optimal for agentic use")
+        print("   💡 Fast loading (< 13.5s) - optimal for agentic use")
     elif config.get("priority") == "medium":
-        print(f"   💡 Moderate loading (13.5-60s) - acceptable for agentic use")
+        print("   💡 Moderate loading (13.5-60s) - acceptable for agentic use")
     elif config.get("priority") == "low":
-        print(f"   💡 Slow loading (> 60s) - deprioritized for agentic use")
+        print("   💡 Slow loading (> 60s) - deprioritized for agentic use")
 
     if "trust_remote_code" in config:
         print(f"⚠️  Requires trust_remote_code: {config['trust_remote_code']}")
@@ -434,7 +416,7 @@ def _run_lm_harness_evaluation(
             from lm_eval.api.model import LM
 
         if verbose:
-            print(f"\n🔍 RUNNING LM-HARNESS EVALUATION WITH STEERING:")
+            print("\n🔍 RUNNING LM-HARNESS EVALUATION WITH STEERING:")
             print(f"   • Task: {task_data.config.task}")
             print(f"   • Test samples: {len(test_qa_pairs)}")
             try:
@@ -446,7 +428,7 @@ def _run_lm_harness_evaluation(
                     if steering_methods
                     else "None"
                 )
-            except:
+            except Exception:
                 steering_method_names = "Unknown"
             print(f"   • Steering methods: {steering_method_names}")
             print(f"   • Layers: {layers}")
@@ -559,7 +541,7 @@ def _run_lm_harness_evaluation(
         }
 
         if verbose:
-            print(f"   ✅ Evaluation completed")
+            print("   ✅ Evaluation completed")
             print(f"   📊 Accuracy: {accuracy}")
             print(f"   🎯 Steering applied: {'Yes' if steering_methods else 'No'}")
 
@@ -690,6 +672,30 @@ def run_task_pipeline(
         Dictionary containing the results of the task pipeline
     """
 
+    # SECURITY: Enforce Docker for code execution tasks
+    from .core import enforce_secure_execution, SecureCodeEvaluator
+
+    if enforce_secure_execution(task_name):
+        if verbose:
+            print(f"🔒 Task '{task_name}' requires secure Docker execution")
+            print("   • All code will be executed in isolated Docker containers")
+            print("   • This is mandatory for security - cannot be disabled")
+
+        # Ensure Docker is available for code execution tasks
+        try:
+            # Test if we can create a secure evaluator (will check Docker availability)
+            secure_evaluator = SecureCodeEvaluator(use_mock=False)
+            if verbose:
+                executor_info = secure_evaluator.get_executor_info()
+                print(f"   • Docker executor ready: {executor_info['image_name']}")
+        except Exception as e:
+            # Fall back to mock for development/testing
+            if verbose:
+                print(
+                    f"   ⚠️ Docker not available ({e}), using mock executor for testing"
+                )
+            secure_evaluator = SecureCodeEvaluator(use_mock=True)
+
     # AUTOMATICALLY SET LM-EVAL-HARNESS AS DEFAULT FOR TESTED TASKS
     # These tasks have been thoroughly tested and validated to work with lm-eval-harness
     # 🚨 UPDATED: All benchmarks now use extractor-based ground truth evaluation
@@ -749,9 +755,9 @@ def run_task_pipeline(
     ):
         print(f"✅ Using 'lm-eval-harness' ground truth method for task '{task_name}'")
         print(
-            f"   • This task has been tested and validated to work with lm-eval-harness"
+            "   • This task has been tested and validated to work with lm-eval-harness"
         )
-        print(f"   • To use a different method, specify --ground-truth-method <method>")
+        print("   • To use a different method, specify --ground-truth-method <method>")
 
     # AUTO-LOAD MODEL CONFIGURATION (if available)
     # Load saved optimal parameters for this model if they exist
@@ -807,8 +813,8 @@ def run_task_pipeline(
                 print(f"\n🔧 Auto-loaded saved configuration for model: {model_name}")
                 for param, change in config_overrides.items():
                     print(f"   • {param}: {change}")
-                print(f"   • To override these defaults, specify parameters explicitly")
-                print(f"   • Config file: ~/.wisent-guard/model_configs/")
+                print("   • To override these defaults, specify parameters explicitly")
+                print("   • Config file: ~/.wisent-guard/model_configs/")
                 print()
 
         # AUTO-LOAD CONTROL VECTOR: Check if a control vector exists for this task
@@ -883,20 +889,20 @@ def run_task_pipeline(
 
                 # Check if it's an unavailable benchmark
                 if task_name in UNAVAILABLE_BENCHMARKS:
-                    print(f"🚫 This benchmark is known to be unavailable/problematic.")
+                    print("🚫 This benchmark is known to be unavailable/problematic.")
 
                 if suggestions:
-                    print(f"\n💡 Did you mean one of these?")
+                    print("\n💡 Did you mean one of these?")
                     for i, suggestion in enumerate(suggestions, 1):
                         config = AVAILABLE_BENCHMARKS[suggestion]
                         priority = config.get("priority", "unknown")
                         tags = ", ".join(config.get("tags", []))
                         print(f"   {i}. {suggestion} ({priority} priority) - {tags}")
 
-                print(f"\n📖 To see all valid tasks, run:")
-                print(f"   wisent-guard tasks --list-tasks")
-                print(f"\n📖 To see task details, run:")
-                print(f"   wisent-guard tasks --task-info <task_name>")
+                print("\n📖 To see all valid tasks, run:")
+                print("   wisent-guard tasks --list-tasks")
+                print("\n📖 To see task details, run:")
+                print("   wisent-guard tasks --task-info <task_name>")
 
             return {
                 "task_name": task_name,
@@ -942,7 +948,7 @@ def run_task_pipeline(
             latency_tracker = get_global_latency_tracker()
             latency_tracker.start_tracking()
             if verbose:
-                print(f"   • Latency tracking started")
+                print("   • Latency tracking started")
 
     # Show current memory usage if requested
     if show_memory_usage:
@@ -996,7 +1002,7 @@ def run_task_pipeline(
         print(f"\n{'='*80}")
         print(f"🚀 STARTING PIPELINE FOR TASK: {display_name.upper()}")
         print(f"{'='*80}")
-        print(f"📋 Configuration:")
+        print("📋 Configuration:")
         print(f"   • Model: {model_name}")
         print(f"   • Layer: {layer}")
         print(f"   • Classifier: {classifier_type}")
@@ -1006,10 +1012,10 @@ def run_task_pipeline(
         print(f"   • Limit: {limit}")
         print(f"   • Seed: {seed}")
         if from_csv:
-            print(f"   • Input: CSV file")
+            print("   • Input: CSV file")
             print(f"   • Columns: {question_col}, {correct_col}, {incorrect_col}")
         elif from_json:
-            print(f"   • Input: JSON file")
+            print("   • Input: JSON file")
 
     try:
         # Initialize control_vector_info to ensure it's in scope
@@ -1021,7 +1027,7 @@ def run_task_pipeline(
 
         # Initialize enhanced primitives
         if verbose:
-            print(f"\n🔧 Initializing model and primitives...")
+            print("\n🔧 Initializing model and primitives...")
             if is_multi_layer:
                 print(f"   • Multi-layer mode: {layers}")
             else:
@@ -1031,7 +1037,7 @@ def run_task_pipeline(
         if model_instance is not None:
             model = model_instance
             if verbose:
-                print(f"   • Using pre-loaded model instance (reused across tasks)")
+                print("   • Using pre-loaded model instance (reused across tasks)")
         else:
             # Time model loading
             if latency_tracker:
@@ -1044,7 +1050,7 @@ def run_task_pipeline(
 
         # Create detection handler based on CLI arguments
         if verbose and detection_action != "pass_through":
-            print(f"\n🛡️  Setting up detection handling:")
+            print("\n🛡️  Setting up detection handling:")
             print(f"   • Action: {detection_action}")
             if placeholder_message:
                 print(f"   • Custom placeholder: {placeholder_message}")
@@ -1166,20 +1172,20 @@ def run_task_pipeline(
                 else:
                     if verbose:
                         print(
-                            f"⚠️  Failed to load cached data, falling back to fresh download"
+                            "⚠️  Failed to load cached data, falling back to fresh download"
                         )
 
             if not used_cache:
                 # Load fresh data from lm-eval
                 if verbose:
-                    print(f"🔄 Loading fresh data from lm-eval...")
+                    print("🔄 Loading fresh data from lm-eval...")
 
                 # FIRST: Check if this is a group task and expand if needed
                 # Skip group task check for MBPP as it's known to be slow
                 if task_name == "mbpp":
                     if verbose:
                         print(
-                            f"🔍 Skipping group task check for MBPP (known to be slow)"
+                            "🔍 Skipping group task check for MBPP (known to be slow)"
                         )
                     group_task_processed = False
                     group_task_qa_format = False
@@ -1187,7 +1193,6 @@ def run_task_pipeline(
                     try:
                         from lm_eval import evaluator
                         import threading
-                        import time
 
                         if verbose:
                             print(f"🔍 Checking if '{task_name}' is a group task...")
@@ -1230,7 +1235,7 @@ def run_task_pipeline(
                                 print(
                                     f"🎯 Detected GROUP task '{task_name}' with {len(expanded_tasks)} subtasks: {expanded_tasks[:5]}{'...' if len(expanded_tasks) > 5 else ''}"
                                 )
-                                print(f"📚 Extracting samples from all subtasks...")
+                                print("📚 Extracting samples from all subtasks...")
 
                             # Handle group task by combining samples from all subtasks
                             all_qa_pairs = []
@@ -1326,7 +1331,7 @@ def run_task_pipeline(
                                     pair.get("source_subtask", "unknown")
                                     for pair in qa_pairs
                                 )
-                                print(f"📋 Breakdown by subtask:")
+                                print("📋 Breakdown by subtask:")
                                 for subtask, count in subtask_counts.most_common():
                                     print(f"   • {subtask}: {count} pairs")
 
@@ -1347,7 +1352,7 @@ def run_task_pipeline(
                     except TimeoutError as e:
                         if verbose:
                             print(f"⏰ Task loading timed out for '{task_name}': {e}")
-                            print(f"🔄 Proceeding with standard task loading...")
+                            print("🔄 Proceeding with standard task loading...")
                         group_task_processed = False
                         group_task_qa_format = False
                     except Exception as e:
@@ -1357,7 +1362,7 @@ def run_task_pipeline(
                             print(
                                 f"⚠️  Could not check if '{task_name}' is a group task: {e}"
                             )
-                            print(f"🔄 Proceeding with standard task loading...")
+                            print("🔄 Proceeding with standard task loading...")
                         group_task_processed = False
                         group_task_qa_format = False
 
@@ -1384,7 +1389,7 @@ def run_task_pipeline(
 
                     # Extract QA pairs from training documents
                     if verbose:
-                        print(f"\n📝 TRAINING DATA PREPARATION:")
+                        print("\n📝 TRAINING DATA PREPARATION:")
                         print(
                             f"   • Loading {task_name} data with correct/incorrect answers..."
                         )
@@ -1438,15 +1443,15 @@ def run_task_pipeline(
                 # CACHE SAVING: Save to cache if requested and we loaded fresh data
                 if cache_benchmark and not used_cache:
                     if verbose:
-                        print(f"💾 Caching benchmark data for future use...")
+                        print("💾 Caching benchmark data for future use...")
 
                     success = save_benchmark_to_cache(
                         task_name, cache_dir, limit, verbose
                     )
                     if success and verbose:
-                        print(f"✅ Benchmark cached successfully!")
+                        print("✅ Benchmark cached successfully!")
                     elif verbose:
-                        print(f"⚠️  Failed to cache benchmark")
+                        print("⚠️  Failed to cache benchmark")
             else:
                 # We used cached data, process it for the pipeline
                 # Properly split the data using the split ratio with limits
@@ -1474,7 +1479,7 @@ def run_task_pipeline(
 
         if verbose:
             print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
-            print(f"\n🔍 Training Examples:")
+            print("\n🔍 Training Examples:")
             for i, qa_pair in enumerate(qa_pairs[:4]):  # Show first 4
                 print(f"\n   📋 Example {i+1}:")
                 question_preview = (
@@ -1523,11 +1528,11 @@ def run_task_pipeline(
             if evaluation_method == "perplexity":
                 if verbose:
                     print(
-                        f"\n🎯 PERPLEXITY TASK DETECTED: Skipping contrastive training"
+                        "\n🎯 PERPLEXITY TASK DETECTED: Skipping contrastive training"
                     )
                     print(f"   • Task: {task_name}")
                     print(f"   • Evaluation method: {evaluation_method}")
-                    print(f"   • Going directly to perplexity evaluation")
+                    print("   • Going directly to perplexity evaluation")
 
                 # Create a minimal "dummy" classifier for the perplexity evaluation
                 # Note: LMEvalHarnessGroundTruth is already imported at the top of the file
@@ -1556,7 +1561,7 @@ def run_task_pipeline(
                         f"\n🎉 PERPLEXITY EVALUATION COMPLETED FOR {task_name.upper()}!"
                     )
                     print(f"{'='*80}")
-                    print(f"📊 FINAL RESULTS:")
+                    print("📊 FINAL RESULTS:")
                     print(f"   • Test samples: {len(test_qa_pairs_source)}")
                     print(f"   • Evaluation method: {evaluation_method}")
 
@@ -1567,7 +1572,7 @@ def run_task_pipeline(
                         avg_score = lm_eval_results["average_classifier_score"]
                         print(f"   • Average perplexity score: {avg_score:.3f}")
                     else:
-                        print(f"   • Perplexity evaluation: Completed")
+                        print("   • Perplexity evaluation: Completed")
                     print(f"{'='*80}")
 
                 return {
@@ -1588,16 +1593,16 @@ def run_task_pipeline(
             error_msg = f"Insufficient training data: {len(qa_pairs)} pairs found, minimum {min_training_samples} required"
             if verbose:
                 print(f"\n❌ ERROR: {error_msg}")
-                print(f"   • Consider increasing --limit or using a larger dataset")
+                print("   • Consider increasing --limit or using a larger dataset")
                 print(
                     f"   • CSV/JSON files should have at least {min_training_samples} rows"
                 )
-                print(f"   • lm-harness tasks may need higher --limit values")
+                print("   • lm-harness tasks may need higher --limit values")
 
             if not allow_small_dataset:
                 if verbose:
                     print(
-                        f"   • Use --allow-small-dataset flag to bypass this check (may cause training issues)"
+                        "   • Use --allow-small-dataset flag to bypass this check (may cause training issues)"
                     )
 
                 return {
@@ -1611,7 +1616,7 @@ def run_task_pipeline(
             else:
                 if verbose:
                     print(
-                        f"   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag"
+                        "   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag"
                     )
                     print(
                         f"   • Training may be unstable with only {len(qa_pairs)} samples"
@@ -1686,9 +1691,9 @@ def run_task_pipeline(
             error_msg = "Inference-only mode requires --load-classifier or --load-steering-vector"
             if verbose:
                 print(f"\n❌ ERROR: {error_msg}")
-                print(f"   • Use --load-classifier to load pre-trained classifiers")
+                print("   • Use --load-classifier to load pre-trained classifiers")
                 print(
-                    f"   • Use --load-steering-vector to load pre-trained steering vectors"
+                    "   • Use --load-steering-vector to load pre-trained steering vectors"
                 )
             return {"task_name": task_name, "error": error_msg}
 
@@ -1697,8 +1702,8 @@ def run_task_pipeline(
             from .core.model_persistence import ModelPersistence
 
             if verbose:
-                print(f"\n🔄 INFERENCE-ONLY MODE:")
-                print(f"   • Loading pre-trained models for inference...")
+                print("\n🔄 INFERENCE-ONLY MODE:")
+                print("   • Loading pre-trained models for inference...")
 
             # Parse layers to know what to load
             layers = parse_layers_from_arg(layer)
@@ -1768,7 +1773,7 @@ def run_task_pipeline(
                         else:
                             if verbose:
                                 print(
-                                    f"     ⚠️  Warning: No layer information in loaded vector"
+                                    "     ⚠️  Warning: No layer information in loaded vector"
                                 )
                     else:
                         if verbose:
@@ -1787,7 +1792,7 @@ def run_task_pipeline(
 
             # Set up inference with loaded models
             if verbose:
-                print(f"   • Inference setup complete")
+                print("   • Inference setup complete")
                 print(f"   • Available models: {list(loaded_models.keys())}")
 
             # Continue with inference pipeline using loaded models
@@ -1796,9 +1801,9 @@ def run_task_pipeline(
         # Handle training-only mode
         elif train_only:
             if verbose:
-                print(f"\n🎓 TRAINING-ONLY MODE:")
+                print("\n🎓 TRAINING-ONLY MODE:")
                 print(
-                    f"   • Training classifiers/vectors and saving, skipping inference..."
+                    "   • Training classifiers/vectors and saving, skipping inference..."
                 )
 
             # Continue with training but return early before inference
@@ -1828,7 +1833,7 @@ def run_task_pipeline(
                         else:
                             question = doc.get("question", str(doc))
                     test_questions.append(question)
-                except:
+                except Exception:
                     continue
 
             if test_questions:
@@ -1847,7 +1852,7 @@ def run_task_pipeline(
                     token_aggregation = optimization_result["best_aggregation"]
 
                     if verbose:
-                        print(f"✅ Interactive optimization completed!")
+                        print("✅ Interactive optimization completed!")
                         print(f"   • Optimized layer: {layer} (was {original_layer})")
                         print(
                             f"   • Optimized aggregation: {token_aggregation} (was {original_token_aggregation})"
@@ -1867,7 +1872,7 @@ def run_task_pipeline(
                     }
             else:
                 if verbose:
-                    print(f"⚠️ No test questions available for interactive optimization")
+                    print("⚠️ No test questions available for interactive optimization")
                 return {"task_name": task_name, "error": "No test questions available"}
 
         elif optimize:
@@ -1902,7 +1907,7 @@ def run_task_pipeline(
                                 f"⚠️  Failed to extract test QA pair from benchmark {task_name}"
                             )
 
-                except Exception as e:
+                except Exception:
                     continue
 
             # Run smart optimization with caching
@@ -1942,7 +1947,7 @@ def run_task_pipeline(
             )  # Update layer object too
 
             if verbose:
-                print(f"✅ Hyperparameter optimization completed!")
+                print("✅ Hyperparameter optimization completed!")
                 print(f"   • Best layer: {layer} + {token_aggregation} aggregation")
                 print(f"   • Best classifier: {optimized_classifier_type}")
                 print(f"   • Best threshold: {optimized_threshold}")
@@ -1962,7 +1967,7 @@ def run_task_pipeline(
 
         # Extract activations from the choice tokens using the (possibly optimized) layer
         optimization_note = (
-            f" (optimized)" if optimize and layer != original_layer else ""
+            " (optimized)" if optimize and layer != original_layer else ""
         )
         if verbose:
             print(
@@ -2043,7 +2048,7 @@ def run_task_pipeline(
 
             # Ensure task_data is available for steering evaluation
             # If not already loaded (e.g., from CSV/JSON), load it now
-            if not "task_data" in locals():
+            if "task_data" not in locals():
                 # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
                 actual_task_name = get_actual_task_name(task_name)
                 if verbose and actual_task_name != task_name:
@@ -2269,9 +2274,7 @@ def run_task_pipeline(
                 # TEST THE STEERING using lm-harness evaluation (same as baseline)
                 if verbose:
                     print(f"\n🧪 TESTING {steering_method} STEERING:")
-                    print(
-                        f"   • Running lm-harness evaluation with steering applied..."
-                    )
+                    print("   • Running lm-harness evaluation with steering applied...")
                     print(f"   • Test samples: {len(test_qa_pairs_source)}")
                     print(f"   • Steering strength: {steering_strength}")
 
@@ -2329,7 +2332,7 @@ def run_task_pipeline(
                                     }
                                 )
 
-                    except Exception as e:
+                    except Exception:
                         # Skip problematic docs
                         continue
 
@@ -2370,15 +2373,15 @@ def run_task_pipeline(
                     or show_timing_summary
                 ):
                     if verbose:
-                        print(f"\n🔍 Generating performance report...")
-                    print(f"\n📊 PERFORMANCE REPORT:")
+                        print("\n🔍 Generating performance report...")
+                    print("\n📊 PERFORMANCE REPORT:")
                     print(f"{'='*50}")
 
                     if memory_tracker:
                         if verbose:
-                            print(f"   • Stopping memory monitoring...")
+                            print("   • Stopping memory monitoring...")
                         memory_stats = memory_tracker.stop_monitoring()
-                        print(f"💾 Memory Usage:")
+                        print("💾 Memory Usage:")
                         print(
                             memory_tracker.format_stats(
                                 memory_stats, detailed_performance_report
@@ -2387,16 +2390,16 @@ def run_task_pipeline(
 
                     if latency_tracker or show_timing_summary:
                         if verbose:
-                            print(f"   • Collecting timing data...")
+                            print("   • Collecting timing data...")
 
                         if latency_tracker:
                             # Use new user-facing metrics format
-                            print(f"\n⏱️ Performance Metrics:")
+                            print("\n⏱️ Performance Metrics:")
                             print(latency_tracker.format_user_metrics())
                         else:
                             from .core.tracking import format_timing_summary
 
-                            print(f"\n⏱️ Timing Summary:")
+                            print("\n⏱️ Timing Summary:")
                             print(format_timing_summary(detailed_performance_report))
 
                     if export_performance_csv:
@@ -2442,15 +2445,15 @@ def run_task_pipeline(
                 ):
                     try:
                         if verbose:
-                            print(f"\n🔍 Generating performance report (error case)...")
-                        print(f"\n📊 PERFORMANCE REPORT:")
+                            print("\n🔍 Generating performance report (error case)...")
+                        print("\n📊 PERFORMANCE REPORT:")
                         print(f"{'='*50}")
 
                         if memory_tracker:
                             if verbose:
-                                print(f"   • Stopping memory monitoring...")
+                                print("   • Stopping memory monitoring...")
                             memory_stats = memory_tracker.stop_monitoring()
-                            print(f"💾 Memory Usage:")
+                            print("💾 Memory Usage:")
                             print(
                                 memory_tracker.format_stats(
                                     memory_stats, detailed_performance_report
@@ -2459,16 +2462,16 @@ def run_task_pipeline(
 
                         if latency_tracker or show_timing_summary:
                             if verbose:
-                                print(f"   • Collecting timing data...")
+                                print("   • Collecting timing data...")
 
                             if latency_tracker:
                                 # Use new user-facing metrics format
-                                print(f"\n⏱️ Performance Metrics:")
+                                print("\n⏱️ Performance Metrics:")
                                 print(latency_tracker.format_user_metrics())
                             else:
                                 from .core.tracking import format_timing_summary
 
-                                print(f"\n⏱️ Timing Summary:")
+                                print("\n⏱️ Timing Summary:")
                                 print(
                                     format_timing_summary(detailed_performance_report)
                                 )
@@ -2531,7 +2534,7 @@ def run_task_pipeline(
             if classifier_exists:
                 if verbose:
                     print(
-                        f"\n📦 Found pre-trained classifiers, loading automatically..."
+                        "\n📦 Found pre-trained classifiers, loading automatically..."
                     )
                     print(f"   • Loading from: {auto_load_path}")
 
@@ -2607,12 +2610,12 @@ def run_task_pipeline(
                         )
 
                 if loaded_classifiers and verbose:
-                    print(f"   🎉 Using cached classifiers for faster inference!")
+                    print("   🎉 Using cached classifiers for faster inference!")
 
             except Exception as e:
                 if verbose:
                     print(f"   ⚠️  Failed to load classifiers: {e}")
-                    print(f"   🔄 Falling back to training new classifiers...")
+                    print("   🔄 Falling back to training new classifiers...")
                 load_classifier = None  # Reset to allow training
                 steering_methods = {}
                 layer_training_results = {}
@@ -2650,8 +2653,8 @@ def run_task_pipeline(
                         print(
                             f"\n🎮 Using auto-loaded control vector for layer {cv_layer}"
                         )
-                        print(f"   • Vector will be applied during generation")
-                        print(f"   • Use --skip-steering to disable")
+                        print("   • Vector will be applied during generation")
+                        print("   • Use --skip-steering to disable")
 
             except Exception as e:
                 if verbose:
@@ -2660,7 +2663,7 @@ def run_task_pipeline(
         # Only train if we didn't successfully load classifiers
         if not steering_methods and is_multi_layer:
             if verbose:
-                print(f"\n🎯 TRAINING MULTI-LAYER CLASSIFIERS:")
+                print("\n🎯 TRAINING MULTI-LAYER CLASSIFIERS:")
                 print(f"   • Layers: {layers}")
                 print(f"   • Type: {final_classifier_type}")
                 print(f"   • Threshold: {final_threshold}")
@@ -2750,7 +2753,9 @@ def run_task_pipeline(
                 training_results = layer_training_results[primary_layer]
             else:
                 # If primary layer failed, try to find any successful layer
-                successful_layers = [l for l in layers if l in steering_methods]
+                successful_layers = [
+                    layer for layer in layers if layer in steering_methods
+                ]
                 if successful_layers:
                     primary_layer = successful_layers[0]
                     steering_method = steering_methods[primary_layer]
@@ -2771,7 +2776,7 @@ def run_task_pipeline(
         elif not steering_methods:  # Only train if we didn't load classifiers
             # Single layer mode (original logic)
             if verbose:
-                print(f"\n🎯 TRAINING CLASSIFIER:")
+                print("\n🎯 TRAINING CLASSIFIER:")
                 print(f"   • Layer: {layers[0]}")
                 print(f"   • Type: {final_classifier_type}")
                 print(f"   • Threshold: {final_threshold}")
@@ -2792,7 +2797,7 @@ def run_task_pipeline(
                 layer_training_results[layers[0]] = training_results
 
                 if verbose:
-                    print(f"✅ Training completed!")
+                    print("✅ Training completed!")
                     print(
                         f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}"
                     )
@@ -2802,9 +2807,9 @@ def run_task_pipeline(
                 error_msg = f"Classifier training failed due to insufficient or imbalanced data: {str(e)}"
                 if verbose:
                     print(f"\n❌ TRAINING ERROR: {error_msg}")
-                    print(f"   • This often happens with very small datasets")
+                    print("   • This often happens with very small datasets")
                     print(
-                        f"   • Try increasing the dataset size or using --limit with a higher value"
+                        "   • Try increasing the dataset size or using --limit with a higher value"
                     )
                     print(f"   • Current training samples: {len(pair_set)}")
 
@@ -2835,7 +2840,7 @@ def run_task_pipeline(
         else:
             # Classifiers were already loaded
             if verbose:
-                print(f"\n✅ Using pre-loaded classifiers (skipped training)")
+                print("\n✅ Using pre-loaded classifiers (skipped training)")
             # Ensure we have the primary steering method and training results set
             if is_multi_layer and layers[0] in steering_methods:
                 steering_method = steering_methods[layers[0]]
@@ -2863,7 +2868,7 @@ def run_task_pipeline(
                 )
 
             if verbose:
-                print(f"\n💾 SAVING TRAINED CLASSIFIERS:")
+                print("\n💾 SAVING TRAINED CLASSIFIERS:")
                 print(f"   • Save path: {save_path}")
 
             try:
@@ -2922,13 +2927,13 @@ def run_task_pipeline(
         # Handle train-only mode - return early after training and saving
         if train_only:
             if verbose:
-                print(f"\n🎓 TRAINING-ONLY MODE COMPLETED!")
+                print("\n🎓 TRAINING-ONLY MODE COMPLETED!")
                 print(
                     f"   • Trained classifiers for layers: {list(steering_methods.keys())}"
                 )
                 if saved_classifier_paths:
                     print(f"   • Saved {len(saved_classifier_paths)} classifier files")
-                print(f"   • Skipping inference phase")
+                print("   • Skipping inference phase")
 
             return {
                 "task_name": task_name,
@@ -2971,9 +2976,9 @@ def run_task_pipeline(
             evaluation_method = get_evaluation_method_for_task(task_name)
 
             if verbose:
-                print(f"\n🔍 LM-EVAL-HARNESS GROUND TRUTH EVALUATION:")
+                print("\n🔍 LM-EVAL-HARNESS GROUND TRUTH EVALUATION:")
                 print(
-                    f"   • Using lm-eval-harness tasks for direct classifier evaluation"
+                    "   • Using lm-eval-harness tasks for direct classifier evaluation"
                 )
                 print(f"   • Task: {task_name}")
                 print(f"   • Evaluation method: {evaluation_method}")
@@ -2997,7 +3002,7 @@ def run_task_pipeline(
 
             if classifier is None:
                 if verbose:
-                    print(f"   ❌ No trained classifier found for evaluation")
+                    print("   ❌ No trained classifier found for evaluation")
                 lm_eval_results = {
                     "ground_truth": "UNKNOWN",
                     "method_used": "lm-eval-harness-error",
@@ -3023,7 +3028,7 @@ def run_task_pipeline(
                 )
 
                 if verbose:
-                    print(f"   ✅ LM-eval-harness evaluation completed")
+                    print("   ✅ LM-eval-harness evaluation completed")
                     # Access accuracy from nested lm_eval_metrics
                     lm_eval_metrics = lm_eval_results.get("lm_eval_metrics", {})
                     accuracy = lm_eval_metrics.get("accuracy", "N/A")
@@ -3083,7 +3088,7 @@ The task will be skipped in optimization."""
                     f"\n🎉 LM-EVAL-HARNESS EVALUATION COMPLETED FOR {task_name.upper()}!"
                 )
                 print(f"{'='*80}")
-                print(f"📊 FINAL RESULTS:")
+                print("📊 FINAL RESULTS:")
                 print(f"   • Training samples: {len(contrastive_pairs)}")
                 print(f"   • Test samples: {len(test_qa_pairs_source)}")
 
@@ -3134,8 +3139,8 @@ The task will be skipped in optimization."""
         # Test the optimized classifier by generating responses and classifying them
         if optimize:
             if verbose:
-                print(f"\n🧪 TESTING OPTIMIZED CLASSIFIER ON GENERATED RESPONSES:")
-                print(f"   • Generating responses to test questions...")
+                print("\n🧪 TESTING OPTIMIZED CLASSIFIER ON GENERATED RESPONSES:")
+                print("   • Generating responses to test questions...")
 
             # Get test questions for response generation
             test_qa_pairs = []
@@ -3177,14 +3182,14 @@ The task will be skipped in optimization."""
                                 }
                             )
 
-                except Exception as e:
+                except Exception:
                     continue
 
             if verbose:
                 print(
                     f"   • Successfully extracted {len(test_qa_pairs)} test questions"
                 )
-                print(f"\n🔍 Test Questions:")
+                print("\n🔍 Test Questions:")
                 for i, qa_pair in enumerate(test_qa_pairs):
                     print(f"\n   📋 Question {i+1}:")
                     print(
@@ -3194,22 +3199,24 @@ The task will be skipped in optimization."""
 
             # Generate responses and classify them
             if verbose:
-                print(f"\n🎭 GENERATING AND CLASSIFYING RESPONSES:")
+                print("\n🎭 GENERATING AND CLASSIFYING RESPONSES:")
                 print(f"   • Generating responses with optimized layer {layer}...")
 
             generated_responses = []
             correct_classifications = 0
             total_classifications = 0
 
-            if use_cached_activations:
+            if locals().get("use_cached_activations", False):
                 # Use cached activations instead of generating new responses
                 if verbose:
-                    print(f"\n🔄 PROCESSING CACHED ACTIVATIONS:")
+                    print("\n🔄 PROCESSING CACHED ACTIVATIONS:")
                     print(
-                        f"   • Processing {len(cached_layer_activations)} cached responses..."
+                        f"   • Processing {len(locals().get('cached_layer_activations', []))} cached responses..."
                     )
 
-                for i, cached_item in enumerate(cached_layer_activations):
+                for i, cached_item in enumerate(
+                    locals().get("cached_layer_activations", [])
+                ):
                     if verbose and not optimize:
                         print(f"\n   🎯 Processing cached response {i+1}:")
                         print(
@@ -3410,7 +3417,10 @@ The task will be skipped in optimization."""
                         )
 
                         # Save activations if requested (extract from last generation)
-                        if save_test_activations and test_activation_cache is not None:
+                        if (
+                            save_test_activations
+                            and locals().get("test_activation_cache") is not None
+                        ):
                             try:
                                 # We need to extract activations from the last forward pass
                                 # This is a simplified version - ideally we'd modify the generation functions
@@ -3456,7 +3466,9 @@ The task will be skipped in optimization."""
                                         )
 
                                         # Add to cache
-                                        test_activation_cache.add_activation(
+                                        locals().get(
+                                            "test_activation_cache"
+                                        ).add_activation(
                                             question=qa_pair["question"],
                                             response=response,
                                             activations=activations_obj,
@@ -3591,14 +3603,14 @@ The task will be skipped in optimization."""
                 }
 
             if verbose:
-                print(f"\n✅ Response generation and classification completed!")
+                print("\n✅ Response generation and classification completed!")
                 if total_classifications > 0:
                     print(
                         f"   • Test accuracy: {test_accuracy:.2%} ({correct_classifications}/{total_classifications})"
                     )
                 else:
-                    print(f"   • Test accuracy: Could not evaluate")
-                print(f"   • Tested on generated responses, not pre-written choices")
+                    print("   • Test accuracy: Could not evaluate")
+                print("   • Tested on generated responses, not pre-written choices")
 
             # Create results dictionary for optimization path
             results = {
@@ -3627,7 +3639,7 @@ The task will be skipped in optimization."""
             if verbose:
                 print(f"\n🎉 OPTIMIZATION PIPELINE COMPLETED FOR {task_name.upper()}!")
                 print(f"{'='*80}")
-                print(f"📊 FINAL RESULTS:")
+                print("📊 FINAL RESULTS:")
                 print(f"   • Training samples: {len(contrastive_pairs)}")
                 print(f"   • Test samples: {len(test_qa_pairs)}")
                 print(
@@ -3638,7 +3650,7 @@ The task will be skipped in optimization."""
                         f"   • Test accuracy: {test_accuracy:.2%} ({correct_classifications}/{total_classifications})"
                     )
                 else:
-                    print(f"   • Test accuracy: Could not evaluate")
+                    print("   • Test accuracy: Could not evaluate")
                 print(f"   • Generated responses: {len(generated_responses)}")
                 if total_classifications > 0:
                     classification_acc = correct_classifications / total_classifications
@@ -3646,7 +3658,7 @@ The task will be skipped in optimization."""
                         f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})"
                     )
                 else:
-                    print(f"   • Classification accuracy: Could not evaluate")
+                    print("   • Classification accuracy: Could not evaluate")
                 print(f"{'='*80}\n")
 
             logger.info(f"Optimization pipeline completed for {task_name}")
@@ -3654,7 +3666,7 @@ The task will be skipped in optimization."""
         else:
             # Only do pre-written validation when NOT optimizing
             if verbose:
-                print(f"\n🧪 PREPARING TEST DATA:")
+                print("\n🧪 PREPARING TEST DATA:")
                 print(
                     f"   • Loading {task_name} test data with correct/incorrect answers..."
                 )
@@ -3709,13 +3721,13 @@ The task will be skipped in optimization."""
                                 }
                             )
 
-                except Exception as e:
+                except Exception:
                     # Skip problematic docs
                     continue
 
             if verbose:
                 print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
-                print(f"\n🔍 Test Examples:")
+                print("\n🔍 Test Examples:")
                 for i, qa_pair in enumerate(test_qa_pairs):
                     print(f"\n   📋 Test Example {i+1}:")
                     print(
@@ -3787,7 +3799,7 @@ The task will be skipped in optimization."""
             if load_test_activations:
                 # Load cached test activations instead of generating new responses
                 if verbose:
-                    print(f"\n💾 LOADING CACHED TEST ACTIVATIONS:")
+                    print("\n💾 LOADING CACHED TEST ACTIVATIONS:")
                     print(f"   • Loading from: {load_test_activations}")
 
                 try:
@@ -3818,7 +3830,7 @@ The task will be skipped in optimization."""
                 except Exception as e:
                     if verbose:
                         print(f"   ❌ Failed to load cached activations: {e}")
-                        print(f"   • Will generate new responses instead")
+                        print("   • Will generate new responses instead")
 
             if save_test_activations and not use_cached_activations:
                 # Initialize cache for saving
@@ -3831,15 +3843,13 @@ The task will be skipped in optimization."""
             # Generate sample responses with token-level classification
             if verbose:
                 if optimize:
-                    print(
-                        f"\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:"
-                    )
+                    print("\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
                     print(
                         f"   • Generating {len(test_qa_pairs)} sample responses with optimized layer {layer}..."
                     )
                 else:
                     print(
-                        f"\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:"
+                        "\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:"
                     )
                     print(f"   • Generating {len(test_qa_pairs)} sample responses...")
 
@@ -4048,7 +4058,7 @@ The task will be skipped in optimization."""
             if verbose:
                 print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
                 print(f"{'='*80}")
-                print(f"📊 FINAL RESULTS:")
+                print("📊 FINAL RESULTS:")
                 print(f"   • Training samples: {len(contrastive_pairs)}")
                 print(f"   • Test samples: {len(test_qa_pairs)}")
                 print(
@@ -4061,21 +4071,21 @@ The task will be skipped in optimization."""
                         f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})"
                     )
                 else:
-                    print(f"   • Classification accuracy: Could not evaluate")
+                    print("   • Classification accuracy: Could not evaluate")
                 print(f"{'='*80}\n")
 
             # Generate performance report
             if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
                 if verbose:
-                    print(f"\n🔍 Generating performance report...")
-                print(f"\n📊 PERFORMANCE REPORT:")
+                    print("\n🔍 Generating performance report...")
+                print("\n📊 PERFORMANCE REPORT:")
                 print(f"{'='*50}")
 
                 if memory_tracker:
                     if verbose:
-                        print(f"   • Stopping memory monitoring...")
+                        print("   • Stopping memory monitoring...")
                     memory_stats = memory_tracker.stop_monitoring()
-                    print(f"💾 Memory Usage:")
+                    print("💾 Memory Usage:")
                     print(
                         memory_tracker.format_stats(
                             memory_stats, detailed_performance_report
@@ -4084,10 +4094,10 @@ The task will be skipped in optimization."""
 
                 if latency_tracker or show_timing_summary:
                     if verbose:
-                        print(f"   • Collecting timing data...")
+                        print("   • Collecting timing data...")
                     from .core.tracking import format_timing_summary
 
-                    print(f"\n⏱️ Timing Summary:")
+                    print("\n⏱️ Timing Summary:")
                     print(format_timing_summary(detailed_performance_report))
 
                 if export_performance_csv:
@@ -4108,7 +4118,7 @@ The task will be skipped in optimization."""
                 try:
                     test_activation_cache.save_to_file(save_test_activations)
                     if verbose:
-                        print(f"\n💾 SAVED TEST ACTIVATIONS:")
+                        print("\n💾 SAVED TEST ACTIVATIONS:")
                         print(f"   • File: {save_test_activations}")
                         print(
                             f"   • Count: {len(test_activation_cache.activations)} activations"
@@ -4128,17 +4138,17 @@ The task will be skipped in optimization."""
         if memory_tracker:
             try:
                 memory_tracker.stop_monitoring()
-            except:
+            except Exception:
                 pass
         # Import traceback for full stack trace
         import traceback
 
-        print(f"\n💥💥💥 HARD STOP - ERROR DETECTED 💥💥💥")
+        print("\n💥💥💥 HARD STOP - ERROR DETECTED 💥💥💥")
         print(f"Task: {task_name}")
         print(f"Error: {e}")
-        print(f"Full traceback:")
+        print("Full traceback:")
         traceback.print_exc()
-        print(f"💥💥💥 STOPPING EXECUTION IMMEDIATELY 💥💥💥\n")
+        print("💥💥💥 STOPPING EXECUTION IMMEDIATELY 💥💥💥\n")
         # HARD STOP - crash the program immediately
         raise e
 
@@ -4181,7 +4191,7 @@ def main():
 
 def handle_generate_pairs_command(args):
     """Handle the generate-pairs command."""
-    print(f"🎯 Generating synthetic contrastive pairs...")
+    print("🎯 Generating synthetic contrastive pairs...")
     print(f"   • Trait: {args.trait}")
     print(f"   • Number of pairs: {args.num_pairs}")
     print(f"   • Output file: {args.output}")
@@ -4211,7 +4221,7 @@ def handle_generate_pairs_command(args):
 
 def handle_synthetic_command(args):
     """Handle the synthetic command (generate + train + test)."""
-    print(f"🚀 Running synthetic contrastive pair pipeline...")
+    print("🚀 Running synthetic contrastive pair pipeline...")
 
     try:
         # Load model
@@ -4222,7 +4232,7 @@ def handle_synthetic_command(args):
         # Get or generate contrastive pairs
         if args.trait:
             print(f"   • Generating pairs for trait: {args.trait}")
-            pair_set = generate_synthetic_pairs_cli(
+            generate_synthetic_pairs_cli(
                 trait_description=args.trait,
                 num_pairs=args.num_pairs,
                 output_file=args.save_pairs,
@@ -4230,9 +4240,9 @@ def handle_synthetic_command(args):
             )
         else:
             print(f"   • Loading pairs from: {args.pairs_file}")
-            pair_set = load_synthetic_pairs_cli(args.pairs_file, model)
+            load_synthetic_pairs_cli(args.pairs_file, model)
 
-        print(f"✅ Synthetic pipeline completed!")
+        print("✅ Synthetic pipeline completed!")
 
     except Exception as e:
         print(f"❌ Error in synthetic pipeline: {e}")
@@ -4257,7 +4267,6 @@ def handle_tasks_command(args):
 
     # Handle cache management commands first
     if hasattr(args, "cache_status") and args.cache_status:
-        import os
         import json
         from pathlib import Path
 
@@ -4265,17 +4274,17 @@ def handle_tasks_command(args):
         data_dir = cache_dir / "data"
         metadata_dir = cache_dir / "metadata"
 
-        print(f"📊 CACHE STATUS")
+        print("📊 CACHE STATUS")
         print(f"{'='*50}")
         print(f"Cache directory: {args.cache_dir}")
 
         if not cache_dir.exists():
-            print(f"❌ Cache directory does not exist")
+            print("❌ Cache directory does not exist")
             return
 
         if not data_dir.exists() or not metadata_dir.exists():
             print(
-                f"❌ Cache structure incomplete (missing data or metadata directories)"
+                "❌ Cache structure incomplete (missing data or metadata directories)"
             )
             return
 
@@ -4315,7 +4324,7 @@ def handle_tasks_command(args):
         print()
 
         if cached_tasks:
-            print(f"📋 CACHED TASKS:")
+            print("📋 CACHED TASKS:")
             # Sort by size for better display
             sorted_tasks = sorted(
                 cached_tasks.items(), key=lambda x: x[1]["size_mb"], reverse=True
@@ -4331,7 +4340,7 @@ def handle_tasks_command(args):
                     f"   📁 {task_name}: {samples} samples, {size_mb:.1f} MB (downloaded {download_time})"
                 )
         else:
-            print(f"📋 No cached tasks found")
+            print("📋 No cached tasks found")
         return
 
     if hasattr(args, "cleanup_cache") and args.cleanup_cache is not None:
@@ -4400,7 +4409,7 @@ def handle_tasks_command(args):
                         tags = ", ".join(config.get("tags", []))
                         print(f"   • {suggestion} ({priority} priority) - {tags}")
 
-            print(f"\n📖 To see all valid tasks: wisent-guard tasks --list-tasks")
+            print("\n📖 To see all valid tasks: wisent-guard tasks --list-tasks")
             sys.exit(1)
 
         task_sources.extend(task_names)
@@ -4430,10 +4439,10 @@ def handle_tasks_command(args):
         )
         try:
             shared_model = Model(name=args.model, device=args.device)
-            print(f"✅ Model loaded successfully! Will reuse across all tasks.")
+            print("✅ Model loaded successfully! Will reuse across all tasks.")
         except Exception as e:
             print(f"⚠️  Failed to pre-load model: {e}")
-            print(f"   Will load model individually for each task.")
+            print("   Will load model individually for each task.")
             shared_model = None
 
     all_results = {}
@@ -4669,8 +4678,8 @@ def handle_tasks_command(args):
 
 def handle_test_nonsense_command(args):
     """Handle the test-nonsense command."""
-    print(f"🧪 Testing nonsense detection...")
-    print(f"✅ Nonsense detection test completed!")
+    print("🧪 Testing nonsense detection...")
+    print("✅ Nonsense detection test completed!")
 
 
 def handle_monitor_command(args):
@@ -4697,7 +4706,7 @@ def handle_monitor_command(args):
             gpu_name = torch.cuda.get_device_name(i)
             print(f"   GPU {i}: {gpu_name}")
 
-    print(f"\n💡 Use --help to see more monitoring options")
+    print("\n💡 Use --help to see more monitoring options")
 
 
 def handle_agent_command(args):
@@ -4706,7 +4715,7 @@ def handle_agent_command(args):
     from .core.autonomous_agent import AutonomousAgent
 
     async def run_agent():
-        print(f"🤖 Starting autonomous agent...")
+        print("🤖 Starting autonomous agent...")
         print(f"   Prompt: {args.prompt}")
         print(f"   Model: {args.model}")
         if args.layer:
@@ -4756,7 +4765,7 @@ def handle_agent_command(args):
 
             # Choose which method to use based on enable_quality_control parameter
             if getattr(args, "enable_quality_control", True):
-                print(f"🎯 Using NEW Quality Control System...")
+                print("🎯 Using NEW Quality Control System...")
 
                 # Process the prompt using new quality control system
                 result = await agent.respond_with_quality_control(
@@ -4768,18 +4777,18 @@ def handle_agent_command(args):
                 )
 
                 # Show results from quality control system
-                print(f"\n🎯 FINAL RESPONSE:")
+                print("\n🎯 FINAL RESPONSE:")
                 print(f"{result.response_text}")
 
                 if args.verbose:
-                    print(f"\n📊 QUALITY CONTROL DETAILS:")
+                    print("\n📊 QUALITY CONTROL DETAILS:")
                     print(f"   Final quality score: {result.final_quality_score:.3f}")
                     print(f"   Attempts needed: {result.attempts_needed}")
                     print(f"   Total time: {result.total_time_seconds:.1f}s")
 
                     # Show classifier parameters used
                     classifier_params = result.classifier_params_used
-                    print(f"\n🧠 CLASSIFIER PARAMETERS:")
+                    print("\n🧠 CLASSIFIER PARAMETERS:")
                     if classifier_params is not None:
                         print(f"   Layer: {classifier_params.optimal_layer}")
                         print(
@@ -4794,13 +4803,13 @@ def handle_agent_command(args):
                         print(f"   Reasoning: {classifier_params.reasoning}")
                     else:
                         print(
-                            f"   ❌ No classifier parameters available (operation timed out)"
+                            "   ❌ No classifier parameters available (operation timed out)"
                         )
 
                     # Show steering parameters if used
                     if result.steering_params_used:
                         steering_params = result.steering_params_used
-                        print(f"\n🎛️ STEERING PARAMETERS:")
+                        print("\n🎛️ STEERING PARAMETERS:")
                         print(f"   Method: {steering_params.steering_method}")
                         print(
                             f"   Initial strength: {steering_params.initial_strength}"
@@ -4814,18 +4823,18 @@ def handle_agent_command(args):
                         result.quality_progression
                         and len(result.quality_progression) > 1
                     ):
-                        print(f"\n📈 QUALITY PROGRESSION:")
+                        print("\n📈 QUALITY PROGRESSION:")
                         for i, score in enumerate(result.quality_progression, 1):
                             print(f"   Attempt {i}: {score:.3f}")
 
                     if getattr(args, "show_parameter_reasoning", False):
-                        print(f"\n💭 PARAMETER REASONING:")
-                        print(f"   All parameters were self-determined by the model")
+                        print("\n💭 PARAMETER REASONING:")
+                        print("   All parameters were self-determined by the model")
                         if classifier_params is not None:
                             print(f"   Classifier: {classifier_params.reasoning}")
                         else:
                             print(
-                                f"   Classifier: ❌ No parameters available (operation timed out)"
+                                "   Classifier: ❌ No parameters available (operation timed out)"
                             )
                         if result.steering_params_used:
                             print(
@@ -4833,7 +4842,7 @@ def handle_agent_command(args):
                             )
 
             else:
-                print(f"🔄 Using Legacy Autonomous Response System...")
+                print("🔄 Using Legacy Autonomous Response System...")
 
                 # Process the prompt using legacy system
                 result = await agent.respond_autonomously(
@@ -4845,11 +4854,11 @@ def handle_agent_command(args):
                 )
 
                 # Show results from legacy system
-                print(f"\n🎯 FINAL RESPONSE:")
+                print("\n🎯 FINAL RESPONSE:")
                 print(f"{result['final_response']}")
 
                 if args.verbose:
-                    print(f"\n📊 DETAILS:")
+                    print("\n📊 DETAILS:")
                     print(f"   Attempts: {result['attempts']}")
                     print(f"   Improvements: {len(result['improvement_chain'])}")
 
@@ -4864,7 +4873,7 @@ def handle_agent_command(args):
                     # Show performance summary
                     summary = agent.get_performance_summary()
                     if not summary.get("tracking_disabled"):
-                        print(f"\n📈 PERFORMANCE SUMMARY:")
+                        print("\n📈 PERFORMANCE SUMMARY:")
                         print(
                             f"   Total improvements: {summary.get('total_improvements_attempted', 0)}"
                         )
@@ -4938,7 +4947,7 @@ def handle_model_config_save(args, config_manager):
         optimization_metrics=optimization_metrics,
     )
 
-    print(f"\n🎯 Configuration saved successfully!")
+    print("\n🎯 Configuration saved successfully!")
     print(f"   📁 Config file: {config_path}")
     print(f"   🔧 Use 'wisent-guard model-config show {args.model}' to view")
 
@@ -4949,7 +4958,7 @@ def handle_model_config_list(args, config_manager):
 
     if not configs:
         print("📝 No model configurations found.")
-        print(f"   💡 Use 'wisent-guard model-config save <model>' to create one")
+        print("   💡 Use 'wisent-guard model-config save <model>' to create one")
         return
 
     print(f"\n📋 MODEL CONFIGURATIONS ({len(configs)} total)")
@@ -4995,7 +5004,7 @@ def handle_model_config_show(args, config_manager):
     print(f"🔧 Optimization Method: {config.get('optimization_method', 'unknown')}")
     print(f"📝 Config Version: {config.get('config_version', 'unknown')}")
 
-    print(f"\n🎯 OPTIMAL PARAMETERS:")
+    print("\n🎯 OPTIMAL PARAMETERS:")
     if optimal_params:
         for key, value in optimal_params.items():
             print(f"   • {key}: {value}")
@@ -5013,7 +5022,7 @@ def handle_model_config_show(args, config_manager):
 
     optimization_metrics = config.get("optimization_metrics", {})
     if optimization_metrics:
-        print(f"\n📈 OPTIMIZATION METRICS:")
+        print("\n📈 OPTIMIZATION METRICS:")
         for key, value in optimization_metrics.items():
             print(f"   • {key}: {value}")
 
@@ -5074,7 +5083,7 @@ def handle_model_config_test(args, config_manager):
             train_only=True,  # Just test training, don't run full evaluation
         )
 
-        print(f"\n✅ Configuration test completed successfully!")
+        print("\n✅ Configuration test completed successfully!")
         print(f"   📊 Results: {results}")
 
     except Exception as e:
@@ -5088,7 +5097,7 @@ def handle_model_config_test(args, config_manager):
 def handle_classification_optimization_command(args):
     """Handle the optimize-classification command."""
     try:
-        print(f"🚀 Starting comprehensive classification optimization...")
+        print("🚀 Starting comprehensive classification optimization...")
         print(f"   📊 Model: {args.model}")
         print(f"   🔢 Limit per task: {args.limit}")
         print(f"   📈 Optimization metric: {args.optimization_metric}")
@@ -5102,7 +5111,7 @@ def handle_classification_optimization_command(args):
             )
             print(f"   💾 Classifiers will be saved to: {classifiers_dir}")
         else:
-            print(f"   🚫 Classifier saving disabled")
+            print("   🚫 Classifier saving disabled")
 
         # Get tasks list
         tasks = args.tasks or get_valid_task_names()
@@ -5141,7 +5150,7 @@ def handle_classification_optimization_command(args):
 
             # Check if estimated time is over 1 hour and prompt for confirmation
             if total_time > 3600:  # More than 1 hour
-                print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
+                print("\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
                 response = input("   Do you want to continue? (y/n): ").strip().lower()
                 while response not in ["y", "yes", "n", "no"]:
                     response = input("   Please enter 'y' or 'n': ").strip().lower()
@@ -5172,7 +5181,7 @@ def handle_classification_optimization_command(args):
             classifiers_dir=args.classifiers_dir,
         )
 
-        print(f"\n✅ Classification optimization completed successfully!")
+        print("\n✅ Classification optimization completed successfully!")
         print(
             f"   📊 Optimized {summary.successful_optimizations}/{summary.total_tasks_tested} tasks"
         )
@@ -5193,7 +5202,7 @@ def handle_classification_optimization_command(args):
 def handle_steering_optimization_command(args):
     """Handle the optimize-steering command."""
     try:
-        print(f"🎯 Starting steering optimization...")
+        print("🎯 Starting steering optimization...")
         print(f"   📊 Model: {args.model}")
         print(f"   🔧 Optimization type: {args.steering_action}")
 
@@ -5204,11 +5213,11 @@ def handle_steering_optimization_command(args):
         kwargs = {"device": args.device, "verbose": args.verbose}
 
         if args.steering_action == "auto":
-            print(f"   🚀 Auto mode: Optimizing based on classification config")
+            print("   🚀 Auto mode: Optimizing based on classification config")
             if args.task:
                 print(f"   📋 Task: {args.task}")
             else:
-                print(f"   📋 Tasks: All classification-optimized tasks")
+                print("   📋 Tasks: All classification-optimized tasks")
             print(f"   🔧 Methods: {args.methods}")
             print(f"   🔢 Limit: {args.limit}")
             print(f"   ⏱️  Max time: {args.max_time} minutes")
@@ -5234,10 +5243,10 @@ def handle_steering_optimization_command(args):
                 print(f"\n❌ Error: {result['error']}")
                 sys.exit(1)
 
-            print(f"\n✅ Steering optimization complete!")
+            print("\n✅ Steering optimization complete!")
             if result.get("overall_best"):
                 best = result["overall_best"]
-                print(f"\n🏆 Overall best configuration:")
+                print("\n🏆 Overall best configuration:")
                 print(f"   Task: {best['task']}")
                 print(f"   Method: {best['best_method']}")
                 print(f"   Layer: {best['best_layer']}")
@@ -5334,16 +5343,16 @@ def handle_steering_optimization_command(args):
             print(f"❌ Unknown steering action: {args.steering_action}")
             sys.exit(1)
 
-        print(f"\n✅ Steering optimization completed successfully!")
+        print("\n✅ Steering optimization completed successfully!")
         # Add more specific success information based on result type
 
     except NotImplementedError as e:
         print(f"⚠️  Steering optimization not yet implemented: {e}")
         print(
-            f"   📝 This is expected - steering optimization framework has been created"
+            "   📝 This is expected - steering optimization framework has been created"
         )
-        print(f"   🔧 Implementation of actual optimization logic is needed")
-        print(f"   📋 See wisent_guard/core/steering_optimizer.py for TODOs")
+        print("   🔧 Implementation of actual optimization logic is needed")
+        print("   📋 See wisent_guard/core/steering_optimizer.py for TODOs")
 
     except Exception as e:
         print(f"❌ Steering optimization failed: {e}")
@@ -5399,27 +5408,25 @@ def handle_sample_size_optimization_command(args):
 
                 if mismatches:
                     print(
-                        f"⚠️  Parameter mismatch with existing classifier configuration!"
+                        "⚠️  Parameter mismatch with existing classifier configuration!"
                     )
                     print(f"   Model config for {args.model} has different parameters:")
                     for mismatch in mismatches:
                         print(f"   • {mismatch}")
-                    print(f"\n   Options:")
+                    print("\n   Options:")
                     print(
                         f"   1. Run 'wisent-guard optimize-classification {args.model} --task {args.task}' first"
                     )
                     print(
                         f"   2. Use parameters from config: --layer {config_layer} --token-aggregation {config_aggregation} --threshold {config_threshold}"
                     )
+                    print("   3. Force optimization with your parameters using --force")
                     print(
-                        f"   3. Force optimization with your parameters using --force"
-                    )
-                    print(
-                        f"\n   Sample size optimization should use the same parameters as your actual classifier!"
+                        "\n   Sample size optimization should use the same parameters as your actual classifier!"
                     )
                     sys.exit(1)
 
-        print(f"📏 Starting sample size optimization...")
+        print("📏 Starting sample size optimization...")
         print(f"   📊 Model: {args.model}")
         print(f"   📋 Task: {args.task}")
         print(f"   📊 Layer: {args.layer}")
@@ -5450,11 +5457,11 @@ def handle_sample_size_optimization_command(args):
         )
 
         # Display results
-        print(f"\n✅ Sample size optimization completed!")
+        print("\n✅ Sample size optimization completed!")
         print(f"   🎯 Optimal sample size: {results['optimal_sample_size']}")
 
         # Show performance summary
-        print(f"\n📊 Performance Summary:")
+        print("\n📊 Performance Summary:")
         print(f"{'Sample Size':>12} {'Accuracy':>10} {'F1 Score':>10} {'Time (s)':>10}")
         print(f"{'-'*12} {'-'*10} {'-'*10} {'-'*10}")
 
@@ -5466,7 +5473,7 @@ def handle_sample_size_optimization_command(args):
             print(f"{size:>12} {acc:>10.3f} {f1:>10.3f} {time:>10.2f}")
 
         if not args.no_save_config:
-            print(f"\n💾 Optimal sample size saved to model config")
+            print("\n💾 Optimal sample size saved to model config")
             print(
                 f"   • This will be used as default --limit for {args.task} on layer {args.layer}"
             )
@@ -5483,7 +5490,7 @@ def handle_sample_size_optimization_command(args):
 def handle_full_optimization_command(args):
     """Handle the full-optimize command."""
     try:
-        print(f"🚀 Starting full optimization pipeline...")
+        print("🚀 Starting full optimization pipeline...")
         print(f"   📊 Model: {args.model}")
 
         # Get list of tasks to optimize
@@ -5533,11 +5540,11 @@ def handle_full_optimization_command(args):
             # Display time estimate
             estimator.print_time_breakdown(total_time, phase_times)
 
-            print(f"\n   💡 Note: Estimates based on calibration measurements")
+            print("\n   💡 Note: Estimates based on calibration measurements")
 
             # Check if estimated time is over 1 hour and prompt for confirmation
             if total_time > 3600:  # More than 1 hour
-                print(f"\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
+                print("\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
                 print(
                     f"   This optimization will take approximately {estimator.format_time(total_time)}."
                 )
@@ -5548,17 +5555,17 @@ def handle_full_optimization_command(args):
                         input("\n   Do you want to continue? (y/n): ").strip().lower()
                     )
                     if response == "y" or response == "yes":
-                        print(f"\n✅ Continuing with optimization...")
+                        print("\n✅ Continuing with optimization...")
                         break
                     elif response == "n" or response == "no":
-                        print(f"\n❌ Optimization cancelled by user.")
+                        print("\n❌ Optimization cancelled by user.")
                         sys.exit(0)
                     else:
-                        print(f"   Please enter 'y' for yes or 'n' for no.")
+                        print("   Please enter 'y' for yes or 'n' for no.")
 
         # Step 1: Classification optimization (unless skipped)
         if not args.skip_classification:
-            print(f"\n📈 Step 1: Classification Parameter Optimization")
+            print("\n📈 Step 1: Classification Parameter Optimization")
             print(f"   🔢 Sample limit: {args.classification_limit}")
 
             # Create a simple progress callback
@@ -5585,18 +5592,18 @@ def handle_full_optimization_command(args):
                 skip_confirmation=True,  # Already asked for confirmation above
             )
 
-            print(f"\n✅ Classification optimization completed!")
+            print("\n✅ Classification optimization completed!")
             print(
                 f"   📊 Optimized {classification_results.successful_optimizations}/{classification_results.total_tasks_tested} tasks"
             )
 
             # Update overall progress would go here if we had a progress tracker
         else:
-            print(f"\n⏭️  Skipping classification optimization (using existing config)")
+            print("\n⏭️  Skipping classification optimization (using existing config)")
 
         # Step 2: Sample size optimization (unless skipped)
         if not args.skip_sample_size:
-            print(f"\n📏 Step 2: Sample Size Optimization")
+            print("\n📏 Step 2: Sample Size Optimization")
             print(f"   🔢 Testing sample sizes: {args.sample_sizes}")
             print(f"   📊 Dataset limit: {args.sample_size_limit}")
 
@@ -5607,9 +5614,9 @@ def handle_full_optimization_command(args):
             model_config = config_manager.load_model_config(args.model)
 
             if not model_config:
-                print(f"\n❌ Error: No model configuration found!")
+                print("\n❌ Error: No model configuration found!")
                 print(
-                    f"   • Run classification optimization first or use --skip-sample-size"
+                    "   • Run classification optimization first or use --skip-sample-size"
                 )
                 sys.exit(1)
 
@@ -5673,16 +5680,16 @@ def handle_full_optimization_command(args):
             successful = sum(
                 1 for r in sample_size_results.values() if "error" not in r
             )
-            print(f"\n✅ Sample size optimization completed!")
+            print("\n✅ Sample size optimization completed!")
             print(f"   📊 Successfully optimized {successful}/{len(tasks)} tasks")
 
         else:
-            print(f"\n⏭️  Skipping sample size optimization")
+            print("\n⏭️  Skipping sample size optimization")
 
         # Step 3: Train final classifiers with optimal sample sizes
         if not args.skip_classifier_training:
-            print(f"\n🎨 Step 3: Training Final Classifiers with Optimal Sample Sizes")
-            print(f"   💾 This ensures classifiers are cached for instant use")
+            print("\n🎨 Step 3: Training Final Classifiers with Optimal Sample Sizes")
+            print("   💾 This ensures classifiers are cached for instant use")
 
             # Reload model config to get all optimal parameters
             model_config = config_manager.load_model_config(args.model)
@@ -5752,7 +5759,7 @@ def handle_full_optimization_command(args):
                         )
 
                         if result and not result.get("error"):
-                            print(f"      ✅ Classifier saved successfully")
+                            print("      ✅ Classifier saved successfully")
                             classifiers_trained += 1
                         else:
                             print(
@@ -5764,7 +5771,7 @@ def handle_full_optimization_command(args):
                     except Exception as e:
                         print(f"      ❌ Error training classifier: {e}")
 
-                print(f"\n✅ Classifier training completed!")
+                print("\n✅ Classifier training completed!")
                 print(
                     f"   📊 Trained and cached {classifiers_trained}/{len(tasks)} classifiers"
                 )
@@ -5772,12 +5779,12 @@ def handle_full_optimization_command(args):
 
                 # Update overall progress
         else:
-            print(f"\n⏭️  Skipping classifier training")
+            print("\n⏭️  Skipping classifier training")
 
         # Step 4: Train control vectors with optimal parameters
         if not args.skip_control_vectors:
-            print(f"\n🎮 Step 4: Training Control Vectors for Steering")
-            print(f"   🧲 This enables model steering for improved truthfulness")
+            print("\n🎮 Step 4: Training Control Vectors for Steering")
+            print("   🧲 This enables model steering for improved truthfulness")
 
             # Reload model config to get all optimal parameters
             model_config = config_manager.load_model_config(args.model)
@@ -5853,7 +5860,7 @@ def handle_full_optimization_command(args):
                         )
 
                         if not qa_pairs:
-                            print(f"      ❌ No QA pairs extracted")
+                            print("      ❌ No QA pairs extracted")
                             continue
 
                         # Create contrastive pairs
@@ -5919,7 +5926,7 @@ def handle_full_optimization_command(args):
                                 vector_path,
                             )
 
-                            print(f"      ✅ Control vector saved successfully")
+                            print("      ✅ Control vector saved successfully")
                             vectors_trained += 1
 
                             # Update model config with control vector info
@@ -5933,7 +5940,7 @@ def handle_full_optimization_command(args):
                                 "trained_date": datetime.now().isoformat(),
                             }
                         else:
-                            print(f"      ❌ Failed to compute control vector")
+                            print("      ❌ Failed to compute control vector")
 
                         # Update progress
 
@@ -5947,28 +5954,28 @@ def handle_full_optimization_command(args):
                 # Save updated model config
                 config_manager.save_model_config(args.model, model_config)
 
-                print(f"\n✅ Control vector training completed!")
+                print("\n✅ Control vector training completed!")
                 print(
                     f"   📊 Trained and cached {vectors_trained}/{len(tasks)} control vectors"
                 )
                 print(f"   📁 Saved to: {vector_dir}")
 
                 # Final overall progress
-                print(f"\n   📊 All phases completed!")
+                print("\n   📊 All phases completed!")
         else:
-            print(f"\n⏭️  Skipping control vector training")
+            print("\n⏭️  Skipping control vector training")
 
-        print(f"\n🎉 Full optimization pipeline completed!")
-        print(f"   💾 All configurations saved to model config")
-        print(f"   🎨 Classifiers pre-trained and cached")
-        print(f"   🎮 Control vectors trained and cached")
-        print(f"   🚀 Ready to use optimized parameters with 'wisent-guard tasks'")
-        print(f"\n   Example usage:")
+        print("\n🎉 Full optimization pipeline completed!")
+        print("   💾 All configurations saved to model config")
+        print("   🎨 Classifiers pre-trained and cached")
+        print("   🎮 Control vectors trained and cached")
+        print("   🚀 Ready to use optimized parameters with 'wisent-guard tasks'")
+        print("\n   Example usage:")
         print(
             f"   $ wisent-guard tasks {tasks[0] if tasks else 'truthfulqa_mc1'} --model {args.model}"
         )
         print(
-            f"   (Will automatically use optimal parameters, cached classifier, and control vector)"
+            "   (Will automatically use optimal parameters, cached classifier, and control vector)"
         )
 
     except Exception as e:
