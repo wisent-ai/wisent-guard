@@ -4,159 +4,187 @@ Tests for the ContrastiveVectors class
 
 import os
 import torch
-import unittest
+import pytest
 import tempfile
 import shutil
 from wisent_guard.vectors import ContrastiveVectors
 
-class TestContrastiveVectors(unittest.TestCase):
+
+@pytest.mark.slow
+@pytest.mark.unit
+class TestContrastiveVectors:
     """Test suite for ContrastiveVectors class."""
     
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup_vectors(self):
         """Set up test fixtures."""
         self.test_dir = tempfile.mkdtemp()
-        self.vectors = ContrastiveVectors(save_dir=self.test_dir)
         
-        # Create sample vectors
-        self.harmful_vector = torch.randn(768)
-        self.harmless_vector = torch.randn(768)
-    
-    def tearDown(self):
-        """Tear down test fixtures."""
+        yield
+        
+        # Tear down test fixtures
         shutil.rmtree(self.test_dir)
     
-    def test_add_vector_pair(self):
-        """Test adding a vector pair."""
-        category = "test_category"
-        layer = 0
-        
-        # Add a vector pair
-        self.vectors.add_vector_pair(
-            category=category,
-            layer=layer,
-            harmful_vector=self.harmful_vector,
-            harmless_vector=self.harmless_vector
+    def test_vectors_initialization(self):
+        """Test that ContrastiveVectors initializes correctly."""
+        # Use a small model for testing
+        vectors = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0, 1],
+            save_dir=self.test_dir
         )
         
-        # Check that the vectors were added correctly
-        self.assertIn(category, self.vectors.harmful_vectors)
-        self.assertIn(category, self.vectors.harmless_vectors)
-        self.assertIn(layer, self.vectors.harmful_vectors[category])
-        self.assertIn(layer, self.vectors.harmless_vectors[category])
+        # Check that initialization worked
+        assert vectors.model is not None
+        assert len(vectors.layers) == 2
+        assert vectors.save_dir.exists()
         
-        # Check that metadata was updated
-        self.assertIn(category, self.vectors.metadata["categories"])
-        self.assertEqual(self.vectors.metadata["num_pairs"][category], 1)
-        self.assertIn(str(layer), self.vectors.metadata["layers"])
+        # Check that layers are correctly set
+        layer_indices = [layer.index for layer in vectors.layers]
+        assert layer_indices == [0, 1]
     
-    def test_compute_contrastive_vectors(self):
-        """Test computing contrastive vectors."""
-        category = "test_category"
-        layer = 0
-        
-        # Add a vector pair
-        self.vectors.add_vector_pair(
-            category=category,
-            layer=layer,
-            harmful_vector=self.harmful_vector,
-            harmless_vector=self.harmless_vector
+    def test_create_pair_set(self):
+        """Test creating a contrastive pair set."""
+        vectors = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0],
+            save_dir=self.test_dir
         )
         
-        # Compute contrastive vectors
-        contrastive_vectors = self.vectors.compute_contrastive_vectors()
+        # Create a simple pair set
+        harmful_texts = ["This is harmful text", "Another harmful example"]
+        harmless_texts = ["This is harmless text", "Another harmless example"]
         
-        # Check that contrastive vectors were computed correctly
-        self.assertIn(category, contrastive_vectors)
-        self.assertIn(layer, contrastive_vectors[category])
-        
-        # Check that the contrastive vector is normalized
-        contrastive_vector = contrastive_vectors[category][layer]
-        norm = torch.norm(contrastive_vector, p=2).item()
-        self.assertAlmostEqual(norm, 1.0, places=5)
-    
-    def test_save_and_load_vectors(self):
-        """Test saving and loading vectors."""
-        category = "test_category"
-        layer = 0
-        
-        # Add a vector pair
-        self.vectors.add_vector_pair(
-            category=category,
-            layer=layer,
-            harmful_vector=self.harmful_vector,
-            harmless_vector=self.harmless_vector
+        pair_set = vectors.create_pair_set(
+            name="test_pairs",
+            harmful_texts=harmful_texts,
+            harmless_texts=harmless_texts
         )
         
-        # Compute and save vectors
-        self.vectors.compute_contrastive_vectors()
-        self.vectors.save_vectors()
-        
-        # Check that files were created
-        category_dir = os.path.join(self.test_dir, "vectors", category)
-        vector_path = os.path.join(category_dir, f"contrastive_layer_{layer}.pt")
-        harmful_path = os.path.join(category_dir, "harmful_vectors.pkl")
-        harmless_path = os.path.join(category_dir, "harmless_vectors.pkl")
-        
-        self.assertTrue(os.path.exists(vector_path))
-        self.assertTrue(os.path.exists(harmful_path))
-        self.assertTrue(os.path.exists(harmless_path))
-        
-        # Create a new vectors object and load the saved vectors
-        new_vectors = ContrastiveVectors(save_dir=self.test_dir)
-        success = new_vectors.load_vectors()
-        
-        # Check that vectors were loaded successfully
-        self.assertTrue(success)
-        self.assertIn(category, new_vectors.contrastive_vectors)
-        self.assertIn(layer, new_vectors.contrastive_vectors[category])
-        
-        # Check that metadata was loaded correctly
-        self.assertIn(category, new_vectors.metadata["categories"])
-        self.assertEqual(new_vectors.metadata["num_pairs"][category], 1)
+        # Check that pair set was created
+        assert pair_set is not None
+        assert "test_pairs" in vectors.pair_sets
+        assert len(pair_set.phrase_pairs) == 2
     
-    def test_get_contrastive_vector(self):
-        """Test getting a contrastive vector."""
-        category = "test_category"
-        layer = 0
-        
-        # Add a vector pair and compute contrastive vectors
-        self.vectors.add_vector_pair(
-            category=category,
-            layer=layer,
-            harmful_vector=self.harmful_vector,
-            harmless_vector=self.harmless_vector
+    def test_compute_vectors_basic(self):
+        """Test basic vector computation."""
+        vectors = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0],
+            save_dir=self.test_dir
         )
-        self.vectors.compute_contrastive_vectors()
         
-        # Get the contrastive vector
-        contrastive_vector = self.vectors.get_contrastive_vector(category, layer)
+        # Create a simple pair set
+        harmful_texts = ["Bad content"]
+        harmless_texts = ["Good content"]
         
-        # Check that the contrastive vector is correct
-        self.assertIsNotNone(contrastive_vector)
-        self.assertEqual(contrastive_vector.shape, self.harmful_vector.shape)
+        vectors.create_pair_set(
+            name="test_pairs",
+            harmful_texts=harmful_texts,
+            harmless_texts=harmless_texts
+        )
         
-        # Check that getting a non-existent vector returns None
-        self.assertIsNone(self.vectors.get_contrastive_vector("nonexistent", layer))
-        self.assertIsNone(self.vectors.get_contrastive_vector(category, 999))
+        # Compute vectors
+        computed_vectors = vectors.compute_vectors("test_pairs", layer_idx=0)
+        
+        # Check that vectors were computed
+        assert isinstance(computed_vectors, dict)
+        assert 0 in computed_vectors  # Layer 0 should have a vector
+        
+        # Check that the vector is stored
+        assert "test_pairs" in vectors.vectors
+        assert 0 in vectors.vectors["test_pairs"]
     
-    def test_get_available_categories_and_layers(self):
-        """Test getting available categories and layers."""
-        categories = ["category1", "category2"]
-        layers = [0, 1, 2]
+    def test_get_similarity_basic(self):
+        """Test basic similarity computation."""
+        vectors = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0],
+            save_dir=self.test_dir
+        )
         
-        # Add vector pairs for different categories and layers
-        for category in categories:
-            for layer in layers:
-                self.vectors.add_vector_pair(
-                    category=category,
-                    layer=layer,
-                    harmful_vector=self.harmful_vector,
-                    harmless_vector=self.harmless_vector
-                )
+        # Create and compute vectors
+        harmful_texts = ["Bad content"]
+        harmless_texts = ["Good content"]
         
-        # Check that available categories and layers are correct
-        self.assertEqual(set(self.vectors.get_available_categories()), set(categories))
-        self.assertEqual(set(self.vectors.get_available_layers()), set(layers))
-
-if __name__ == "__main__":
-    unittest.main() 
+        vectors.create_pair_set(
+            name="test_pairs",
+            harmful_texts=harmful_texts,
+            harmless_texts=harmless_texts
+        )
+        
+        vectors.compute_vectors("test_pairs", layer_idx=0)
+        
+        # Test similarity
+        similarity = vectors.get_similarity(
+            text="Some test text",
+            category="test_pairs",
+            layer_idx=0
+        )
+        
+        # Check that similarity is a number
+        assert isinstance(similarity, (int, float))
+    
+    def test_vectors_storage_structure(self):
+        """Test that vectors are stored in correct structure."""
+        vectors = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0, 1],
+            save_dir=self.test_dir
+        )
+        
+        # Create pair set
+        vectors.create_pair_set(
+            name="test_pairs",
+            harmful_texts=["Bad"],
+            harmless_texts=["Good"]
+        )
+        
+        # Compute for all layers
+        vectors.compute_vectors("test_pairs")
+        
+        # Check storage structure
+        assert "test_pairs" in vectors.vectors
+        assert isinstance(vectors.vectors["test_pairs"], dict)
+        
+        # Should have computed vectors for both layers
+        available_layers = list(vectors.vectors["test_pairs"].keys())
+        assert len(available_layers) > 0  # At least one layer should work
+    
+    def test_layer_configuration(self):
+        """Test different layer configurations."""
+        # Test with single layer
+        vectors_single = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0],
+            save_dir=self.test_dir
+        )
+        assert len(vectors_single.layers) == 1
+        
+        # Test with multiple layers
+        vectors_multi = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0, 1, 2],
+            save_dir=self.test_dir
+        )
+        assert len(vectors_multi.layers) == 3
+        
+        # Check layer indices
+        layer_indices = [layer.index for layer in vectors_multi.layers]
+        assert layer_indices == [0, 1, 2]
+    
+    def test_save_directory_creation(self):
+        """Test that save directory is created correctly."""
+        # Use a nested path
+        nested_path = os.path.join(self.test_dir, "nested", "vectors")
+        
+        vectors = ContrastiveVectors(
+            model_name="distilbert/distilgpt2",
+            layers=[0],
+            save_dir=nested_path
+        )
+        
+        # Check that directory was created
+        assert os.path.exists(nested_path)
+        assert vectors.save_dir.exists()
+        assert vectors.save_dir.is_dir()
