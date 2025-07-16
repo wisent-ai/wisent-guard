@@ -2205,11 +2205,17 @@ class MBPPExtractor(BenchmarkExtractor):
         try:
             qa_pair = self.extract_qa_pair(doc, task_data)
             if not qa_pair:
+                print(f"DEBUG MBPP: qa_pair is None for doc keys: {list(doc.keys())}")
                 return None
                 
-            # For code generation, incorrect answer is syntactically valid but wrong code
+            # For code generation, create incorrect answer by removing random words
             correct_answer = qa_pair['correct_answer']
-            incorrect_answer = "def solution(): raise NotImplementedError()"
+            incorrect_answer = self._create_incorrect_code(correct_answer)
+            
+            print(f"DEBUG MBPP: Successfully created contrastive pair")
+            print(f"DEBUG MBPP: Question: {qa_pair['formatted_question'][:50]}...")
+            print(f"DEBUG MBPP: Correct: {correct_answer[:50]}...")
+            print(f"DEBUG MBPP: Incorrect: {incorrect_answer[:50]}...")
             
             return {
                 'question': qa_pair['formatted_question'],
@@ -2218,8 +2224,57 @@ class MBPPExtractor(BenchmarkExtractor):
             }
             
         except Exception as e:
+            print(f"DEBUG MBPP: Error extracting contrastive pair: {e}")
             logger.debug(f"Error extracting MBPP contrastive pair: {e}")
             return None
+
+    def _create_incorrect_code(self, correct_code: str) -> str:
+        """Create incorrect code by removing random words."""
+        import random
+        import re
+        
+        try:
+            # Split code into tokens (words, operators, etc.)
+            tokens = re.findall(r'\b\w+\b|[^\w\s]', correct_code)
+            
+            if len(tokens) < 3:
+                # If too few tokens, return a simple fallback
+                return "def solution(): raise NotImplementedError()"
+            
+            # Find words (not operators or punctuation) that we can remove
+            word_indices = []
+            for i, token in enumerate(tokens):
+                if (token.isalpha() and 
+                    token not in ['def', 'return', 'if', 'else', 'elif', 'for', 'while', 'try', 'except', 'class', 'import', 'from', 'pass', 'break', 'continue'] and
+                    len(token) > 1):
+                    word_indices.append(i)
+            
+            if not word_indices:
+                # No suitable words to remove, return fallback
+                return "def solution(): raise NotImplementedError()"
+            
+            # Remove 1-2 random words
+            num_to_remove = min(2, len(word_indices))
+            indices_to_remove = random.sample(word_indices, num_to_remove)
+            
+            # Create new token list with removed words
+            new_tokens = []
+            for i, token in enumerate(tokens):
+                if i not in indices_to_remove:
+                    new_tokens.append(token)
+            
+            # Reconstruct the code
+            result = ""
+            for i, token in enumerate(new_tokens):
+                if i > 0 and new_tokens[i-1].isalnum() and token.isalnum():
+                    result += " "
+                result += token
+            
+            return result
+            
+        except Exception:
+            # If anything goes wrong, return fallback
+            return "def solution(): raise NotImplementedError()"
 
 
 class ANLIExtractor(BenchmarkExtractor):

@@ -231,9 +231,9 @@ class ManagedCachedBenchmarks:
                     f"but {start_offset + limit} were requested"
                 )
             
-            # Extract QA pair using extractor
+            # Extract contrastive pair using extractor (includes both correct and incorrect answers)
             try:
-                qa_pair = extractor.extract_qa_pair(raw_sample, task)
+                qa_pair = extractor.extract_contrastive_pair(raw_sample, task)
                 if qa_pair is None:
                     raise ValueError("Extractor returned None")
             except Exception as e:
