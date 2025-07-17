@@ -134,6 +134,7 @@ ALLOWED_TASKS = {
     "triviaqa",
     # Coding benchmarks
     "mbpp",
+    "livecodebench",
     # Additional benchmarks
     "cb",
     "logiqa",
@@ -690,14 +691,14 @@ def run_task_pipeline(
                 print(f"   • Docker executor ready: {executor_info['image_name']}")
         except Exception as e:
             # FAIL HARD - No mock execution allowed
-            print(f"\n❌ FATAL ERROR: Docker is required for code execution tasks")
+            print("\n❌ FATAL ERROR: Docker is required for code execution tasks")
             print(f"   • Task '{task_name}' requires secure Docker execution")
             print(f"   • Docker error: {e}")
-            print(f"\n📋 To fix this:")
-            print(f"   1. Install Docker: https://docs.docker.com/get-docker/")
-            print(f"   2. Start Docker daemon")
-            print(f"   3. Ensure your user has Docker permissions")
-            print(f"\n⚠️  Code execution tasks CANNOT run without Docker for security reasons")
+            print("\n📋 To fix this:")
+            print("   1. Install Docker: https://docs.docker.com/get-docker/")
+            print("   2. Start Docker daemon")
+            print("   3. Ensure your user has Docker permissions")
+            print("\n⚠️  Code execution tasks CANNOT run without Docker for security reasons")
             sys.exit(1)
 
     # AUTOMATICALLY SET LM-EVAL-HARNESS AS DEFAULT FOR TESTED TASKS
@@ -1185,11 +1186,11 @@ def run_task_pipeline(
                     print("🔄 Loading fresh data from lm-eval...")
 
                 # FIRST: Check if this is a group task and expand if needed
-                # Skip group task check for MBPP as it's known to be slow
-                if task_name == "mbpp":
+                # Skip group task check for MBPP and LiveCodeBench as they're known to be slow
+                if task_name in ["mbpp", "livecodebench"]:
                     if verbose:
                         print(
-                            "🔍 Skipping group task check for MBPP (known to be slow)"
+                            f"🔍 Skipping group task check for {task_name} (known to be slow)"
                         )
                     group_task_processed = False
                     group_task_qa_format = False
