@@ -6,7 +6,7 @@ This module ensures that NO code execution happens outside of Docker containers.
 import logging
 from typing import Dict, Any, List, Optional
 
-from .docker import DockerExecutor
+from .docker import OptimizedDockerExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,11 @@ class SecureCodeEvaluator:
         Args:
             docker_config: Docker configuration options
         """
-        self.executor = DockerExecutor(**(docker_config or {}))
+        self.executor = OptimizedDockerExecutor(
+            **(docker_config or {}),
+            enable_batching=True,
+            enable_resource_optimization=True
+        )
         self.docker_config = docker_config or {}
 
     @classmethod

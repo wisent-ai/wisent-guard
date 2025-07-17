@@ -1,5 +1,8 @@
 # Dockerfile for secure code execution (MBPP, HumanEval, APPS, etc.)
 # Based on bigcode-evaluation-harness patterns
+#
+# ⚠️ DEPRECATED: Use Dockerfile.optimized instead for smaller, faster images.
+# This file is kept for backward compatibility and will be removed in future versions.
 
 # Use specific digest for reproducible builds and security
 FROM python:3.12-alpine

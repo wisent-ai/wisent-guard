@@ -4,12 +4,14 @@ This directory contains Docker-based code execution optimizations for WisentGuar
 
 ## Files
 
-- **`docker_executor.py`** - Original Docker executor (baseline)
-- **`optimized_docker_executor.py`** - Level 1 optimized executor with 3.1x performance improvement
-- **`Dockerfile`** - Original Docker image definition
-- **`Dockerfile.optimized`** - Multi-stage optimized Docker image
+- **`optimized_docker_executor.py`** - **RECOMMENDED**: Level 1 optimized executor with 3.1x performance improvement
+- **`Dockerfile.optimized`** - **RECOMMENDED**: Multi-stage optimized Docker image
 - **`level1_demo.py`** - Performance demonstration script
 - **`performance_comparison.py`** - Benchmarking and comparison tools
+
+### Deprecated Files (backward compatibility only)
+- **`docker_executor.py`** - ⚠️ DEPRECATED: Use `optimized_docker_executor.py` instead
+- **`Dockerfile`** - ⚠️ DEPRECATED: Use `Dockerfile.optimized` instead
 
 ## Level 1 Optimizations
 

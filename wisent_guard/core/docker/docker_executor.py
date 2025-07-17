@@ -1,6 +1,9 @@
 """
 Docker-based code executor for secure code evaluation.
 Ensures all code execution happens in isolated Docker containers.
+
+⚠️ DEPRECATED: Use OptimizedDockerExecutor instead for 3.1x better performance.
+This module is kept for backward compatibility and will be removed in future versions.
 """
 
 import tempfile
