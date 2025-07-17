@@ -10,14 +10,55 @@ from ..benchmark_extractors import LiveCodeBenchExtractor, BenchmarkExtractor
 class LiveCodeBenchTask(TaskInterface):
     """LiveCodeBench task implementation."""
     
-    def __init__(self):
+    def __init__(self, release_version: str = "release_v1"):
         self._extractor = LiveCodeBenchExtractor()
+        self._release_version = release_version
+        self._validate_release_version(release_version)
+    
+    def _validate_release_version(self, release_version: str) -> None:
+        """Validate release version."""
+        valid_versions = {
+            "release_v1", "release_v2", "release_v3", "release_v4", "release_v5", "release_v6",
+            "release_latest", "v1", "v2", "v1_v3", "v4_v5"
+        }
+        if release_version not in valid_versions:
+            raise ValueError(f"Invalid release version: {release_version}. Valid versions: {valid_versions}")
+    
+    def _get_version_info(self) -> Dict[str, Any]:
+        """Get version-specific information."""
+        version_info = {
+            "release_v1": {"problems": 400, "date_range": "May 2023 - Mar 2024"},
+            "release_v2": {"problems": 511, "date_range": "May 2023 - May 2024"},
+            "release_v3": {"problems": 612, "date_range": "May 2023 - Jul 2024"},
+            "release_v4": {"problems": 713, "date_range": "May 2023 - Sep 2024"},
+            "release_v5": {"problems": 880, "date_range": "May 2023 - Jan 2025"},
+            "release_v6": {"problems": 1055, "date_range": "May 2023 - Apr 2025"},
+            "release_latest": {"problems": 1055, "date_range": "May 2023 - Apr 2025"},
+            "v1": {"problems": 400, "date_range": "May 2023 - Mar 2024"},
+            "v2": {"problems": 511, "date_range": "May 2023 - May 2024"},
+            "v1_v3": {"problems": 612, "date_range": "May 2023 - Jul 2024"},
+            "v4_v5": {"problems": 880, "date_range": "Sep 2024 - Jan 2025"}
+        }
+        return version_info.get(self._release_version, {"problems": 400, "date_range": "May 2023 - Mar 2024"})
     
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Load LiveCodeBench data."""
-        # For now, return sample data. In a real implementation, this would
-        # integrate with the LiveCodeBench library to load actual data.
-        sample_data = [
+        """Load LiveCodeBench data for the specified release version."""
+        # Get version-specific information
+        version_info = self._get_version_info()
+        expected_problems = version_info["problems"]
+        
+        # TODO: Replace with real LiveCodeBench integration
+        # For now, generate sample data based on release version
+        sample_data = self._generate_sample_data(expected_problems)
+        
+        if limit:
+            sample_data = sample_data[:limit]
+        
+        return sample_data
+    
+    def _generate_sample_data(self, expected_problems: int) -> List[Dict[str, Any]]:
+        """Generate sample data for the specified number of problems."""
+        base_problems = [
             {
                 "task_id": "lcb_001",
                 "question_title": "Two Sum",
@@ -120,10 +161,22 @@ class LiveCodeBenchTask(TaskInterface):
             }
         ]
         
-        if limit:
-            sample_data = sample_data[:limit]
+        # Generate additional problems to simulate the expected count
+        # For now, we'll duplicate and modify the base problems
+        result = []
+        for i in range(expected_problems):
+            base_index = i % len(base_problems)
+            problem = base_problems[base_index].copy()
+            
+            # Modify task_id to make it unique
+            problem["task_id"] = f"lcb_{i+1:03d}"
+            
+            # Add version-specific metadata
+            problem["release_version"] = self._release_version
+            
+            result.append(problem)
         
-        return sample_data
+        return result
     
     def get_extractor(self) -> BenchmarkExtractor:
         """Get the LiveCodeBench extractor."""
@@ -135,7 +188,8 @@ class LiveCodeBenchTask(TaskInterface):
     
     def get_description(self) -> str:
         """Get the task description."""
-        return "LiveCodeBench: Contamination-free coding benchmark with problems from LeetCode, AtCoder, and CodeForces"
+        version_info = self._get_version_info()
+        return f"LiveCodeBench {self._release_version}: Contamination-free coding benchmark with {version_info['problems']} problems ({version_info['date_range']}) from LeetCode, AtCoder, and CodeForces"
     
     def get_categories(self) -> List[str]:
         """Get the task categories."""

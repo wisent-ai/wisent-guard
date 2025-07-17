@@ -87,7 +87,7 @@ def demo_task_agnostic_approach():
         print(f"   ❌ Error: {e}")
 
 
-def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limit: Optional[int] = None, device: str = "auto"):
+def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limit: Optional[int] = None, device: str = "auto", release_version: str = "release_v1"):
     """Run the task-agnostic pipeline."""
     print("🚀 Running Task-Agnostic Pipeline")
     print(f"   Task: {task_name}")
@@ -95,6 +95,7 @@ def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limi
     print(f"   Layer: {layer}")
     print(f"   Limit: {limit}")
     print(f"   Device: {device}")
+    print(f"   Release Version: {release_version}")
     
     # Ensure tasks are registered
     try:
@@ -108,9 +109,17 @@ def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limi
         register_task("livecodebench", LiveCodeBenchTask)
     
     try:
-        # Get task
-        task = get_task(task_name)
+        # Get task with release version support
+        if task_name == "livecodebench":
+            # Create LiveCodeBench task with specific release version
+            from .tasks.livecodebench_task import LiveCodeBenchTask
+            task = LiveCodeBenchTask(release_version=release_version)
+        else:
+            # Use regular task loading for other tasks
+            task = get_task(task_name)
+            
         print(f"   ✅ Task loaded: {task.get_name()}")
+        print(f"   📝 Description: {task.get_description()}")
         
         # Load data
         data = task.load_data(limit=limit)
@@ -146,9 +155,9 @@ def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limi
                     response = model.generate(question, layer_index=layer, max_new_tokens=50)
                     print(f"   ✅ Model response sample: {response[:50]}...")
                 else:
-                    print(f"   ⚠️  No QA pair available for model testing")
+                    print("   ⚠️  No QA pair available for model testing")
             
-            print(f"   🧠 Model inference: ✅ REAL MODEL LOADED AND TESTED")
+            print("   🧠 Model inference: ✅ REAL MODEL LOADED AND TESTED")
             
         except Exception as e:
             print(f"   ⚠️  Model loading failed: {e}")
@@ -183,18 +192,19 @@ def main():
     parser.add_argument("--layer", type=int, help="Layer number")
     parser.add_argument("--limit", type=int, help="Limit number of items")
     parser.add_argument("--device", type=str, default="auto", help="Device to use (auto, cpu, cuda, mps)")
+    parser.add_argument("--release-version", type=str, default="release_v1", help="LiveCodeBench release version (release_v1, release_v2, etc.)")
     
     args = parser.parse_args()
     
     if args.demo:
         demo_task_agnostic_approach()
     elif args.task and args.model and args.layer is not None:
-        result = run_task_agnostic_pipeline(args.task, args.model, args.layer, args.limit, args.device)
+        result = run_task_agnostic_pipeline(args.task, args.model, args.layer, args.limit, args.device, getattr(args, 'release_version', 'release_v1'))
         print(f"\n📊 Final Result: {result}")
     else:
         print("Usage:")
         print("  python -m wisent_guard.core.task_agnostic_cli --demo")
-        print("  python -m wisent_guard.core.task_agnostic_cli --task livecodebench --model meta-llama/Llama-3.2-3B-Instruct --layer 15 --limit 5 --device mps")
+        print("  python -m wisent_guard.core.task_agnostic_cli --task livecodebench --model meta-llama/Llama-3.2-1B-Instruct --layer 15 --limit 5 --device mps --release-version release_v1")
 
 
 if __name__ == "__main__":
