@@ -198,7 +198,7 @@ class TestDockerCLIIntegration:
 
         # Image name should follow convention
         assert "wisent-guard" in docker_config["image"]
-        assert "mbpp" in docker_config["image"]
+        assert "codeexec" in docker_config["image"]
 
     def test_docker_volume_configuration_for_cli(self, docker_config):
         """Test Docker volume configuration for CLI usage."""
