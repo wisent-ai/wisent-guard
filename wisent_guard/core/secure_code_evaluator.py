@@ -6,7 +6,7 @@ This module ensures that NO code execution happens outside of Docker containers.
 import logging
 from typing import Dict, Any, List, Optional
 
-from .docker import DockerExecutor, MockDockerExecutor
+from .docker import DockerExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -31,21 +31,15 @@ class SecureCodeEvaluator:
     """
 
     def __init__(
-        self, use_mock: bool = False, docker_config: Optional[Dict[str, Any]] = None
+        self, docker_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize secure code evaluator.
 
         Args:
-            use_mock: Whether to use mock executor (for testing only)
             docker_config: Docker configuration options
         """
-        if use_mock:
-            logger.warning("Using MockDockerExecutor - for testing only!")
-            self.executor = MockDockerExecutor(**(docker_config or {}))
-        else:
-            self.executor = DockerExecutor(**(docker_config or {}))
-
+        self.executor = DockerExecutor(**(docker_config or {}))
         self.docker_config = docker_config or {}
 
     @classmethod

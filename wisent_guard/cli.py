@@ -684,17 +684,21 @@ def run_task_pipeline(
         # Ensure Docker is available for code execution tasks
         try:
             # Test if we can create a secure evaluator (will check Docker availability)
-            secure_evaluator = SecureCodeEvaluator(use_mock=False)
+            secure_evaluator = SecureCodeEvaluator()
             if verbose:
                 executor_info = secure_evaluator.get_executor_info()
                 print(f"   • Docker executor ready: {executor_info['image_name']}")
         except Exception as e:
-            # Fall back to mock for development/testing
-            if verbose:
-                print(
-                    f"   ⚠️ Docker not available ({e}), using mock executor for testing"
-                )
-            secure_evaluator = SecureCodeEvaluator(use_mock=True)
+            # FAIL HARD - No mock execution allowed
+            print(f"\n❌ FATAL ERROR: Docker is required for code execution tasks")
+            print(f"   • Task '{task_name}' requires secure Docker execution")
+            print(f"   • Docker error: {e}")
+            print(f"\n📋 To fix this:")
+            print(f"   1. Install Docker: https://docs.docker.com/get-docker/")
+            print(f"   2. Start Docker daemon")
+            print(f"   3. Ensure your user has Docker permissions")
+            print(f"\n⚠️  Code execution tasks CANNOT run without Docker for security reasons")
+            sys.exit(1)
 
     # AUTOMATICALLY SET LM-EVAL-HARNESS AS DEFAULT FOR TESTED TASKS
     # These tasks have been thoroughly tested and validated to work with lm-eval-harness
