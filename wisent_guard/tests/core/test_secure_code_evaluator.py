@@ -10,7 +10,7 @@ from wisent_guard.core.secure_code_evaluator import (
     enforce_secure_execution,
     CODE_EXECUTION_TASKS,
 )
-from wisent_guard.core.docker import MockDockerExecutor
+from wisent_guard.tests.core.docker.mock_docker_executor import MockDockerExecutor
 
 
 class TestSecureCodeEvaluator:

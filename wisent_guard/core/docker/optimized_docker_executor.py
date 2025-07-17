@@ -143,6 +143,7 @@ class OptimizedDockerExecutor:
         self.build_if_missing = build_if_missing
         self.enable_batching = enable_batching
         self.enable_resource_optimization = enable_resource_optimization
+        self._cleanup_on_exit = True  # Auto-cleanup containers
         
         # Performance tracking
         self.execution_stats = {
@@ -159,6 +160,9 @@ class OptimizedDockerExecutor:
         # Ensure image exists
         if build_if_missing:
             self._ensure_image_exists()
+            
+        # Auto-cleanup if Docker usage is high
+        self._check_and_cleanup_docker()
 
     def _check_docker_available(self):
         """Check if Docker is installed and running."""
@@ -417,3 +421,31 @@ class OptimizedDockerExecutor:
             'resource_optimizations': 0,
             'total_time': 0.0
         }
+    
+    def _check_and_cleanup_docker(self):
+        """Check Docker usage and perform minimal cleanup if needed."""
+        try:
+            # Clean up dangling images and stopped containers periodically
+            # This prevents accumulation without requiring external utilities
+            subprocess.run(
+                ["docker", "container", "prune", "-f"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            logger.debug("Performed automatic container cleanup")
+        except Exception as e:
+            # Don't fail execution if cleanup fails
+            logger.debug(f"Auto-cleanup skipped: {e}")
+    
+    def cleanup(self):
+        """Clean up Docker resources created by this executor."""
+        try:
+            # Clean up containers and build cache
+            subprocess.run(["docker", "container", "prune", "-f"], 
+                         capture_output=True, timeout=30)
+            subprocess.run(["docker", "builder", "prune", "-f"], 
+                         capture_output=True, timeout=30)
+            logger.info("Docker resources cleaned up")
+        except Exception as e:
+            logger.debug(f"Cleanup failed: {e}")

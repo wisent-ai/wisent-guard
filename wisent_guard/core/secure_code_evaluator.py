@@ -31,19 +31,34 @@ class SecureCodeEvaluator:
     """
 
     def __init__(
-        self, docker_config: Optional[Dict[str, Any]] = None
+        self, docker_config: Optional[Dict[str, Any]] = None, use_mock: bool = False
     ):
         """
         Initialize secure code evaluator.
 
         Args:
             docker_config: Docker configuration options
+            use_mock: Whether to use mock executor for testing
         """
-        self.executor = OptimizedDockerExecutor(
-            **(docker_config or {}),
-            enable_batching=True,
-            enable_resource_optimization=True
-        )
+        if use_mock:
+            # Import mock executor only when needed for testing
+            try:
+                from ..tests.core.docker.mock_docker_executor import MockDockerExecutor
+                self.executor = MockDockerExecutor(**(docker_config or {}))
+            except ImportError:
+                # Fallback for test environments where relative import might not work
+                import sys
+                import os
+                tests_path = os.path.join(os.path.dirname(__file__), '..', 'tests', 'core', 'docker')
+                sys.path.insert(0, tests_path)
+                from mock_docker_executor import MockDockerExecutor
+                self.executor = MockDockerExecutor(**(docker_config or {}))
+        else:
+            self.executor = OptimizedDockerExecutor(
+                **(docker_config or {}),
+                enable_batching=True,
+                enable_resource_optimization=True
+            )
         self.docker_config = docker_config or {}
 
     @classmethod
