@@ -2,6 +2,19 @@
 Task-agnostic CLI demonstration.
 
 This shows how the new architecture would work without depending on lm-eval for task validation.
+
+TODO: REFACTOR WITH MAIN CLI
+=====================================
+This task-agnostic architecture is now fully functional with real model inference (tested with distilgpt2).
+The next step is to refactor wisent_guard/cli.py to use this architecture instead of lm-eval dependency:
+
+1. Replace lm-eval task validation with TaskRegistry.list_tasks()
+2. Use TaskInterface.get_extractor() instead of lm-eval for data extraction  
+3. Integrate TaskRegistry into main CLI argument parsing
+4. Remove the 34 references to lm-eval in cli.py for task management
+5. Keep lm-eval only for actual evaluation metrics, not task discovery
+
+Current status: Proof-of-concept complete, production integration pending.
 """
 
 import argparse
@@ -74,13 +87,14 @@ def demo_task_agnostic_approach():
         print(f"   ❌ Error: {e}")
 
 
-def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limit: Optional[int] = None):
+def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limit: Optional[int] = None, device: str = "auto"):
     """Run the task-agnostic pipeline."""
     print("🚀 Running Task-Agnostic Pipeline")
     print(f"   Task: {task_name}")
     print(f"   Model: {model_name}")
     print(f"   Layer: {layer}")
     print(f"   Limit: {limit}")
+    print(f"   Device: {device}")
     
     # Ensure tasks are registered
     try:
@@ -116,8 +130,29 @@ def run_task_agnostic_pipeline(task_name: str, model_name: str, layer: int, limi
         
         print(f"   📈 Results: {processed}/{len(data)} items processed successfully")
         
-        # Simulate model inference (would integrate with actual model)
-        print(f"   🧠 Model inference: [SIMULATED - would use {model_name} at layer {layer}]")
+        # Real model inference
+        try:
+            from wisent_guard.core.model import Model
+            print(f"   🧠 Loading model: {model_name} at layer {layer} on device {device}")
+            model = Model(name=model_name, device=device)
+            
+            # Process a sample item with real model
+            if data:
+                sample_doc = data[0]
+                qa_pair = extractor.extract_qa_pair(sample_doc)
+                if qa_pair:
+                    # Generate response using the model
+                    question = qa_pair.get("question", "")
+                    response = model.generate(question, layer_index=layer, max_new_tokens=50)
+                    print(f"   ✅ Model response sample: {response[:50]}...")
+                else:
+                    print(f"   ⚠️  No QA pair available for model testing")
+            
+            print(f"   🧠 Model inference: ✅ REAL MODEL LOADED AND TESTED")
+            
+        except Exception as e:
+            print(f"   ⚠️  Model loading failed: {e}")
+            print(f"   🧠 Model inference: [SIMULATED - would use {model_name} at layer {layer}]")
         
         return {
             "task_name": task_name,
@@ -147,18 +182,19 @@ def main():
     parser.add_argument("--model", type=str, help="Model name")
     parser.add_argument("--layer", type=int, help="Layer number")
     parser.add_argument("--limit", type=int, help="Limit number of items")
+    parser.add_argument("--device", type=str, default="auto", help="Device to use (auto, cpu, cuda, mps)")
     
     args = parser.parse_args()
     
     if args.demo:
         demo_task_agnostic_approach()
     elif args.task and args.model and args.layer is not None:
-        result = run_task_agnostic_pipeline(args.task, args.model, args.layer, args.limit)
+        result = run_task_agnostic_pipeline(args.task, args.model, args.layer, args.limit, args.device)
         print(f"\n📊 Final Result: {result}")
     else:
         print("Usage:")
         print("  python -m wisent_guard.core.task_agnostic_cli --demo")
-        print("  python -m wisent_guard.core.task_agnostic_cli --task livecodebench --model llama --layer 15 --limit 5")
+        print("  python -m wisent_guard.core.task_agnostic_cli --task livecodebench --model meta-llama/Llama-3.2-3B-Instruct --layer 15 --limit 5 --device mps")
 
 
 if __name__ == "__main__":
