@@ -334,6 +334,10 @@ class FullBenchmarkDownloader:
         elif "label" in sample and str(sample["label"]).lower() in ["true", "false", "0", "1"]:
             return self._convert_boolean_question(sample)
         
+        # MBPP format (programming problems with code)
+        elif "task_id" in sample and "text" in sample and "code" in sample:
+            return self._convert_mbpp_format(sample)
+        
         # Text generation with question/answer (GSM8K, math problems)
         elif "question" in sample and "answer" in sample:
             return self._convert_text_generation(sample)
@@ -713,6 +717,30 @@ class FullBenchmarkDownloader:
         distractors.append(str(int(final_number + random.randint(2, 10))))
         
         return distractors[:3]  # Return top 3
+
+    def _convert_mbpp_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert MBPP format (programming problems with code)."""
+        # Use the benchmark extractor to get contrastive pairs
+        from wisent_guard.core.benchmark_extractors import extract_contrastive_pair
+        
+        try:
+            contrastive_data = extract_contrastive_pair('mbpp', sample, None)
+            
+            if contrastive_data:
+                return [{
+                    "context": contrastive_data['question'],
+                    "good_response": contrastive_data['correct_answer'],
+                    "bad_response": contrastive_data['incorrect_answer'],
+                    "metadata": {
+                        "task_id": sample.get("task_id", ""),
+                        "benchmark_type": "mbpp"
+                    }
+                }]
+            else:
+                return []
+        except Exception as e:
+            print(f"         ⚠️ Error converting MBPP sample: {e}")
+            return []
 
 def main():
     """Main function for CLI usage."""
