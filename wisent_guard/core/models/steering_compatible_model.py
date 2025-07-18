@@ -34,7 +34,10 @@ class SteeringCompatibleModel(GPT2LMHeadModel):
         self.steering_active = True
         
         # Register steering vectors as model parameters so they're saved/loaded
-        self.register_buffer("_steering_layer_indices", torch.tensor([], dtype=torch.long))
+        self.register_buffer("_steering_layer_indices", torch.tensor([], dtype=torch.long), persistent=True)
+        
+        # Hook to restore steering vectors after loading
+        self.register_load_state_dict_post_hook(self._restore_steering_vectors)
         
     def add_steering_vector(
         self,
@@ -100,6 +103,40 @@ class SteeringCompatibleModel(GPT2LMHeadModel):
         self.steering_active = False
         logger.info("Steering vectors disabled")
     
+    def load_state_dict(self, state_dict, strict=True):
+        """Override load_state_dict to handle steering vector buffers."""
+        # Handle _steering_layer_indices buffer size mismatch
+        indices_key = "_steering_layer_indices"
+        if indices_key in state_dict:
+            new_size = state_dict[indices_key].shape[0]
+            if new_size > 0:
+                self.register_buffer("_steering_layer_indices", torch.zeros(new_size, dtype=torch.long), persistent=True)
+        
+        # Register steering vector buffers dynamically
+        for key, tensor in state_dict.items():
+            if key.startswith("_steering_vector_"):
+                if not hasattr(self, key):
+                    self.register_buffer(key, torch.zeros_like(tensor), persistent=True)
+        
+        # Call parent method
+        return super().load_state_dict(state_dict, strict)
+    
+    def _restore_steering_vectors(self, module, incompatible_keys):
+        """Restore steering vectors from saved buffers after loading."""
+        self.steering_vectors = {}
+        
+        # Find all steering vector buffers
+        for name, buffer in self.named_buffers():
+            if name.startswith("_steering_vector_"):
+                try:
+                    layer_idx = int(name.split("_")[-1])
+                    self.steering_vectors[layer_idx] = buffer
+                    logger.info(f"Restored steering vector for layer {layer_idx}")
+                except (ValueError, IndexError):
+                    logger.warning(f"Could not parse layer index from buffer name: {name}")
+        
+        logger.info(f"Restored {len(self.steering_vectors)} steering vectors from model state")
+    
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -156,62 +193,66 @@ class SteeringCompatibleModel(GPT2LMHeadModel):
     
     def _forward_with_steering(self, **kwargs):
         """Forward pass with steering vector application."""
-        # Get transformer outputs
-        transformer_outputs = self.transformer(
-            input_ids=kwargs.get("input_ids"),
-            past_key_values=kwargs.get("past_key_values"),
-            attention_mask=kwargs.get("attention_mask"),
-            token_type_ids=kwargs.get("token_type_ids"),
-            position_ids=kwargs.get("position_ids"),
-            head_mask=kwargs.get("head_mask"),
-            inputs_embeds=kwargs.get("inputs_embeds"),
-            use_cache=kwargs.get("use_cache"),
-            output_attentions=kwargs.get("output_attentions"),
-            output_hidden_states=True,  # We need hidden states for steering
-            return_dict=True,
-        )
+        # Apply steering using hooks during forward pass
+        hooks = []
         
-        # Apply steering vectors to hidden states
-        hidden_states = transformer_outputs.hidden_states
-        modified_hidden_states = []
-        
-        for layer_idx, layer_hidden_state in enumerate(hidden_states):
-            if layer_idx in self.steering_vectors:
-                # Apply steering vector
-                steering_vector = self.steering_vectors[layer_idx]
+        def create_steering_hook(layer_idx, steering_vector):
+            def hook_fn(module, input, output):
+                # Handle different output formats (tuple vs tensor)
+                if isinstance(output, tuple):
+                    hidden_states = output[0]
+                else:
+                    hidden_states = output
                 
-                # Ensure steering vector is the right shape
+                # Apply steering vector to the output
+                # hidden_states shape: (batch_size, seq_len, hidden_size)
                 if steering_vector.dim() == 1:
-                    steering_vector = steering_vector.unsqueeze(0).unsqueeze(0)
+                    # Expand to match batch and sequence dimensions
+                    steering_vector_expanded = steering_vector.unsqueeze(0).unsqueeze(0)
                 elif steering_vector.dim() == 2:
-                    steering_vector = steering_vector.unsqueeze(0)
+                    steering_vector_expanded = steering_vector.unsqueeze(0)
+                else:
+                    steering_vector_expanded = steering_vector
                 
-                # Apply steering (additive)
-                modified_hidden_state = layer_hidden_state + steering_vector
-                modified_hidden_states.append(modified_hidden_state)
-            else:
-                modified_hidden_states.append(layer_hidden_state)
+                # Apply steering (additive) to last token position
+                hidden_states[:, -1, :] = hidden_states[:, -1, :] + steering_vector_expanded.squeeze(0).squeeze(0)
+                
+                # Return in the same format as received
+                if isinstance(output, tuple):
+                    return (hidden_states,) + output[1:]
+                else:
+                    return hidden_states
+            return hook_fn
         
-        # Use the last layer's hidden states for the language model head
-        sequence_output = modified_hidden_states[-1]
-        lm_logits = self.lm_head(sequence_output)
+        try:
+            # Register hooks for layers with steering vectors
+            for layer_idx, steering_vector in self.steering_vectors.items():
+                if layer_idx < len(self.transformer.h):
+                    hook = self.transformer.h[layer_idx].register_forward_hook(
+                        create_steering_hook(layer_idx, steering_vector)
+                    )
+                    hooks.append(hook)
+            
+            # Run normal forward pass with steering hooks active
+            return super().forward(
+                input_ids=kwargs.get("input_ids"),
+                past_key_values=kwargs.get("past_key_values"),
+                attention_mask=kwargs.get("attention_mask"),
+                token_type_ids=kwargs.get("token_type_ids"),
+                position_ids=kwargs.get("position_ids"),
+                head_mask=kwargs.get("head_mask"),
+                inputs_embeds=kwargs.get("inputs_embeds"),
+                labels=kwargs.get("labels"),
+                use_cache=kwargs.get("use_cache"),
+                output_attentions=kwargs.get("output_attentions"),
+                output_hidden_states=kwargs.get("output_hidden_states"),
+                return_dict=kwargs.get("return_dict"),
+            )
         
-        # Compute loss if labels are provided
-        loss = None
-        if kwargs.get("labels") is not None:
-            labels = kwargs["labels"]
-            shift_logits = lm_logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=lm_logits,
-            past_key_values=transformer_outputs.past_key_values,
-            hidden_states=tuple(modified_hidden_states) if kwargs.get("output_hidden_states") else None,
-            attentions=transformer_outputs.attentions,
-        )
+        finally:
+            # Remove hooks
+            for hook in hooks:
+                hook.remove()
     
     def save_steering_vectors(self, save_directory: str):
         """Save steering vectors with metadata."""
@@ -253,10 +294,11 @@ class SteeringCompatibleModel(GPT2LMHeadModel):
                 steering_vector = torch.load(filepath, map_location=self.device)
                 
                 # Extract layer index from filename
+                # Expected format: steering_vector_<model>_<layer>_<date>.pt
                 parts = filename.split("_")
-                if len(parts) >= 3:
+                if len(parts) >= 4:
                     try:
-                        layer_idx = int(parts[2])
+                        layer_idx = int(parts[3])  # layer index is at position 3
                         
                         # Load metadata if available
                         metadata_filename = filename.replace(".pt", ".json")
