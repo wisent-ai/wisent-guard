@@ -567,6 +567,8 @@ def run_task_pipeline(
     shots: int = 0,
     split_ratio: float = 0.8,
     limit: int = None,
+    training_limit: int = None,
+    testing_limit: int = None,
     classifier_type: str = "logistic",
     max_new_tokens: int = 300,
     device: str = None,
@@ -1379,12 +1381,44 @@ def run_task_pipeline(
                             f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'"
                         )
 
+                    # Determine the total limit to load
+                    # If training_limit or testing_limit are specified, we need to load enough data
+                    total_limit = limit
+                    if training_limit is not None or testing_limit is not None:
+                        # Calculate how many total docs we need based on split ratio
+                        # Add some buffer to ensure we have enough after splitting
+                        if training_limit is not None and testing_limit is not None:
+                            # Both specified, use sum
+                            total_limit = training_limit + testing_limit
+                        elif training_limit is not None:
+                            # Only training limit specified, calculate total based on split ratio
+                            # Add 20% buffer to account for rounding
+                            total_limit = int(training_limit / split_ratio * 1.2) + 1
+                        elif testing_limit is not None:
+                            # Only testing limit specified, calculate total based on split ratio
+                            # Add 20% buffer to account for rounding
+                            total_limit = int(testing_limit / (1 - split_ratio) * 1.2) + 1
+                    
                     task_data = model.load_lm_eval_task(
-                        actual_task_name, shots=shots, limit=limit
+                        actual_task_name, shots=shots, limit=total_limit
                     )
                     train_docs, test_docs = model.split_task_data(
                         task_data, split_ratio=split_ratio, random_seed=seed
                     )
+                    
+                    # Apply training and testing limits if specified
+                    original_train_size = len(train_docs)
+                    original_test_size = len(test_docs)
+                    
+                    if training_limit is not None and len(train_docs) > training_limit:
+                        train_docs = train_docs[:training_limit]
+                        if verbose:
+                            print(f"   ⚠️  Training data limited to {training_limit} samples (from {original_train_size})")
+                    
+                    if testing_limit is not None and len(test_docs) > testing_limit:
+                        test_docs = test_docs[:testing_limit]
+                        if verbose:
+                            print(f"   ⚠️  Test data limited to {testing_limit} samples (from {original_test_size})")
 
                     if verbose:
                         print(
@@ -1406,9 +1440,23 @@ def run_task_pipeline(
 
                         try:
                             # Get samples using intelligent caching
+                            # Calculate total limit needed based on training/testing limits
+                            cache_limit = limit
+                            if training_limit is not None or testing_limit is not None:
+                                # Need enough samples to satisfy both limits after split
+                                # Add buffer to ensure we have enough after splitting
+                                if training_limit is not None and testing_limit is not None:
+                                    cache_limit = training_limit + testing_limit
+                                elif training_limit is not None:
+                                    # Add 20% buffer to account for rounding
+                                    cache_limit = int(training_limit / split_ratio * 1.2) + 1
+                                elif testing_limit is not None:
+                                    # Add 20% buffer to account for rounding
+                                    cache_limit = int(testing_limit / (1 - split_ratio) * 1.2) + 1
+                            
                             cached_samples = managed_cache.get_task_samples(
                                 task_name=task_name,
-                                limit=limit or 1000,  # Default to 1000 if no limit
+                                limit=cache_limit or 1000,  # Default to 1000 if no limit
                                 force_fresh=force_download,
                             )
 
@@ -1459,25 +1507,35 @@ def run_task_pipeline(
             else:
                 # We used cached data, process it for the pipeline
                 # Properly split the data using the split ratio with limits
-                MAX_TRAIN_SAMPLES = 1000
-                MAX_TEST_SAMPLES = 200
+                # Use training_limit and testing_limit if specified, otherwise use defaults
+                MAX_TRAIN_SAMPLES = training_limit if training_limit is not None else 1000
+                MAX_TEST_SAMPLES = testing_limit if testing_limit is not None else 200
 
                 split_point = int(len(all_qa_pairs) * split_ratio)
                 qa_pairs = all_qa_pairs[:split_point]  # Training data
                 test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
+                
+                if verbose:
+                    print(f"📊 Initial split: {len(qa_pairs)} training, {len(test_qa_pairs_source)} test samples")
 
                 # Apply limits
+                original_train_size = len(qa_pairs)
+                original_test_size = len(test_qa_pairs_source)
+                
                 if len(qa_pairs) > MAX_TRAIN_SAMPLES:
                     qa_pairs = qa_pairs[:MAX_TRAIN_SAMPLES]
                     if verbose:
                         print(
-                            f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples"
+                            f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples (from {original_train_size})"
                         )
 
                 if len(test_qa_pairs_source) > MAX_TEST_SAMPLES:
                     test_qa_pairs_source = test_qa_pairs_source[:MAX_TEST_SAMPLES]
                     if verbose:
-                        print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples")
+                        print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples (from {original_test_size})")
+                        
+                if verbose:
+                    print(f"📊 Final data split: {len(qa_pairs)} training, {len(test_qa_pairs_source)} test samples")
                 group_task_processed = False
                 group_task_qa_format = True  # Cached data is already in QA format
 
@@ -4568,6 +4626,8 @@ def handle_tasks_command(args):
                 shots=args.shots,
                 split_ratio=args.split_ratio,
                 limit=limit_to_use,
+                training_limit=args.training_limit,
+                testing_limit=args.testing_limit,
                 classifier_type=args.classifier_type,
                 max_new_tokens=args.max_new_tokens,
                 device=args.device,
@@ -4650,7 +4710,8 @@ def handle_tasks_command(args):
                 smart_selection=args.smart_selection,
                 # Benchmark caching parameters
                 cache_benchmark=getattr(args, "cache_benchmark", False),
-                use_cached=getattr(args, "use_cached", True),
+                # When --no-cache is used, it sets cache_benchmark to False, so use_cached should also be False
+                use_cached=getattr(args, "cache_benchmark", True),  # Use cache_benchmark value
                 force_download=getattr(args, "force_download", False),
                 cache_dir=getattr(args, "cache_dir", "./benchmark_cache"),
                 # Model reuse parameter for efficiency
@@ -5370,8 +5431,11 @@ def handle_steering_optimization_command(args):
 def handle_sample_size_optimization_command(args):
     """Handle the optimize-sample-size command."""
     try:
-        # Check if we should verify parameters match existing config
-        if not args.force:
+        # Determine if we're optimizing for classification or steering
+        method_type = "steering" if args.steering_mode else "classification"
+        
+        # Check if we should verify parameters match existing config (for classification)
+        if method_type == "classification" and not args.force:
             from .core.model_config_manager import ModelConfigManager
 
             config_manager = ModelConfigManager()
@@ -5430,53 +5494,81 @@ def handle_sample_size_optimization_command(args):
                     )
                     sys.exit(1)
 
-        print("📏 Starting sample size optimization...")
+        print(f"📏 Starting {method_type} sample size optimization...")
         print(f"   📊 Model: {args.model}")
         print(f"   📋 Task: {args.task}")
         print(f"   📊 Layer: {args.layer}")
         print(f"   📊 Token aggregation: {args.token_aggregation}")
-        print(f"   📊 Threshold: {args.threshold}")
+        
+        if method_type == "classification":
+            print(f"   📊 Threshold: {args.threshold}")
+        else:  # steering
+            print(f"   🎯 Steering method: {args.steering_method}")
+            print(f"   💪 Steering strength: {args.steering_strength}")
+            if hasattr(args, 'token_targeting_strategy'):
+                print(f"   🎯 Token targeting: {args.token_targeting_strategy}")
+        
         print(f"   🔢 Sample sizes: {args.sample_sizes}")
-        print(f"   📊 Test split: {args.test_split * 100:.0f}%")
+        print(f"   📊 Test size: {args.test_size}")
+        print(f"   🌱 Random seed: {args.seed}")
         if args.limit:
             print(f"   📊 Dataset limit: {args.limit}")
 
-        # Import sample size optimizer
-        from .core.sample_size_optimizer import run_sample_size_optimization
+        # Import the new simplified optimizer
+        from .core.sample_size_optimizer_v2 import optimize_sample_size
+
+        # Prepare method-specific kwargs
+        method_kwargs = {
+            "token_aggregation": args.token_aggregation,
+        }
+        
+        if method_type == "classification":
+            method_kwargs.update({
+                "threshold": args.threshold,
+                "classifier_type": getattr(args, 'classifier_type', 'logistic')
+            })
+        else:  # steering
+            method_kwargs.update({
+                "steering_method": args.steering_method,
+                "steering_strength": args.steering_strength,
+                "token_targeting_strategy": getattr(args, 'token_targeting_strategy', 'LAST_TOKEN')
+            })
 
         # Run optimization
-        results = run_sample_size_optimization(
+        results = optimize_sample_size(
             model_name=args.model,
             task_name=args.task,
             layer=args.layer,
-            token_aggregation=args.token_aggregation,
-            threshold=args.threshold,
-            test_split=args.test_split,
+            method_type=method_type,
             sample_sizes=args.sample_sizes,
-            dataset_limit=args.limit,
+            test_size=args.test_size,
+            seed=args.seed,
             device=args.device,
             verbose=args.verbose,
             save_plot=args.save_plot,
             save_to_config=not args.no_save_config,
+            **method_kwargs
         )
 
         # Display results
         print("\n✅ Sample size optimization completed!")
         print(f"   🎯 Optimal sample size: {results['optimal_sample_size']}")
+        if results.get('optimal_accuracy') is not None:
+            print(f"   📊 Optimal accuracy: {results['optimal_accuracy']:.4f}")
 
         # Show performance summary
         print("\n📊 Performance Summary:")
         print(f"{'Sample Size':>12} {'Accuracy':>10} {'F1 Score':>10} {'Time (s)':>10}")
         print(f"{'-'*12} {'-'*10} {'-'*10} {'-'*10}")
 
-        for result in results["results"]:
-            size = result["sample_size"]
-            acc = result["metrics"]["accuracy"]
-            f1 = result["metrics"]["f1"]
-            time = result["training_time"]
+        all_results = results.get("all_results", {})
+        for i, size in enumerate(all_results.get("sample_sizes", [])):
+            acc = all_results["accuracies"][i]
+            f1 = all_results["f1_scores"][i]
+            time = all_results["training_times"][i]
             print(f"{size:>12} {acc:>10.3f} {f1:>10.3f} {time:>10.2f}")
 
-        if not args.no_save_config:
+        if not args.no_save_config and method_type == "classification":
             print("\n💾 Optimal sample size saved to model config")
             print(
                 f"   • This will be used as default --limit for {args.task} on layer {args.layer}"
