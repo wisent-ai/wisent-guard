@@ -226,7 +226,7 @@ class Classifier:
                 optimizer.step()
                 train_loss += loss.item()
             
-            train_loss /= len(train_loader)
+            train_loss /= len(train_loader) if len(train_loader) > 0 else 1
             metrics['train_loss'].append(train_loss)
             
             # Evaluation phase
@@ -251,11 +251,14 @@ class Classifier:
                     all_preds.extend(preds.tolist())
                     all_labels.extend(labels.cpu().tolist())
             
-            test_loss /= len(test_loader)
+            test_loss /= len(test_loader) if len(test_loader) > 0 else 1
             metrics['test_loss'].append(test_loss)
             
             # Calculate metrics
-            test_accuracy = sum(1 for p, l in zip(all_preds, all_labels) if p == l) / len(all_preds)
+            if len(all_preds) > 0:
+                test_accuracy = sum(1 for p, l in zip(all_preds, all_labels) if p == l) / len(all_preds)
+            else:
+                test_accuracy = 0.0
             metrics['accuracy'].append(test_accuracy)
             
             # Calculate precision, recall, F1
@@ -320,7 +323,7 @@ class Classifier:
                 y_true.extend(labels.cpu().tolist())
         
         # Final metrics
-        test_accuracy = sum(1 for p, l in zip(y_pred, y_true) if p == l) / len(y_pred)
+        test_accuracy = sum(1 for p, l in zip(y_pred, y_true) if p == l) / len(y_pred) if len(y_pred) > 0 else 0.0
         
         true_positives = sum(1 for p, l in zip(y_pred, y_true) if p == 1 and l == 1)
         false_positives = sum(1 for p, l in zip(y_pred, y_true) if p == 1 and l == 0)
