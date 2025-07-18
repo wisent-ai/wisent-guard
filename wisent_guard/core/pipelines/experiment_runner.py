@@ -287,7 +287,7 @@ class ExperimentRunner:
         """Create a quick experiment for testing."""
         training_config = TrainingConfig(
             model_name="distilgpt2",
-            target_layers=[6],
+            target_layers=[5],  # DistilGPT2 has 6 layers (0-5)
             batch_size=2
         )
         

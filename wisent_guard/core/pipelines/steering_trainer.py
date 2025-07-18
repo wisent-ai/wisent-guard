@@ -4,7 +4,7 @@ Steering vector trainer that orchestrates the training process.
 
 import torch
 import logging
-from typing import Dict, List, Any, Optional, Type
+from typing import Dict, List, Any, Optional, Type, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import os
@@ -36,7 +36,7 @@ class TrainingConfig:
     
     def __post_init__(self):
         if self.target_layers is None:
-            self.target_layers = [6]  # Default to layer 6 for distilgpt2
+            self.target_layers = [5]  # Default to layer 5 for distilgpt2 (6 layers: 0-5)
 
 
 @dataclass
