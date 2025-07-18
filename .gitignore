@@ -74,6 +74,7 @@ Thumbs.db
 !/models/
 !/examples/
 !/evaluation/
+!/classifier_evaluation/
 !/dist/
 !/wisent_guard.egg-info/
 !/scripts/
