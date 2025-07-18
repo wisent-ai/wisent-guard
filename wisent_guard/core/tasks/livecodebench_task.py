@@ -5,6 +5,7 @@ LiveCodeBench task implementation for task-agnostic architecture.
 from typing import Dict, Any, List, Optional
 from ..task_interface import TaskInterface
 from ..benchmark_extractors import LiveCodeBenchExtractor, BenchmarkExtractor
+from ..data_loaders import LiveCodeBenchLoader
 
 
 class LiveCodeBenchTask(TaskInterface):
@@ -12,51 +13,39 @@ class LiveCodeBenchTask(TaskInterface):
     
     def __init__(self, release_version: str = "release_v1"):
         self._extractor = LiveCodeBenchExtractor()
+        self._data_loader = LiveCodeBenchLoader()
         self._release_version = release_version
         self._validate_release_version(release_version)
     
     def _validate_release_version(self, release_version: str) -> None:
         """Validate release version."""
-        valid_versions = {
-            "release_v1", "release_v2", "release_v3", "release_v4", "release_v5", "release_v6",
-            "release_latest", "v1", "v2", "v1_v3", "v4_v5"
-        }
+        valid_versions = set(self._data_loader.list_available_versions())
         if release_version not in valid_versions:
             raise ValueError(f"Invalid release version: {release_version}. Valid versions: {valid_versions}")
     
     def _get_version_info(self) -> Dict[str, Any]:
         """Get version-specific information."""
-        version_info = {
-            "release_v1": {"problems": 400, "date_range": "May 2023 - Mar 2024"},
-            "release_v2": {"problems": 511, "date_range": "May 2023 - May 2024"},
-            "release_v3": {"problems": 612, "date_range": "May 2023 - Jul 2024"},
-            "release_v4": {"problems": 713, "date_range": "May 2023 - Sep 2024"},
-            "release_v5": {"problems": 880, "date_range": "May 2023 - Jan 2025"},
-            "release_v6": {"problems": 1055, "date_range": "May 2023 - Apr 2025"},
-            "release_latest": {"problems": 1055, "date_range": "May 2023 - Apr 2025"},
-            "v1": {"problems": 400, "date_range": "May 2023 - Mar 2024"},
-            "v2": {"problems": 511, "date_range": "May 2023 - May 2024"},
-            "v1_v3": {"problems": 612, "date_range": "May 2023 - Jul 2024"},
-            "v4_v5": {"problems": 880, "date_range": "Sep 2024 - Jan 2025"}
-        }
-        return version_info.get(self._release_version, {"problems": 400, "date_range": "May 2023 - Mar 2024"})
+        return self._data_loader.get_version_info(self._release_version)
     
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Load LiveCodeBench data for the specified release version."""
-        # Get version-specific information
-        version_info = self._get_version_info()
-        expected_problems = version_info["problems"]
-        
-        # TODO: Replace with real LiveCodeBench integration
-        # For now, generate sample data based on release version
-        sample_data = self._generate_sample_data(expected_problems)
-        
-        if limit:
-            sample_data = sample_data[:limit]
-        
-        return sample_data
+        try:
+            # Load real LiveCodeBench data
+            problems = self._data_loader.load_problems(
+                release_version=self._release_version,
+                limit=limit
+            )
+            
+            # Convert to dictionary format
+            return [problem.to_dict() for problem in problems]
+            
+        except Exception as e:
+            # Fallback to sample data if loading fails
+            import logging
+            logging.warning(f"Failed to load real LiveCodeBench data: {e}. Using sample data.")
+            return self._generate_sample_data_fallback(limit)
     
-    def _generate_sample_data(self, expected_problems: int) -> List[Dict[str, Any]]:
+    def _generate_sample_data_fallback(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Generate sample data for the specified number of problems."""
         base_problems = [
             {
@@ -161,22 +150,15 @@ class LiveCodeBenchTask(TaskInterface):
             }
         ]
         
-        # Generate additional problems to simulate the expected count
-        # For now, we'll duplicate and modify the base problems
-        result = []
-        for i in range(expected_problems):
-            base_index = i % len(base_problems)
-            problem = base_problems[base_index].copy()
-            
-            # Modify task_id to make it unique
-            problem["task_id"] = f"lcb_{i+1:03d}"
-            
-            # Add version-specific metadata
-            problem["release_version"] = self._release_version
-            
-            result.append(problem)
+        # Generate limited sample data for fallback
+        if limit:
+            base_problems = base_problems[:limit]
         
-        return result
+        # Add version-specific metadata
+        for problem in base_problems:
+            problem["release_version"] = self._release_version
+        
+        return base_problems
     
     def get_extractor(self) -> BenchmarkExtractor:
         """Get the LiveCodeBench extractor."""
