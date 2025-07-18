@@ -180,10 +180,7 @@ class SimplifiedSampleSizeOptimizer:
                 self.results["evaluation_times"].append(result["evaluation_time"])
                 
                 if self.verbose:
-                    print(f"\nResults for {sample_size} samples:")
-                    print(f"  Accuracy: {result['accuracy']:.4f}")
-                    print(f"  F1 Score: {result['f1_score']:.4f}")
-                    print(f"  Time: {result['total_time']:.2f}s")
+                    print(f"\n✓ Tested {sample_size} samples: accuracy={result['accuracy']:.3f}, f1={result['f1_score']:.3f}")
         
         # Find optimal sample size
         optimal_idx, optimal_size = self.find_optimal_sample_size()
@@ -290,7 +287,7 @@ def optimize_sample_size(
     test_size: int = 200,
     seed: int = 42,
     verbose: bool = False,
-    save_plot: bool = True,
+    save_plot: bool = False,
     save_to_config: bool = True,
     **method_kwargs
 ) -> Dict[str, Any]:
@@ -340,29 +337,19 @@ def optimize_sample_size(
     
     # Save to config if requested
     if save_to_config and results["optimal_sample_size"] > 0:
-        config_manager = ModelConfigManager()
-        
-        if method_type == "classification":
-            # Save classification sample size
-            config_manager.save_optimal_sample_size(
-                model_name=model_name,
-                task_name=task_name,
-                layer=layer,
-                sample_size=results["optimal_sample_size"],
-                accuracy=results["optimal_accuracy"],
-                metadata={
-                    "f1_score": results["optimal_f1_score"],
-                    "test_size": test_size,
-                    "token_aggregation": method_kwargs.get("token_aggregation", "average"),
-                    "threshold": method_kwargs.get("threshold", 0.5)
-                }
-            )
-        else:
-            # Save steering sample size (extend config manager if needed)
-            # For now, we'll just log it
+        try:
+            config_manager = ModelConfigManager()
+            
+            # For now, just log the optimal sample size
+            # TODO: Implement save_optimal_sample_size in ModelConfigManager
             logger.info(
-                f"Optimal steering sample size for {model_name} on {task_name}: "
-                f"{results['optimal_sample_size']} (accuracy: {results['optimal_accuracy']:.4f})"
+                f"Optimal {method_type} sample size for {model_name} on {task_name}: "
+                f"{results['optimal_sample_size']} (accuracy: {results.get('optimal_accuracy', 'N/A')})"
             )
+            
+            if verbose:
+                print(f"\n💡 Note: To use this optimal sample size, add --limit {results['optimal_sample_size']} to your commands")
+        except Exception as e:
+            logger.warning(f"Could not save to config: {e}")
     
     return results

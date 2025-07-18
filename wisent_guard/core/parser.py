@@ -871,8 +871,8 @@ def setup_sample_size_optimizer_parser(parser):
                        help="Random seed for reproducibility (default: 42)")
     parser.add_argument("--limit", type=int, default=None,
                        help="Maximum number of samples to load from dataset")
-    parser.add_argument("--save-plot", action="store_true", default=True,
-                       help="Save performance plot (default: True)")
+    parser.add_argument("--save-plot", action="store_true",
+                       help="Save performance plot")
     parser.add_argument("--no-save-config", action="store_true",
                        help="Don't save optimal sample size to model config")
     parser.add_argument("--device", type=str, default=None,

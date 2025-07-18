@@ -5551,22 +5551,20 @@ def handle_sample_size_optimization_command(args):
         )
 
         # Display results
-        print("\n✅ Sample size optimization completed!")
-        print(f"   🎯 Optimal sample size: {results['optimal_sample_size']}")
-        if results.get('optimal_accuracy') is not None:
-            print(f"   📊 Optimal accuracy: {results['optimal_accuracy']:.4f}")
-
-        # Show performance summary
-        print("\n📊 Performance Summary:")
-        print(f"{'Sample Size':>12} {'Accuracy':>10} {'F1 Score':>10} {'Time (s)':>10}")
-        print(f"{'-'*12} {'-'*10} {'-'*10} {'-'*10}")
-
-        all_results = results.get("all_results", {})
-        for i, size in enumerate(all_results.get("sample_sizes", [])):
-            acc = all_results["accuracies"][i]
-            f1 = all_results["f1_scores"][i]
-            time = all_results["training_times"][i]
-            print(f"{size:>12} {acc:>10.3f} {f1:>10.3f} {time:>10.2f}")
+        print(f"\n✅ Optimal sample size: {results['optimal_sample_size']}")
+        
+        # Only show details if verbose
+        if args.verbose:
+            if results.get('optimal_accuracy') is not None:
+                print(f"   Accuracy at optimal size: {results['optimal_accuracy']:.3f}")
+            
+            # Show all tested sizes
+            all_results = results.get("all_results", {})
+            if all_results.get("sample_sizes"):
+                print("\n   Tested configurations:")
+                for i, size in enumerate(all_results["sample_sizes"]):
+                    acc = all_results["accuracies"][i]
+                    print(f"   - {size} samples: accuracy={acc:.3f}")
 
         if not args.no_save_config and method_type == "classification":
             print("\n💾 Optimal sample size saved to model config")
