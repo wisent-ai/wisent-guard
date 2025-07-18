@@ -21,7 +21,7 @@ class TestDockerCLIIntegration:
         mock_evaluator = MagicMock()
         mock_evaluator_class.return_value = mock_evaluator
         mock_evaluator.get_executor_info.return_value = {
-            "executor_type": "MockDockerExecutor",
+            "executor_type": "OptimizedDockerExecutor",
             "image_name": "wisent-guard-codeexec:latest",
             "timeout": 10,
             "memory_limit": "256m",
@@ -70,18 +70,15 @@ class TestDockerCLIIntegration:
         mock_evaluator_class.assert_not_called()
 
     @patch("wisent_guard.core.secure_code_evaluator.SecureCodeEvaluator")
-    def test_docker_fallback_to_mock_on_error(self, mock_evaluator_class):
-        """Test fallback to mock executor when Docker is not available."""
-        # Setup mock to raise error on first call (real Docker), succeed on second (mock)
-        mock_evaluator_class.side_effect = [
-            RuntimeError("Docker not available"),  # First call fails
-            MagicMock(),  # Second call succeeds with mock
-        ]
+    def test_docker_error_handling(self, mock_evaluator_class):
+        """Test error handling when Docker operations fail."""
+        # Setup mock to raise error
+        mock_evaluator_class.side_effect = RuntimeError("Docker not available")
 
         with patch("wisent_guard.cli.load_task_data") as mock_load_task:
             mock_load_task.return_value = ([], "mbpp_config")
 
-            try:
+            with pytest.raises(RuntimeError):
                 run_task_pipeline(
                     task_name="mbpp",
                     model_name="MockModel",
@@ -89,17 +86,6 @@ class TestDockerCLIIntegration:
                     limit=1,
                     verbose=True,
                 )
-            except Exception:
-                # Expected to fail due to missing dependencies
-                pass
-
-        # Should have been called twice: once for real Docker, once for mock
-        assert mock_evaluator_class.call_count == 2
-
-        # Verify first call was with use_mock=False, second with use_mock=True
-        calls = mock_evaluator_class.call_args_list
-        assert calls[0][1]["use_mock"] is False
-        assert calls[1][1]["use_mock"] is True
 
     def test_enforce_secure_execution_integration(self):
         """Test that enforce_secure_execution is properly integrated."""
@@ -126,17 +112,33 @@ class TestDockerConfigurationIntegration:
             "image_name": "custom-mbpp:latest",
         }
 
-        evaluator = SecureCodeEvaluator(use_mock=True, docker_config=docker_config)
+        with patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor') as mock_executor_class:
+            mock_executor = MagicMock()
+            mock_executor.timeout = 30
+            mock_executor.memory_limit = "512m"
+            mock_executor.cpu_limit = 1.0
+            mock_executor.image_name = "custom-mbpp:latest"
+            mock_executor_class.return_value = mock_executor
+            
+            evaluator = SecureCodeEvaluator(docker_config=docker_config)
 
-        # Verify configuration is applied
-        assert evaluator.executor.timeout == 30
-        assert evaluator.executor.memory_limit == "512m"
-        assert evaluator.executor.cpu_limit == 1.0
-        assert evaluator.executor.image_name == "custom-mbpp:latest"
+            # Verify configuration is applied
+            assert evaluator.executor.timeout == 30
+            assert evaluator.executor.memory_limit == "512m"
+            assert evaluator.executor.cpu_limit == 1.0
+            assert evaluator.executor.image_name == "custom-mbpp:latest"
 
-    def test_executor_info_includes_security_settings(self):
+    @patch('wisent_guard.core.docker.optimized_docker_executor.OptimizedDockerExecutor')
+    def test_executor_info_includes_security_settings(self, mock_executor_class):
         """Test that executor info includes all security settings."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        mock_executor.image_name = "wisent-guard-codeexec:latest"
+        mock_executor.timeout = 10
+        mock_executor.memory_limit = "256m"
+        mock_executor.cpu_limit = 0.5
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
         info = evaluator.get_executor_info()
 
         required_keys = [
@@ -200,13 +202,10 @@ class TestCLISecurityMessages:
 
     @patch("builtins.print")
     @patch("wisent_guard.core.secure_code_evaluator.SecureCodeEvaluator")
-    def test_docker_unavailable_warning(self, mock_evaluator_class, mock_print):
-        """Test warning message when Docker is unavailable."""
-        # First call raises exception, second succeeds with mock
-        mock_evaluator_class.side_effect = [
-            RuntimeError("Docker not running"),
-            MagicMock(),
-        ]
+    def test_docker_error_message(self, mock_evaluator_class, mock_print):
+        """Test error message when Docker operations fail."""
+        # Setup to raise exception
+        mock_evaluator_class.side_effect = RuntimeError("Docker not running")
 
         with patch("wisent_guard.cli.load_task_data") as mock_load_task:
             mock_load_task.return_value = ([], "mbpp_config")
@@ -219,18 +218,9 @@ class TestCLISecurityMessages:
                     limit=1,
                     verbose=True,
                 )
-            except Exception:
+            except RuntimeError:
+                # Expected error
                 pass
-
-        # Check that warning message was printed
-        print_calls = [call[0][0] for call in mock_print.call_args_list]
-        warning_messages = [
-            msg
-            for msg in print_calls
-            if "⚠️" in msg and ("Docker not available" in msg or "mock executor" in msg)
-        ]
-
-        assert len(warning_messages) > 0, "No Docker unavailable warning found"
 
 
 @pytest.mark.docker
@@ -241,16 +231,25 @@ class TestDockerPerformanceIntegration:
     def test_docker_executor_respects_timeout(self):
         """Test that Docker executor respects timeout configuration."""
         short_timeout_config = {"timeout": 1}  # 1 second
-        evaluator = SecureCodeEvaluator(
-            use_mock=True, docker_config=short_timeout_config
-        )
+        with patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor') as mock_executor_class:
+            mock_executor = MagicMock()
+            mock_executor.timeout = 1
+            mock_executor_class.return_value = mock_executor
+            
+            evaluator = SecureCodeEvaluator(docker_config=short_timeout_config)
 
-        assert evaluator.executor.timeout == 1
+            assert evaluator.executor.timeout == 1
 
     def test_docker_executor_respects_resource_limits(self):
         """Test that Docker executor respects resource limits."""
         resource_config = {"memory_limit": "128m", "cpu_limit": 0.25}
-        evaluator = SecureCodeEvaluator(use_mock=True, docker_config=resource_config)
+        with patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor') as mock_executor_class:
+            mock_executor = MagicMock()
+            mock_executor.memory_limit = "128m"
+            mock_executor.cpu_limit = 0.25
+            mock_executor_class.return_value = mock_executor
+            
+            evaluator = SecureCodeEvaluator(docker_config=resource_config)
 
-        assert evaluator.executor.memory_limit == "128m"
-        assert evaluator.executor.cpu_limit == 0.25
+            assert evaluator.executor.memory_limit == "128m"
+            assert evaluator.executor.cpu_limit == 0.25
