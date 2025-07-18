@@ -4534,7 +4534,7 @@ def handle_tasks_command(args):
                         BiPO(
                             beta=args.bipo_beta,
                             learning_rate=args.bipo_learning_rate,
-                            epochs=args.bipo_epochs,
+                            num_epochs=args.bipo_epochs,
                         )
                     )
                 elif args.steering_method == "KSteering":
