@@ -5,4 +5,5 @@ scikit-learn>=0.24.0
 pandas>=1.2.0
 lm-eval==0.4.8
 nltk>=3.8.0
+datasets>=2.0.0 
 bigcode-evaluation-harness @ git+https://github.com/bigcode-project/bigcode-evaluation-harness.git 

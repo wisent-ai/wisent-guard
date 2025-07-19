@@ -5,7 +5,7 @@ Each benchmark has its own data structure and format. This module centralizes
 the extraction logic to cleanly handle the differences between benchmarks.
 """
 
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional
 import logging
 import re
 
@@ -1344,7 +1344,6 @@ class CoQAExtractor(BenchmarkExtractor):
             
             question_texts = questions_data.get('input_text', [])
             answer_texts = answers_data.get('input_text', [])
-            turn_ids = questions_data.get('turn_id', [])
             
             if not all([story, question_texts, answer_texts]):
                 return None
@@ -2212,7 +2211,7 @@ class MBPPExtractor(BenchmarkExtractor):
             correct_answer = qa_pair['correct_answer']
             incorrect_answer = self._create_incorrect_code(correct_answer)
             
-            print(f"DEBUG MBPP: Successfully created contrastive pair")
+            print("DEBUG MBPP: Successfully created contrastive pair")
             print(f"DEBUG MBPP: Question: {qa_pair['formatted_question'][:50]}...")
             print(f"DEBUG MBPP: Correct: {correct_answer[:50]}...")
             print(f"DEBUG MBPP: Incorrect: {incorrect_answer[:50]}...")
@@ -2329,8 +2328,8 @@ class ANLIExtractor(BenchmarkExtractor):
             
             # Get an incorrect answer
             incorrect_answer = None
-            for l, answer in label_map.items():
-                if l != label:
+            for label_key, answer in label_map.items():
+                if label_key != label:
                     incorrect_answer = answer
                     break
                     
@@ -2658,6 +2657,108 @@ class DefaultExtractor(BenchmarkExtractor):
             return None
 
 
+class LiveCodeBenchExtractor(BenchmarkExtractor):
+    """Extractor for LiveCodeBench coding benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        LiveCodeBench format:
+        - doc['question_title']: problem title
+        - doc['question_content']: problem description
+        - doc['starter_code']: starter code template
+        - doc['difficulty']: EASY/MEDIUM/HARD
+        - doc['platform']: LEETCODE/ATCODER/CODEFORCES
+        - doc['public_test_cases']: test cases
+        """
+        try:
+            title = doc.get('question_title', '')
+            content = doc.get('question_content', '')
+            starter_code = doc.get('starter_code', '')
+            difficulty = doc.get('difficulty', '')
+            platform = doc.get('platform', '')
+            
+            if not content:
+                return None
+                
+            # Create comprehensive problem statement
+            problem_statement = f"Problem: {title}\n\n{content}"
+            if starter_code:
+                problem_statement += f"\n\nStarter Code:\n{starter_code}"
+            
+            # Format the question
+            if hasattr(task_data, 'doc_to_text'):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"[{platform}] [{difficulty}] {problem_statement}"
+                
+            # For LiveCodeBench, we need to provide a placeholder solution
+            # since the actual solution might not be in the data
+            correct_answer = starter_code if starter_code else "def solution():\n    # TODO: Implement solution\n    pass"
+            
+            return {
+                'question': problem_statement,
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting LiveCodeBench QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for LiveCodeBench."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            # For code generation, create incorrect answer by removing random words
+            correct_answer = qa_pair['correct_answer']
+            incorrect_answer = self._create_incorrect_code(correct_answer)
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting LiveCodeBench contrastive pair: {e}")
+            return None
+    
+    def _create_incorrect_code(self, correct_code: str) -> str:
+        """Create incorrect code by introducing syntax errors."""
+        try:
+            # Tokenize the code
+            tokens = re.findall(r'\b\w+\b|[^\w\s]', correct_code)
+            
+            if len(tokens) < 3:
+                return "def solution():\n    raise SyntaxError('Broken code')"
+            
+            # Don't remove critical keywords
+            removable_tokens = [
+                i for i, token in enumerate(tokens) 
+                if token not in ['def', 'class', 'if', 'else', 'for', 'while', 'return', 'import', 'from']
+                and token.strip()
+            ]
+            
+            if not removable_tokens:
+                return "def solution():\n    raise SyntaxError('Broken code')"
+                
+            # Remove 1-2 random tokens
+            import random
+            num_to_remove = min(2, len(removable_tokens))
+            indices_to_remove = sorted(random.sample(removable_tokens, num_to_remove), reverse=True)
+            
+            for idx in indices_to_remove:
+                tokens.pop(idx)
+                
+            return ''.join(tokens)
+            
+        except Exception:
+            return "def solution():\n    raise NotImplementedError('Broken implementation')"
+
+
 # Registry of extractors
 EXTRACTORS = {
     'winogrande': WinograndeExtractor,
@@ -2722,6 +2823,7 @@ EXTRACTORS = {
     'big_bench': BigBenchExtractor,  # BIG-Bench tasks
     'humaneval': HumanEvalExtractor,  # Code generation
     'mbpp': MBPPExtractor,  # Python problems
+    'livecodebench': LiveCodeBenchExtractor,  # LiveCodeBench coding problems
     'anli': ANLIExtractor,  # Adversarial NLI
     'arithmetic': ArithmeticExtractor,  # Arithmetic tasks
     'belebele': MultilingualExtractor,  # Multilingual reading comprehension

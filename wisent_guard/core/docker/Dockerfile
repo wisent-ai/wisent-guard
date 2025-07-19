@@ -1,42 +1,37 @@
-# Dockerfile for secure code execution (MBPP, HumanEval, APPS, etc.)
-# Based on bigcode-evaluation-harness patterns
+# Multi-stage Dockerfile for Level 1 optimization
+# Reduces image size and improves startup time
 
-# Use specific digest for reproducible builds and security
-FROM python:3.12-alpine
+# Build stage - includes build tools and dependencies
+FROM python:3.12-alpine AS builder
 
-# Security: Run as non-root from the start
-RUN addgroup -g 1001 coderunner && \
-    adduser -u 1001 -G coderunner -s /bin/sh -D coderunner
+# Install build dependencies
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    python3-dev \
+    linux-headers \
+    git
 
-# Set working directory
-WORKDIR /app
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Security: Update packages and install minimal requirements
-RUN apk update && \
-    apk upgrade && \
-    apk add --no-cache \
-        gcc \
-        musl-dev \
-        python3-dev \
-    && rm -rf /var/cache/apk/*
-
-# Security: Pin Python packages to specific versions
+# Install Python packages in virtual environment (minimal set)
 RUN pip install --no-cache-dir --upgrade pip==24.0 && \
     pip install --no-cache-dir \
-        numpy==1.26.4 \
         timeout-decorator==0.5.0 \
     && pip cache purge
 
-# Security: Remove unnecessary packages and clean up
-RUN apk del gcc musl-dev python3-dev && \
-    rm -rf /var/cache/apk/*
+# Runtime stage - minimal image without build tools
+FROM python:3.12-alpine AS runtime
 
-# Security: Set restrictive permissions
-RUN chmod 755 /app && \
-    chown -R coderunner:coderunner /app
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Switch to non-root user early
-USER coderunner
+# Security: Create non-root user
+RUN addgroup -g 1001 coderunner && \
+    adduser -u 1001 -G coderunner -s /bin/sh -D coderunner
 
 # Security: Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -48,16 +43,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Create secure workspace
 RUN mkdir -p /home/coderunner/workspace && \
-    chmod 750 /home/coderunner/workspace
+    chmod 750 /home/coderunner/workspace && \
+    chown -R coderunner:coderunner /home/coderunner
 
+# Set working directory
 WORKDIR /home/coderunner/workspace
 
-# Security: Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; print('healthy'); sys.exit(0)" || exit 1
+# Security: Minimal healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=2 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
 
-# Security: Set default non-privileged user
+# Switch to non-root user
 USER 1001:1001
 
-# Default secure command
-CMD ["python", "-c", "print('Secure code execution container ready')"]
+# Default command
+CMD ["python", "-c", "print('Optimized secure code execution container ready')"]

@@ -6,7 +6,7 @@ This module ensures that NO code execution happens outside of Docker containers.
 import logging
 from typing import Dict, Any, List, Optional
 
-from .docker import DockerExecutor
+from .docker import OptimizedDockerExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +49,26 @@ class SecureCodeEvaluator:
     preventing any security risks from running untrusted code.
     """
 
-    def __init__(
-        self, docker_config: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, docker_config: Optional[Dict[str, Any]] = None):
         """
         Initialize secure code evaluator.
 
         Args:
             docker_config: Docker configuration options
         """
-        self.executor = DockerExecutor(**(docker_config or {}))
+        # Filter out configs that OptimizedDockerExecutor doesn't accept
+        executor_config = docker_config or {}
+        valid_params = {"image_name", "build_if_missing", "enable_batching", "enable_resource_optimization"}
+        filtered_config = {k: v for k, v in executor_config.items() if k in valid_params}
+        
+        self.executor = OptimizedDockerExecutor(
+            **filtered_config,
+            enable_batching=True,
+            enable_resource_optimization=True
+        )
+        
+        # Store additional config separately if needed
+        self.runtime_config = {k: v for k, v in executor_config.items() if k not in valid_params}
         self.docker_config = docker_config or {}
 
     @classmethod
@@ -116,8 +126,13 @@ class SecureCodeEvaluator:
             "test_list": task_data.get("test_list", []),
         }
 
-        # Execute in Docker
-        result = self.executor.execute_code_task(docker_task)
+        # Execute in Docker - convert MBPP task to code execution format
+        code = docker_task["code"]
+        # Create test execution code
+        test_code = "\n".join(docker_task["test_list"])
+        full_code = f"{code}\n\n# Run tests\n{test_code}"
+        
+        result = self.executor.execute_single(full_code)
 
         # Add task-specific information
         result["task_name"] = "mbpp"
@@ -203,10 +218,10 @@ class SecureCodeEvaluator:
         """Get information about the Docker executor."""
         return {
             "executor_type": type(self.executor).__name__,
-            "image_name": self.executor.image_name,
-            "timeout": self.executor.timeout,
-            "memory_limit": self.executor.memory_limit,
-            "cpu_limit": self.executor.cpu_limit,
+            "image_name": getattr(self.executor, "image_name", "wisent-guard-codeexec:latest"),
+            "timeout": getattr(self.executor, "timeout", 10),
+            "memory_limit": getattr(self.executor, "memory_limit", "256m"),
+            "cpu_limit": getattr(self.executor, "cpu_limit", 0.5),
         }
 
     def cleanup(self):

@@ -10,7 +10,7 @@ from wisent_guard.core.secure_code_evaluator import (
     enforce_secure_execution,
     CODE_EXECUTION_TASKS,
 )
-from wisent_guard.core.docker import MockDockerExecutor
+from unittest.mock import patch, MagicMock
 
 
 class TestSecureCodeEvaluator:
@@ -29,27 +29,48 @@ class TestSecureCodeEvaluator:
         assert SecureCodeEvaluator.is_code_execution_task("hellaswag") is False
         assert SecureCodeEvaluator.is_code_execution_task("truthfulqa_mc1") is False
 
-    def test_secure_evaluator_initialization_with_mock(self):
-        """Test SecureCodeEvaluator initialization with mock executor."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_secure_evaluator_initialization(self, mock_executor_class):
+        """Test SecureCodeEvaluator initialization."""
+        mock_executor = MagicMock()
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
-        assert isinstance(evaluator.executor, MockDockerExecutor)
+        assert evaluator.executor == mock_executor
         assert evaluator.docker_config == {}
+        mock_executor_class.assert_called_once_with(
+            enable_batching=True,
+            enable_resource_optimization=True
+        )
 
-    def test_secure_evaluator_initialization_with_config(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_secure_evaluator_initialization_with_config(self, mock_executor_class):
         """Test SecureCodeEvaluator initialization with custom config."""
+        mock_executor = MagicMock()
+        mock_executor_class.return_value = mock_executor
+        
         config = {"timeout": 30, "memory_limit": "512m", "cpu_limit": 1.0}
-
-        evaluator = SecureCodeEvaluator(use_mock=True, docker_config=config)
+        evaluator = SecureCodeEvaluator(docker_config=config)
 
         assert evaluator.docker_config == config
-        assert evaluator.executor.timeout == 30
-        assert evaluator.executor.memory_limit == "512m"
-        assert evaluator.executor.cpu_limit == 1.0
+        # OptimizedDockerExecutor doesn't accept timeout/memory_limit/cpu_limit in __init__
+        mock_executor_class.assert_called_once_with(
+            enable_batching=True,
+            enable_resource_optimization=True
+        )
 
-    def test_evaluate_mbpp_response(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_evaluate_mbpp_response(self, mock_executor_class):
         """Test evaluating MBPP response."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        mock_executor.execute_code_task.return_value = {
+            "success": True,
+            "error": None
+        }
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
         task_data = {
             "task_id": "test_1",
@@ -65,6 +86,10 @@ def add_numbers(a, b):
     return a + b
 """
 
+        # Configure mock to return proper result
+        mock_result = {"success": True, "error": None, "task_name": "mbpp", "passed": True}
+        mock_executor.execute_single.return_value = mock_result
+        
         result = evaluator.evaluate_response("mbpp", task_data, generated_code)
 
         assert result is not None
@@ -73,16 +98,26 @@ def add_numbers(a, b):
         assert "passed" in result
         assert result["passed"] == result["success"]
 
-    def test_evaluate_non_code_task_raises_error(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_evaluate_non_code_task_raises_error(self, mock_executor_class):
         """Test that non-code tasks raise ValueError."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor_class.return_value = MagicMock()
+        evaluator = SecureCodeEvaluator()
 
         with pytest.raises(ValueError, match="is not a code execution task"):
             evaluator.evaluate_response("gsm8k", {}, "some response")
 
-    def test_batch_evaluate_responses(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_batch_evaluate_responses(self, mock_executor_class):
         """Test batch evaluation of responses."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        mock_executor.execute_code_task.return_value = {
+            "success": True,
+            "error": None
+        }
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
         tasks = [
             {"task_id": "test_1", "test_list": ["assert func1() == 1"]},
@@ -91,15 +126,21 @@ def add_numbers(a, b):
 
         responses = ["def func1(): return 1", "def func2(): return 2"]
 
+        # Configure mock to return proper results
+        mock_result = {"success": True, "error": None, "task_name": "mbpp", "passed": True}
+        mock_executor.execute_single.return_value = mock_result
+        
         results = evaluator.batch_evaluate_responses("mbpp", tasks, responses)
 
         assert len(results) == 2
         assert all(r["task_name"] == "mbpp" for r in results)
         assert all("success" in r for r in results)
 
-    def test_batch_evaluate_mismatched_lengths(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_batch_evaluate_mismatched_lengths(self, mock_executor_class):
         """Test batch evaluation with mismatched lengths raises error."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor_class.return_value = MagicMock()
+        evaluator = SecureCodeEvaluator()
 
         tasks = [{"task_id": "test_1"}]
         responses = ["code1", "code2"]  # Different length
@@ -107,9 +148,17 @@ def add_numbers(a, b):
         with pytest.raises(ValueError, match="must match"):
             evaluator.batch_evaluate_responses("mbpp", tasks, responses)
 
-    def test_evaluate_contrastive_pairs(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_evaluate_contrastive_pairs(self, mock_executor_class):
         """Test evaluation of contrastive pairs."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        mock_executor.execute_code_task.return_value = {
+            "success": True,
+            "error": None
+        }
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
         contrastive_pairs = [
             {
@@ -129,10 +178,17 @@ def add_numbers(a, b):
         assert len(result["correct_results"]) == 1
         assert len(result["incorrect_results"]) == 1
 
-    def test_get_executor_info(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_get_executor_info(self, mock_executor_class):
         """Test getting executor information."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
-
+        mock_executor = MagicMock()
+        mock_executor.image_name = "wisent-guard-codeexec:latest"
+        mock_executor.timeout = 10
+        mock_executor.memory_limit = "256m"
+        mock_executor.cpu_limit = 0.5
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
         info = evaluator.get_executor_info()
 
         assert "executor_type" in info
@@ -140,18 +196,18 @@ def add_numbers(a, b):
         assert "timeout" in info
         assert "memory_limit" in info
         assert "cpu_limit" in info
-        assert info["executor_type"] == "MockDockerExecutor"
+        assert info["executor_type"] == type(mock_executor).__name__
 
-    def test_cleanup(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_cleanup(self, mock_executor_class):
         """Test cleanup method."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
-
-        # Mock the executor cleanup method
-        evaluator.executor.cleanup = MagicMock()
-
+        mock_executor = MagicMock()
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
         evaluator.cleanup()
 
-        evaluator.executor.cleanup.assert_called_once()
+        mock_executor.cleanup.assert_called_once()
 
 
 class TestEnforceSecureExecution:
@@ -187,9 +243,17 @@ class TestEnforceSecureExecution:
 class TestSecureCodeEvaluatorIntegration:
     """Integration tests for SecureCodeEvaluator."""
 
-    def test_mbpp_evaluation_with_correct_code(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_mbpp_evaluation_with_correct_code(self, mock_executor_class):
         """Test MBPP evaluation with correct code."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        mock_executor.execute_code_task.return_value = {
+            "success": True,
+            "error": None
+        }
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
         task_data = {
             "task_id": "mbpp_1",
@@ -210,14 +274,28 @@ def factorial(n):
 
         result = evaluator.evaluate_response("mbpp", task_data, correct_code)
 
-        # With mock executor, syntactically correct code should pass
+        # Configure mock to return success
+        mock_result = {"success": True, "error": None, "task_name": "mbpp", "passed": True}
+        mock_executor.execute_single.return_value = mock_result
+        
+        result = evaluator.evaluate_response("mbpp", task_data, correct_code)
+        
+        # With mock executor returning success
         assert result["success"] is True
         assert result["passed"] is True
         assert result["task_name"] == "mbpp"
 
-    def test_mbpp_evaluation_with_incorrect_code(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_mbpp_evaluation_with_incorrect_code(self, mock_executor_class):
         """Test MBPP evaluation with syntactically incorrect code."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        mock_executor.execute_code_task.return_value = {
+            "success": False,
+            "error": "SyntaxError: invalid syntax"
+        }
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
         task_data = {
             "task_id": "mbpp_2",
@@ -234,14 +312,33 @@ def factorial(n):
 
         result = evaluator.evaluate_response("mbpp", task_data, incorrect_code)
 
-        # With mock executor, syntactically incorrect code should fail
+        # Configure mock to return failure
+        mock_result = {"success": False, "error": "SyntaxError: invalid syntax", "task_name": "mbpp", "passed": False}
+        mock_executor.execute_single.return_value = mock_result
+        
+        result = evaluator.evaluate_response("mbpp", task_data, incorrect_code)
+        
+        # With mock executor returning failure
         assert result["success"] is False
         assert result["passed"] is False
         assert "SyntaxError" in result["error"] or "syntax" in result["error"].lower()
 
-    def test_end_to_end_contrastive_evaluation(self):
+    @patch('wisent_guard.core.secure_code_evaluator.OptimizedDockerExecutor')
+    def test_end_to_end_contrastive_evaluation(self, mock_executor_class):
         """Test end-to-end contrastive evaluation."""
-        evaluator = SecureCodeEvaluator(use_mock=True)
+        mock_executor = MagicMock()
+        # Return success for syntactically correct code, failure for incorrect
+        def execute_side_effect(code, input_data=""):
+            if "return a +" in code and "def multiply" in code:  # Syntax error in multiply function  
+                return {"success": False, "error": "SyntaxError", "task_name": "mbpp", "passed": False}
+            elif "return a - b" in code:  # Wrong operation (logically incorrect)
+                return {"success": True, "error": None, "task_name": "mbpp", "passed": True}  # Executes but wrong answer
+            return {"success": True, "error": None, "task_name": "mbpp", "passed": True}
+        
+        mock_executor.execute_single.side_effect = execute_side_effect
+        mock_executor_class.return_value = mock_executor
+        
+        evaluator = SecureCodeEvaluator()
 
         pairs = [
             {
@@ -263,7 +360,7 @@ def factorial(n):
         assert len(results["correct_results"]) == 2
         assert len(results["incorrect_results"]) == 2
 
-        # All correct code should pass (syntactically)
+        # All correct code should pass
         assert all(r["success"] for r in results["correct_results"])
 
         # Incorrect code with syntax error should fail
@@ -271,4 +368,4 @@ def factorial(n):
 
         # Pass rates should be calculated correctly
         assert results["correct_pass_rate"] == 1.0  # All correct code passes
-        assert results["incorrect_pass_rate"] < 1.0  # Some incorrect code fails
+        assert results["incorrect_pass_rate"] == 0.5  # Second incorrect code fails

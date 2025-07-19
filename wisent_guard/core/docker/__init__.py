@@ -2,6 +2,6 @@
 Docker-based secure code execution for wisent-guard.
 """
 
-from .docker_executor import DockerExecutor
+from .optimized_docker_executor import OptimizedDockerExecutor
 
-__all__ = ["DockerExecutor"]
+__all__ = ["OptimizedDockerExecutor"]
