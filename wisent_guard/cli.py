@@ -6087,7 +6087,7 @@ def handle_full_optimization_command(args):
                     result = run_steering_optimization(
                         model_name=args.model,
                         optimization_type="method_comparison",
-                        task=task,
+                        task_name=task,
                         methods=args.steering_methods,
                         limit=args.steering_limit,
                         device=args.device,
