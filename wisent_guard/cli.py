@@ -5961,7 +5961,7 @@ def handle_full_optimization_command(args):
                         from .core.activation_collection_method import (
                             ActivationCollectionLogic,
                         )
-                        from .core.contrastive_pairs.prompt_construction import (
+                        from .core.activation_collection_method import (
                             PromptConstructionStrategy,
                         )
 
@@ -6075,13 +6075,12 @@ def handle_full_optimization_command(args):
                     
                     # Determine layer range
                     if args.steering_layer_range:
-                        # Parse layer range
-                        from .core.parser import parse_layer_range
-                        layer_range = parse_layer_range(args.steering_layer_range, None)
+                        # Use the layer range string directly
+                        layer_range_str = args.steering_layer_range
                     else:
                         # Use optimal classification layer
                         optimal_layer = model_config.get("optimal_parameters", {}).get("classification_layer", 0)
-                        layer_range = [optimal_layer]
+                        layer_range_str = str(optimal_layer)
                     
                     # Run steering optimization
                     result = run_steering_optimization(
@@ -6092,7 +6091,7 @@ def handle_full_optimization_command(args):
                         limit=args.steering_limit,
                         device=args.device,
                         verbose=args.verbose,
-                        layer_range=layer_range,
+                        layer_range=layer_range_str,
                         strength_range=args.steering_strength_range,
                     )
                     
