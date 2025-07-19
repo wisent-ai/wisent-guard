@@ -4430,6 +4430,46 @@ def handle_tasks_command(args):
         print(f"🚀 Running ALL {len(AVAILABLE_BENCHMARKS)} available benchmarks:")
         print(f"   {', '.join(sorted(AVAILABLE_BENCHMARKS.keys()))}")
         print(f"   Using --limit {args.limit or 'unlimited'} samples per benchmark\n")
+    
+    # Handle --skills/--risks based task selection
+    elif hasattr(args, "skills") and (args.skills or args.risks):
+        from .core.task_selector import TaskSelector
+        selector = TaskSelector()
+        
+        # Validate and show selection criteria
+        if args.skills:
+            print(f"🎯 Selecting tasks by skills: {', '.join(args.skills)}")
+        if args.risks:
+            print(f"⚠️  Selecting tasks by risks: {', '.join(args.risks)}")
+        
+        # Find matching tasks
+        selected_tasks = selector.select_random_tasks(
+            skills=args.skills,
+            risks=args.risks,
+            num_tasks=args.num_tasks,
+            min_quality_score=args.min_quality_score,
+            seed=args.task_seed
+        )
+        
+        if not selected_tasks:
+            print("❌ No tasks found matching the specified skills/risks criteria")
+            print("💡 Available skills:", ", ".join(selector.get_available_skills()))
+            print("💡 Available risks:", ", ".join(selector.get_available_risks()))
+            sys.exit(1)
+        
+        # Filter to only include available benchmarks
+        selected_tasks = [t for t in selected_tasks if t in AVAILABLE_BENCHMARKS]
+        
+        if not selected_tasks:
+            print("❌ No available benchmarks match the specified criteria")
+            print("   (Some matching tasks may be in the unavailable/problematic list)")
+            sys.exit(1)
+        
+        args.task_names = ",".join(selected_tasks)
+        print(f"📋 Selected {len(selected_tasks)} tasks from skills/risks criteria")
+        if args.verbose:
+            print(f"   Tasks: {', '.join(selected_tasks[:10])}" + 
+                  (" ..." if len(selected_tasks) > 10 else ""))
 
     task_sources = []
 
@@ -5590,6 +5630,35 @@ def handle_full_optimization_command(args):
         # Get list of tasks to optimize
         if args.tasks:
             tasks = args.tasks
+            print(f"   📋 Tasks: {len(tasks)} specified tasks")
+        elif args.skills or args.risks:
+            # Use task selector to find tasks by skills/risks
+            from .core.task_selector import TaskSelector
+            selector = TaskSelector()
+            
+            # Validate skills and risks
+            if args.skills:
+                print(f"   🎯 Skills: {', '.join(args.skills)}")
+            if args.risks:
+                print(f"   ⚠️  Risks: {', '.join(args.risks)}")
+            
+            # Find matching tasks
+            tasks = selector.select_random_tasks(
+                skills=args.skills,
+                risks=args.risks,
+                num_tasks=args.num_tasks,
+                min_quality_score=args.min_quality_score,
+                seed=args.task_seed
+            )
+            
+            if not tasks:
+                print("❌ No tasks found matching the specified skills/risks criteria")
+                sys.exit(1)
+                
+            print(f"   📋 Tasks: {len(tasks)} tasks selected from skills/risks criteria")
+            if args.verbose:
+                print(f"      Selected tasks: {', '.join(tasks[:5])}" + 
+                      (" ..." if len(tasks) > 5 else ""))
         else:
             # Use all available tasks
             tasks = get_valid_task_names()
