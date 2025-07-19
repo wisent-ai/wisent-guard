@@ -1290,20 +1290,37 @@ class ContrastivePairSet:
                         # For HellaSwag, use the question as formatted_question
                         formatted_question = question
                 
-                elif task_name in ['livecodebench', 'humaneval', 'mbpp', 'mbpp_plus', 'apps']:
-                    # Code generation tasks - use starter code as correct answer template
-                    # and create an incorrect version
-                    starter_code = doc.get('starter_code', doc.get('prompt', ''))
-                    if starter_code:
-                        # For correct answer, use the starter code with a working solution hint
-                        correct_answer = starter_code + "\n    # TODO: Implement correct solution"
-                        # For incorrect answer, use the starter code with a broken solution hint
-                        incorrect_answer = starter_code + "\n    # TODO: Fix broken implementation"
+                elif task_name in ['humaneval', 'mbpp', 'mbpp_plus', 'apps']:
+                    # Code generation tasks with known solutions
+                    if task_name == 'humaneval':
+                        # HumanEval has canonical_solution
+                        correct_answer = doc.get('canonical_solution', '')
+                        prompt = doc.get('prompt', '')
+                        if correct_answer:
+                            # Create incorrect by breaking the solution
+                            incorrect_answer = correct_answer.replace('return', 'return None  # ')
+                        else:
+                            correct_answer = "# Solution not found"
+                            incorrect_answer = "raise NotImplementedError"
+                    elif task_name in ['mbpp', 'mbpp_plus']:
+                        # MBPP has code field
+                        correct_answer = doc.get('code', '')
+                        if correct_answer:
+                            # Create incorrect version
+                            incorrect_answer = "def solution():\n    raise NotImplementedError"
+                        else:
+                            correct_answer = "# Solution not found"
+                            incorrect_answer = "raise NotImplementedError"
                     else:
-                        # Fallback if no starter code
-                        correct_answer = "def solution():\n    # Correct implementation\n    pass"
-                        incorrect_answer = "def solution():\n    # Incorrect implementation\n    raise NotImplementedError"
+                        # Generic fallback for other code tasks
+                        correct_answer = "# Correct implementation"
+                        incorrect_answer = "# Incorrect implementation"
                     formatted_question = question
+                
+                elif task_name == 'livecodebench':
+                    # LiveCodeBench will be handled separately after the loop
+                    # using the model outputs extractor
+                    continue
                 
                 else:
                     # Use benchmark-specific extractors for all other tasks
@@ -1429,5 +1446,29 @@ class ContrastivePairSet:
                     print(f"   Document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
                     print(f"   Continuing with next document...\n")
                 continue
+        
+        # Special handling for LiveCodeBench using model outputs
+        if task_name == 'livecodebench' and len(qa_pairs) == 0:
+            try:
+                from ..benchmark_extractors.livecodebench_model_outputs_extractor import LiveCodeBenchModelOutputsExtractor
+                extractor = LiveCodeBenchModelOutputsExtractor()
+                
+                # Extract contrastive pairs from model outputs
+                contrastive_pairs = extractor.extract_contrastive_pairs(docs, limit=len(docs))
+                
+                # Convert to QA pair format
+                for pair in contrastive_pairs:
+                    qa_pairs.append({
+                        'question': pair['question'],
+                        'formatted_question': pair['question'],
+                        'correct_answer': pair['correct_answer'],
+                        'incorrect_answer': pair['incorrect_answer'],
+                        'metadata': pair.get('metadata', {})
+                    })
+                    
+                logger.info(f"Extracted {len(qa_pairs)} LiveCodeBench pairs from model outputs")
+                
+            except Exception as e:
+                logger.error(f"Failed to extract LiveCodeBench pairs from model outputs: {e}")
         
         return qa_pairs 

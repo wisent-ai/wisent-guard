@@ -1,7 +1,7 @@
 # Ignore CAA folder
 /CAA/
 /circuit-breakers/*
-
+/wisent_core/
 .env
 
 # Python cache and compiled files

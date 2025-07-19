@@ -4,7 +4,7 @@ LiveCodeBench task implementation for task-agnostic architecture.
 
 from typing import Dict, Any, List, Optional
 from ..task_interface import TaskInterface
-from ..benchmark_extractors import LiveCodeBenchExtractor, BenchmarkExtractor
+# from wisent_guard.core.benchmark_extractors import LiveCodeBenchExtractor
 from ..data_loaders import LiveCodeBenchLoader
 
 
@@ -12,7 +12,7 @@ class LiveCodeBenchTask(TaskInterface):
     """LiveCodeBench task implementation."""
     
     def __init__(self, release_version: str = "release_v1", limit: Optional[int] = None):
-        self._extractor = LiveCodeBenchExtractor()
+        # self._extractor = LiveCodeBenchExtractor()  # Not needed with model outputs approach
         self._data_loader = LiveCodeBenchLoader()
         self._release_version = release_version
         self._validate_release_version(release_version)
@@ -162,9 +162,9 @@ class LiveCodeBenchTask(TaskInterface):
         
         return base_problems
     
-    def get_extractor(self) -> BenchmarkExtractor:
-        """Get the LiveCodeBench extractor."""
-        return self._extractor
+    def get_extractor(self):
+        """Get the LiveCodeBench extractor - not used with model outputs approach."""
+        return None  # Using model outputs instead
     
     def get_name(self) -> str:
         """Get the task name."""
@@ -213,7 +213,7 @@ class LiveCodeBenchTask(TaskInterface):
 # class LiveCodeBenchTask(TaskInterface):
 #     def __init__(self):
 #         self._lcb = LiveCodeBench()
-#         self._extractor = LiveCodeBenchExtractor()
+#         # self._extractor = LiveCodeBenchExtractor()  # Not needed with model outputs approach
 #     
 #     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
 #         return self._lcb.load_problems(limit=limit)
