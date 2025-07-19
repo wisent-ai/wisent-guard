@@ -85,7 +85,7 @@ def optimize_layers_on_contrastive_pairs(
     """
     from .core.hyperparameter_optimizer import detect_model_layers
     from .core.classifier import Classifier
-    from .cli import parse_layer_range
+    from .core.parser import parse_layer_range
     
     total_layers = detect_model_layers(model)
     

@@ -400,7 +400,7 @@ class SampleSizeOptimizer:
                 break
                 
         # Also consider training time - if time increases dramatically, prefer smaller
-        if optimal_idx < len(sizes) - 1:
+        if optimal_idx < len(sizes) - 1 and times[optimal_idx] > 0:
             time_ratio = times[optimal_idx + 1] / times[optimal_idx]
             if time_ratio > 2.0 and gains[optimal_idx] < 0.01:
                 # Training time doubled for < 1% gain, stick with current

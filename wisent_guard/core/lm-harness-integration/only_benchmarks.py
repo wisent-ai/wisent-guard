@@ -784,6 +784,128 @@ CORE_BENCHMARKS = {
 
     # Dialogue and Conversation
     # babi removed - dialogue task requires different approach
+    
+    # BigCode Evaluation Harness tasks
+    "humaneval": {
+        "task": "humaneval",
+        "tags": ["coding", "python", "code generation"],
+        "priority": "high"
+    },
+    "humaneval_plus": {
+        "task": "humaneval_plus",
+        "tags": ["coding", "python", "code generation"],
+        "priority": "high"
+    },
+    "instructhumaneval": {
+        "task": "instructhumaneval",
+        "tags": ["coding", "python", "code generation", "instruction-following"],
+        "priority": "high"
+    },
+    "apps": {
+        "task": "apps",
+        "tags": ["coding", "python", "code generation", "competitive programming"],
+        "priority": "medium"
+    },
+    "mbpp_plus": {
+        "task": "mbpp_plus",
+        "tags": ["coding", "python", "code generation"],
+        "priority": "high"
+    },
+    "ds1000": {
+        "task": "ds1000",
+        "tags": ["coding", "python", "data science", "code generation"],
+        "priority": "high"
+    },
+    "humanevalpack": {
+        "task": "humanevalpack",
+        "tags": ["coding", "multilingual", "code generation"],
+        "priority": "high"
+    },
+    "multiple_py": {
+        "task": "multiple_py",
+        "tags": ["coding", "python", "code generation", "multilingual"],
+        "priority": "high"
+    },
+    "multiple_js": {
+        "task": "multiple_js",
+        "tags": ["coding", "javascript", "code generation", "multilingual"],
+        "priority": "high"
+    },
+    "multiple_java": {
+        "task": "multiple_java",
+        "tags": ["coding", "java", "code generation", "multilingual"],
+        "priority": "high"
+    },
+    "multiple_cpp": {
+        "task": "multiple_cpp",
+        "tags": ["coding", "cpp", "code generation", "multilingual"],
+        "priority": "high"
+    },
+    "multiple_rs": {
+        "task": "multiple_rs",
+        "tags": ["coding", "rust", "code generation", "multilingual"],
+        "priority": "high"
+    },
+    "multiple_go": {
+        "task": "multiple_go",
+        "tags": ["coding", "go", "code generation", "multilingual"],
+        "priority": "high"
+    },
+    "recode": {
+        "task": "recode",
+        "tags": ["coding", "python", "code generation", "robustness"],
+        "priority": "medium"
+    },
+    "conala": {
+        "task": "conala",
+        "tags": ["coding", "python", "code generation", "natural language to code"],
+        "priority": "medium"
+    },
+    "concode": {
+        "task": "concode",
+        "tags": ["coding", "java", "code generation", "natural language to code"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text": {
+        "task": "codexglue_code_to_text",
+        "tags": ["coding", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text_python": {
+        "task": "codexglue_code_to_text_python",
+        "tags": ["coding", "python", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text_go": {
+        "task": "codexglue_code_to_text_go",
+        "tags": ["coding", "go", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text_ruby": {
+        "task": "codexglue_code_to_text_ruby",
+        "tags": ["coding", "ruby", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text_java": {
+        "task": "codexglue_code_to_text_java",
+        "tags": ["coding", "java", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text_javascript": {
+        "task": "codexglue_code_to_text_javascript",
+        "tags": ["coding", "javascript", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "codexglue_code_to_text_php": {
+        "task": "codexglue_code_to_text_php",
+        "tags": ["coding", "php", "code understanding", "documentation"],
+        "priority": "medium"
+    },
+    "mercury": {
+        "task": "mercury",
+        "tags": ["coding", "python", "code generation", "efficiency"],
+        "priority": "medium"
+    }
 }
 
 def test_single_benchmark_direct(benchmark_name: str, benchmark_config: dict) -> bool:

@@ -87,11 +87,25 @@ def setup_tasks_parser(parser):
     parser.add_argument("task_names", nargs='?',
                        help="Comma-separated list of available task names (37 working benchmarks), or path to CSV/JSON file with --from-csv/--from-json (not needed with --all)")
     
+    # Skills/risks based task selection
+    parser.add_argument("--skills", type=str, nargs='+',
+                       help="Select tasks by skill categories (e.g., coding, mathematics, reasoning)")
+    parser.add_argument("--risks", type=str, nargs='+',
+                       help="Select tasks by risk categories (e.g., harmfulness, toxicity, hallucination)")
+    parser.add_argument("--num-tasks", type=int, default=None,
+                       help="Number of tasks to randomly select from matched tasks (default: all)")
+    parser.add_argument("--min-quality-score", type=int, default=2, choices=[1, 2, 3, 4, 5],
+                       help="Minimum quality score for tasks when using --skills/--risks (default: 2)")
+    parser.add_argument("--task-seed", type=int, default=None,
+                       help="Random seed for task selection (for reproducibility)")
+    
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")
     parser.add_argument("--shots", type=int, default=0, help="Number of few-shot examples")
     parser.add_argument("--split-ratio", type=float, default=0.8, help="Train/test split ratio")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of documents per task")
+    parser.add_argument("--training-limit", type=int, default=None, help="Limit number of training documents (overrides limit for training)")
+    parser.add_argument("--testing-limit", type=int, default=None, help="Limit number of testing documents (overrides limit for testing)")
     parser.add_argument("--output", type=str, default="./results", help="Output directory for results")
     parser.add_argument("--classifier-type", type=str, choices=["logistic", "mlp"], default="logistic", help="Type of classifier")
     parser.add_argument("--max-new-tokens", type=int, default=300, help="Maximum new tokens for generation")
@@ -836,19 +850,39 @@ def setup_sample_size_optimizer_parser(parser):
     parser.add_argument("--task", type=str, required=True,
                        help="Task to optimize for (REQUIRED)")
     parser.add_argument("--layer", type=int, required=True,
-                       help="Layer index to use (REQUIRED - must match your classifier config)")
+                       help="Layer index to use (REQUIRED)")
     parser.add_argument("--token-aggregation", type=str, required=True,
                        choices=["average", "final", "first", "max", "min"],
-                       help="Token aggregation method (REQUIRED - must match your classifier config)")
-    parser.add_argument("--threshold", type=float, required=True,
-                       help="Detection threshold (REQUIRED - must match your classifier config)")
+                       help="Token aggregation method (REQUIRED)")
+    
+    # Classification-specific arguments
+    parser.add_argument("--threshold", type=float, default=0.5,
+                       help="Detection threshold for classification (default: 0.5)")
+    
+    # Steering mode
+    parser.add_argument("--steering-mode", action="store_true",
+                       help="Optimize for steering instead of classification")
+    parser.add_argument("--steering-method", type=str, default="CAA",
+                       choices=["CAA", "CAA_L2", "HPR", "DAC", "BiPO", "KSteering"],
+                       help="Steering method to use (default: CAA)")
+    parser.add_argument("--steering-strength", type=float, default=1.0,
+                       help="Steering strength to use (default: 1.0)")
+    parser.add_argument("--token-targeting-strategy", type=str, default="LAST_TOKEN",
+                       choices=["CHOICE_TOKEN", "LAST_TOKEN", "FIRST_TOKEN", "ALL_TOKENS"],
+                       help="Token targeting strategy for steering (default: LAST_TOKEN)")
+    
+    # Common optimization parameters
     parser.add_argument("--sample-sizes", type=int, nargs='+',
-                       default=[1, 2, 5, 10, 20, 50, 100, 200, 500],
-                       help="Sample sizes to test (default: 1 2 5 10 20 50 100 200 500)")
+                       default=[5, 10, 20, 50, 100, 200, 500],
+                       help="Sample sizes to test (default: 5 10 20 50 100 200 500)")
+    parser.add_argument("--test-size", type=int, default=200,
+                       help="Fixed test set size (default: 200)")
     parser.add_argument("--test-split", type=float, default=0.2,
-                       help="Fraction of data to use for testing (default: 0.2)")
+                       help="DEPRECATED: Use --test-size instead")
+    parser.add_argument("--seed", type=int, default=42,
+                       help="Random seed for reproducibility (default: 42)")
     parser.add_argument("--limit", type=int, default=None,
-                       help="Maximum number of samples to load from dataset (default: 1000)")
+                       help="Maximum number of samples to load from dataset")
     parser.add_argument("--save-plot", action="store_true",
                        help="Save performance plot")
     parser.add_argument("--no-save-config", action="store_true",
@@ -864,8 +898,15 @@ def setup_sample_size_optimizer_parser(parser):
 def setup_full_optimizer_parser(parser):
     """Set up the full-optimize subcommand parser."""
     parser.add_argument("model", type=str, help="Model name or path to optimize")
-    parser.add_argument("--tasks", type=str, nargs='+', 
-                       help="Tasks to optimize (default: all 37 available tasks)")
+    
+    # Task selection - mutually exclusive options
+    task_group = parser.add_mutually_exclusive_group()
+    task_group.add_argument("--tasks", type=str, nargs='+', 
+                           help="Specific tasks to optimize")
+    task_group.add_argument("--skills", type=str, nargs='+',
+                           help="Select tasks by skill categories (e.g., coding, mathematics, reasoning)")
+    task_group.add_argument("--risks", type=str, nargs='+',
+                           help="Select tasks by risk categories (e.g., harmfulness, toxicity, hallucination)")
     
     # General limit that applies to all optimizations unless overridden
     parser.add_argument("--limit", type=int, default=100,
@@ -903,6 +944,14 @@ def setup_full_optimizer_parser(parser):
     parser.add_argument("--steering-strength-range", type=float, nargs='+',
                        default=[0.5, 1.0, 1.5, 2.0],
                        help="Steering strengths to test (default: 0.5 1.0 1.5 2.0)")
+    # Task selection options
+    parser.add_argument("--num-tasks", type=int, default=None,
+                       help="Number of tasks to randomly select from matched tasks (default: all)")
+    parser.add_argument("--min-quality-score", type=int, default=2, choices=[1, 2, 3, 4, 5],
+                       help="Minimum quality score for tasks (default: 2)")
+    parser.add_argument("--task-seed", type=int, default=None,
+                       help="Random seed for task selection (for reproducibility)")
+    
     parser.add_argument("--max-time-per-task", type=float, default=20.0,
                        help="Maximum time per task in minutes (default: 20.0)")
     

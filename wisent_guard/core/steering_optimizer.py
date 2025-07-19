@@ -223,8 +223,19 @@ class SteeringOptimizer:
                         method=item,
                         params={}
                     ))
+                elif isinstance(item, str):
+                    # Convert string to SteeringMethod enum
+                    try:
+                        method = SteeringMethod(item)
+                        method_configs.append(SteeringMethodConfig(
+                            name=method.value,
+                            method=method,
+                            params={}
+                        ))
+                    except ValueError:
+                        logger.warning(f"Unknown steering method: {item}")
                 else:
-                    logger.warning(f"Unknown method type: {type(item)}")
+                    logger.warning(f"Unknown method type: {type(item)}, value: {item}")
         
         if strength_range is None:
             strength_range = [0.5, 1.0, 1.5, 2.0]

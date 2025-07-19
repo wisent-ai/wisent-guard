@@ -26,6 +26,7 @@ from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass, asdict
 from itertools import product
 import logging
+import torch
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -77,12 +78,21 @@ class SteeringOptimizer:
     """Optimizes steering parameters for maximum accuracy."""
     
     def __init__(self, task_name: str, model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
-                 limit: int = 100, device: str = "cuda", verbose: bool = True, 
+                 limit: int = 100, device: str = None, verbose: bool = True, 
                  custom_layer_range: Optional[str] = None):
         self.task_name = task_name
         self.model_name = model_name
         self.limit = limit
-        self.device = device
+        # Auto-detect best available device if not specified
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                self.device = "mps"
+            else:
+                self.device = "cpu"
+        else:
+            self.device = device
         self.verbose = verbose
         self.custom_layer_range = custom_layer_range
         self.results: List[OptimizationResult] = []
@@ -794,7 +804,7 @@ def main():
                        help='Search strategy')
     parser.add_argument('--layer-range', help='Custom layer range (e.g., "8-24" or "10,15,20")')
     parser.add_argument('--output-dir', help='Output directory path (default: optimization_results)')
-    parser.add_argument('--device', default='cuda', help='Device to use')
+    parser.add_argument('--device', default=None, help='Device to use (auto-detects best available if not specified)')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     parser.add_argument('--skip-confirmation', action='store_true', help='Skip runtime confirmation prompt')
     parser.add_argument('--target-runtime', type=float, help='Target runtime in minutes')

@@ -355,7 +355,7 @@ class AutonomousAgent:
                 device=None,
                 beta=self.bipo_beta,
                 learning_rate=self.bipo_learning_rate,
-                epochs=self.bipo_epochs
+                num_epochs=self.bipo_epochs
             )
         elif self.steering_method == "KSteering":
             # Parse target and avoid labels

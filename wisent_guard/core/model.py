@@ -850,6 +850,18 @@ class Model:
         Returns:
             Task object from lm_eval
         """
+        # Check if it's a BigCode task
+        try:
+            from .bigcode_integration import is_bigcode_task, load_bigcode_task
+            
+            if is_bigcode_task(task_name):
+                # Load from BigCode
+                return load_bigcode_task(task_name, limit=limit)
+        except ImportError:
+            # BigCode not available, continue with lm-eval
+            pass
+            
+        # Default to lm-eval
         if _task_manager is None:
             raise RuntimeError("Task management system not available")
         
