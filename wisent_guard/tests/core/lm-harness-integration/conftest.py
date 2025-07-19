@@ -47,85 +47,8 @@ def docker_environment():
     os.environ.update(original_env)
 
 
-@pytest.fixture
-def mock_docker_client():
-    """Mock Docker client for testing without actual Docker."""
-
-    class MockDockerClient:
-        def __init__(self):
-            self.containers = MockContainerManager()
-            self.images = MockImageManager()
-
-        def ping(self):
-            return True
-
-        def version(self):
-            return {"Version": "20.10.0"}
-
-    class MockContainerManager:
-        def __init__(self):
-            self.running_containers = []
-
-        def run(
-            self,
-            image,
-            command=None,
-            volumes=None,
-            environment=None,
-            remove=True,
-            detach=False,
-            timeout=None,
-            **kwargs
-        ):
-            """Mock container run method."""
-            container = MockContainer(image, command, volumes, environment)
-            if not detach:
-                # Simulate immediate execution
-                return container.wait_and_get_output()
-            else:
-                self.running_containers.append(container)
-                return container
-
-        def list(self, all=False):
-            return self.running_containers
-
-        def prune(self):
-            self.running_containers.clear()
-
-    class MockImageManager:
-        def list(self):
-            return [{"RepoTags": ["wisent-guard-codeexec:latest"]}]
-
-        def build(self, path, tag, **kwargs):
-            return {"Id": "sha256:12345", "stream": "Successfully built"}
-
-    class MockContainer:
-        def __init__(self, image, command, volumes, environment):
-            self.image = image
-            self.command = command
-            self.volumes = volumes
-            self.environment = environment
-            self.id = "mock_container_id"
-            self.status = "running"
-
-        def wait_and_get_output(self):
-            """Mock successful execution."""
-            return MockContainerOutput()
-
-        def kill(self):
-            self.status = "killed"
-
-        def remove(self):
-            self.status = "removed"
-
-    class MockContainerOutput:
-        def __init__(self):
-            self.exit_code = 0
-
-        def decode(self):
-            return '{"pass@1": 0.5, "results": {"0": [{"passed": true}]}}'
-
-    return MockDockerClient()
+# Removed mock_docker_client fixture - Docker is required for code execution tests
+# Tests should use real Docker or be marked with @pytest.mark.skip if Docker is not available
 
 
 @pytest.fixture
@@ -233,6 +156,13 @@ class DockerMBPPRunner:
 
 
 @pytest.fixture
-def docker_mbpp_runner(mock_docker_client):
-    """Create a Docker MBPP runner instance."""
-    return DockerMBPPRunner(mock_docker_client)
+def docker_mbpp_runner():
+    """Create a Docker MBPP runner instance with real Docker."""
+    try:
+        import docker
+        client = docker.from_env()
+        # Test if Docker is actually running
+        client.ping()
+        return DockerMBPPRunner(client)
+    except Exception as e:
+        pytest.skip(f"Docker is not available: {e}")
