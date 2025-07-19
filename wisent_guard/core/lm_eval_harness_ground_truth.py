@@ -66,6 +66,8 @@ class LMEvalHarnessGroundTruth:
             return self._evaluate_text_generation(classifier, task_name, num_samples, evaluation_model, layer, token_aggregation)
         elif self.evaluation_method == "perplexity":
             return self._evaluate_perplexity(classifier, task_name, num_samples, evaluation_model, layer, token_aggregation)
+        elif self.evaluation_method == "code-execution":
+            return self._evaluate_code_execution(classifier, task_name, num_samples, evaluation_model, layer, token_aggregation)
         else:
             return {
                 "ground_truth": "UNKNOWN",
@@ -974,3 +976,166 @@ class LMEvalHarnessGroundTruth:
         except Exception as e:
             logger.error(f"Error in default evaluation: {e}")
             return False
+    
+    def _evaluate_code_execution(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:
+        """Evaluate classifier using code execution approach for BigCode tasks."""
+        try:
+            logger.info(f"🎯 CODE EXECUTION EVALUATION: {task_name}")
+            
+            # Check if it's a BigCode task
+            from .bigcode_integration import is_bigcode_task, load_bigcode_task, get_bigcode_evaluator
+            
+            if not is_bigcode_task(task_name):
+                logger.warning(f"Task {task_name} is not a BigCode task, falling back to text generation")
+                return self._evaluate_text_generation(classifier, task_name, num_samples, model, layer, token_aggregation)
+            
+            # Load BigCode task
+            bigcode_task = load_bigcode_task(task_name, limit=num_samples)
+            logger.info(f"📝 Loaded BigCode task {task_name} with {len(bigcode_task)} samples")
+            
+            # Generate code for each sample
+            generated_codes = []
+            for i, sample in enumerate(bigcode_task.get_samples()):
+                try:
+                    # Get prompt
+                    prompt = bigcode_task.doc_to_text(sample)
+                    logger.info(f"📋 Prompt for sample {i+1}:\n{prompt}\n")
+                    
+                    # Generate code using model
+                    logger.info(f"🔸 Generating code for sample {i+1}/{len(bigcode_task)}...")
+                    generated_code, _ = model.generate(
+                        prompt=prompt,
+                        layer_index=layer,
+                        max_new_tokens=300,  # More tokens for code generation
+                        temperature=0.1
+                        # Note: stop_sequences not supported by all models
+                    )
+                    
+                    generated_codes.append(generated_code)
+                    logger.info(f"   📝 Generated: {generated_code[:100]}...")
+                    logger.info(f"   📝 Full generated code:\n{generated_code}\n")
+                    
+                except Exception as e:
+                    logger.error(f"Error generating code for sample {i}: {e}")
+                    generated_codes.append("")  # Empty code for failed generation
+            
+            # Evaluate generated code using BigCode evaluator
+            logger.info(f"🎯 Evaluating {len(generated_codes)} generated code samples...")
+            
+            # Get Docker executor if available
+            docker_executor = None
+            try:
+                from .docker import DockerExecutor
+                docker_executor = DockerExecutor()
+            except Exception as e:
+                logger.warning(f"Docker executor not available: {e}")
+            
+            # Use BigCode evaluator
+            evaluator = get_bigcode_evaluator(docker_executor)
+            
+            # Prepare generations in expected format (list of lists)
+            generations_for_eval = [[code] for code in generated_codes]
+            
+            # Run evaluation
+            evaluation_results = evaluator.evaluate(
+                bigcode_task, 
+                generations_for_eval,
+                k_values=[1]  # Just pass@1 for now
+            )
+            
+            # Extract pass rate
+            pass_rate = evaluation_results.get('pass_at_k', {}).get('pass@1', 0.0)
+            
+            logger.info(f"✅ Code execution pass@1: {pass_rate:.2%}")
+            
+            # Now classify the generated code to see if classifier agrees
+            classification_results = []
+            for i, code in enumerate(generated_codes):
+                try:
+                    # Create layer object
+                    from .activations import Activations, ActivationAggregationMethod
+                    from .layer import Layer
+                    
+                    layer_obj = Layer(index=layer, type="transformer")
+                    
+                    # Extract activations from generated code
+                    activation_tensor = model.extract_activations(code, layer_obj)
+                    activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
+                    
+                    activation_obj = Activations(
+                        tensor=activation_tensor,
+                        layer=layer_obj,
+                        aggregation_method=activation_method
+                    )
+                    
+                    # Get classifier prediction
+                    features = activation_obj.extract_features_for_classifier()
+                    features_numpy = features.cpu().numpy()
+                    
+                    # Get prediction probability
+                    try:
+                        prediction_proba = classifier.predict_proba([features_numpy])
+                        if isinstance(prediction_proba, (list, tuple)) and len(prediction_proba) > 0:
+                            prediction = float(prediction_proba[0])
+                        else:
+                            prediction = float(prediction_proba)
+                    except:
+                        prediction = float(classifier.predict([features_numpy])[0])
+                    
+                    # Check if code passed tests
+                    code_passed = False
+                    if i < len(evaluation_results.get('execution_results', [])):
+                        sample_results = evaluation_results['execution_results'][i].get('results', [])
+                        if sample_results:
+                            code_passed = sample_results[0].get('passed', False)
+                    
+                    classification_results.append({
+                        'classifier_score': prediction,
+                        'code_passed': code_passed,
+                        'code_snippet': code[:200]
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Error classifying generated code {i}: {e}")
+                    classification_results.append({
+                        'classifier_score': 0.5,
+                        'code_passed': False,
+                        'error': str(e)
+                    })
+            
+            # Analyze classifier performance
+            correct_predictions = 0
+            for result in classification_results:
+                # Classifier should predict high score (>0.5) for passing code
+                if (result['classifier_score'] > 0.5 and result['code_passed']) or \
+                   (result['classifier_score'] <= 0.5 and not result['code_passed']):
+                    correct_predictions += 1
+            
+            classifier_accuracy = correct_predictions / len(classification_results) if classification_results else 0.0
+            
+            return {
+                "ground_truth": "CODE_EXECUTION",
+                "method_used": "bigcode-evaluation",
+                "confidence": classifier_accuracy,
+                "pass_rate": pass_rate,
+                "classifier_accuracy": classifier_accuracy,
+                "total_samples": len(generated_codes),
+                "passing_samples": int(pass_rate * len(generated_codes)),
+                "details": f"Pass@1: {pass_rate:.2%}, Classifier accuracy: {classifier_accuracy:.2%}",
+                "task_name": task_name,
+                "evaluation_method": "code-execution",
+                "execution_results": evaluation_results
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in code execution evaluation: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "ground_truth": "ERROR",
+                "method_used": "code-execution-error",
+                "confidence": 0.0,
+                "details": f"Code execution evaluation failed: {str(e)}",
+                "task_name": task_name,
+                "evaluation_method": "code-execution"
+            }

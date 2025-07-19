@@ -55773,6 +55773,248 @@
         "english"
       ],
       "quality_score": 2
+    },
+    "humaneval": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "english"
+      ],
+      "quality_score": 4
+    },
+    "humaneval_plus": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "english"
+      ],
+      "quality_score": 4
+    },
+    "instructhumaneval": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "instruction-following",
+        "english"
+      ],
+      "quality_score": 4
+    },
+    "apps": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "competitive programming",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "mbpp_plus": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "ds1000": {
+      "tags": [
+        "coding",
+        "python",
+        "data science",
+        "code generation",
+        "english"
+      ],
+      "quality_score": 4
+    },
+    "humanevalpack": {
+      "tags": [
+        "coding",
+        "multilingual",
+        "code generation",
+        "python",
+        "javascript",
+        "java",
+        "go",
+        "cpp",
+        "rust"
+      ],
+      "quality_score": 4
+    },
+    "multiple_py": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "multiple_js": {
+      "tags": [
+        "coding",
+        "javascript",
+        "code generation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "multiple_java": {
+      "tags": [
+        "coding",
+        "java",
+        "code generation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "multiple_cpp": {
+      "tags": [
+        "coding",
+        "cpp",
+        "code generation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "multiple_rs": {
+      "tags": [
+        "coding",
+        "rust",
+        "code generation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "multiple_go": {
+      "tags": [
+        "coding",
+        "go",
+        "code generation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "recode": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "robustness",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "conala": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "natural language to code",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "concode": {
+      "tags": [
+        "coding",
+        "java",
+        "code generation",
+        "natural language to code",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text": {
+      "tags": [
+        "coding",
+        "code understanding",
+        "documentation",
+        "multilingual",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text_python": {
+      "tags": [
+        "coding",
+        "python",
+        "code understanding",
+        "documentation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text_go": {
+      "tags": [
+        "coding",
+        "go",
+        "code understanding",
+        "documentation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text_ruby": {
+      "tags": [
+        "coding",
+        "ruby",
+        "code understanding",
+        "documentation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text_java": {
+      "tags": [
+        "coding",
+        "java",
+        "code understanding",
+        "documentation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text_javascript": {
+      "tags": [
+        "coding",
+        "javascript",
+        "code understanding",
+        "documentation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "codexglue_code_to_text_php": {
+      "tags": [
+        "coding",
+        "php",
+        "code understanding",
+        "documentation",
+        "english"
+      ],
+      "quality_score": 3
+    },
+    "mercury": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "efficiency",
+        "computational efficiency",
+        "english"
+      ],
+      "quality_score": 3
     }
   }
 }

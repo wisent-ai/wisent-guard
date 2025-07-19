@@ -149,6 +149,31 @@ ALLOWED_TASKS = {
     "wsc273",
     # Adversarial benchmarks
     "anli",
+    # BigCode benchmarks
+    "humaneval",
+    "humaneval_plus",
+    "instructhumaneval",
+    "apps",
+    "mbpp_plus",
+    "ds1000",
+    "humanevalpack",
+    "multiple_py",
+    "multiple_js",
+    "multiple_java",
+    "multiple_cpp",
+    "multiple_rs",
+    "multiple_go",
+    "recode",
+    "conala",
+    "concode",
+    "codexglue_code_to_text",
+    "codexglue_code_to_text_python",
+    "codexglue_code_to_text_go",
+    "codexglue_code_to_text_ruby",
+    "codexglue_code_to_text_java",
+    "codexglue_code_to_text_javascript",
+    "codexglue_code_to_text_php",
+    "mercury",
 }
 
 # Filter to only available (working) benchmarks - this gives us the validated benchmarks

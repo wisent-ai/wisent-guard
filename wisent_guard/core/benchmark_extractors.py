@@ -2746,6 +2746,14 @@ EXTRACTORS = {
 
 def get_extractor(benchmark_name: str) -> BenchmarkExtractor:
     """Get the appropriate extractor for a benchmark with hard error for unsupported tasks."""
+    # Check if it's a BigCode task first
+    try:
+        from .bigcode_extractors import BIGCODE_EXTRACTORS, get_bigcode_extractor
+        if benchmark_name in BIGCODE_EXTRACTORS:
+            return get_bigcode_extractor(benchmark_name)
+    except ImportError:
+        pass
+    
     # Try exact match first
     if benchmark_name in EXTRACTORS:
         return EXTRACTORS[benchmark_name]()
