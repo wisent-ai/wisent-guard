@@ -6095,22 +6095,62 @@ def handle_full_optimization_command(args):
                         strength_range=args.steering_strength_range,
                     )
                     
-                    if result and result.get("overall_best"):
-                        best = result["overall_best"]
-                        print(f"      ✅ Best method: {best['method']} (layer {best['layer']}, strength {best['strength']})")
-                        print(f"      📊 Accuracy: {best['accuracy']:.3f}")
-                        steering_results[task] = best
-                        
-                        # Save to model config
-                        if "steering_optimization" not in model_config:
-                            model_config["steering_optimization"] = {}
-                        model_config["steering_optimization"][task] = {
-                            "method": best["method"],
-                            "layer": best["layer"],
-                            "strength": best["strength"],
-                            "accuracy": best["accuracy"],
-                            "optimized_date": datetime.now().isoformat()
-                        }
+                    if result:
+                        # Handle SteeringOptimizationSummary object
+                        if hasattr(result, 'best_overall_method'):
+                            # Extract best configuration from summary
+                            best_method = result.best_overall_method
+                            best_layer = result.best_overall_layer
+                            best_strength = result.best_overall_strength
+                            
+                            # Find accuracy from task results
+                            best_accuracy = 0.0
+                            if result.task_results:
+                                for task_result in result.task_results:
+                                    if (task_result.best_steering_method == best_method and 
+                                        task_result.best_steering_layer == best_layer):
+                                        best_accuracy = task_result.steering_effectiveness_score
+                                        break
+                            
+                            print(f"      ✅ Best method: {best_method} (layer {best_layer}, strength {best_strength})")
+                            print(f"      📊 Effectiveness: {best_accuracy:.3f}")
+                            
+                            steering_results[task] = {
+                                "method": best_method,
+                                "layer": best_layer,
+                                "strength": best_strength,
+                                "accuracy": best_accuracy
+                            }
+                            
+                            # Save to model config
+                            if "steering_optimization" not in model_config:
+                                model_config["steering_optimization"] = {}
+                            model_config["steering_optimization"][task] = {
+                                "method": best_method,
+                                "layer": best_layer,
+                                "strength": best_strength,
+                                "accuracy": best_accuracy,
+                                "optimized_date": datetime.now().isoformat()
+                            }
+                        # Handle dictionary result (backward compatibility)
+                        elif isinstance(result, dict) and result.get("overall_best"):
+                            best = result["overall_best"]
+                            print(f"      ✅ Best method: {best['method']} (layer {best['layer']}, strength {best['strength']})")
+                            print(f"      📊 Accuracy: {best['accuracy']:.3f}")
+                            steering_results[task] = best
+                            
+                            # Save to model config
+                            if "steering_optimization" not in model_config:
+                                model_config["steering_optimization"] = {}
+                            model_config["steering_optimization"][task] = {
+                                "method": best["method"],
+                                "layer": best["layer"],
+                                "strength": best["strength"],
+                                "accuracy": best["accuracy"],
+                                "optimized_date": datetime.now().isoformat()
+                            }
+                        else:
+                            print("      ❌ Steering optimization failed - unexpected result format")
                     else:
                         print("      ❌ Steering optimization failed")
                         
