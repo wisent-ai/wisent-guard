@@ -1144,6 +1144,11 @@ class ContrastivePairSet:
                 elif task_name == 'wsc273':
                     # For wsc273, use the text field which contains the actual sentence
                     question = doc.get('text', '')
+                elif task_name in ['livecodebench', 'humaneval', 'mbpp', 'mbpp_plus', 'apps']:
+                    # For code generation tasks, use the problem description/content
+                    question = doc.get('question_content', doc.get('text', doc.get('prompt', '')))
+                    if not question and 'question_title' in doc:
+                        question = doc.get('question_title', '')
                 else:
                     # For other tasks, use the template method
                     try:
@@ -1284,6 +1289,21 @@ class ContrastivePairSet:
                                 break
                         # For HellaSwag, use the question as formatted_question
                         formatted_question = question
+                
+                elif task_name in ['livecodebench', 'humaneval', 'mbpp', 'mbpp_plus', 'apps']:
+                    # Code generation tasks - use starter code as correct answer template
+                    # and create an incorrect version
+                    starter_code = doc.get('starter_code', doc.get('prompt', ''))
+                    if starter_code:
+                        # For correct answer, use the starter code with a working solution hint
+                        correct_answer = starter_code + "\n    # TODO: Implement correct solution"
+                        # For incorrect answer, use the starter code with a broken solution hint
+                        incorrect_answer = starter_code + "\n    # TODO: Fix broken implementation"
+                    else:
+                        # Fallback if no starter code
+                        correct_answer = "def solution():\n    # Correct implementation\n    pass"
+                        incorrect_answer = "def solution():\n    # Incorrect implementation\n    raise NotImplementedError"
+                    formatted_question = question
                 
                 else:
                     # Use benchmark-specific extractors for all other tasks

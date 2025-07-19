@@ -56015,6 +56015,17 @@
         "english"
       ],
       "quality_score": 3
+    },
+    "livecodebench": {
+      "tags": [
+        "coding",
+        "python",
+        "code generation",
+        "competitive programming",
+        "real-world",
+        "english"
+      ],
+      "quality_score": 9
     }
   }
 }

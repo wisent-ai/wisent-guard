@@ -811,6 +811,11 @@ CORE_BENCHMARKS = {
         "tags": ["coding", "python", "code generation"],
         "priority": "high"
     },
+    "livecodebench": {
+        "task": "livecodebench",
+        "tags": ["coding", "python", "code generation", "competitive programming", "real-world"],
+        "priority": "high"
+    },
     "ds1000": {
         "task": "ds1000",
         "tags": ["coding", "python", "data science", "code generation"],

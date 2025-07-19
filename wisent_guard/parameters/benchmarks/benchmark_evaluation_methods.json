@@ -59,5 +59,6 @@
   "codexglue_code_to_text_java": "text-generation",
   "codexglue_code_to_text_javascript": "text-generation",
   "codexglue_code_to_text_php": "text-generation",
-  "codexglue_code_to_text_ruby": "text-generation"
+  "codexglue_code_to_text_ruby": "text-generation",
+  "livecodebench": "code-execution"
 }

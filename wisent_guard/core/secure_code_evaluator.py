@@ -37,6 +37,7 @@ CODE_EXECUTION_TASKS = {
     "codexglue_code_to_text_javascript",
     "codexglue_code_to_text_php",
     "mercury",
+    "livecodebench",  # LiveCodeBench task
     # Add more code execution tasks as needed
 }
 
@@ -121,6 +122,8 @@ class SecureCodeEvaluator:
 
         if task_name.lower() == "mbpp":
             return self._evaluate_mbpp_response(task_data, generated_response)
+        elif task_name.lower() == "livecodebench":
+            return self._evaluate_livecodebench_response(task_data, generated_response)
         else:
             raise NotImplementedError(f"Evaluation for {task_name} not yet implemented")
 
@@ -157,6 +160,106 @@ class SecureCodeEvaluator:
         result["passed"] = result.get("success", False)
 
         return result
+
+    def _evaluate_livecodebench_response(
+        self, task_data: Dict[str, Any], generated_code: str
+    ) -> Dict[str, Any]:
+        """
+        Evaluate LiveCodeBench response in Docker.
+
+        Args:
+            task_data: LiveCodeBench task data with test cases
+            generated_code: Generated code to evaluate
+
+        Returns:
+            Evaluation results
+        """
+        # Extract test cases from task data
+        public_test_cases = task_data.get("public_test_cases", [])
+        private_test_cases = task_data.get("private_test_cases", [])
+        all_test_cases = public_test_cases + private_test_cases
+        
+        if not all_test_cases:
+            # If no test cases, can't evaluate
+            return {
+                "task_name": "livecodebench",
+                "passed": False,
+                "error": "No test cases available",
+                "success": False
+            }
+        
+        # Create test execution code for LiveCodeBench
+        # LiveCodeBench uses stdin/stdout format
+        test_results = []
+        for i, test_case in enumerate(all_test_cases):
+            test_input = test_case.get("input", "")
+            expected_output = test_case.get("output", "").strip()
+            
+            # Create a test script that runs the code with the input
+            # Use repr() to properly escape the strings
+            test_script = f"""
+import sys
+import io
+
+# Test input and expected output
+test_input = {repr(test_input)}
+expected_output = {repr(expected_output)}
+
+# Redirect stdin
+sys.stdin = io.StringIO(test_input)
+
+# Capture stdout
+old_stdout = sys.stdout
+sys.stdout = io.StringIO()
+
+# Generated code
+{generated_code}
+
+# Get output
+output = sys.stdout.getvalue()
+sys.stdout = old_stdout
+
+# Check if output matches expected
+actual = output.strip()
+expected = expected_output.strip()
+
+if actual == expected:
+    print("TEST PASSED")
+else:
+    print("TEST FAILED")
+    print(f"Expected:\\n{{expected}}")
+    print(f"Actual:\\n{{actual}}")
+"""
+            
+            # Execute test in Docker
+            result = self.executor.execute_single(test_script)
+            stdout = result.get("stdout", "")
+            stderr = result.get("stderr", "")
+            success = result.get("success", False)
+            
+            # Check if test passed by looking for TEST PASSED in stdout
+            passed = success and "TEST PASSED" in stdout
+            
+            test_results.append({
+                "test_id": i,
+                "passed": passed,
+                "output": stdout,
+                "error": stderr
+            })
+        
+        # Aggregate results
+        passed_count = sum(1 for r in test_results if r["passed"])
+        total_count = len(test_results)
+        
+        return {
+            "task_name": "livecodebench",
+            "passed": passed_count == total_count,
+            "success": passed_count == total_count,
+            "passed_tests": passed_count,
+            "total_tests": total_count,
+            "test_results": test_results,
+            "pass_rate": passed_count / total_count if total_count > 0 else 0.0
+        }
 
     def batch_evaluate_responses(
         self,

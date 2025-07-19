@@ -672,6 +672,104 @@ class LMEvalHarnessGroundTruth:
             logger.error(f"Error calculating perplexity: {e}")
             return float('inf')
     
+    def _evaluate_generic_code_execution(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:
+        """Evaluate generic code execution tasks (non-BigCode) like LiveCodeBench."""
+        try:
+            logger.info(f"🎯 GENERIC CODE EXECUTION EVALUATION: {task_name}")
+            
+            # Get secure code evaluator
+            from .secure_code_evaluator import SecureCodeEvaluator
+            secure_evaluator = SecureCodeEvaluator()
+            
+            # Load task data
+            task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
+            
+            if hasattr(task_data, 'test_docs'):
+                docs = task_data.test_docs()
+            else:
+                docs, _ = model.split_task_data(task_data, split_ratio=1.0)
+            
+            if not docs:
+                return self._error_result(f"No documents retrieved from task: {task_name}")
+            
+            logger.info(f"📝 Retrieved {len(docs)} documents from {task_name}")
+            
+            # Generate code for each sample
+            generated_codes = []
+            evaluation_results = []
+            
+            for i, doc in enumerate(docs):
+                try:
+                    # Get prompt
+                    if hasattr(task_data, 'doc_to_text'):
+                        prompt = task_data.doc_to_text(doc)
+                    else:
+                        # For LiveCodeBench
+                        question = doc.get('question_content', doc.get('text', ''))
+                        starter_code = doc.get('starter_code', '')
+                        prompt = f"{question}\n\n{starter_code}" if starter_code else question
+                    
+                    logger.info(f"📋 Prompt for sample {i+1}:\n{prompt[:200]}...\n")
+                    
+                    # Generate code using model
+                    logger.info(f"🔸 Generating code for sample {i+1}/{len(docs)}...")
+                    generated_code, _ = model.generate(
+                        prompt=prompt,
+                        layer_index=layer,
+                        max_new_tokens=500,  # More tokens for code generation
+                        temperature=0.1
+                    )
+                    
+                    generated_codes.append(generated_code)
+                    logger.info(f"   📝 Generated code:\n{generated_code}\n")
+                    
+                    # Evaluate generated code
+                    eval_result = secure_evaluator.evaluate_response(
+                        task_name, doc, generated_code
+                    )
+                    evaluation_results.append(eval_result)
+                    
+                    logger.info(f"   ✅ Evaluation result: {'PASSED' if eval_result.get('passed', False) else 'FAILED'}")
+                    if 'pass_rate' in eval_result:
+                        logger.info(f"   📊 Pass rate: {eval_result['pass_rate']:.2%}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing sample {i}: {e}")
+                    generated_codes.append("")
+                    evaluation_results.append({
+                        "passed": False,
+                        "error": str(e),
+                        "success": False
+                    })
+            
+            # Aggregate results
+            total_passed = sum(1 for r in evaluation_results if r.get('passed', False))
+            accuracy = total_passed / len(evaluation_results) if evaluation_results else 0.0
+            
+            logger.info(f"📊 CODE EXECUTION COMPLETED: {total_passed}/{len(evaluation_results)} passed ({accuracy:.2%})")
+            
+            # Clean up Docker resources
+            secure_evaluator.cleanup()
+            
+            return {
+                "ground_truth": "EVALUATED",
+                "method_used": f"generic-code-execution-{task_name}",
+                "confidence": accuracy,
+                "accuracy": accuracy,
+                "details": f"Executed and evaluated {len(generated_codes)} code samples",
+                "task_name": task_name,
+                "evaluation_method": "code-execution",
+                "total_samples": len(generated_codes),
+                "passed_samples": total_passed,
+                "evaluation_results": evaluation_results
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in generic code execution evaluation: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return self._error_result(f"Generic code execution evaluation error: {str(e)}")
+
     def _evaluate_with_lm_eval_metrics(self, task_name: str, response_data: list, task_data) -> Dict[str, Any]:
         """Evaluate responses using task-specific evaluation metrics."""
         try:
@@ -984,10 +1082,16 @@ class LMEvalHarnessGroundTruth:
             
             # Check if it's a BigCode task
             from .bigcode_integration import is_bigcode_task, load_bigcode_task, get_bigcode_evaluator
+            from .secure_code_evaluator import SecureCodeEvaluator
             
             if not is_bigcode_task(task_name):
-                logger.warning(f"Task {task_name} is not a BigCode task, falling back to text generation")
-                return self._evaluate_text_generation(classifier, task_name, num_samples, model, layer, token_aggregation)
+                # Check if it's still a code execution task (like LiveCodeBench)
+                if SecureCodeEvaluator.is_code_execution_task(task_name):
+                    logger.info(f"Task {task_name} is a non-BigCode code execution task")
+                    return self._evaluate_generic_code_execution(classifier, task_name, num_samples, model, layer, token_aggregation)
+                else:
+                    logger.warning(f"Task {task_name} is not a code execution task, falling back to text generation")
+                    return self._evaluate_text_generation(classifier, task_name, num_samples, model, layer, token_aggregation)
             
             # Load BigCode task
             bigcode_task = load_bigcode_task(task_name, limit=num_samples)

@@ -850,6 +850,11 @@ class Model:
         Returns:
             Task object from lm_eval
         """
+        # Check if it's LiveCodeBench
+        if task_name == "livecodebench":
+            from .tasks.livecodebench_task import LiveCodeBenchTask
+            return LiveCodeBenchTask(release_version="release_v1", limit=limit)
+            
         # Check if it's a BigCode task
         try:
             from .bigcode_integration import is_bigcode_task, load_bigcode_task
