@@ -8,6 +8,19 @@ import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import hashlib
+import numpy as np
+
+
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64)):
+            return int(obj)
+        if isinstance(obj, (np.floating, np.float64)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +115,7 @@ class ModelConfigManager:
         
         try:
             with open(config_path, 'w') as f:
-                json.dump(config_data, f, indent=2)
+                json.dump(config_data, f, indent=2, cls=NumpyEncoder)
             
             logger.info(f"✅ Model configuration saved: {config_path}")
             logger.info(f"   • Classification layer: {classification_layer}")
@@ -165,7 +178,7 @@ class ModelConfigManager:
         
         try:
             with open(config_path, 'w') as f:
-                json.dump(config_data, f, indent=2)
+                json.dump(config_data, f, indent=2, cls=NumpyEncoder)
             
             logger.info(f"✅ Model configuration updated: {config_path}")
             return config_path
