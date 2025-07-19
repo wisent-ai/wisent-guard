@@ -1144,9 +1144,16 @@ class ContrastivePairSet:
                 elif task_name == 'wsc273':
                     # For wsc273, use the text field which contains the actual sentence
                     question = doc.get('text', '')
-                elif task_name in ['livecodebench', 'humaneval', 'mbpp', 'mbpp_plus', 'apps']:
+                elif task_name in ['livecodebench', 'humaneval', 'mbpp', 'mbpp_plus', 'apps', 'conala', 'concode']:
                     # For code generation tasks, use the problem description/content
-                    question = doc.get('question_content', doc.get('text', doc.get('prompt', '')))
+                    if task_name == 'conala':
+                        # Conala uses 'intent' field for the natural language description
+                        question = doc.get('intent', doc.get('question_content', doc.get('text', '')))
+                    elif task_name == 'concode':
+                        # Concode uses 'nl' field for natural language
+                        question = doc.get('nl', doc.get('question_content', doc.get('text', '')))
+                    else:
+                        question = doc.get('question_content', doc.get('text', doc.get('prompt', '')))
                     if not question and 'question_title' in doc:
                         question = doc.get('question_title', '')
                 else:
@@ -1290,33 +1297,6 @@ class ContrastivePairSet:
                         # For HellaSwag, use the question as formatted_question
                         formatted_question = question
                 
-                elif task_name in ['humaneval', 'mbpp', 'mbpp_plus', 'apps']:
-                    # Code generation tasks with known solutions
-                    if task_name == 'humaneval':
-                        # HumanEval has canonical_solution
-                        correct_answer = doc.get('canonical_solution', '')
-                        prompt = doc.get('prompt', '')
-                        if correct_answer:
-                            # Create incorrect by breaking the solution
-                            incorrect_answer = correct_answer.replace('return', 'return None  # ')
-                        else:
-                            correct_answer = "# Solution not found"
-                            incorrect_answer = "raise NotImplementedError"
-                    elif task_name in ['mbpp', 'mbpp_plus']:
-                        # MBPP has code field
-                        correct_answer = doc.get('code', '')
-                        if correct_answer:
-                            # Create incorrect version
-                            incorrect_answer = "def solution():\n    raise NotImplementedError"
-                        else:
-                            correct_answer = "# Solution not found"
-                            incorrect_answer = "raise NotImplementedError"
-                    else:
-                        # Generic fallback for other code tasks
-                        correct_answer = "# Correct implementation"
-                        incorrect_answer = "# Incorrect implementation"
-                    formatted_question = question
-                
                 elif task_name == 'livecodebench':
                     # LiveCodeBench will be handled separately after the loop
                     # using the model outputs extractor
@@ -1439,18 +1419,12 @@ class ContrastivePairSet:
             except Exception as e:
                 # Skip this document and continue with others
                 logger.warning(f"⚠️  Skipping document {i} in {task_name} due to extraction error: {e}")
-                if self.verbose:
-                    print(f"\n⚠️  WARNING: Failed to extract QA pair from document {i}")
-                    print(f"   Task: {task_name}")
-                    print(f"   Error: {e}")
-                    print(f"   Document keys: {list(doc.keys()) if isinstance(doc, dict) else 'Not a dict'}")
-                    print(f"   Continuing with next document...\n")
                 continue
         
         # Special handling for LiveCodeBench using model outputs
         if task_name == 'livecodebench' and len(qa_pairs) == 0:
             try:
-                from ..benchmark_extractors.livecodebench_model_outputs_extractor import LiveCodeBenchModelOutputsExtractor
+                from ..benchmark_extractor_impls.livecodebench_model_outputs_extractor import LiveCodeBenchModelOutputsExtractor
                 extractor = LiveCodeBenchModelOutputsExtractor()
                 
                 # Extract contrastive pairs from model outputs

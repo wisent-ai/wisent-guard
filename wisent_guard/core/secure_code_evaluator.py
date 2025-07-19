@@ -125,7 +125,7 @@ class SecureCodeEvaluator:
         elif task_name.lower() == "livecodebench":
             return self._evaluate_livecodebench_response(task_data, generated_response)
         else:
-            raise NotImplementedError(f"Evaluation for {task_name} not yet implemented")
+            raise ValueError(f"Unsupported code execution task: {task_name}")
 
     def _evaluate_mbpp_response(
         self, task_data: Dict[str, Any], generated_code: str

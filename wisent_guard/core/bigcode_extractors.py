@@ -13,6 +13,39 @@ from .benchmark_extractors import BenchmarkExtractor
 logger = logging.getLogger(__name__)
 
 
+def _create_syntactic_corruption(code: str) -> str:
+    """
+    Create a syntactically incorrect version of the code by removing tokens.
+    
+    Args:
+        code: The correct code
+        
+    Returns:
+        A syntactically corrupted version of the code
+    """
+    if not code or not code.strip():
+        return "SyntaxError"
+    
+    tokens = code.split()
+    if len(tokens) > 3:
+        # Remove a token from the middle to create syntax error
+        mid = len(tokens) // 2
+        tokens.pop(mid)
+    elif len(tokens) > 0:
+        # For very short code, remove the last token
+        tokens.pop()
+        # If we end up with empty result, return partial code
+        if not tokens:
+            return code[:len(code)//2] if len(code) > 2 else "pass"
+    else:
+        # If no tokens, return something invalid
+        return "SyntaxError"
+    
+    result = ' '.join(tokens)
+    # Never return empty string
+    return result if result.strip() else "SyntaxError"
+
+
 class HumanEvalExtractor(BenchmarkExtractor):
     """Extractor for HumanEval and related benchmarks."""
     
@@ -76,7 +109,7 @@ class HumanEvalExtractor(BenchmarkExtractor):
     def _create_incorrect_humaneval(self, correct_code: str, doc: Dict[str, Any]) -> str:
         """Create an incorrect version specifically for HumanEval."""
         if not correct_code or correct_code == "pass":
-            return "raise NotImplementedError('Incorrect implementation')"
+            raise ValueError("Cannot create incorrect version: no meaningful correct code provided")
             
         lines = correct_code.strip().split('\n')
         
@@ -135,7 +168,8 @@ class MBPPExtractor(BenchmarkExtractor):
         - challenge_test_list: additional harder tests (MBPP+)
         """
         try:
-            text = doc.get('text', '')
+            # mbpp_plus uses 'prompt' field instead of 'text'
+            text = doc.get('text', doc.get('prompt', ''))
             code = doc.get('code', '')
             
             if not text:
@@ -182,7 +216,7 @@ class MBPPExtractor(BenchmarkExtractor):
     def _create_incorrect_mbpp(self, correct_code: str, test_list: List[str]) -> str:
         """Create incorrect MBPP solution."""
         if not correct_code:
-            return "def solution():\n    return None"
+            raise ValueError("Cannot create incorrect solution: no correct code provided")
             
         # Analyze test cases to understand expected behavior
         has_numeric = any('assert' in test and any(c.isdigit() for c in test) for test in test_list)
@@ -452,13 +486,24 @@ class DS1000Extractor(BenchmarkExtractor):
         - prompt: specific prompt
         - code_context: context code
         - test: test cases
-        - solution: reference solution
+        - reference_code: reference solution (not 'solution')
         """
         try:
-            problem = doc.get('problem', '')
-            prompt = doc.get('prompt', '')
-            code_context = doc.get('code_context', '')
-            solution = doc.get('solution', '')
+            # Handle DS1000Problem objects
+            if hasattr(doc, 'data') and isinstance(doc.data, dict):
+                doc = doc.data
+            
+            if isinstance(doc, dict):
+                problem = doc.get('problem', '')
+                prompt = doc.get('prompt', '')
+                code_context = doc.get('code_context', '')
+                solution = doc.get('reference_code', doc.get('solution', ''))
+            else:
+                # Try to extract attributes from DS1000Problem
+                problem = getattr(doc, 'problem', '')
+                prompt = getattr(doc, 'prompt', '')
+                code_context = getattr(doc, 'code_context', '')
+                solution = getattr(doc, 'reference_code', getattr(doc, 'solution', ''))
             
             if not problem and not prompt:
                 return None
@@ -554,6 +599,173 @@ class DS1000Extractor(BenchmarkExtractor):
         return '\n'.join(lines)
 
 
+class ConalaExtractor(BenchmarkExtractor):
+    """Extractor for CoNaLa (Code from Natural Language) benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        CoNaLa format:
+        - intent: natural language description
+        - snippet: code snippet
+        """
+        try:
+            intent = doc.get('intent', '')
+            snippet = doc.get('snippet', '')
+            
+            if not intent or not snippet:
+                return None
+                
+            return {
+                'question': intent,
+                'formatted_question': f"Write Python code to: {intent}",
+                'correct_answer': snippet
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting CoNaLa QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for CoNaLa."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            question = qa_pair['formatted_question']
+            correct_answer = qa_pair['correct_answer']
+            
+            # Create syntactic corruption
+            incorrect_answer = _create_syntactic_corruption(correct_answer)
+            
+            return {
+                'question': question,
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting CoNaLa contrastive pair: {e}")
+            return None
+
+
+class MultiPLEExtractor(BenchmarkExtractor):
+    """Extractor for MultiPL-E benchmarks (multiple_js, multiple_java, etc.)."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        MultiPL-E format:
+        - prompt: the function signature and docstring
+        - tests: test cases
+        - stop_tokens: tokens to stop generation
+        - name: problem name
+        
+        These are generation tasks - we need to handle them specially.
+        """
+        try:
+            prompt = doc.get('prompt', '')
+            
+            if not prompt:
+                return None
+                
+            # For MultiPL-E, we don't have solutions but we can still
+            # create QA pairs with the prompt
+            return {
+                'question': prompt,
+                'formatted_question': prompt,
+                'correct_answer': 'pass',  # Placeholder - actual solution comes from generation
+                'name': doc.get('name', ''),
+                'tests': doc.get('tests', '')
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting MultiPL-E QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for MultiPL-E by creating a minimal stub."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            prompt = qa_pair['question']
+            
+            # Extract language from prompt or use a default
+            if 'function' in prompt and '{' in prompt:
+                # JavaScript/Java/C++/Go style
+                correct_answer = "return null;"
+                incorrect_answer = "returnnull"
+            elif 'fn ' in prompt:
+                # Rust style
+                correct_answer = "unimplemented!()"
+                incorrect_answer = "unimplemented!"
+            else:
+                # Python style (default)
+                correct_answer = "pass"
+                incorrect_answer = "pas"
+            
+            return {
+                'question': prompt,
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting MultiPL-E contrastive pair: {e}")
+            return None
+
+
+class ConcodeExtractor(BenchmarkExtractor):
+    """Extractor for Concode benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Concode format:
+        - nl: natural language description
+        - code: code implementation
+        """
+        try:
+            nl = doc.get('nl', '')
+            code = doc.get('code', '')
+            
+            if not nl or not code:
+                return None
+                
+            return {
+                'question': nl,
+                'formatted_question': f"Implement the following: {nl}",
+                'correct_answer': code
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting Concode QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for Concode."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+                
+            question = qa_pair['formatted_question']
+            correct_answer = qa_pair['correct_answer']
+            
+            # Create syntactic corruption for Java code
+            incorrect_answer = _create_syntactic_corruption(correct_answer)
+            
+            return {
+                'question': question,
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting Concode contrastive pair: {e}")
+            return None
+
+
 # Registry mapping task names to extractors
 BIGCODE_EXTRACTORS = {
     'humaneval': HumanEvalExtractor,
@@ -563,15 +775,15 @@ BIGCODE_EXTRACTORS = {
     'mbpp_plus': MBPPExtractor,
     'ds1000': DS1000Extractor,
     'humanevalpack': HumanEvalExtractor,
-    'multiple_py': HumanEvalExtractor,
-    'multiple_js': HumanEvalExtractor,
-    'multiple_java': HumanEvalExtractor,
-    'multiple_cpp': HumanEvalExtractor,
-    'multiple_rs': HumanEvalExtractor,
-    'multiple_go': HumanEvalExtractor,
+    'multiple_py': MultiPLEExtractor,
+    'multiple_js': MultiPLEExtractor,
+    'multiple_java': MultiPLEExtractor,
+    'multiple_cpp': MultiPLEExtractor,
+    'multiple_rs': MultiPLEExtractor,
+    'multiple_go': MultiPLEExtractor,
     'recode': HumanEvalExtractor,
-    'conala': MBPPExtractor,  # Similar format
-    'concode': MBPPExtractor,  # Similar format
+    'conala': ConalaExtractor,
+    'concode': ConcodeExtractor,
     'codexglue_code_to_text': CodeXGLUEExtractor,
     'codexglue_code_to_text_python': CodeXGLUEExtractor,
     'codexglue_code_to_text_go': CodeXGLUEExtractor,

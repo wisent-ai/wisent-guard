@@ -81,7 +81,7 @@ class ManagedCachedBenchmarks:
     CACHE_VERSION = "1.0"
     CHUNK_SIZE = 25  # Samples per chunk
     MAX_CACHE_AGE_DAYS = 30
-    SUPPORTED_BENCHMARKS = set(EXTRACTORS.keys())
+    SUPPORTED_BENCHMARKS = None  # Will be initialized in __init__
     
     def __init__(self, cache_dir: str = "./benchmark_cache"):
         """
@@ -95,6 +95,17 @@ class ManagedCachedBenchmarks:
         
         self.metadata_file = self.cache_dir / "metadata.json"
         self._metadata = self._load_metadata()
+        
+        # Initialize supported benchmarks including BigCode tasks
+        if ManagedCachedBenchmarks.SUPPORTED_BENCHMARKS is None:
+            supported = set(EXTRACTORS.keys())
+            try:
+                from .bigcode_integration import BigCodeTaskLoader
+                loader = BigCodeTaskLoader()
+                supported.update(loader.TASK_MAPPING.keys())
+            except ImportError:
+                pass
+            ManagedCachedBenchmarks.SUPPORTED_BENCHMARKS = supported
         
         # Validate all supported benchmarks have extractors
         self._validate_extractor_registry()
@@ -198,11 +209,17 @@ class ManagedCachedBenchmarks:
         # Get extractor (hard error if not found)
         extractor = get_extractor(task_name)
         
-        # Load raw task from lm-eval
+        # Load raw task from lm-eval or BigCode
         try:
             task = self._load_lm_eval_task(task_name)
         except Exception as e:
-            raise BenchmarkError(f"Failed to load task '{task_name}' from lm-eval: {e}")
+            # Check if it's a BigCode task
+            from .bigcode_integration import BigCodeTaskLoader
+            loader = BigCodeTaskLoader()
+            if loader.is_bigcode_task(task_name):
+                task = self._load_bigcode_task(task_name)
+            else:
+                raise BenchmarkError(f"Failed to load task '{task_name}' from lm-eval: {e}")
         
         # Get sample iterator
         try:
@@ -251,13 +268,52 @@ class ManagedCachedBenchmarks:
         logger.info(f"Successfully downloaded {len(samples)} samples for '{task_name}'")
         return samples
     
+    def _load_bigcode_task(self, task_name: str):
+        """Load task from bigcode-evaluation-harness."""
+        from .bigcode_integration import BigCodeTaskLoader
+        loader = BigCodeTaskLoader()
+        
+        # For APPS, we need to check if HF_ALLOW_CODE_EVAL is set
+        if task_name == 'apps' and os.environ.get('HF_ALLOW_CODE_EVAL') != '1':
+            print(f"\n⚠️  Task '{task_name}' requires code evaluation permission.")
+            print("This task will execute model-generated code which could be potentially harmful.")
+            print("Please review the safety information at: https://arxiv.org/abs/2107.03374")
+            response = input("\nDo you want to enable code evaluation? (yes/no): ").strip().lower()
+            
+            if response == 'yes':
+                os.environ['HF_ALLOW_CODE_EVAL'] = '1'
+                print("✅ Code evaluation enabled for this session.")
+            else:
+                raise BenchmarkError(f"Code evaluation permission denied for task '{task_name}'")
+        
+        return loader.load_task(task_name)
+    
     def _load_lm_eval_task(self, task_name: str):
         """Load task from lm-eval-harness."""
         try:
             from lm_eval.tasks import get_task_dict
             
+            # Check if we need HF_ALLOW_CODE_EVAL for code evaluation tasks
+            code_eval_tasks = ['mbpp', 'mbpp_plus', 'humaneval', 'humaneval_plus']
+            if task_name in code_eval_tasks and os.environ.get('HF_ALLOW_CODE_EVAL') != '1':
+                print(f"\n⚠️  Task '{task_name}' requires code evaluation permission.")
+                print("This task will execute model-generated code which could be potentially harmful.")
+                print("Please review the safety information at: https://arxiv.org/abs/2107.03374")
+                response = input("\nDo you want to enable code evaluation? (yes/no): ").strip().lower()
+                
+                if response == 'yes':
+                    os.environ['HF_ALLOW_CODE_EVAL'] = '1'
+                    print("✅ Code evaluation enabled for this session.")
+                else:
+                    raise BenchmarkError(f"Code evaluation permission denied for task '{task_name}'")
+            
             task_dict = get_task_dict([task_name])
             if task_name not in task_dict:
+                # Check if it's a BigCode task
+                from .bigcode_integration import BigCodeTaskLoader
+                loader = BigCodeTaskLoader()
+                if loader.is_bigcode_task(task_name):
+                    raise ValueError(f"Task '{task_name}' is a BigCode task. Use --bigcode flag or BigCodeTaskLoader")
                 raise ValueError(f"Task '{task_name}' not found in lm-eval")
             
             return task_dict[task_name]
