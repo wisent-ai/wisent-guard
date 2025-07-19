@@ -3148,8 +3148,8 @@ if not BIGCODE_AVAILABLE:
     EXTRACTORS['multiple_java'] = MultiPLEExtractor
     EXTRACTORS['multiple_rs'] = MultiPLEExtractor
     EXTRACTORS['multiple_go'] = MultiPLEExtractor
-    EXTRACTORS['conala'] = ConalaExtractor
-    EXTRACTORS['concode'] = ConcodeExtractor
+    # ConalaExtractor and ConcodeExtractor are in bigcode_extractors
+    # They will be handled by get_extractor's lazy import
 
 
 def get_extractor(benchmark_name: str) -> BenchmarkExtractor:

@@ -293,6 +293,12 @@ class ManagedCachedBenchmarks:
         try:
             from lm_eval.tasks import get_task_dict
             
+            # First check if it's a BigCode task before trying lm-eval
+            from .bigcode_integration import BigCodeTaskLoader
+            loader = BigCodeTaskLoader()
+            if loader.is_bigcode_task(task_name):
+                raise ValueError(f"Task '{task_name}' is a BigCode task. Use --bigcode flag or BigCodeTaskLoader")
+            
             # Check if we need HF_ALLOW_CODE_EVAL for code evaluation tasks
             code_eval_tasks = ['mbpp', 'mbpp_plus', 'humaneval', 'humaneval_plus']
             if task_name in code_eval_tasks and os.environ.get('HF_ALLOW_CODE_EVAL') != '1':
@@ -309,11 +315,6 @@ class ManagedCachedBenchmarks:
             
             task_dict = get_task_dict([task_name])
             if task_name not in task_dict:
-                # Check if it's a BigCode task
-                from .bigcode_integration import BigCodeTaskLoader
-                loader = BigCodeTaskLoader()
-                if loader.is_bigcode_task(task_name):
-                    raise ValueError(f"Task '{task_name}' is a BigCode task. Use --bigcode flag or BigCodeTaskLoader")
                 raise ValueError(f"Task '{task_name}' not found in lm-eval")
             
             return task_dict[task_name]

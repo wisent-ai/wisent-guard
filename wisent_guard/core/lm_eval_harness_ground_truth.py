@@ -1129,8 +1129,8 @@ class LMEvalHarnessGroundTruth:
             # Get Docker executor if available
             docker_executor = None
             try:
-                from .docker import DockerExecutor
-                docker_executor = DockerExecutor()
+                from .docker import OptimizedDockerExecutor
+                docker_executor = OptimizedDockerExecutor()
             except Exception as e:
                 logger.warning(f"Docker executor not available: {e}")
             
