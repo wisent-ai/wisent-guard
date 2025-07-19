@@ -6059,17 +6059,173 @@ def handle_full_optimization_command(args):
         else:
             print("\n⏭️  Skipping control vector training")
 
+        # Step 5: Steering method optimization
+        if not args.skip_steering:
+            print("\n🎯 Step 5: Steering Method Optimization")
+            print(f"   🔧 Testing methods: {', '.join(args.steering_methods)}")
+            print(f"   📊 Layer range: {args.steering_layer_range or 'auto'}")
+            print(f"   💪 Strength range: {args.steering_strength_range}")
+            
+            from .core.steering_optimizer import run_steering_optimization
+            
+            steering_results = {}
+            for idx, task in enumerate(tasks):
+                try:
+                    print(f"\n   🔄 [{idx+1}/{len(tasks)}] Optimizing steering for {task}...")
+                    
+                    # Determine layer range
+                    if args.steering_layer_range:
+                        # Parse layer range
+                        from .core.parser import parse_layer_range
+                        layer_range = parse_layer_range(args.steering_layer_range, None)
+                    else:
+                        # Use optimal classification layer
+                        optimal_layer = model_config.get("optimal_parameters", {}).get("classification_layer", 0)
+                        layer_range = [optimal_layer]
+                    
+                    # Run steering optimization
+                    result = run_steering_optimization(
+                        model_name=args.model,
+                        optimization_type="method_comparison",
+                        task=task,
+                        methods=args.steering_methods,
+                        limit=args.steering_limit,
+                        device=args.device,
+                        verbose=args.verbose,
+                        layer_range=layer_range,
+                        strength_range=args.steering_strength_range,
+                    )
+                    
+                    if result and result.get("overall_best"):
+                        best = result["overall_best"]
+                        print(f"      ✅ Best method: {best['method']} (layer {best['layer']}, strength {best['strength']})")
+                        print(f"      📊 Accuracy: {best['accuracy']:.3f}")
+                        steering_results[task] = best
+                        
+                        # Save to model config
+                        if "steering_optimization" not in model_config:
+                            model_config["steering_optimization"] = {}
+                        model_config["steering_optimization"][task] = {
+                            "method": best["method"],
+                            "layer": best["layer"],
+                            "strength": best["strength"],
+                            "accuracy": best["accuracy"],
+                            "optimized_date": datetime.now().isoformat()
+                        }
+                    else:
+                        print("      ❌ Steering optimization failed")
+                        
+                except Exception as e:
+                    print(f"      ❌ Error: {e}")
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
+            
+            if steering_results:
+                print("\n✅ Steering method optimization completed!")
+                print(f"   📊 Optimized {len(steering_results)}/{len(tasks)} tasks")
+                
+                # Find most common method
+                from collections import Counter
+                methods = [r["method"] for r in steering_results.values()]
+                most_common = Counter(methods).most_common(1)[0] if methods else ("CAA", 0)
+                print(f"   🏆 Most common best method: {most_common[0]} ({most_common[1]}/{len(methods)} tasks)")
+                
+                # Save to config
+                config_manager.save_model_config(args.model, model_config)
+        else:
+            print("\n⏭️  Skipping steering method optimization")
+
+        # Step 6: Steering sample size optimization
+        if not args.skip_steering and not args.skip_sample_size:
+            print("\n📏 Step 6: Steering Sample Size Optimization")
+            print("   🎯 Finding optimal training size for steering methods")
+            
+            steering_sample_results = {}
+            for idx, task in enumerate(tasks):
+                try:
+                    # Get best steering method for this task
+                    best_steering = model_config.get("steering_optimization", {}).get(task)
+                    if not best_steering:
+                        print(f"\n   ⏭️  [{idx+1}/{len(tasks)}] Skipping {task} (no steering config)")
+                        continue
+                        
+                    print(f"\n   🔄 [{idx+1}/{len(tasks)}] Optimizing sample size for {task}...")
+                    print(f"      • Method: {best_steering['method']}")
+                    print(f"      • Layer: {best_steering['layer']}")
+                    print(f"      • Strength: {best_steering['strength']}")
+                    
+                    # Run sample size optimization for steering
+                    from .core.sample_size_optimizer_v2 import optimize_sample_size
+                    
+                    sample_result = optimize_sample_size(
+                        model_name=args.model,
+                        task_name=task,
+                        layer=best_steering['layer'],
+                        method_type="steering",
+                        sample_sizes=args.sample_sizes,
+                        test_size=min(200, args.steering_limit or 200),
+                        seed=42,
+                        verbose=False,
+                        save_plot=args.save_plots,
+                        save_to_config=False,  # We'll save manually
+                        steering_method=best_steering['method'],
+                        steering_strength=best_steering['strength'],
+                    )
+                    
+                    if sample_result and sample_result.get("optimal_sample_size"):
+                        optimal_size = sample_result["optimal_sample_size"]
+                        print(f"      ✅ Optimal sample size: {optimal_size}")
+                        print(f"      📊 Accuracy: {sample_result.get('optimal_accuracy', 'N/A')}")
+                        steering_sample_results[task] = optimal_size
+                        
+                        # Save to model config
+                        if "steering_sample_sizes" not in model_config:
+                            model_config["steering_sample_sizes"] = {}
+                        model_config["steering_sample_sizes"][task] = {
+                            str(best_steering['layer']): optimal_size,
+                            "method": best_steering['method'],
+                            "strength": best_steering['strength']
+                        }
+                    else:
+                        print("      ❌ Sample size optimization failed")
+                        
+                except Exception as e:
+                    print(f"      ❌ Error: {e}")
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
+            
+            if steering_sample_results:
+                print("\n✅ Steering sample size optimization completed!")
+                print(f"   📊 Optimized {len(steering_sample_results)}/{len(tasks)} tasks")
+                
+                # Calculate average sample size
+                avg_size = sum(steering_sample_results.values()) / len(steering_sample_results)
+                print(f"   📏 Average optimal sample size: {avg_size:.0f}")
+                
+                # Save to config
+                config_manager.save_model_config(args.model, model_config)
+        else:
+            if args.skip_steering:
+                print("\n⏭️  Skipping steering sample size optimization (steering skipped)")
+            else:
+                print("\n⏭️  Skipping steering sample size optimization")
+
         print("\n🎉 Full optimization pipeline completed!")
         print("   💾 All configurations saved to model config")
         print("   🎨 Classifiers pre-trained and cached")
         print("   🎮 Control vectors trained and cached")
+        if not args.skip_steering:
+            print("   🎯 Optimal steering methods identified")
+            print("   📏 Optimal steering sample sizes determined")
         print("   🚀 Ready to use optimized parameters with 'wisent-guard tasks'")
         print("\n   Example usage:")
         print(
             f"   $ wisent-guard tasks {tasks[0] if tasks else 'truthfulqa_mc1'} --model {args.model}"
         )
         print(
-            "   (Will automatically use optimal parameters, cached classifier, and control vector)"
+            "   (Will automatically use optimal parameters, cached classifier, control vector, and steering)"
         )
 
     except Exception as e:
