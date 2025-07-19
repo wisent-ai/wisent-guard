@@ -5989,16 +5989,16 @@ def handle_full_optimization_command(args):
                             # Extract positive activations
                             if pair.positive_response:
                                 pos_activations = model.extract_activations(
-                                    pair.positive_response.text, layer_obj
+                                    pair.positive_response, layer_obj
                                 )
-                                pair.positive_response.activations = pos_activations
+                                pair.positive_activations = pos_activations
 
                             # Extract negative activations
                             if pair.negative_response:
                                 neg_activations = model.extract_activations(
-                                    pair.negative_response.text, layer_obj
+                                    pair.negative_response, layer_obj
                                 )
-                                pair.negative_response.activations = neg_activations
+                                pair.negative_activations = neg_activations
 
                         # Compute control vector
                         control_vector = pair_set.compute_contrastive_vector(layer_obj)
@@ -6046,7 +6046,7 @@ def handle_full_optimization_command(args):
                             traceback.print_exc()
 
                 # Save updated model config
-                config_manager.save_model_config(args.model, model_config)
+                config_manager.update_model_config(args.model, model_config)
 
                 print("\n✅ Control vector training completed!")
                 print(
@@ -6083,6 +6083,10 @@ def handle_full_optimization_command(args):
                         layer_range_str = str(optimal_layer)
                     
                     # Run steering optimization
+                    print(f"      • Debug: Testing methods {args.steering_methods}")
+                    print(f"      • Debug: Layer range: {layer_range_str}")
+                    print(f"      • Debug: Strength range: {args.steering_strength_range}")
+                    
                     result = run_steering_optimization(
                         model_name=args.model,
                         optimization_type="method_comparison",
@@ -6090,7 +6094,7 @@ def handle_full_optimization_command(args):
                         methods_to_test=args.steering_methods,
                         limit=args.steering_limit,
                         device=args.device,
-                        verbose=args.verbose,
+                        verbose=True,  # Always verbose for debugging
                         layer_range=layer_range_str,
                         strength_range=args.steering_strength_range,
                     )
@@ -6171,7 +6175,7 @@ def handle_full_optimization_command(args):
                 print(f"   🏆 Most common best method: {most_common[0]} ({most_common[1]}/{len(methods)} tasks)")
                 
                 # Save to config
-                config_manager.save_model_config(args.model, model_config)
+                config_manager.update_model_config(args.model, model_config)
         else:
             print("\n⏭️  Skipping steering method optimization")
 
@@ -6185,8 +6189,8 @@ def handle_full_optimization_command(args):
                 try:
                     # Get best steering method for this task
                     best_steering = model_config.get("steering_optimization", {}).get(task)
-                    if not best_steering:
-                        print(f"\n   ⏭️  [{idx+1}/{len(tasks)}] Skipping {task} (no steering config)")
+                    if not best_steering or best_steering.get('method') == 'none':
+                        print(f"\n   ⏭️  [{idx+1}/{len(tasks)}] Skipping {task} (no valid steering method found)")
                         continue
                         
                     print(f"\n   🔄 [{idx+1}/{len(tasks)}] Optimizing sample size for {task}...")
@@ -6244,7 +6248,7 @@ def handle_full_optimization_command(args):
                 print(f"   📏 Average optimal sample size: {avg_size:.0f}")
                 
                 # Save to config
-                config_manager.save_model_config(args.model, model_config)
+                config_manager.update_model_config(args.model, model_config)
         else:
             if args.skip_steering:
                 print("\n⏭️  Skipping steering sample size optimization (steering skipped)")
