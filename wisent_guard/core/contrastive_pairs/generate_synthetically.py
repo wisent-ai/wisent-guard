@@ -55,10 +55,10 @@ class SyntheticContrastivePairGenerator:
         
         # Different prompt strategies to ensure diversity  
         prompt_templates = [
-            f"List {target_scenarios//4} different questions or scenarios where someone would naturally respond with {trait_description}. Include everyday situations, conversations, and interactions:\n1.",
-            f"Generate {target_scenarios//4} realistic prompts that would elicit {trait_description} in the response. Include various contexts like advice-seeking, opinions, and casual conversation:\n1.",
-            f"Create {target_scenarios//4} diverse questions where the answer would demonstrate {trait_description}. Mix formal and informal contexts:\n1.",
-            f"Write {target_scenarios//4} conversation starters that would naturally lead to {trait_description} in the reply:\n1."
+            f"List {target_scenarios//4} short, simple questions (5-10 words each) that could reveal if someone is {trait_description}:\n1.",
+            f"Generate {target_scenarios//4} brief, direct questions where someone might respond in a {trait_description} way:\n1.",
+            f"Create {target_scenarios//4} concise questions about everyday topics where {trait_description} could show:\n1.",
+            f"Write {target_scenarios//4} short open-ended questions that could elicit {trait_description} responses:\n1."
         ]
         
         for i, template in enumerate(prompt_templates):
@@ -137,16 +137,13 @@ class SyntheticContrastivePairGenerator:
             cleaned_lower = cleaned.lower()
             is_meta = any(phrase in cleaned_lower for phrase in skip_phrases)
             
-            # Keep questions and statements that could be prompts
-            if (len(cleaned) > 10 and len(cleaned) < 200 and not is_meta):
-                # Accept questions
+            # Keep only short questions and prompts
+            if (len(cleaned) > 10 and len(cleaned) < 100 and not is_meta):
+                # Prefer questions
                 if '?' in cleaned:
                     scenarios.append(cleaned)
-                # Accept statements that could be conversation starters
-                elif any(word in cleaned_lower for word in ['tell me', 'explain', 'describe', 'i need', 'help me', 'what do you think', 'can you', 'could you', 'would you', 'share your', 'give me']):
-                    scenarios.append(cleaned)
-                # Accept opinion-seeking statements
-                elif any(word in cleaned_lower for word in ['opinion', 'thoughts', 'advice', 'recommendation', 'suggest', 'view']):
+                # Accept short imperative statements
+                elif len(cleaned.split()) <= 12 and any(word in cleaned_lower for word in ['tell me', 'explain', 'describe', 'what', 'how', 'why', 'when', 'share']):
                     scenarios.append(cleaned)
         
         return scenarios[:10]  # Limit per response
@@ -266,14 +263,9 @@ Respond directly with the opposite of {trait_description} (no preamble):"""
         
         print(f"🔄 DEBUG: Negative response: {negative_response[:100]}...")
         
-        # Create contrastive pair
-        # Use scenario directly if it's already a question, otherwise add context
-        if scenario.strip().endswith('?') or any(word in scenario.lower() for word in ['what', 'how', 'why', 'when', 'explain', 'tell me']):
-            prompt = scenario.strip()
-            print(f"🔄 DEBUG: Using scenario as direct prompt: {prompt}")
-        else:
-            prompt = f"Scenario: {scenario}"
-            print(f"🔄 DEBUG: Using scenario with prefix: {prompt}")
+        # Create contrastive pair - always use the question directly
+        prompt = scenario.strip()
+        print(f"🔄 DEBUG: Using question as direct prompt: {prompt}")
         
         pair = ContrastivePair(
             prompt=prompt,
