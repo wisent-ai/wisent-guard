@@ -99,6 +99,26 @@ def setup_tasks_parser(parser):
     parser.add_argument("--task-seed", type=int, default=None,
                        help="Random seed for task selection (for reproducibility)")
     
+    # Mixed sampling from multiple benchmarks
+    parser.add_argument("--tag", type=str, nargs='+',
+                       help="Sample randomly from all benchmarks with these tags (e.g., --tag coding). Creates a mixed dataset from multiple benchmarks.")
+    parser.add_argument("--mixed-samples", type=int, default=1000,
+                       help="Total number of samples to collect when using --tag (default: 1000)")
+    parser.add_argument("--tag-mode", type=str, choices=["any", "all"], default="any",
+                       help="Whether benchmarks must have ANY or ALL specified tags (default: any)")
+    
+    # Cross-benchmark evaluation
+    parser.add_argument("--train-task", type=str,
+                       help="Task/benchmark to train on (can be a task name or --tag for mixed)")
+    parser.add_argument("--eval-task", type=str,
+                       help="Task/benchmark to evaluate on (can be a task name or --tag for mixed)")
+    parser.add_argument("--train-tag", type=str, nargs='+',
+                       help="Tags for training data when using cross-benchmark evaluation")
+    parser.add_argument("--eval-tag", type=str, nargs='+',
+                       help="Tags for evaluation data when using cross-benchmark evaluation")
+    parser.add_argument("--cross-benchmark", action="store_true",
+                       help="Enable cross-benchmark evaluation mode (train on one, eval on another)")
+    
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")
     parser.add_argument("--shots", type=int, default=0, help="Number of few-shot examples")

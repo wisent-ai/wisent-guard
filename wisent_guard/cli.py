@@ -682,6 +682,12 @@ def run_task_pipeline(
     smart_selection: bool = False,
     # Benchmark caching parameters
     cache_benchmark: bool = True,
+    # Pre-loaded data for mixed sampling
+    preloaded_qa_pairs: List[Dict[str, Any]] = None,
+    # Cross-benchmark evaluation
+    cross_benchmark_mode: bool = False,
+    train_contrastive_pairs: Optional[Any] = None,
+    eval_contrastive_pairs: Optional[Any] = None,
     use_cached: bool = True,
     force_download: bool = False,
     cache_dir: str = "./benchmark_cache",
@@ -907,7 +913,7 @@ def run_task_pipeline(
         Dictionary with all results
     """
     # VALIDATE TASK NAME - Only allow validated benchmarks from CORE_BENCHMARKS
-    if not (from_csv or from_json):
+    if not (from_csv or from_json or cross_benchmark_mode):
         if not validate_task_name(task_name):
             error_msg = f"Invalid task name: '{task_name}'"
             suggestions = suggest_similar_tasks(task_name)
@@ -1109,7 +1115,33 @@ def run_task_pipeline(
                 log_detections=log_detections,
             )
 
-        if from_csv or from_json:
+        if cross_benchmark_mode and train_contrastive_pairs and eval_contrastive_pairs:
+            # Cross-benchmark evaluation mode
+            if verbose:
+                print(f"\n🔄 Cross-benchmark evaluation mode:")
+                print(f"   • Training pairs: {len(train_contrastive_pairs.pairs)}")
+                print(f"   • Evaluation pairs: {len(eval_contrastive_pairs.pairs)}")
+            
+            # Skip normal data loading - we'll use the pre-loaded pair sets
+            group_task_processed = True
+            group_task_qa_format = True
+            
+            # We'll handle training and evaluation separately below
+            contrastive_pairs = train_contrastive_pairs.pairs
+            
+        elif preloaded_qa_pairs:
+            # Use pre-loaded QA pairs (e.g., from mixed sampling)
+            if verbose:
+                print(f"\n📊 Using pre-loaded mixed dataset with {len(preloaded_qa_pairs)} QA pairs...")
+            
+            all_qa_pairs = preloaded_qa_pairs
+            qa_pairs = all_qa_pairs
+            
+            # Set group task format flag
+            group_task_qa_format = True
+            group_task_processed = True
+            
+        elif from_csv or from_json:
             # Load data from CSV/JSON file using ContrastivePairSet
             if verbose:
                 print(f"\n📁 Loading data from {'CSV' if from_csv else 'JSON'} file...")
@@ -1565,7 +1597,29 @@ def run_task_pipeline(
                 group_task_processed = False
                 group_task_qa_format = True  # Cached data is already in QA format
 
-        if verbose:
+        # Set up qa_pairs and test_qa_pairs_source for cross-benchmark evaluation
+        if cross_benchmark_mode and eval_contrastive_pairs:
+            # In cross-benchmark mode, we need to recreate qa_pairs for display purposes
+            # Note: The actual training will use train_contrastive_pairs which already has activations
+            
+            # For cross-benchmark, we skip showing training examples and QA pair extraction
+            # since the data is already processed
+            qa_pairs = []  # Empty list to avoid errors
+            test_qa_pairs_source = []  # Will be populated from eval pairs later
+            
+            if verbose:
+                print(f"\n🔄 Cross-benchmark evaluation setup:")
+                print(f"   • Training pairs from: {train_contrastive_pairs.name}")
+                print(f"   • Evaluation pairs from: {eval_contrastive_pairs.name}")
+                print(f"   • Training samples: {len(train_contrastive_pairs.pairs)}")
+                print(f"   • Evaluation samples: {len(eval_contrastive_pairs.pairs)}")
+            
+            # Skip the normal QA pair display
+            skip_qa_display = True
+        else:
+            skip_qa_display = False
+        
+        if verbose and not skip_qa_display:
             print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
             print("\n🔍 Training Examples:")
             for i, qa_pair in enumerate(qa_pairs[:4]):  # Show first 4
@@ -1581,7 +1635,7 @@ def run_task_pipeline(
                     print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
 
         # 🚨 HARD ERROR CHECK: QA pair extraction failure
-        if len(qa_pairs) == 0:
+        if len(qa_pairs) == 0 and not cross_benchmark_mode:
             raise ValueError(
                 f"❌ CRITICAL ERROR: QA pair extraction failed for task '{task_name}'!\n"
                 f"   📊 Task loaded {len(train_docs) if 'train_docs' in locals() else 0} training documents\n"
@@ -1677,8 +1731,14 @@ def run_task_pipeline(
 
         # Validate dataset size before proceeding (for non-perplexity tasks)
         min_training_samples = 4
-        if len(qa_pairs) < min_training_samples:
-            error_msg = f"Insufficient training data: {len(qa_pairs)} pairs found, minimum {min_training_samples} required"
+        # In cross-benchmark mode, check the contrastive pairs instead
+        if cross_benchmark_mode:
+            training_sample_count = len(train_contrastive_pairs.pairs) if train_contrastive_pairs else 0
+        else:
+            training_sample_count = len(qa_pairs)
+        
+        if training_sample_count < min_training_samples:
+            error_msg = f"Insufficient training data: {training_sample_count} pairs found, minimum {min_training_samples} required"
             if verbose:
                 print(f"\n❌ ERROR: {error_msg}")
                 print("   • Consider increasing --limit or using a larger dataset")
@@ -1745,20 +1805,29 @@ def run_task_pipeline(
             print(f"   • Prompt construction: {prompt_strategy.value}")
             print(f"   • Token targeting: {targeting_strategy.value}")
 
+        # Create collector (needed for activation extraction regardless of mode)
         collector = ActivationCollectionLogic(model=model)
-        contrastive_pairs = collector.create_batch_contrastive_pairs(
-            qa_pairs, prompt_strategy
-        )
-
-        # 🚨 HARD ERROR CHECK: No training data created
-        if len(contrastive_pairs) == 0:
-            raise ValueError(
-                f"❌ CRITICAL ERROR: No contrastive pairs created for task '{task_name}'!\n"
-                f"   📊 Input: {len(qa_pairs)} QA pairs\n"
-                f"   🔍 Output: 0 contrastive pairs\n"
-                f"   💡 This indicates the contrastive pair creation logic failed\n"
-                f"   🛠️  Check ActivationCollectionLogic.create_batch_contrastive_pairs() method"
+        
+        # In cross-benchmark mode, use pre-loaded contrastive pairs
+        if cross_benchmark_mode and train_contrastive_pairs:
+            contrastive_pairs = train_contrastive_pairs.pairs
+            if verbose:
+                print(f"\n🔄 Using pre-loaded contrastive pairs from cross-benchmark training data")
+                print(f"   • Pairs: {len(contrastive_pairs)}")
+        else:
+            contrastive_pairs = collector.create_batch_contrastive_pairs(
+                qa_pairs, prompt_strategy
             )
+
+            # 🚨 HARD ERROR CHECK: No training data created
+            if len(contrastive_pairs) == 0:
+                raise ValueError(
+                    f"❌ CRITICAL ERROR: No contrastive pairs created for task '{task_name}'!\n"
+                    f"   📊 Input: {len(qa_pairs)} QA pairs\n"
+                    f"   🔍 Output: 0 contrastive pairs\n"
+                    f"   💡 This indicates the contrastive pair creation logic failed\n"
+                    f"   🛠️  Check ActivationCollectionLogic.create_batch_contrastive_pairs() method"
+                )
 
         if verbose:
             print(f"\n🔄 Created {len(contrastive_pairs)} contrastive pairs:")
@@ -2093,11 +2162,18 @@ def run_task_pipeline(
             )
 
         # Create ContrastivePairSet with the real activations
-        pair_set = ContrastivePairSet.from_phrase_pairs(
-            name=f"{task_name}_training",
-            phrase_pairs=phrase_pairs,
-            task_type="lm_evaluation",
-        )
+        if cross_benchmark_mode and train_contrastive_pairs:
+            # In cross-benchmark mode, use the pre-loaded training pair set
+            pair_set = train_contrastive_pairs
+            if verbose:
+                print(f"   • Using pre-loaded training pairs: {len(pair_set.pairs)} pairs")
+        else:
+            # Normal mode: create from phrase pairs
+            pair_set = ContrastivePairSet.from_phrase_pairs(
+                name=f"{task_name}_training",
+                phrase_pairs=phrase_pairs,
+                task_type="lm_evaluation",
+            )
 
         # Store the real activations in the pair set response objects
         for i, processed_pair in enumerate(processed_pairs):
@@ -4450,13 +4526,37 @@ def handle_tasks_command(args):
         print_task_info(args.task_info)
         return
 
+    # Handle cross-benchmark evaluation mode
+    if hasattr(args, "cross_benchmark") and args.cross_benchmark:
+        if not (hasattr(args, "train_task") and hasattr(args, "eval_task")):
+            print("❌ Cross-benchmark mode requires both --train-task and --eval-task")
+            sys.exit(1)
+        
+        print("🔄 Cross-benchmark evaluation mode:")
+        print(f"   • Training on: {args.train_task}")
+        print(f"   • Evaluating on: {args.eval_task}")
+        
+        # Set up for cross-benchmark processing
+        args.task_names = "CROSS_BENCHMARK"  # Special marker
+        
     # Handle --all flag: automatically use all available benchmarks
-    if hasattr(args, "all") and args.all:
+    elif hasattr(args, "all") and args.all:
         args.task_names = ",".join(sorted(AVAILABLE_BENCHMARKS.keys()))
         print(f"🚀 Running ALL {len(AVAILABLE_BENCHMARKS)} available benchmarks:")
         print(f"   {', '.join(sorted(AVAILABLE_BENCHMARKS.keys()))}")
         print(f"   Using --limit {args.limit or 'unlimited'} samples per benchmark\n")
     
+    # Handle --tag for mixed benchmark sampling
+    elif hasattr(args, "tag") and args.tag:
+        print(f"🎲 Mixed benchmark sampling with tags: {', '.join(args.tag)}")
+        print(f"   • Total samples: {args.mixed_samples}")
+        print(f"   • Tag mode: {args.tag_mode}")
+        print(f"   • Split ratio: {args.split_ratio}")
+        
+        # Set a special marker for mixed sampling mode
+        args.mixed_sampling_mode = True
+        args.task_names = "MIXED_SAMPLING"  # Special marker
+        
     # Handle --skills/--risks based task selection
     elif hasattr(args, "skills") and (args.skills or args.risks):
         from .core.task_selector import TaskSelector
@@ -4509,6 +4609,9 @@ def handle_tasks_command(args):
         # Validate each task name before processing
         invalid_tasks = []
         for task_name in task_names:
+            # Skip validation for special modes
+            if task_name in ["MIXED_SAMPLING", "CROSS_BENCHMARK"]:
+                continue
             if not validate_task_name(task_name):
                 invalid_tasks.append(task_name)
 
@@ -4583,9 +4686,174 @@ def handle_tasks_command(args):
                 print(f"📊 TASK {i}/{len(task_sources)}: {source.upper()}")
                 print(f"{'='*60}")
 
-            # Determine source type
-            from_csv = source.endswith(".csv") or args.from_csv
-            from_json = source.endswith(".json") or args.from_json
+            # Handle cross-benchmark evaluation mode
+            if source == "CROSS_BENCHMARK" and hasattr(args, "cross_benchmark") and args.cross_benchmark:
+                print("\n🔄 Setting up cross-benchmark evaluation...")
+                
+                # Load training and evaluation data separately
+                from .core.mixed_benchmark_sampler import MixedBenchmarkSampler
+                
+                cache_dir = getattr(args, 'cache_dir', './benchmark_cache')
+                sampler = MixedBenchmarkSampler(cache_dir=cache_dir)
+                
+                try:
+                    # Load training data
+                    print(f"\n📚 Loading training data from: {args.train_task}")
+                    if args.train_tag:
+                        # Use tag-based mixed sampling for training
+                        train_pair_set = sampler.create_mixed_contrastive_pair_set(
+                            tags=args.train_tag,
+                            total_samples=args.limit or args.mixed_samples,
+                            split_ratio=1.0,  # Use all for training
+                            random_seed=args.seed,
+                            tag_mode=args.tag_mode,
+                            name=f"train_mixed_{'_'.join(args.train_tag)}"
+                        )
+                    else:
+                        # Load single benchmark for training using managed cache
+                        from .core.contrastive_pairs import ContrastivePairSet
+                        from .core.managed_cached_benchmarks import get_managed_cache
+                        
+                        # Get cached samples for training
+                        managed_cache = get_managed_cache()
+                        train_samples = managed_cache.get_task_samples(
+                            task_name=args.train_task,
+                            limit=args.limit,
+                            force_fresh=False
+                        )
+                        
+                        # Extract QA pairs and convert to phrase pairs format
+                        phrase_pairs = []
+                        for sample in train_samples:
+                            qa_pair = sample.get("normalized", {})
+                            if qa_pair and all(k in qa_pair for k in ["question", "correct_answer", "incorrect_answer"]):
+                                # Convert QA pair to phrase pair format
+                                # Format: question + correct answer as harmless, question + incorrect answer as harmful
+                                phrase_pairs.append({
+                                    "harmless": f"{qa_pair['question']} {qa_pair['correct_answer']}",
+                                    "harmful": f"{qa_pair['question']} {qa_pair['incorrect_answer']}"
+                                })
+                        
+                        # Create ContrastivePairSet from phrase pairs
+                        train_pair_set = ContrastivePairSet.from_phrase_pairs(
+                            name=f"train_{args.train_task}",
+                            phrase_pairs=phrase_pairs,
+                            task_type="lm_evaluation"
+                        )
+                    
+                    print(f"✅ Loaded {len(train_pair_set.pairs)} training pairs")
+                    
+                    # Load evaluation data
+                    print(f"\n📊 Loading evaluation data from: {args.eval_task}")
+                    if args.eval_tag:
+                        # Use tag-based mixed sampling for evaluation
+                        eval_pair_set = sampler.create_mixed_contrastive_pair_set(
+                            tags=args.eval_tag,
+                            total_samples=args.testing_limit or args.limit or args.mixed_samples,
+                            split_ratio=1.0,  # Use all for evaluation
+                            random_seed=args.seed + 1 if args.seed else None,  # Different seed
+                            tag_mode=args.tag_mode,
+                            name=f"eval_mixed_{'_'.join(args.eval_tag)}"
+                        )
+                    else:
+                        # Load single benchmark for evaluation using managed cache
+                        # Get cached samples for evaluation
+                        eval_samples = managed_cache.get_task_samples(
+                            task_name=args.eval_task,
+                            limit=args.testing_limit or args.limit,
+                            force_fresh=False
+                        )
+                        
+                        # Extract QA pairs and convert to phrase pairs format
+                        eval_phrase_pairs = []
+                        for sample in eval_samples:
+                            qa_pair = sample.get("normalized", {})
+                            if qa_pair and all(k in qa_pair for k in ["question", "correct_answer", "incorrect_answer"]):
+                                # Convert QA pair to phrase pair format
+                                # Format: question + correct answer as harmless, question + incorrect answer as harmful
+                                eval_phrase_pairs.append({
+                                    "harmless": f"{qa_pair['question']} {qa_pair['correct_answer']}",
+                                    "harmful": f"{qa_pair['question']} {qa_pair['incorrect_answer']}"
+                                })
+                        
+                        # Create ContrastivePairSet from phrase pairs
+                        eval_pair_set = ContrastivePairSet.from_phrase_pairs(
+                            name=f"eval_{args.eval_task}",
+                            phrase_pairs=eval_phrase_pairs,
+                            task_type="lm_evaluation"
+                        )
+                    
+                    print(f"✅ Loaded {len(eval_pair_set.pairs)} evaluation pairs")
+                    
+                    # Set up for cross-benchmark processing
+                    task_name = f"cross_{args.train_task}_to_{args.eval_task}"
+                    from_csv = False
+                    from_json = False
+                    cross_benchmark_mode = True
+                    
+                    # Store the pair sets for later use
+                    train_contrastive_pairs = train_pair_set
+                    eval_contrastive_pairs = eval_pair_set
+                    
+                except Exception as e:
+                    print(f"❌ Failed to load cross-benchmark data: {e}")
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
+                    continue
+                    
+            # Handle mixed sampling mode
+            elif source == "MIXED_SAMPLING" and hasattr(args, "mixed_sampling_mode") and args.mixed_sampling_mode:
+                # Use mixed benchmark sampler
+                from .core.mixed_benchmark_sampler import MixedBenchmarkSampler
+                
+                print("\n🎲 Using mixed benchmark sampling...")
+                
+                cache_dir = getattr(args, 'cache_dir', './benchmark_cache')
+                sampler = MixedBenchmarkSampler(cache_dir=cache_dir)
+                
+                # Create mixed contrastive pair set
+                try:
+                    pair_set = sampler.create_mixed_contrastive_pair_set(
+                        tags=args.tag,
+                        total_samples=args.mixed_samples,
+                        split_ratio=args.split_ratio,
+                        random_seed=args.seed,
+                        tag_mode=args.tag_mode,
+                        name=f"mixed_{'_'.join(args.tag)}"
+                    )
+                    
+                    print(f"✅ Created mixed dataset with {len(pair_set.pairs)} contrastive pairs")
+                    
+                    # Extract QA pairs for processing
+                    qa_pairs = []
+                    for pair in pair_set.pairs:
+                        qa_pairs.append({
+                            "question": pair.question,
+                            "correct_answer": pair.correct_answer,
+                            "incorrect_answer": pair.incorrect_answer,
+                            "source_benchmark": pair.metadata.get("source_benchmark", "unknown")
+                        })
+                    
+                    # Set up parameters for mixed sampling
+                    task_name = f"mixed_{'_'.join(args.tag)}"
+                    from_csv = False
+                    from_json = False
+                    group_task_qa_format = True  # Use the same format as group tasks
+                    
+                except Exception as e:
+                    print(f"❌ Failed to create mixed dataset: {e}")
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
+                    continue
+            else:
+                # Determine source type for regular tasks
+                from_csv = source.endswith(".csv") or args.from_csv
+                from_json = source.endswith(".json") or args.from_json
+                task_name = source
+                group_task_qa_format = False
+                qa_pairs = None
 
             # Parse layers
             layers = parse_layers_from_arg(args.layer)
@@ -4780,6 +5048,12 @@ def handle_tasks_command(args):
                 use_cached=getattr(args, "cache_benchmark", True),  # Use cache_benchmark value
                 force_download=getattr(args, "force_download", False),
                 cache_dir=getattr(args, "cache_dir", "./benchmark_cache"),
+                # Pass pre-loaded QA pairs for mixed sampling
+                preloaded_qa_pairs=qa_pairs if (source == "MIXED_SAMPLING" and qa_pairs) else None,
+                # Pass cross-benchmark data
+                cross_benchmark_mode=cross_benchmark_mode if 'cross_benchmark_mode' in locals() else False,
+                train_contrastive_pairs=train_contrastive_pairs if 'train_contrastive_pairs' in locals() else None,
+                eval_contrastive_pairs=eval_contrastive_pairs if 'eval_contrastive_pairs' in locals() else None,
                 # Model reuse parameter for efficiency
                 model_instance=shared_model,
             )
