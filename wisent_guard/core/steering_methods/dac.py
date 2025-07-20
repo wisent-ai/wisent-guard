@@ -240,8 +240,9 @@ class DAC(SteeringMethod):
             Dictionary mapping property names to computed alphas
         """
         # Debug print
-        print(f"\n[DEBUG] Computing dynamic alphas for properties: {active_properties}")
-        print(f"[DEBUG] Input shape: {input_ids.shape}")
+        if os.environ.get('WISENT_DEBUG') != '0':
+            print(f"\n[DEBUG] Computing dynamic alphas for properties: {active_properties}")
+            print(f"[DEBUG] Input shape: {input_ids.shape}")
         
         # Get unsteered logits
         with torch.no_grad():
@@ -250,14 +251,16 @@ class DAC(SteeringMethod):
                 unsteered_logits = unsteered_logits.logits
             unsteered_logits = unsteered_logits[:, -1, :]  # Last token
         
-        print(f"[DEBUG] Unsteered logits shape: {unsteered_logits.shape}")
+        if os.environ.get('WISENT_DEBUG') != '0':
+            print(f"[DEBUG] Unsteered logits shape: {unsteered_logits.shape}")
         
         alphas = {}
         
         # For each property, compute KL with α=2 steering
         for prop_name in active_properties:
             if prop_name not in self.property_vectors:
-                print(f"[DEBUG] Property {prop_name} not found in property_vectors!")
+                if os.environ.get('WISENT_DEBUG') != '0':
+                    print(f"[DEBUG] Property {prop_name} not found in property_vectors!")
                 continue
             
             # Get steered logits by applying steering directly with α=2
@@ -293,7 +296,8 @@ class DAC(SteeringMethod):
             elif hasattr(model_forward_fn, '__self__'):  # It's a bound method
                 model_obj = model_forward_fn.__self__
             else:
-                print(f"[DEBUG] Warning: Cannot access model for {prop_name}")
+                if os.environ.get('WISENT_DEBUG') != '0':
+                    print(f"[DEBUG] Warning: Cannot access model for {prop_name}")
                 alpha = 0.0
                 alphas[prop_name] = alpha
                 continue
@@ -304,7 +308,8 @@ class DAC(SteeringMethod):
             elif hasattr(model_obj, 'transformer') and hasattr(model_obj.transformer, 'h'):
                 layer_module = model_obj.transformer.h[layer_idx]
             else:
-                print(f"[DEBUG] Warning: Cannot find layer module for {prop_name}")
+                if os.environ.get('WISENT_DEBUG') != '0':
+                    print(f"[DEBUG] Warning: Cannot find layer module for {prop_name}")
                 alpha = 0.0
                 alphas[prop_name] = alpha
                 continue
@@ -384,7 +389,8 @@ class DAC(SteeringMethod):
         dynamic_alphas: Optional[Dict[str, float]] = None,
         model_forward_fn: Optional[callable] = None,
         input_ids: Optional[torch.Tensor] = None,
-        compute_dynamic: bool = True
+        compute_dynamic: bool = True,
+        token_position: Optional[int] = None
     ) -> torch.Tensor:
         """
         Apply DAC steering with optional dynamic intensity control.
@@ -401,6 +407,7 @@ class DAC(SteeringMethod):
             model_forward_fn: Function to compute model forward pass (for dynamic alpha computation)
             input_ids: Input token ids (for dynamic alpha computation)
             compute_dynamic: Whether to compute dynamic alphas (requires model_forward_fn and input_ids)
+            token_position: Specific token position to steer (for precise position tracking)
             
         Returns:
             Steered activations
@@ -447,25 +454,38 @@ class DAC(SteeringMethod):
             # Apply strength multiplier
             alpha *= strength
             
-            print(f"[DEBUG] Applying {property_name} steering: alpha={alpha:.4f}, vector norm={torch.norm(steering_vector).item():.4f}")
+            if os.environ.get('WISENT_DEBUG') != '0':
+                print(f"[DEBUG] Applying {property_name} steering: alpha={alpha:.4f}, vector norm={torch.norm(steering_vector).item():.4f}")
             
             # Handle different activation shapes
             if len(activations.shape) == 3:  # [batch, seq, hidden]
-                # Apply to last token position (for generation)
-                before_norm = torch.norm(steered[:, -1:, :]).item()
-                steered[:, -1:, :] = steered[:, -1:, :] + alpha * steering_vector.unsqueeze(0).unsqueeze(0)
-                after_norm = torch.norm(steered[:, -1:, :]).item()
-                print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                # Use token_position if specified, otherwise apply to last token
+                if token_position is not None:
+                    # Apply to specific token position
+                    before_norm = torch.norm(steered[:, token_position:token_position+1, :]).item()
+                    steered[:, token_position:token_position+1, :] = steered[:, token_position:token_position+1, :] + alpha * steering_vector.unsqueeze(0).unsqueeze(0)
+                    after_norm = torch.norm(steered[:, token_position:token_position+1, :]).item()
+                    if os.environ.get('WISENT_DEBUG') != '0':
+                        print(f"[DEBUG] Applied to token position {token_position}, shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                else:
+                    # Default: apply to last token position (for generation)
+                    before_norm = torch.norm(steered[:, -1:, :]).item()
+                    steered[:, -1:, :] = steered[:, -1:, :] + alpha * steering_vector.unsqueeze(0).unsqueeze(0)
+                    after_norm = torch.norm(steered[:, -1:, :]).item()
+                    if os.environ.get('WISENT_DEBUG') != '0':
+                        print(f"[DEBUG] Applied to last token, shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
             elif len(activations.shape) == 2:  # [batch, hidden]
                 before_norm = torch.norm(steered).item()
                 steered = steered + alpha * steering_vector.unsqueeze(0)
                 after_norm = torch.norm(steered).item()
-                print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                if os.environ.get('WISENT_DEBUG') != '0':
+                    print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
             else:
                 before_norm = torch.norm(steered).item()
                 steered = steered + alpha * steering_vector
                 after_norm = torch.norm(steered).item()
-                print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                if os.environ.get('WISENT_DEBUG') != '0':
+                    print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
         
         return steered
     
@@ -647,8 +667,14 @@ class DAC(SteeringMethod):
         inputs = model.tokenizer(formatted_prompt, return_tensors="pt")
         input_ids = inputs['input_ids'].to(model.device)
         
+        # Track initial prompt length for precise token position handling
+        initial_prompt_len = input_ids.shape[1]
+        
         # Track alpha history
         alpha_history = {prop: [] for prop in active_properties}
+        
+        # Track current token position (will be updated in the loop)
+        current_generation_step = [0]  # Use list to allow mutation in closure
         
         # Set up hooks for each property at their respective layers
         hooks = []
@@ -669,13 +695,16 @@ class DAC(SteeringMethod):
                 # print(f"[DEBUG] Hidden states shape: {hidden_states.shape}")
                 # print(f"[DEBUG] Current alpha for {property_name}: {current_alphas[property_name]:.4f}")
                 
-                # Apply steering with current alpha
+                # Apply steering with current alpha and token position info
+                # Use the current generation step to determine the exact token position
+                token_pos = initial_prompt_len - 1 + current_generation_step[0]
                 steered = self.apply_steering(
                     hidden_states,
                     strength=1.0,
                     active_properties=[property_name],
                     dynamic_alphas={property_name: current_alphas[property_name]},
-                    compute_dynamic=False  # Already computed
+                    compute_dynamic=False,  # Already computed
+                    token_position=token_pos  # Precise position
                 )
                 
                 if isinstance(output, tuple):
@@ -709,6 +738,9 @@ class DAC(SteeringMethod):
         generated_tokens = []
         
         for step in range(max_new_tokens):
+            # Update current generation step for precise token position tracking
+            current_generation_step[0] = step
+            
             # Compute dynamic alphas for this step
             # Pass the model's forward method directly
             new_alphas = self._compute_dynamic_alphas_online(
