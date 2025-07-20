@@ -119,6 +119,18 @@ def setup_tasks_parser(parser):
     parser.add_argument("--cross-benchmark", action="store_true",
                        help="Enable cross-benchmark evaluation mode (train on one, eval on another)")
     
+    # Synthetic pair generation
+    parser.add_argument("--synthetic", action="store_true",
+                       help="Generate synthetic contrastive pairs from a trait description")
+    parser.add_argument("--trait", type=str,
+                       help="Natural language description of desired model behavior (e.g., 'hallucinates less', 'more factual', 'less verbose')")
+    parser.add_argument("--num-synthetic-pairs", type=int, default=30,
+                       help="Number of synthetic pairs to generate (default: 30)")
+    parser.add_argument("--save-synthetic", type=str,
+                       help="Path to save generated synthetic pairs as JSON")
+    parser.add_argument("--load-synthetic", type=str,
+                       help="Path to load previously generated synthetic pairs from JSON")
+    
     parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-8B-Instruct", help="Model name or path")
     parser.add_argument("--layer", type=str, default="15", help="Layer(s) to extract activations from. Can be a single layer (15), range (14-16), or comma-separated list (14,15,16)")
     parser.add_argument("--shots", type=int, default=0, help="Number of few-shot examples")

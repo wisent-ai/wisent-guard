@@ -693,6 +693,9 @@ def run_task_pipeline(
     use_cached: bool = True,
     force_download: bool = False,
     cache_dir: str = "./benchmark_cache",
+    # Synthetic pair mode
+    from_synthetic: bool = False,
+    synthetic_contrastive_pairs: Optional[Any] = None,
     # Model reuse parameter for efficiency
     model_instance: Optional[Any] = None,
 ) -> Dict[str, Any]:
@@ -915,7 +918,7 @@ def run_task_pipeline(
         Dictionary with all results
     """
     # VALIDATE TASK NAME - Only allow validated benchmarks from CORE_BENCHMARKS
-    if not (from_csv or from_json or cross_benchmark_mode):
+    if not (from_csv or from_json or cross_benchmark_mode or from_synthetic):
         if not validate_task_name(task_name):
             error_msg = f"Invalid task name: '{task_name}'"
             suggestions = suggest_similar_tasks(task_name)
@@ -1117,7 +1120,18 @@ def run_task_pipeline(
                 log_detections=log_detections,
             )
 
-        if cross_benchmark_mode and train_contrastive_pairs and eval_contrastive_pairs:
+        if from_synthetic and synthetic_contrastive_pairs:
+            # Synthetic pair mode
+            if verbose:
+                print(f"\n🧬 Synthetic pair mode:")
+                print(f"   • Training pairs: {len(synthetic_contrastive_pairs.pairs)}")
+                print(f"   • Task name: {synthetic_contrastive_pairs.name}")
+            
+            # Skip normal data loading - we'll use the synthetic pair set
+            group_task_processed = True
+            group_task_qa_format = True
+            
+        elif cross_benchmark_mode and train_contrastive_pairs and eval_contrastive_pairs:
             # Cross-benchmark evaluation mode
             if verbose:
                 print(f"\n🔄 Cross-benchmark evaluation mode:")
@@ -1599,8 +1613,14 @@ def run_task_pipeline(
                 group_task_processed = False
                 group_task_qa_format = True  # Cached data is already in QA format
 
+        # Set up qa_pairs and test_qa_pairs_source for synthetic mode
+        if from_synthetic and synthetic_contrastive_pairs:
+            # In synthetic mode, skip normal QA pair extraction
+            qa_pairs = []  # Empty, we're using synthetic pairs
+            test_qa_pairs_source = []  # No test data for synthetic
+            
         # Set up qa_pairs and test_qa_pairs_source for cross-benchmark evaluation
-        if cross_benchmark_mode and eval_contrastive_pairs:
+        elif cross_benchmark_mode and eval_contrastive_pairs:
             # In cross-benchmark mode, we need to recreate qa_pairs for display purposes
             # Note: The actual training will use train_contrastive_pairs which already has activations
             
@@ -1810,8 +1830,14 @@ def run_task_pipeline(
         # Create collector (needed for activation extraction regardless of mode)
         collector = ActivationCollectionLogic(model=model)
         
+        # In synthetic mode, use pre-loaded synthetic pairs
+        if from_synthetic and synthetic_contrastive_pairs:
+            contrastive_pairs = synthetic_contrastive_pairs.pairs
+            if verbose:
+                print(f"\n🧬 Using pre-loaded synthetic contrastive pairs")
+                print(f"   • Pairs: {len(contrastive_pairs)}")
         # In cross-benchmark mode, use pre-loaded contrastive pairs
-        if cross_benchmark_mode and train_contrastive_pairs:
+        elif cross_benchmark_mode and train_contrastive_pairs:
             contrastive_pairs = train_contrastive_pairs.pairs
             if verbose:
                 print(f"\n🔄 Using pre-loaded contrastive pairs from cross-benchmark training data")
@@ -2164,7 +2190,12 @@ def run_task_pipeline(
             )
 
         # Create ContrastivePairSet with the real activations
-        if cross_benchmark_mode and train_contrastive_pairs:
+        if from_synthetic and synthetic_contrastive_pairs:
+            # In synthetic mode, use the pre-loaded synthetic pair set
+            pair_set = synthetic_contrastive_pairs
+            if verbose:
+                print(f"   • Using pre-loaded synthetic pairs: {len(pair_set.pairs)} pairs")
+        elif cross_benchmark_mode and train_contrastive_pairs:
             # In cross-benchmark mode, use the pre-loaded training pair set
             pair_set = train_contrastive_pairs
             if verbose:
@@ -3303,8 +3334,26 @@ The task will be skipped in optimization."""
             logger.info(f"LM-eval-harness evaluation completed for {task_name}")
             return results
 
+        # Special handling for synthetic mode - skip evaluation
+        if from_synthetic:
+            if verbose:
+                print("\n🧬 SYNTHETIC MODE - SKIPPING EVALUATION")
+                print("   • Synthetic pairs are for training only")
+                print("   • Use the trained classifier for steering or detection")
+            
+            # Return training results only
+            return {
+                "task_name": task_name,
+                "model_name": model_name,
+                "layer": layer,
+                "mode": "synthetic",
+                "training_results": training_results,
+                "num_synthetic_pairs": len(synthetic_contrastive_pairs.pairs) if synthetic_contrastive_pairs else 0,
+                "synthetic_trait": getattr(synthetic_contrastive_pairs, 'trait_description', 'unknown'),
+            }
+        
         # Special handling for cross-benchmark evaluation
-        if cross_benchmark_mode and eval_contrastive_pairs:
+        elif cross_benchmark_mode and eval_contrastive_pairs:
             if verbose:
                 print("\n🔄 CROSS-BENCHMARK EVALUATION:")
                 print(f"   • Evaluating classifier trained on {train_contrastive_pairs.name}")
@@ -4687,8 +4736,30 @@ def handle_tasks_command(args):
         print_task_info(args.task_info)
         return
 
+    # Handle synthetic pair generation mode
+    if hasattr(args, "synthetic") and args.synthetic:
+        if hasattr(args, "load_synthetic") and args.load_synthetic:
+            # Loading existing synthetic pairs
+            print(f"📂 Loading synthetic pairs from: {args.load_synthetic}")
+            args.task_names = "SYNTHETIC_LOAD"  # Special marker
+        else:
+            # Generating new synthetic pairs
+            if not (hasattr(args, "trait") and args.trait):
+                print("❌ Synthetic generation mode requires --trait description")
+                print("   Example: --synthetic --trait 'hallucinates less'")
+                sys.exit(1)
+            
+            print("🧬 Synthetic pair generation mode:")
+            print(f"   • Trait: {args.trait}")
+            print(f"   • Number of pairs: {args.num_synthetic_pairs}")
+            if hasattr(args, "save_synthetic") and args.save_synthetic:
+                print(f"   • Will save to: {args.save_synthetic}")
+            
+            # Set up for synthetic generation
+            args.task_names = "SYNTHETIC_GENERATE"  # Special marker
+    
     # Handle cross-benchmark evaluation mode
-    if hasattr(args, "cross_benchmark") and args.cross_benchmark:
+    elif hasattr(args, "cross_benchmark") and args.cross_benchmark:
         if not (hasattr(args, "train_task") and hasattr(args, "eval_task")):
             print("❌ Cross-benchmark mode requires both --train-task and --eval-task")
             sys.exit(1)
@@ -4771,7 +4842,7 @@ def handle_tasks_command(args):
         invalid_tasks = []
         for task_name in task_names:
             # Skip validation for special modes
-            if task_name in ["MIXED_SAMPLING", "CROSS_BENCHMARK"]:
+            if task_name in ["MIXED_SAMPLING", "CROSS_BENCHMARK", "SYNTHETIC_GENERATE", "SYNTHETIC_LOAD"]:
                 continue
             if not validate_task_name(task_name):
                 invalid_tasks.append(task_name)
@@ -4847,8 +4918,72 @@ def handle_tasks_command(args):
                 print(f"📊 TASK {i}/{len(task_sources)}: {source.upper()}")
                 print(f"{'='*60}")
 
+            # Initialize variables for special modes
+            from_csv = False
+            from_json = False
+            
+            # Handle synthetic generation mode
+            if source == "SYNTHETIC_GENERATE" and hasattr(args, "synthetic") and args.synthetic:
+                print("\n🧬 Generating synthetic contrastive pairs...")
+                
+                # Import the synthetic generator
+                from .core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
+                
+                # Initialize the model if not already done
+                if shared_model is None:
+                    print("🔧 Initializing model for synthetic generation...")
+                    shared_model = Model(args.model, device=args.device)
+                
+                # Create generator
+                generator = SyntheticContrastivePairGenerator(shared_model)
+                
+                # Generate pairs
+                synthetic_pair_set = generator.generate_contrastive_pair_set(
+                    trait_description=args.trait,
+                    num_pairs=args.num_synthetic_pairs,
+                    name=f"synthetic_{args.trait.replace(' ', '_')[:20]}"
+                )
+                
+                print(f"✅ Generated {len(synthetic_pair_set.pairs)} synthetic pairs")
+                
+                # Save if requested
+                if hasattr(args, "save_synthetic") and args.save_synthetic:
+                    generator.save_to_json(synthetic_pair_set, args.save_synthetic)
+                
+                # Set up for training
+                print("\n🎯 Proceeding to train classifier on synthetic pairs...")
+                
+                # Override some args for synthetic training
+                args.from_synthetic = True
+                synthetic_contrastive_pairs = synthetic_pair_set
+                
+            # Handle synthetic loading mode
+            elif source == "SYNTHETIC_LOAD" and hasattr(args, "load_synthetic") and args.load_synthetic:
+                print("\n📂 Loading synthetic pairs from file...")
+                
+                # Import the synthetic generator
+                from .core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
+                
+                # Initialize the model if not already done
+                if shared_model is None:
+                    print("🔧 Initializing model...")
+                    shared_model = Model(args.model, device=args.device)
+                
+                # Create generator and load pairs
+                generator = SyntheticContrastivePairGenerator(shared_model)
+                synthetic_pair_set = generator.load_from_json(args.load_synthetic)
+                
+                print(f"✅ Loaded {len(synthetic_pair_set.pairs)} synthetic pairs")
+                
+                # Set up for training
+                print("\n🎯 Proceeding to train classifier on loaded synthetic pairs...")
+                
+                # Override some args for synthetic training
+                args.from_synthetic = True
+                synthetic_contrastive_pairs = synthetic_pair_set
+            
             # Handle cross-benchmark evaluation mode
-            if source == "CROSS_BENCHMARK" and hasattr(args, "cross_benchmark") and args.cross_benchmark:
+            elif source == "CROSS_BENCHMARK" and hasattr(args, "cross_benchmark") and args.cross_benchmark:
                 print("\n🔄 Setting up cross-benchmark evaluation...")
                 
                 # Load training and evaluation data separately
@@ -5215,6 +5350,9 @@ def handle_tasks_command(args):
                 cross_benchmark_mode=cross_benchmark_mode if 'cross_benchmark_mode' in locals() else False,
                 train_contrastive_pairs=train_contrastive_pairs if 'train_contrastive_pairs' in locals() else None,
                 eval_contrastive_pairs=eval_contrastive_pairs if 'eval_contrastive_pairs' in locals() else None,
+                # Pass synthetic data
+                from_synthetic=getattr(args, 'from_synthetic', False),
+                synthetic_contrastive_pairs=synthetic_contrastive_pairs if 'synthetic_contrastive_pairs' in locals() else None,
                 # Model reuse parameter for efficiency
                 model_instance=shared_model,
             )
