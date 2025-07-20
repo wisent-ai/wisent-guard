@@ -55,10 +55,10 @@ class SyntheticContrastivePairGenerator:
         
         # Different prompt strategies to ensure diversity  
         prompt_templates = [
-            f"Write {target_scenarios//4} short questions testing {trait_description}:\n1.",
-            f"List {target_scenarios//4} simple questions about {trait_description}:\n1.",
-            f"Create {target_scenarios//4} direct questions requiring {trait_description}:\n1.",
-            f"Generate {target_scenarios//4} brief questions on {trait_description}:\n1."
+            f"List {target_scenarios//4} different questions or scenarios where someone would naturally respond with {trait_description}. Include everyday situations, conversations, and interactions:\n1.",
+            f"Generate {target_scenarios//4} realistic prompts that would elicit {trait_description} in the response. Include various contexts like advice-seeking, opinions, and casual conversation:\n1.",
+            f"Create {target_scenarios//4} diverse questions where the answer would demonstrate {trait_description}. Mix formal and informal contexts:\n1.",
+            f"Write {target_scenarios//4} conversation starters that would naturally lead to {trait_description} in the reply:\n1."
         ]
         
         for i, template in enumerate(prompt_templates):
@@ -123,22 +123,31 @@ class SyntheticContrastivePairGenerator:
                 if cleaned.startswith(prefix):
                     cleaned = cleaned[len(prefix):].strip()
             
+            # Remove markdown formatting
+            cleaned = cleaned.replace('**', '').replace('*', '')
+            
             # Filter out meta-descriptions and keep only actual questions/scenarios
             skip_phrases = [
                 'here are', 'here is', 'these are', 'this is', 'the following',
                 'examples of', 'scenarios where', 'situations where', 'cases where',
-                'questions that', 'prompts that', 'list of', 'different situations'
+                'questions that', 'prompts that', 'list of', 'different situations',
+                'advice-seeking:', 'opinion:', 'conversation starter:', 'prompt:', 'scenario:'
             ]
             
             cleaned_lower = cleaned.lower()
             is_meta = any(phrase in cleaned_lower for phrase in skip_phrases)
             
-            # Only keep short, direct questions 
-            if (len(cleaned) > 10 and len(cleaned) < 100 and not is_meta and
-                ('?' in cleaned or 'what' in cleaned_lower or 
-                 'how' in cleaned_lower or 'why' in cleaned_lower or 'when' in cleaned_lower or
-                 'can you' in cleaned_lower or 'should' in cleaned_lower)):
-                scenarios.append(cleaned)
+            # Keep questions and statements that could be prompts
+            if (len(cleaned) > 10 and len(cleaned) < 200 and not is_meta):
+                # Accept questions
+                if '?' in cleaned:
+                    scenarios.append(cleaned)
+                # Accept statements that could be conversation starters
+                elif any(word in cleaned_lower for word in ['tell me', 'explain', 'describe', 'i need', 'help me', 'what do you think', 'can you', 'could you', 'would you', 'share your', 'give me']):
+                    scenarios.append(cleaned)
+                # Accept opinion-seeking statements
+                elif any(word in cleaned_lower for word in ['opinion', 'thoughts', 'advice', 'recommendation', 'suggest', 'view']):
+                    scenarios.append(cleaned)
         
         return scenarios[:10]  # Limit per response
     
@@ -226,14 +235,14 @@ class SyntheticContrastivePairGenerator:
         # Generate positive response (demonstrates the trait)
         positive_prompt = f"""{scenario}
 
-Brief answer showing {trait_description}:"""
+Respond directly with {trait_description} (no preamble):"""
         
         print(f"🔄 DEBUG: Positive prompt: {positive_prompt}")
         
         positive_response, _ = self.model.generate(
             positive_prompt,
             layer_index=15,
-            max_new_tokens=8,
+            max_new_tokens=50,
             temperature=0.8,
             do_sample=True
         )
@@ -243,14 +252,14 @@ Brief answer showing {trait_description}:"""
         # Generate negative response (opposite of trait)
         negative_prompt = f"""{scenario}
 
-Brief answer showing non-{trait_description}:"""
+Respond directly with the opposite of {trait_description} (no preamble):"""
         
         print(f"🔄 DEBUG: Negative prompt: {negative_prompt}")
         
         negative_response, _ = self.model.generate(
             negative_prompt,
             layer_index=15,
-            max_new_tokens=8,
+            max_new_tokens=50,
             temperature=0.8,
             do_sample=True
         )
