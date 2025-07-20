@@ -21,7 +21,7 @@ def load_available_tasks() -> List[str]:
     
     # First try to load from local tasks.json file
     try:
-        tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "tasks.json")
+        tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "parameters", "tasks", "tasks.json")
         if not os.path.exists(tasks_json_path):
             # Try alternative path
             tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "tasks.json")

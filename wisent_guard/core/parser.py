@@ -68,6 +68,11 @@ def setup_parser() -> argparse.ArgumentParser:
                                                  help="Run full optimization: classification parameters then sample size")
     setup_full_optimizer_parser(full_optimizer_parser)
     
+    # Generate vector command for creating steering vectors without tasks
+    generate_vector_parser = subparsers.add_parser("generate-vector",
+                                                   help="Generate steering vectors from contrastive pairs (file or description)")
+    setup_generate_vector_parser(generate_vector_parser)
+    
     return parser
 
 
@@ -721,6 +726,51 @@ def setup_configure_model_parser(parser):
     parser.add_argument("model", type=str, help="Model name to configure")
     parser.add_argument("--force", action="store_true",
                        help="Force reconfiguration even if model already has a config")
+
+
+def setup_generate_vector_parser(parser):
+    """Set up the generate-vector subcommand parser."""
+    # Source of contrastive pairs - mutually exclusive
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--from-pairs", type=str, metavar="FILE",
+                             help="Path to JSON file containing contrastive pairs")
+    source_group.add_argument("--from-description", type=str, metavar="TRAIT",
+                             help="Natural language description of the trait (will generate pairs automatically)")
+    
+    # Model configuration
+    parser.add_argument("--model", type=str, default="distilgpt2",
+                       help="Model name or path (default: distilgpt2)")
+    parser.add_argument("--device", type=str, default=None,
+                       help="Device to run on (default: auto-detect)")
+    
+    # Steering method configuration
+    parser.add_argument("--method", type=str, default="DAC",
+                       choices=["DAC", "CAA", "HPR", "BiPO", "ControlVectorSteering"],
+                       help="Steering method to use (default: DAC)")
+    parser.add_argument("--layer", type=int, default=0,
+                       help="Layer index to apply steering (default: 0)")
+    
+    # Output configuration
+    parser.add_argument("--output", type=str, required=True,
+                       help="Output path for the generated steering vector")
+    
+    # Pair generation options (only used with --from-description)
+    parser.add_argument("--num-pairs", type=int, default=30,
+                       help="Number of pairs to generate when using --from-description (default: 30)")
+    parser.add_argument("--save-pairs", type=str, default=None,
+                       help="Save generated pairs to this file when using --from-description")
+    
+    # Method-specific parameters
+    parser.add_argument("--dynamic-control", action="store_true",
+                       help="Enable dynamic control for DAC method")
+    parser.add_argument("--entropy-threshold", type=float, default=1.0,
+                       help="Entropy threshold for DAC method (default: 1.0)")
+    parser.add_argument("--beta", type=float, default=1.0,
+                       help="Beta parameter for HPR method (default: 1.0)")
+    
+    # General options
+    parser.add_argument("--verbose", action="store_true",
+                       help="Enable verbose output")
     parser.add_argument("--tasks", type=str, nargs='+', default=None,
                        help="Specific tasks to optimize (if None, uses all available tasks)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
@@ -1008,3 +1058,48 @@ def setup_configure_model_parser(parser):
     parser.add_argument("model", type=str, help="Model name to configure")
     parser.add_argument("--force", action="store_true",
                        help="Force reconfiguration even if model already has a config")
+
+
+def setup_generate_vector_parser(parser):
+    """Set up the generate-vector subcommand parser."""
+    # Source of contrastive pairs - mutually exclusive
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--from-pairs", type=str, metavar="FILE",
+                             help="Path to JSON file containing contrastive pairs")
+    source_group.add_argument("--from-description", type=str, metavar="TRAIT",
+                             help="Natural language description of the trait (will generate pairs automatically)")
+    
+    # Model configuration
+    parser.add_argument("--model", type=str, default="distilgpt2",
+                       help="Model name or path (default: distilgpt2)")
+    parser.add_argument("--device", type=str, default=None,
+                       help="Device to run on (default: auto-detect)")
+    
+    # Steering method configuration
+    parser.add_argument("--method", type=str, default="DAC",
+                       choices=["DAC", "CAA", "HPR", "BiPO", "ControlVectorSteering"],
+                       help="Steering method to use (default: DAC)")
+    parser.add_argument("--layer", type=int, default=0,
+                       help="Layer index to apply steering (default: 0)")
+    
+    # Output configuration
+    parser.add_argument("--output", type=str, required=True,
+                       help="Output path for the generated steering vector")
+    
+    # Pair generation options (only used with --from-description)
+    parser.add_argument("--num-pairs", type=int, default=30,
+                       help="Number of pairs to generate when using --from-description (default: 30)")
+    parser.add_argument("--save-pairs", type=str, default=None,
+                       help="Save generated pairs to this file when using --from-description")
+    
+    # Method-specific parameters
+    parser.add_argument("--dynamic-control", action="store_true",
+                       help="Enable dynamic control for DAC method")
+    parser.add_argument("--entropy-threshold", type=float, default=1.0,
+                       help="Entropy threshold for DAC method (default: 1.0)")
+    parser.add_argument("--beta", type=float, default=1.0,
+                       help="Beta parameter for HPR method (default: 1.0)")
+    
+    # General options
+    parser.add_argument("--verbose", action="store_true",
+                       help="Enable verbose output")

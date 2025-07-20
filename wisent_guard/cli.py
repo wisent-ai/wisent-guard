@@ -4558,6 +4558,8 @@ def main():
         handle_sample_size_optimization_command(args)
     elif args.command == "full-optimize":
         handle_full_optimization_command(args)
+    elif args.command == "generate-vector":
+        handle_generate_vector_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -6944,6 +6946,172 @@ def handle_full_optimization_command(args):
         if args.verbose:
             import traceback
 
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_generate_vector_command(args):
+    """Handle the generate-vector command."""
+    try:
+        print("🎯 Generating steering vector...")
+        print(f"   📊 Model: {args.model}")
+        print(f"   🎯 Method: {args.method}")
+        print(f"   📍 Layer: {args.layer}")
+        print(f"   💾 Output: {args.output}")
+        
+        # Load model
+        from .core.model import Model
+        model = Model(name=args.model, device=args.device)
+        
+        # Get or generate contrastive pairs
+        pairs = None
+        if args.from_pairs:
+            # Load pairs from file
+            print(f"\n📄 Loading pairs from: {args.from_pairs}")
+            import json
+            with open(args.from_pairs, 'r') as f:
+                pairs_data = json.load(f)
+            
+            # Convert to ContrastivePairSet
+            from .core.response import PositiveResponse, NegativeResponse
+            pairs = ContrastivePairSet(name="loaded_from_file")
+            for pair_data in pairs_data:
+                pair = ContrastivePair(
+                    prompt=pair_data.get('prompt', ''),
+                    positive_response=PositiveResponse(pair_data.get('positive_response', '')),
+                    negative_response=NegativeResponse(pair_data.get('negative_response', ''))
+                )
+                pairs.pairs.append(pair)
+            print(f"   ✅ Loaded {len(pairs.pairs)} pairs")
+            
+        else:  # from_description
+            print(f"\n🤖 Generating pairs for trait: {args.from_description}")
+            print(f"   📊 Number of pairs: {args.num_pairs}")
+            
+            # Generate pairs
+            from .core.contrastive_pairs import generate_synthetic_pairs_cli
+            pairs = generate_synthetic_pairs_cli(
+                trait_description=args.from_description,
+                num_pairs=args.num_pairs,
+                output_file=args.save_pairs,
+                model=model
+            )
+            print(f"   ✅ Generated {len(pairs.pairs)} pairs")
+            
+            if args.save_pairs:
+                print(f"   💾 Saved pairs to: {args.save_pairs}")
+        
+        # Extract activations
+        print("\n🔍 Extracting activations...")
+        layer = Layer(args.layer)
+        for pair in pairs.pairs:
+            # Extract positive activations
+            positive_activations = model.extract_activations(
+                pair.prompt + " " + pair.positive_response.text,
+                layer=layer
+            )
+            pair.positive_response.activations = positive_activations
+            
+            # Extract negative activations
+            negative_activations = model.extract_activations(
+                pair.prompt + " " + pair.negative_response.text,
+                layer=layer
+            )
+            pair.negative_response.activations = negative_activations
+        
+        # Create and train steering method
+        print(f"\n🎯 Training {args.method} steering vector...")
+        
+        if args.method == "DAC":
+            from .core.steering_methods.dac import DAC
+            method = DAC(
+                dynamic_control=args.dynamic_control,
+                entropy_threshold=args.entropy_threshold
+            )
+        elif args.method == "CAA":
+            from .core.steering_methods.caa import CAA
+            method = CAA()
+        elif args.method == "HPR":
+            from .core.steering_methods.hpr import HPR
+            method = HPR(beta=args.beta)
+        elif args.method == "BiPO":
+            from .core.steering_methods.bipo import BiPO
+            method = BiPO()
+        elif args.method == "ControlVectorSteering":
+            from .core.steering_methods.control_vector_steering import ControlVectorSteering
+            # For ControlVectorSteering, we need to compute the vector first
+            positive_acts = torch.cat([pair.positive_response.activations.unsqueeze(0) for pair in pairs.pairs])
+            negative_acts = torch.cat([pair.negative_response.activations.unsqueeze(0) for pair in pairs.pairs])
+            control_vector = (positive_acts - negative_acts).mean(dim=0)
+            method = ControlVectorSteering(
+                control_vector=control_vector,
+                layer=args.layer
+            )
+        
+        # Train the method
+        if args.method != "ControlVectorSteering":
+            method.train(
+                contrastive_pair_set=pairs,
+                layer_index=args.layer
+            )
+        
+        # Save the steering vector
+        print(f"\n💾 Saving steering vector to: {args.output}")
+        
+        # Create output directory if needed
+        import os
+        os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else '.', exist_ok=True)
+        
+        # Save in a format compatible with our demo script
+        save_data = {
+            'method': args.method,
+            'steering_vector': method.steering_vector if hasattr(method, 'steering_vector') else None,
+            'layer_index': args.layer,
+            'trait_description': args.from_description if args.from_description else 'loaded from file',
+            'num_pairs': len(pairs.pairs),
+            'model_name': args.model
+        }
+        
+        # Add method-specific data
+        if args.method == "DAC":
+            save_data['dynamic_control'] = args.dynamic_control
+            save_data['entropy_threshold'] = args.entropy_threshold
+            save_data['aggregation_method'] = 'caa'  # Default for DAC
+            
+            # Add training stats
+            if hasattr(method, 'steering_vector') and method.steering_vector is not None:
+                vector_norm = torch.norm(method.steering_vector).item()
+                vector_mean = method.steering_vector.mean().item()
+                vector_std = method.steering_vector.std().item()
+                save_data['training_stats'] = {
+                    'num_pairs': len(pairs.pairs),
+                    'vector_norm': vector_norm,
+                    'vector_mean': vector_mean,
+                    'vector_std': vector_std,
+                    'vector_shape': list(method.steering_vector.shape),
+                    'aggregation_method': 'caa'
+                }
+        elif args.method == "HPR":
+            save_data['beta'] = args.beta
+            if hasattr(method, 'householder_matrix'):
+                save_data['householder_matrix'] = method.householder_matrix
+        elif args.method == "ControlVectorSteering":
+            save_data['vector'] = method.control_vector
+            save_data['layer'] = args.layer
+        
+        torch.save(save_data, args.output)
+        
+        print("\n✅ Steering vector generated successfully!")
+        print(f"   📏 Vector shape: {method.steering_vector.shape if hasattr(method, 'steering_vector') else 'N/A'}")
+        if hasattr(method, 'steering_vector') and method.steering_vector is not None:
+            print(f"   📊 Vector norm: {torch.norm(method.steering_vector).item():.4f}")
+        print(f"\n   You can now use this vector with:")
+        print(f"   $ python demo_steering_generation.py \"Your prompt\" --steering-vector {args.output}")
+        
+    except Exception as e:
+        print(f"\n❌ Error generating steering vector: {e}")
+        import traceback
+        if args.verbose:
             traceback.print_exc()
         sys.exit(1)
 

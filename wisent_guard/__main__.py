@@ -24,17 +24,19 @@ def main():
         print("  optimize-steering     - Optimize steering parameters for different methods")
         print("  optimize-sample-size  - Find optimal training sample size for classifiers")
         print("  full-optimize         - Run full optimization: classification, steering, and sample size")
+        print("  generate-vector       - Generate steering vectors from contrastive pairs (file or description)")
         print("\nExamples:")
         print("  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B-Instruct")
         print("  python -m wisent_guard generate-pairs --trait 'refuse harmful requests' --output pairs.json")
         print("  python -m wisent_guard synthetic --trait 'be helpful and honest' --steering-method KSteering")
         print("  python -m wisent_guard optimize-classification meta-llama/Llama-3.1-8B-Instruct --limit 500")
         print("  python -m wisent_guard optimize-steering compare-methods meta-llama/Llama-3.1-8B-Instruct --task truthfulqa_mc1")
+        print("  python -m wisent_guard generate-vector --from-description 'be helpful and honest' --output vector.pt")
         sys.exit(1)
     
     subcommand = sys.argv[1]
     
-    if subcommand in ["tasks", "generate-pairs", "synthetic", "test-nonsense", "agent", "model-config", "optimize-classification", "optimize-steering", "optimize-sample-size", "full-optimize"]:
+    if subcommand in ["tasks", "generate-pairs", "synthetic", "test-nonsense", "agent", "model-config", "optimize-classification", "optimize-steering", "optimize-sample-size", "full-optimize", "generate-vector"]:
         # Import and run the integrated CLI
         from .cli import main as cli_main
         # Remove the subcommand from sys.argv so the CLI parser works correctly
@@ -42,7 +44,7 @@ def main():
         cli_main()
     else:
         print(f"Unknown subcommand: {subcommand}")
-        print("Available subcommands: tasks, generate-pairs, synthetic, test-nonsense, agent, model-config, optimize-classification, optimize-steering, optimize-sample-size, full-optimize")
+        print("Available subcommands: tasks, generate-pairs, synthetic, test-nonsense, agent, model-config, optimize-classification, optimize-steering, optimize-sample-size, full-optimize, generate-vector")
         sys.exit(1)
 
 if __name__ == "__main__":
