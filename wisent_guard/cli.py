@@ -6953,16 +6953,149 @@ def handle_full_optimization_command(args):
 def handle_generate_vector_command(args):
     """Handle the generate-vector command."""
     try:
-        print("🎯 Generating steering vector...")
+        # Check for multi-property mode
+        if args.multi_property:
+            if args.method != "DAC":
+                print("❌ Multi-property steering is only supported with DAC method")
+                sys.exit(1)
+            if not args.property_files and not args.property_descriptions:
+                print("❌ Multi-property mode requires --property-files or --property-descriptions")
+                sys.exit(1)
+            print("🎯 Generating multi-property steering vector...")
+        else:
+            if not args.from_pairs and not args.from_description:
+                print("❌ Single-property mode requires --from-pairs or --from-description")
+                sys.exit(1)
+            print("🎯 Generating steering vector...")
+        
         print(f"   📊 Model: {args.model}")
         print(f"   🎯 Method: {args.method}")
-        print(f"   📍 Layer: {args.layer}")
+        if not args.multi_property:
+            print(f"   📍 Layer: {args.layer}")
         print(f"   💾 Output: {args.output}")
         
         # Load model
         from .core.model import Model
         model = Model(name=args.model, device=args.device)
         
+        # Handle multi-property mode
+        if args.multi_property:
+            from .core.steering_methods.dac import DAC
+            from .core.response import PositiveResponse, NegativeResponse
+            from .core.contrastive_pairs import ContrastivePairSet, ContrastivePair
+            from .core.layer import Layer
+            import json
+            
+            method = DAC(
+                dynamic_control=args.dynamic_control,
+                entropy_threshold=args.entropy_threshold
+            )
+            
+            property_pairs = {}
+            
+            # Process property files
+            if args.property_files:
+                for prop_def in args.property_files:
+                    parts = prop_def.split(':')
+                    if len(parts) != 3:
+                        print(f"❌ Invalid property file format: {prop_def}")
+                        print("   Expected format: property_name:pairs_file:layer")
+                        sys.exit(1)
+                    
+                    prop_name, pairs_file, layer_str = parts
+                    try:
+                        layer = int(layer_str)
+                    except ValueError:
+                        print(f"❌ Invalid layer number: {layer_str}")
+                        sys.exit(1)
+                    
+                    print(f"\n📄 Loading {prop_name} from: {pairs_file}")
+                    with open(pairs_file, 'r') as f:
+                        pairs_data = json.load(f)
+                    
+                    # Create ContrastivePairSet
+                    pairs = ContrastivePairSet(name=prop_name)
+                    for pair_data in pairs_data:
+                        pair = ContrastivePair(
+                            prompt=pair_data.get('prompt', ''),
+                            positive_response=PositiveResponse(pair_data.get('positive_response', '')),
+                            negative_response=NegativeResponse(pair_data.get('negative_response', ''))
+                        )
+                        pairs.pairs.append(pair)
+                    
+                    print(f"   ✅ Loaded {len(pairs.pairs)} pairs for {prop_name}")
+                    property_pairs[prop_name] = (pairs, layer)
+            
+            # Process property descriptions
+            if args.property_descriptions:
+                from .core.contrastive_pairs import generate_synthetic_pairs_cli
+                
+                for prop_def in args.property_descriptions:
+                    parts = prop_def.split(':')
+                    if len(parts) != 3:
+                        print(f"❌ Invalid property description format: {prop_def}")
+                        print("   Expected format: property_name:description:layer")
+                        sys.exit(1)
+                    
+                    prop_name, description, layer_str = parts
+                    try:
+                        layer = int(layer_str)
+                    except ValueError:
+                        print(f"❌ Invalid layer number: {layer_str}")
+                        sys.exit(1)
+                    
+                    print(f"\n🤖 Generating pairs for {prop_name}: {description}")
+                    pairs = generate_synthetic_pairs_cli(
+                        trait_description=description,
+                        num_pairs=args.num_pairs,
+                        output_file=None,
+                        model=model
+                    )
+                    print(f"   ✅ Generated {len(pairs.pairs)} pairs for {prop_name}")
+                    property_pairs[prop_name] = (pairs, layer)
+            
+            # Extract activations for all properties
+            print("\n🔍 Extracting activations for all properties...")
+            for prop_name, (pairs, layer) in property_pairs.items():
+                print(f"   Processing {prop_name} (layer {layer})...")
+                layer_obj = Layer(layer)
+                for pair in pairs.pairs:
+                    # Extract positive activations
+                    positive_activations = model.extract_activations(
+                        pair.prompt + " " + pair.positive_response.text,
+                        layer=layer_obj
+                    )
+                    pair.positive_response.activations = positive_activations
+                    
+                    # Extract negative activations
+                    negative_activations = model.extract_activations(
+                        pair.prompt + " " + pair.negative_response.text,
+                        layer=layer_obj
+                    )
+                    pair.negative_response.activations = negative_activations
+            
+            # Train multi-property DAC
+            print(f"\n🎯 Training multi-property DAC...")
+            all_stats = method.train_multi_property(property_pairs)
+            
+            for prop_name, stats in all_stats.items():
+                print(f"   ✅ {prop_name} vector trained (layer {property_pairs[prop_name][1]}, norm: {stats['vector_norm']:.4f})")
+            
+            # Save the multi-property vector
+            print(f"\n💾 Saving multi-property steering vector to: {args.output}")
+            import os
+            os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else '.', exist_ok=True)
+            
+            # Use DAC's built-in save method
+            method.save_steering_vector(args.output)
+            
+            print("\n✅ Multi-property steering vector generated successfully!")
+            print(f"   Properties: {list(property_pairs.keys())}")
+            print(f"\n   You can now use this vector with multi-property steering!")
+            
+            return
+        
+        # Single-property mode (original code)
         # Get or generate contrastive pairs
         pairs = None
         if args.from_pairs:
@@ -7003,6 +7136,7 @@ def handle_generate_vector_command(args):
         
         # Extract activations
         print("\n🔍 Extracting activations...")
+        from .core.layer import Layer
         layer = Layer(args.layer)
         for pair in pairs.pairs:
             # Extract positive activations

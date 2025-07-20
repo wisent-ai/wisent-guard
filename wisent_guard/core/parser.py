@@ -728,52 +728,6 @@ def setup_configure_model_parser(parser):
                        help="Force reconfiguration even if model already has a config")
 
 
-def setup_generate_vector_parser(parser):
-    """Set up the generate-vector subcommand parser."""
-    # Source of contrastive pairs - mutually exclusive
-    source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument("--from-pairs", type=str, metavar="FILE",
-                             help="Path to JSON file containing contrastive pairs")
-    source_group.add_argument("--from-description", type=str, metavar="TRAIT",
-                             help="Natural language description of the trait (will generate pairs automatically)")
-    
-    # Model configuration
-    parser.add_argument("--model", type=str, default="distilgpt2",
-                       help="Model name or path (default: distilgpt2)")
-    parser.add_argument("--device", type=str, default=None,
-                       help="Device to run on (default: auto-detect)")
-    
-    # Steering method configuration
-    parser.add_argument("--method", type=str, default="DAC",
-                       choices=["DAC", "CAA", "HPR", "BiPO", "ControlVectorSteering"],
-                       help="Steering method to use (default: DAC)")
-    parser.add_argument("--layer", type=int, default=0,
-                       help="Layer index to apply steering (default: 0)")
-    
-    # Output configuration
-    parser.add_argument("--output", type=str, required=True,
-                       help="Output path for the generated steering vector")
-    
-    # Pair generation options (only used with --from-description)
-    parser.add_argument("--num-pairs", type=int, default=30,
-                       help="Number of pairs to generate when using --from-description (default: 30)")
-    parser.add_argument("--save-pairs", type=str, default=None,
-                       help="Save generated pairs to this file when using --from-description")
-    
-    # Method-specific parameters
-    parser.add_argument("--dynamic-control", action="store_true",
-                       help="Enable dynamic control for DAC method")
-    parser.add_argument("--entropy-threshold", type=float, default=1.0,
-                       help="Entropy threshold for DAC method (default: 1.0)")
-    parser.add_argument("--beta", type=float, default=1.0,
-                       help="Beta parameter for HPR method (default: 1.0)")
-    
-    # General options
-    parser.add_argument("--verbose", action="store_true",
-                       help="Enable verbose output")
-    parser.add_argument("--tasks", type=str, nargs='+', default=None,
-                       help="Specific tasks to optimize (if None, uses all available tasks)")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
 
 def setup_steering_optimizer_parser(parser):
@@ -1062,12 +1016,20 @@ def setup_configure_model_parser(parser):
 
 def setup_generate_vector_parser(parser):
     """Set up the generate-vector subcommand parser."""
-    # Source of contrastive pairs - mutually exclusive
-    source_group = parser.add_mutually_exclusive_group(required=True)
+    # Source of contrastive pairs - mutually exclusive for single property
+    source_group = parser.add_mutually_exclusive_group(required=False)
     source_group.add_argument("--from-pairs", type=str, metavar="FILE",
-                             help="Path to JSON file containing contrastive pairs")
+                             help="Path to JSON file containing contrastive pairs (single property)")
     source_group.add_argument("--from-description", type=str, metavar="TRAIT",
-                             help="Natural language description of the trait (will generate pairs automatically)")
+                             help="Natural language description of the trait (single property)")
+    
+    # Multi-property support
+    parser.add_argument("--multi-property", action="store_true",
+                       help="Enable multi-property steering (DAC only)")
+    parser.add_argument("--property-files", type=str, nargs='+', metavar="NAME:FILE:LAYER",
+                       help="Property definitions from files (format: property_name:pairs_file:layer)")
+    parser.add_argument("--property-descriptions", type=str, nargs='+', metavar="NAME:DESC:LAYER",
+                       help="Property definitions from descriptions (format: property_name:description:layer)")
     
     # Model configuration
     parser.add_argument("--model", type=str, default="distilgpt2",
