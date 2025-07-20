@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List, Tuple
 import torch
 import torch.nn.functional as F
 from dataclasses import dataclass
+import os
 
 from .base import SteeringMethod
 from ..contrastive_pairs import ContrastivePairSet
@@ -201,10 +202,11 @@ class DAC(SteeringMethod):
             p_unsteered_filtered = p_unsteered_filtered / p_unsteered_filtered.sum(dim=-1, keepdim=True)
             p_steered_filtered = p_steered_filtered / p_steered_filtered.sum(dim=-1, keepdim=True)
             
-            # Compute KL divergence: KL(p_unsteered || p_steered)
+            # Compute KL divergence: KL(p_steered || p_unsteered)
+            # We want to measure how much the steered distribution diverges from unsteered
             kl_div = F.kl_div(
-                p_steered_filtered.log(),
-                p_unsteered_filtered,
+                p_unsteered_filtered.log(),
+                p_steered_filtered,
                 reduction='batchmean'
             )
             
@@ -237,6 +239,10 @@ class DAC(SteeringMethod):
         Returns:
             Dictionary mapping property names to computed alphas
         """
+        # Debug print
+        print(f"\n[DEBUG] Computing dynamic alphas for properties: {active_properties}")
+        print(f"[DEBUG] Input shape: {input_ids.shape}")
+        
         # Get unsteered logits
         with torch.no_grad():
             unsteered_logits = model_forward_fn(input_ids)
@@ -244,28 +250,67 @@ class DAC(SteeringMethod):
                 unsteered_logits = unsteered_logits.logits
             unsteered_logits = unsteered_logits[:, -1, :]  # Last token
         
+        print(f"[DEBUG] Unsteered logits shape: {unsteered_logits.shape}")
+        
         alphas = {}
         
         # For each property, compute KL with α=2 steering
         for prop_name in active_properties:
             if prop_name not in self.property_vectors:
+                print(f"[DEBUG] Property {prop_name} not found in property_vectors!")
                 continue
             
-            # Temporarily store current hook state
-            original_apply_fn = self.apply_steering
+            # Get steered logits by applying steering directly with α=2
+            # We need to set up a temporary hook for this specific computation
+            prop_vec = self.property_vectors[prop_name]
+            layer_idx = prop_vec.layer_index
             
-            # Create a modified apply function that only steers this property with α=2
-            def temp_apply(acts, **kwargs):
-                return original_apply_fn(
-                    acts,
-                    strength=2.0,
+            # Create temporary hook for this property with α=2
+            def temp_hook_fn(module, input, output):
+                if isinstance(output, tuple):
+                    hidden_states = output[0]
+                else:
+                    hidden_states = output
+                
+                # Apply steering with α=2
+                steered = self.apply_steering(
+                    hidden_states,
+                    strength=1.0,
                     active_properties=[prop_name],
-                    compute_dynamic=False,  # Avoid recursion
-                    **{k: v for k, v in kwargs.items() if k not in ['strength', 'active_properties', 'compute_dynamic']}
+                    dynamic_alphas={prop_name: 2.0},  # Force α=2
+                    compute_dynamic=False
                 )
+                
+                if isinstance(output, tuple):
+                    return (steered,) + output[1:]
+                else:
+                    return steered
             
-            # Temporarily replace apply_steering
-            self.apply_steering = temp_apply
+            # Get the right layer module
+            # Use the stored model reference if available
+            if hasattr(self, '_model_ref') and self._model_ref is not None:
+                model_obj = self._model_ref.hf_model
+            elif hasattr(model_forward_fn, '__self__'):  # It's a bound method
+                model_obj = model_forward_fn.__self__
+            else:
+                print(f"[DEBUG] Warning: Cannot access model for {prop_name}")
+                alpha = 0.0
+                alphas[prop_name] = alpha
+                continue
+            
+            # Find the layer module
+            if hasattr(model_obj, 'model') and hasattr(model_obj.model, 'layers'):
+                layer_module = model_obj.model.layers[layer_idx]
+            elif hasattr(model_obj, 'transformer') and hasattr(model_obj.transformer, 'h'):
+                layer_module = model_obj.transformer.h[layer_idx]
+            else:
+                print(f"[DEBUG] Warning: Cannot find layer module for {prop_name}")
+                alpha = 0.0
+                alphas[prop_name] = alpha
+                continue
+            
+            # Register temporary hook
+            handle = layer_module.register_forward_hook(temp_hook_fn)
             
             # Get steered logits
             with torch.no_grad():
@@ -274,8 +319,8 @@ class DAC(SteeringMethod):
                     steered_logits = steered_logits.logits
                 steered_logits = steered_logits[:, -1, :]  # Last token
             
-            # Restore original apply function
-            self.apply_steering = original_apply_fn
+            # Remove temporary hook
+            handle.remove()
             
             # Compute KL divergence using nucleus sampling
             p_unsteered = F.softmax(unsteered_logits, dim=-1)
@@ -307,16 +352,25 @@ class DAC(SteeringMethod):
             p_unsteered_filtered = p_unsteered_filtered / p_unsteered_filtered.sum(dim=-1, keepdim=True)
             p_steered_filtered = p_steered_filtered / p_steered_filtered.sum(dim=-1, keepdim=True)
             
-            # Compute KL divergence
+            # Compute KL divergence: KL(p_steered || p_unsteered)
             kl_div = F.kl_div(
-                p_steered_filtered.log(),
-                p_unsteered_filtered,
+                p_unsteered_filtered.log(),
+                p_steered_filtered,
                 reduction='batchmean'
             ).item()
+            
+            # Debug prints
+            if os.environ.get('WISENT_DEBUG') != '0':
+                print(f"[DEBUG] {prop_name} - KL divergence: {kl_div:.6f}")
+                # Check if distributions are actually different
+                max_diff = torch.abs(p_unsteered_filtered - p_steered_filtered).max().item()
+                print(f"[DEBUG] {prop_name} - Max prob difference: {max_diff:.6f}")
+                print(f"[DEBUG] {prop_name} - Num tokens in nucleus: {len(all_top_indices)}")
             
             # Bound alpha to [0, max_alpha]
             alpha = min(kl_div, self.max_alpha)
             alphas[prop_name] = alpha
+            # print(f"[DEBUG] {prop_name} - Final alpha: {alpha:.6f}")
         
         return alphas
     
@@ -393,14 +447,25 @@ class DAC(SteeringMethod):
             # Apply strength multiplier
             alpha *= strength
             
+            print(f"[DEBUG] Applying {property_name} steering: alpha={alpha:.4f}, vector norm={torch.norm(steering_vector).item():.4f}")
+            
             # Handle different activation shapes
             if len(activations.shape) == 3:  # [batch, seq, hidden]
                 # Apply to last token position (for generation)
+                before_norm = torch.norm(steered[:, -1:, :]).item()
                 steered[:, -1:, :] = steered[:, -1:, :] + alpha * steering_vector.unsqueeze(0).unsqueeze(0)
+                after_norm = torch.norm(steered[:, -1:, :]).item()
+                print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
             elif len(activations.shape) == 2:  # [batch, hidden]
+                before_norm = torch.norm(steered).item()
                 steered = steered + alpha * steering_vector.unsqueeze(0)
+                after_norm = torch.norm(steered).item()
+                print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
             else:
+                before_norm = torch.norm(steered).item()
                 steered = steered + alpha * steering_vector
+                after_norm = torch.norm(steered).item()
+                print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
         
         return steered
     
@@ -594,10 +659,15 @@ class DAC(SteeringMethod):
             layer_idx = prop_vec.layer_index
             
             def hook_fn(module, input, output):
+                # Debug prints disabled
+                # print(f"\n[DEBUG] Hook called for {property_name} at layer {layer_idx}")
                 if isinstance(output, tuple):
                     hidden_states = output[0]
                 else:
                     hidden_states = output
+                
+                # print(f"[DEBUG] Hidden states shape: {hidden_states.shape}")
+                # print(f"[DEBUG] Current alpha for {property_name}: {current_alphas[property_name]:.4f}")
                 
                 # Apply steering with current alpha
                 steered = self.apply_steering(
@@ -619,28 +689,37 @@ class DAC(SteeringMethod):
         for prop_name in active_properties:
             if prop_name in self.property_vectors:
                 layer_idx, hook_fn = create_hook(prop_name)
+                # print(f"\n[DEBUG] Registering hook for {prop_name} at layer {layer_idx}")
                 
                 # Get layer module
                 if hasattr(model.hf_model, 'model') and hasattr(model.hf_model.model, 'layers'):
                     layer_module = model.hf_model.model.layers[layer_idx]
+                    # print(f"[DEBUG] Using Llama-style layers")
                 elif hasattr(model.hf_model, 'transformer') and hasattr(model.hf_model.transformer, 'h'):
                     layer_module = model.hf_model.transformer.h[layer_idx]
+                    # print(f"[DEBUG] Using GPT-style layers")
                 else:
                     raise ValueError(f"Unsupported model architecture")
                 
                 handle = layer_module.register_forward_hook(hook_fn)
                 hooks.append(handle)
+                # print(f"[DEBUG] Hook registered successfully")
         
         # Generate tokens one at a time with dynamic alpha computation
         generated_tokens = []
         
         for step in range(max_new_tokens):
             # Compute dynamic alphas for this step
-            current_alphas = self._compute_dynamic_alphas_online(
-                lambda ids: model.hf_model(input_ids=ids),
+            # Pass the model's forward method directly
+            new_alphas = self._compute_dynamic_alphas_online(
+                model.hf_model,
                 input_ids,
                 active_properties
             )
+            
+            # Update the dictionary in place so hooks see the new values
+            for prop in active_properties:
+                current_alphas[prop] = new_alphas.get(prop, 0.0)
             
             # Record alphas
             for prop in active_properties:
