@@ -104,11 +104,8 @@ class KSteering(SteeringMethod):
         activation_dim = all_activations[0].shape[-1]
         activation_device = all_activations[0].device
         
-        # Update device to match activations if not explicitly set
-        if self.device == "cuda" and not torch.cuda.is_available():
-            self.device = activation_device
-        elif self.device == "cpu" and activation_device != torch.device("cpu"):
-            self.device = activation_device
+        # Update device to match activations
+        self.device = activation_device
         
         # Initialize classifier
         self.classifier = KSteeringClassifier(
@@ -235,6 +232,9 @@ class KSteering(SteeringMethod):
             # Ensure activations have gradients
             if not activations_2d.requires_grad:
                 activations_2d = activations_2d.requires_grad_(True)
+            
+            # Move classifier to same device as activations
+            self.classifier = self.classifier.to(activations_2d.device)
             
             # Forward pass through classifier
             logits = self.classifier(activations_2d)
