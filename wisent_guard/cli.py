@@ -35,6 +35,7 @@ from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
 )
+from .core.contrastive_pairs.contrastive_pair import ContrastivePair
 from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 from .core.model_config_manager import ModelConfigManager
 
@@ -3117,7 +3118,8 @@ def run_task_pipeline(
             }
 
         # Special handling for lm-eval-harness ground truth evaluation
-        if ground_truth_method == "lm-eval-harness":
+        # Skip for cross-benchmark mode since we need custom evaluation
+        if ground_truth_method == "lm-eval-harness" and not cross_benchmark_mode:
             # Get the correct evaluation method for this task
             def get_evaluation_method_for_task(task_name: str) -> str:
                 """Get the evaluation method for a task from the benchmark configuration."""
@@ -3299,6 +3301,112 @@ The task will be skipped in optimization."""
 
             logger.info(f"LM-eval-harness evaluation completed for {task_name}")
             return results
+
+        # Special handling for cross-benchmark evaluation
+        if cross_benchmark_mode and eval_contrastive_pairs:
+            if verbose:
+                print("\n🔄 CROSS-BENCHMARK EVALUATION:")
+                print(f"   • Evaluating classifier trained on {train_contrastive_pairs.name}")
+                print(f"   • Testing on {eval_contrastive_pairs.name}")
+                print(f"   • Evaluation samples: {len(eval_contrastive_pairs.pairs)}")
+            
+            # Extract activations for evaluation data
+            eval_pairs_with_activations = []
+            for pair in eval_contrastive_pairs.pairs:
+                # The pairs already have activations, but we need to extract them with our model
+                eval_pair = ContrastivePair(
+                    prompt=pair.prompt,
+                    positive_response=pair.positive_response,
+                    negative_response=pair.negative_response
+                )
+                eval_pairs_with_activations.append(eval_pair)
+            
+            # Extract activations for evaluation pairs
+            if verbose:
+                print("\n🔬 Extracting activations for evaluation data...")
+            
+            eval_processed_pairs = collector.collect_activations_batch(
+                pairs=eval_pairs_with_activations,
+                layer_index=layers[0],
+                device=device,
+                token_targeting_strategy=targeting_strategy,
+            )
+            
+            # Evaluate the classifier on the evaluation data
+            correct_predictions = 0
+            total_predictions = 0
+            
+            for i, eval_pair in enumerate(eval_processed_pairs):
+                try:
+                    # Get positive and negative activations
+                    pos_activation = eval_pair.positive_activations
+                    neg_activation = eval_pair.negative_activations
+                    
+                    if pos_activation is not None and neg_activation is not None:
+                        # Use the trained classifier to predict
+                        if hasattr(steering_method, 'classifier'):
+                            # Ensure activations are in the right format
+                            if hasattr(pos_activation, 'cpu'):
+                                pos_feat = pos_activation.cpu().numpy()
+                                neg_feat = neg_activation.cpu().numpy()
+                            else:
+                                pos_feat = pos_activation
+                                neg_feat = neg_activation
+                            
+                            # Reshape if needed - ensure 2D array for sklearn
+                            if pos_feat.ndim == 1:
+                                pos_feat = pos_feat.reshape(1, -1)
+                            if neg_feat.ndim == 1:
+                                neg_feat = neg_feat.reshape(1, -1)
+                            
+                            pos_score = steering_method.classifier.predict_proba(pos_feat)[0][1]
+                            neg_score = steering_method.classifier.predict_proba(neg_feat)[0][1]
+                            
+                            # Correct if positive has higher score than negative
+                            if pos_score > neg_score:
+                                correct_predictions += 1
+                            total_predictions += 1
+                            
+                            if verbose and i < 3:  # Show first 3 examples
+                                print(f"\n   Example {i+1}:")
+                                print(f"   • Positive score: {pos_score:.3f}")
+                                print(f"   • Negative score: {neg_score:.3f}")
+                                print(f"   • Prediction: {'✅ Correct' if pos_score > neg_score else '❌ Wrong'}")
+                except Exception as e:
+                    if verbose:
+                        print(f"   ⚠️ Error evaluating pair {i}: {e}")
+                        print(f"      Pos activation type: {type(pos_activation)}")
+                        print(f"      Neg activation type: {type(neg_activation)}")
+                        if pos_activation is not None:
+                            print(f"      Pos shape: {getattr(pos_activation, 'shape', 'no shape')}")
+            
+            # Calculate accuracy
+            accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0.0
+            
+            if verbose:
+                print(f"\n📊 CROSS-BENCHMARK EVALUATION RESULTS:")
+                print(f"   • Accuracy: {accuracy:.2%} ({correct_predictions}/{total_predictions})")
+                print(f"   • Training domain: {train_contrastive_pairs.name}")
+                print(f"   • Evaluation domain: {eval_contrastive_pairs.name}")
+            
+            # Return results
+            return {
+                "task_name": task_name,
+                "model_name": model_name,
+                "layer": layer,
+                "mode": "cross_benchmark",
+                "training_task": train_contrastive_pairs.name,
+                "evaluation_task": eval_contrastive_pairs.name,
+                "training_results": training_results,
+                "evaluation_results": {
+                    "accuracy": accuracy,
+                    "correct_predictions": correct_predictions,
+                    "total_predictions": total_predictions,
+                },
+                "num_train": len(train_contrastive_pairs.pairs),
+                "num_eval": len(eval_contrastive_pairs.pairs),
+                "cross_benchmark_transfer": accuracy,  # Key metric for cross-benchmark
+            }
 
         # Test the optimized classifier by generating responses and classifying them
         if optimize:
