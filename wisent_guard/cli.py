@@ -7,6 +7,7 @@ import logging
 import sys
 import os
 import torch
+import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -3343,8 +3344,36 @@ The task will be skipped in optimization."""
                     neg_activation = eval_pair.negative_activations
                     
                     if pos_activation is not None and neg_activation is not None:
-                        # Use the trained classifier to predict
-                        if hasattr(steering_method, 'classifier'):
+                        # Handle different types of steering methods
+                        if hasattr(steering_method, 'is_vector_based') and steering_method.is_vector_based:
+                            # Vector-based steering (CAA, etc.)
+                            # For vector-based methods, we compare the dot product with the steering vector
+                            steering_vector = steering_method.get_steering_vector()
+                            if steering_vector is not None:
+                                # Ensure activations are tensors
+                                if not isinstance(pos_activation, torch.Tensor):
+                                    pos_activation = torch.tensor(pos_activation)
+                                if not isinstance(neg_activation, torch.Tensor):
+                                    neg_activation = torch.tensor(neg_activation)
+                                
+                                # Compute dot products with steering vector
+                                pos_score = torch.dot(pos_activation.flatten(), steering_vector.flatten()).item()
+                                neg_score = torch.dot(neg_activation.flatten(), steering_vector.flatten()).item()
+                                
+                                # For CAA, negative scores indicate harmful content
+                                # So we want positive to have lower (more negative) score than negative
+                                if pos_score < neg_score:
+                                    correct_predictions += 1
+                                total_predictions += 1
+                                
+                                if verbose and i < 3:  # Show first 3 examples
+                                    print(f"\n   Example {i+1}:")
+                                    print(f"   • Positive score: {pos_score:.3f}")
+                                    print(f"   • Negative score: {neg_score:.3f}")
+                                    print(f"   • Prediction: {'✅ Correct' if pos_score < neg_score else '❌ Wrong'}")
+                        
+                        elif hasattr(steering_method, 'classifier') and steering_method.classifier is not None:
+                            # Classifier-based steering (logistic, MLP)
                             # Ensure activations are in the right format
                             if hasattr(pos_activation, 'cpu'):
                                 pos_feat = pos_activation.cpu().numpy()
@@ -3354,13 +3383,37 @@ The task will be skipped in optimization."""
                                 neg_feat = neg_activation
                             
                             # Reshape if needed - ensure 2D array for sklearn
-                            if pos_feat.ndim == 1:
-                                pos_feat = pos_feat.reshape(1, -1)
-                            if neg_feat.ndim == 1:
-                                neg_feat = neg_feat.reshape(1, -1)
+                            if hasattr(pos_feat, 'ndim'):
+                                if pos_feat.ndim == 1:
+                                    pos_feat = pos_feat.reshape(1, -1)
+                            elif hasattr(pos_feat, 'shape'):
+                                if len(pos_feat.shape) == 1:
+                                    pos_feat = pos_feat.reshape(1, -1)
                             
-                            pos_score = steering_method.classifier.predict_proba(pos_feat)[0][1]
-                            neg_score = steering_method.classifier.predict_proba(neg_feat)[0][1]
+                            if hasattr(neg_feat, 'ndim'):
+                                if neg_feat.ndim == 1:
+                                    neg_feat = neg_feat.reshape(1, -1)
+                            elif hasattr(neg_feat, 'shape'):
+                                if len(neg_feat.shape) == 1:
+                                    neg_feat = neg_feat.reshape(1, -1)
+                            
+                            # Debug: print shapes before prediction
+                            if verbose and i == 0:
+                                print(f"      Debug - pos_feat shape: {pos_feat.shape}")
+                                print(f"      Debug - neg_feat shape: {neg_feat.shape}")
+                                print(f"      Debug - pos_feat type: {type(pos_feat)}")
+                            
+                            # Get predictions
+                            pos_proba = steering_method.classifier.predict_proba(pos_feat)
+                            neg_proba = steering_method.classifier.predict_proba(neg_feat)
+                            
+                            if verbose and i == 0:
+                                print(f"      Debug - pos_proba: {pos_proba}")
+                                print(f"      Debug - neg_proba: {neg_proba}")
+                                print(f"      Debug - pos_proba shape: {pos_proba.shape}")
+                            
+                            pos_score = pos_proba[0][1]
+                            neg_score = neg_proba[0][1]
                             
                             # Correct if positive has higher score than negative
                             if pos_score > neg_score:
