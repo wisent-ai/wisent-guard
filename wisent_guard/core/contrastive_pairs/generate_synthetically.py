@@ -48,17 +48,17 @@ class SyntheticContrastivePairGenerator:
         print(f"🎯 DEBUG: Target number of scenarios: {num_scenarios}")
         
         # Overgenerate to ensure diversity
-        target_scenarios = num_scenarios * 3
+        target_scenarios = num_scenarios * 5  # Increased from 3x to 5x
         all_scenarios = []
         
         print(f"🎯 DEBUG: Will generate {target_scenarios} total scenarios to select {num_scenarios} best ones")
         
         # Different prompt strategies to ensure diversity  
         prompt_templates = [
-            f"List {target_scenarios//4} short, simple questions (5-10 words each) that could reveal if someone is {trait_description}:\n1.",
-            f"Generate {target_scenarios//4} brief, direct questions where someone might respond in a {trait_description} way:\n1.",
-            f"Create {target_scenarios//4} concise questions about everyday topics where {trait_description} could show:\n1.",
-            f"Write {target_scenarios//4} short open-ended questions that could elicit {trait_description} responses:\n1."
+            f"List {target_scenarios//4} very short, simple questions (maximum 10 words) about everyday life:\n1.",
+            f"Generate {target_scenarios//4} brief open-ended questions about common situations:\n1.",
+            f"Create {target_scenarios//4} short questions people might ask in casual conversation:\n1.",
+            f"Write {target_scenarios//4} concise questions about opinions, decisions, or advice:\n1."
         ]
         
         for i, template in enumerate(prompt_templates):
@@ -138,15 +138,22 @@ class SyntheticContrastivePairGenerator:
             is_meta = any(phrase in cleaned_lower for phrase in skip_phrases)
             
             # Keep only short questions and prompts
-            if (len(cleaned) > 10 and len(cleaned) < 100 and not is_meta):
-                # Prefer questions
-                if '?' in cleaned:
+            if (len(cleaned) > 10 and len(cleaned) < 80 and not is_meta):
+                # Reject model refusals
+                refusal_phrases = ['i cannot', "i can't", 'i am not able', 'i cannot provide', 'i cannot create', 
+                                 'i cannot generate', 'harmful', 'evil behavior', 'glorify']
+                if any(phrase in cleaned_lower for phrase in refusal_phrases):
+                    continue
+                
+                # Prefer short questions (under 15 words)
+                word_count = len(cleaned.split())
+                if '?' in cleaned and word_count <= 15:
                     scenarios.append(cleaned)
-                # Accept short imperative statements
-                elif len(cleaned.split()) <= 12 and any(word in cleaned_lower for word in ['tell me', 'explain', 'describe', 'what', 'how', 'why', 'when', 'share']):
+                # Accept very short imperative statements
+                elif word_count <= 10 and any(word in cleaned_lower for word in ['tell me', 'explain', 'describe', 'what', 'how', 'why']):
                     scenarios.append(cleaned)
         
-        return scenarios[:10]  # Limit per response
+        return scenarios[:25]  # Increased limit per response to ensure we get enough
     
     def _deduplicate_scenarios(self, scenarios: List[str]) -> List[str]:
         """Remove duplicate or very similar scenarios."""
