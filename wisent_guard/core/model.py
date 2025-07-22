@@ -871,10 +871,16 @@ class Model:
             from .tasks.math500_task import Math500Task
             return Math500Task(limit=limit)
             
-        # Check if it's AIME 2024
-        if task_name == "aime2024":
-            from .tasks.aime2024_task import AIME2024Task
-            return AIME2024Task(limit=limit)
+        # Check if it's AIME (general or year-specific)
+        if task_name.startswith("aime"):
+            from .tasks.aime_task import AIMETask
+            
+            if task_name == "aime2025-1":
+                return AIMETask(year="2025", limit=limit, config_name="AIME2025-I")
+            elif task_name == "aime2025-2":
+                return AIMETask(year="2025", limit=limit, config_name="AIME2025-II")
+            elif task_name == "aime2024":
+                return AIMETask(year="2024", limit=limit)
             
         # Check if it's a BigCode task
         try:

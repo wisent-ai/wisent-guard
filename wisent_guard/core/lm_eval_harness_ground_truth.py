@@ -156,9 +156,9 @@ class LMEvalHarnessGroundTruth:
                     # MATH-500 task handling  
                     elif task_name in ['math500', 'math', 'hendrycks_math']:
                         ground_truth = doc.get('answer', '')
-                    # AIME 2024 task handling
-                    elif task_name == 'aime2024':
-                        ground_truth = str(doc.get('Answer', ''))
+                    # AIME task handling 
+                    elif task_name.startswith('aime'):
+                        ground_truth = str(doc.get('Answer', '') or doc.get('answer', ''))
                     # FIXED: For DROP task, use raw document data to preserve structured format
                     elif task_name == "drop":
                         # Use raw answer field which contains the structured data
@@ -641,7 +641,7 @@ class LMEvalHarnessGroundTruth:
     def _is_task_interface_task(self, task_name: str) -> bool:
         """Check if this is a TaskInterface task (not an lm-eval task)."""
         # List of known TaskInterface tasks
-        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench', 'math500', 'math', 'hendrycks_math', 'aime2024'}
+        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench', 'math500', 'math', 'hendrycks_math', 'aime2024', 'aime2025-1', 'aime2025-2'}
         return task_name in task_interface_tasks
     
     def _load_task_interface_data(self, task_name: str, num_samples: int):

@@ -9,7 +9,7 @@ from .livecodebench_task import LiveCodeBenchTask
 from .lm_eval_task import MBPPTask, GSM8KTask, TruthfulQATask, MMLUTask
 from .hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
 from .math500_task import Math500Task
-from .aime2024_task import AIME2024Task
+from .aime_task import AIMETask
 
 
 def register_all_tasks():
@@ -33,8 +33,10 @@ def register_all_tasks():
     register_task("math", Math500Task)  
     register_task("hendrycks_math", Math500Task)
     
-    # Register AIME 2024 task
-    register_task("aime2024", AIME2024Task)
+    # Register AIME tasks (general + year-specific)
+    register_task("aime2025-1", lambda limit=None: AIMETask(year="2025", limit=limit, config_name="AIME2025-I"))
+    register_task("aime2025-2", lambda limit=None: AIMETask(year="2025", limit=limit, config_name="AIME2025-II"))
+    register_task("aime2024", lambda limit=None: AIMETask(year="2024", limit=limit))
 
 
 # Auto-register tasks when the module is imported
@@ -51,6 +53,6 @@ __all__ = [
     "HLEExactMatchTask", 
     "HLEMultipleChoiceTask",
     "Math500Task",
-    "AIME2024Task",
+    "AIMETask",
     "register_all_tasks"
 ]

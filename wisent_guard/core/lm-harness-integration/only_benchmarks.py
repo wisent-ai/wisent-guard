@@ -688,6 +688,16 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "advanced"],
         "priority": "high"  # Competition-level math
     },
+    "aime2025-1": {
+        "task": "aime2025-1",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # AIME 2025 contest problems
+    },
+    "aime2025-2": {
+        "task": "aime2025-2",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # AIME 2025 contest problems
+    },
     "aime2024": {
         "task": "aime2024",
         "tags": ["mathematics", "reasoning", "contest", "advanced"],
@@ -1806,6 +1816,9 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "math": "Mathematical reasoning problems requiring multi-step solutions",
         "math500": "500-problem subset of MATH benchmark for mathematical reasoning",
         "hendrycks_math": "Competition-level mathematics problems from Hendrycks et al.",
+        # AIME contest math problems (general + year-specific)
+        "aime2025-1": "High-difficulty AIME contest problems I split",
+        "aime2025-2": "High-difficulty AIME contest problems II split", 
         "aime2024": "High-difficulty AIME contest problems from 2024",
         "math_qa": "Mathematical reasoning and problem solving",
         "arithmetic": "Basic arithmetic operations and calculations",
