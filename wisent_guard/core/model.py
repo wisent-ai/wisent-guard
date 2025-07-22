@@ -854,6 +854,17 @@ class Model:
         if task_name == "livecodebench":
             from .tasks.livecodebench_task import LiveCodeBenchTask
             return LiveCodeBenchTask(release_version="release_v1", limit=limit)
+        
+        # Check if it's HLE task
+        if task_name in ["hle", "hle_exact_match", "hle_multiple_choice"]:
+            from .tasks.hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
+            
+            if task_name == "hle":
+                return HLETask(limit=limit)
+            elif task_name == "hle_exact_match":
+                return HLEExactMatchTask(limit=limit)
+            elif task_name == "hle_multiple_choice":
+                return HLEMultipleChoiceTask(limit=limit)
             
         # Check if it's a BigCode task
         try:

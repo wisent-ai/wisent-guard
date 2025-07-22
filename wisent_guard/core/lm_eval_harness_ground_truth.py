@@ -114,9 +114,14 @@ class LMEvalHarnessGroundTruth:
         try:
             logger.info(f"🎯 TEXT GENERATION EVALUATION: {task_name}")
             
-            # Use existing task loading infrastructure
-            task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
-            docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
+            # TODO In general LMEvalHarness should be rebuild to be BenchmarkGroundTruth
+            # Check if this is a TaskInterface task 
+            if self._is_task_interface_task(task_name):
+                docs, task_data = self._load_task_interface_data(task_name, num_samples)
+            else:
+                # Use existing lm-eval task loading infrastructure
+                task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
+                docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
             
             if not docs:
                 return self._error_result(f"No documents retrieved from task: {task_name}")
@@ -145,8 +150,11 @@ class LMEvalHarnessGroundTruth:
                     )
                     
                     # Extract ground truth answer
+                    # HLE task handling
+                    if task_name.startswith('hle'):
+                        ground_truth = doc.get('answer', '')
                     # FIXED: For DROP task, use raw document data to preserve structured format
-                    if task_name == "drop":
+                    elif task_name == "drop":
                         # Use raw answer field which contains the structured data
                         ground_truth = doc.get('answer', {})
                     elif hasattr(task_data, 'doc_to_target'):
@@ -623,6 +631,29 @@ class LMEvalHarnessGroundTruth:
         }
         
         return mapping.get(token_aggregation.lower(), ActivationAggregationMethod.MEAN)
+    
+    def _is_task_interface_task(self, task_name: str) -> bool:
+        """Check if this is a TaskInterface task (not an lm-eval task)."""
+        # List of known TaskInterface tasks
+        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench'}
+        return task_name in task_interface_tasks
+    
+    def _load_task_interface_data(self, task_name: str, num_samples: int):
+        """Load data from TaskInterface tasks."""
+        try:
+            from .task_interface import get_task
+            
+            # Get the task instance
+            task = get_task(task_name)
+            
+            # Load data
+            docs = task.load_data(limit=num_samples)
+            
+            return docs, task
+            
+        except Exception as e:
+            logger.error(f"Failed to load TaskInterface task {task_name}: {e}")
+            return [], None
     
     def _calculate_perplexity(self, model, text: str) -> float:
         """Calculate perplexity of text using the model."""

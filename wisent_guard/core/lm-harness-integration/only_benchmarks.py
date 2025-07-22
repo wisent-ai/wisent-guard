@@ -973,6 +973,23 @@ CORE_BENCHMARKS = {
         "task": "mercury",
         "tags": ["coding", "python", "code generation", "efficiency"],
         "priority": "medium"
+    },
+    
+    # HLE (Human-Level Evaluation) benchmarks
+    "hle": {
+        "task": "hle",
+        "tags": ["reasoning", "knowledge", "multimodal", "evaluation"],
+        "priority": "high"
+    },
+    "hle_exact_match": {
+        "task": "hle_exact_match", 
+        "tags": ["reasoning", "knowledge", "text-generation"],
+        "priority": "high"
+    },
+    "hle_multiple_choice": {
+        "task": "hle_multiple_choice",
+        "tags": ["reasoning", "knowledge", "multiple-choice"],
+        "priority": "high"
     }
 }
 
@@ -1736,6 +1753,11 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "gpqa_main_cot_zeroshot": "Graduate-level scientific reasoning with chain-of-thought",
         "gpqa_diamond_cot_zeroshot": "Premium graduate-level scientific questions with reasoning",
         "gpqa_extended_cot_zeroshot": "Extended graduate-level scientific reasoning with CoT",
+        
+        # HLE (Human-Level Evaluation)
+        "hle": "Human-Level Evaluation: Multimodal reasoning across multiple domains (text-only subset)",
+        "hle_exact_match": "Human-Level Evaluation: Exact string matching questions across multiple domains",
+        "hle_multiple_choice": "Human-Level Evaluation: Multiple choice questions across multiple domains",
         
         # Reading Comprehension & Long Context
         "coqa": "Conversational question answering with context",

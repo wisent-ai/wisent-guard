@@ -2883,6 +2883,119 @@ class GPQAExtractor(BenchmarkExtractor):
             return None
 
 
+class HLEExtractor(BenchmarkExtractor):
+    """Extractor for HLE (Human-Level Evaluation) benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        HLE format:
+        - doc['question']: the question (includes choices for multipleChoice)
+        - doc['answer']: correct answer (letter for multipleChoice, text for exactMatch)
+        - doc['answer_type']: 'multipleChoice' or 'exactMatch'
+        """
+        try:
+            question = doc.get('question', '')
+            answer = doc.get('answer', '')
+            answer_type = doc.get('answer_type', '')
+            
+            if not all([question, answer, answer_type]):
+                return None
+            
+            if answer_type == 'multipleChoice':
+                # For multiple choice, extract the correct answer text from choices
+                correct_answer_text = self._extract_choice_text(question, answer)
+                if not correct_answer_text:
+                    correct_answer_text = answer  # Fallback to letter
+            else:
+                # For exact match, the answer is the text itself
+                correct_answer_text = answer
+            
+            return {
+                'question': question,
+                'formatted_question': question,  # Question already formatted with choices
+                'correct_answer': correct_answer_text,
+                'answer_letter': answer if answer_type == 'multipleChoice' else None,
+                'answer_type': answer_type
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting HLE QA pair: {e}")
+            return None
+    
+    def _extract_choice_text(self, question: str, answer_letter: str) -> Optional[str]:
+        """Extract the text of the correct choice from the question."""
+        import re
+        
+        # Look for patterns like "A. text" or "A) text"
+        patterns = [
+            rf'{answer_letter}\.\s+(.+?)(?=\n[A-E]\.|$)',  # "A. option" format
+            rf'{answer_letter}\)\s+(.+?)(?=\n[A-E]\)|$)',  # "A) option" format
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, question, re.MULTILINE | re.DOTALL)
+            if match:
+                return match.group(1).strip()
+        
+        return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for HLE."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            answer_type = doc.get('answer_type', '')
+            
+            if answer_type == 'multipleChoice':
+                # For multiple choice, get an incorrect choice
+                incorrect_answer = self._get_incorrect_choice(doc.get('question', ''), doc.get('answer', ''))
+                if not incorrect_answer:
+                    return None
+            else:
+                # For exact match, create a simple incorrect version
+                correct_answer = qa_pair['correct_answer']
+                if len(correct_answer) > 3:
+                    incorrect_answer = correct_answer[:-1] + "X"  # Change last character
+                else:
+                    incorrect_answer = correct_answer + "_incorrect"
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': qa_pair['correct_answer'],
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting HLE contrastive pair: {e}")
+            return None
+    
+    def _get_incorrect_choice(self, question: str, correct_letter: str) -> Optional[str]:
+        """Get text of an incorrect choice for multiple choice questions."""
+        import re
+        
+        # Find all choices
+        choices = []
+        patterns = [
+            r'([A-E])\.\s+(.+?)(?=\n[A-E]\.|$)',  # "A. option" format
+            r'([A-E])\)\s+(.+?)(?=\n[A-E]\)|$)',  # "A) option" format
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, question, re.MULTILINE | re.DOTALL)
+            if matches:
+                choices = matches
+                break
+        
+        # Find an incorrect choice (not the correct one)
+        for letter, text in choices:
+            if letter != correct_letter:
+                return text.strip()
+        
+        return None
+
+
 EXTRACTORS = {
     'winogrande': WinograndeExtractor,
     'arc_challenge': ARCExtractor,
@@ -2988,6 +3101,11 @@ EXTRACTORS = {
     'leaderboard_gpqa_main': GPQAExtractor,
     'leaderboard_gpqa_diamond': GPQAExtractor,
     'leaderboard_gpqa_extended': GPQAExtractor,
+    
+    # HLE (Human-Level Evaluation) benchmarks
+    'hle': HLEExtractor,
+    'hle_exact_match': HLEExtractor,
+    'hle_multiple_choice': HLEExtractor,
 }
 
 # Add BigCode benchmarks manually if import failed

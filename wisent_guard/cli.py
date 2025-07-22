@@ -189,6 +189,10 @@ ALLOWED_TASKS = {
     "codexglue_code_to_text_javascript",
     "codexglue_code_to_text_php",
     "mercury",
+    # HLE (Human-Level Evaluation) benchmarks
+    "hle",
+    "hle_exact_match",
+    "hle_multiple_choice",
 }
 
 # Filter to only available (working) benchmarks - this gives us the validated benchmarks

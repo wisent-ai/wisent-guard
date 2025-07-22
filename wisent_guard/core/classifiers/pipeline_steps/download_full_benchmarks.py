@@ -351,6 +351,11 @@ class FullBenchmarkDownloader:
               "choice3" in sample and "choice4" in sample and "answer" in sample):
             return self._convert_gpqa_format(sample)
         
+        # HLE format (question, answer, answer_type, category)
+        elif ("question" in sample and "answer" in sample and "answer_type" in sample and 
+              "category" in sample):
+            return self._convert_hle_format(sample)
+        
         # Generic multiple choice fallback
         elif "choices" in sample:
             return self._convert_generic_multiple_choice(sample)
@@ -797,6 +802,41 @@ class FullBenchmarkDownloader:
                 })
         
         return pairs
+
+    def _convert_hle_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert HLE format (question, answer, answer_type, category)."""
+        question = sample.get("question", "")
+        answer = sample.get("answer", "")
+        answer_type = sample.get("answer_type", "")
+        category = sample.get("category", "")
+        
+        if not question or not answer:
+            return []
+        
+        # Use the HLE extractor to get contrastive pairs
+        from wisent_guard.core.benchmark_extractors import HLEExtractor
+        
+        try:
+            extractor = HLEExtractor()
+            contrastive_pair = extractor.extract_contrastive_pair(sample)
+            
+            if contrastive_pair:
+                return [{
+                    "question": contrastive_pair["question"],
+                    "good_response": contrastive_pair["correct_answer"],
+                    "bad_response": contrastive_pair["incorrect_answer"],
+                    "metadata": {
+                        "answer_type": answer_type,
+                        "category": category,
+                        "raw_subject": sample.get("raw_subject", ""),
+                        "benchmark_type": "hle"
+                    }
+                }]
+            else:
+                return []
+        except Exception as e:
+            print(f"         ⚠️ Error converting HLE sample: {e}")
+            return []
 
 def main():
     """Main function for CLI usage."""

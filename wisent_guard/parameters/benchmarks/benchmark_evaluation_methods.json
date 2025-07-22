@@ -82,5 +82,9 @@
   "codexglue_code_to_text_javascript": "text-generation",
   "codexglue_code_to_text_php": "text-generation",
   "codexglue_code_to_text_ruby": "text-generation",
-  "livecodebench": "code-execution"
+  "livecodebench": "code-execution",
+  
+  "hle": "text-generation",
+  "hle_exact_match": "text-generation",
+  "hle_multiple_choice": "log-likelihoods"
 }
