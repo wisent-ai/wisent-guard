@@ -419,7 +419,7 @@ class BoolQExtractor(BenchmarkExtractor):
             return None
 
 
-class GSM8KExtractor(BenchmarkExtractor):
+class GSM8KExtractor(BenchmarkExtractor): 
     """Extractor for GSM8K, MATH-500, and AIME_2024 benchmarks."""
     
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
@@ -2957,12 +2957,24 @@ class HLEExtractor(BenchmarkExtractor):
                 if not incorrect_answer:
                     return None
             else:
-                # For exact match, create a simple incorrect version
+                # For exact match, replace one third of words with 'X'
                 correct_answer = qa_pair['correct_answer']
-                if len(correct_answer) > 3:
-                    incorrect_answer = correct_answer[:-1] + "X"  # Change last character
+                words = correct_answer.split()
+                if len(words) > 1:
+                    # Replace approximately 1/3 of the words with 'X'
+                    num_to_replace = max(1, len(words) // 3)
+                    import random
+                    indices_to_replace = random.sample(range(len(words)), num_to_replace)
+                    for idx in indices_to_replace:
+                        words[idx] = 'X'
+                    incorrect_answer = ' '.join(words)
                 else:
-                    incorrect_answer = correct_answer + "_incorrect"
+                    # For single word answers, change part of it
+                    if len(correct_answer) > 3:
+                        mid = len(correct_answer) // 2
+                        incorrect_answer = correct_answer[:mid] + 'X' * (len(correct_answer) - mid)
+                    else:
+                        incorrect_answer = 'X' * len(correct_answer)
             
             return {
                 'question': qa_pair['formatted_question'],
