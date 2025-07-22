@@ -1498,6 +1498,7 @@ def run_task_pipeline(
                     task_data = model.load_lm_eval_task(
                         actual_task_name, shots=shots, limit=total_limit
                     )
+                    #TODO Code below should be refactored. Originally It had been built to support Lm-eval-harness, but it was rebuilt to be suitable for benchamarks outside lm-eval-harness
                     # Check if this is a TaskInterface task (skip split_task_data for these)
                     if hasattr(task_data, 'get_name') and hasattr(task_data, 'load_data'):
                         # TaskInterface task - data loading handled internally
