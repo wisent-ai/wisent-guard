@@ -338,6 +338,11 @@ class FullBenchmarkDownloader:
         elif "task_id" in sample and "text" in sample and "code" in sample:
             return self._convert_mbpp_format(sample)
         
+        # MATH-500 format (problem, solution, answer, subject, level)
+        elif ("problem" in sample and "solution" in sample and "answer" in sample 
+              and "subject" in sample and "level" in sample):
+            return self._convert_math500_format(sample)
+        
         # Text generation with question/answer (GSM8K, math problems)
         elif "question" in sample and "answer" in sample:
             return self._convert_text_generation(sample)
@@ -345,6 +350,16 @@ class FullBenchmarkDownloader:
         # Reading comprehension (CoQA, SQuAD)
         elif "story" in sample or "passage" in sample:
             return self._convert_reading_comprehension(sample)
+        
+        # GPQA format (Question, choice1-4, answer, plus rich metadata)
+        elif ("Question" in sample and "choice1" in sample and "choice2" in sample and 
+              "choice3" in sample and "choice4" in sample and "answer" in sample):
+            return self._convert_gpqa_format(sample)
+        
+        # HLE format (question, answer, answer_type, category)
+        elif ("question" in sample and "answer" in sample and "answer_type" in sample and 
+              "category" in sample):
+            return self._convert_hle_format(sample)
         
         # Generic multiple choice fallback
         elif "choices" in sample:
@@ -606,6 +621,35 @@ class FullBenchmarkDownloader:
         
         return pairs
     
+    def _convert_math500_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert MATH-500 format (problem, solution, answer, subject, level)."""
+        problem = sample.get("problem", "")
+        correct_answer = sample.get("answer", "")
+        solution = sample.get("solution", "")
+        subject = sample.get("subject", "")
+        level = sample.get("level", 0)
+        unique_id = sample.get("unique_id", "")
+        
+        # Generate mathematical incorrect answers based on correct answer
+        incorrect_answers = self._generate_math_distractors(correct_answer)
+        
+        pairs = []
+        for incorrect in incorrect_answers:
+            pairs.append({
+                "context": problem,
+                "good_response": correct_answer,
+                "bad_response": incorrect,
+                "metadata": {
+                    "benchmark_type": "math500",
+                    "subject": subject,
+                    "level": level,
+                    "sample_id": unique_id,
+                    "has_solution": bool(solution.strip())  # Track if step-by-step solution available
+                }
+            })
+        
+        return pairs
+    
     def _convert_reading_comprehension(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert reading comprehension tasks (CoQA, SQuAD)."""
         # This is complex as these often have multiple Q&A pairs
@@ -740,6 +784,92 @@ class FullBenchmarkDownloader:
                 return []
         except Exception as e:
             print(f"         ⚠️ Error converting MBPP sample: {e}")
+            return []
+
+    def _convert_gpqa_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert GPQA format (Question, choice1-4, answer, plus rich metadata)."""
+        question = sample.get("Question", "")
+        choice1 = sample.get("choice1", "")
+        choice2 = sample.get("choice2", "")
+        choice3 = sample.get("choice3", "")
+        choice4 = sample.get("choice4", "")
+        answer = sample.get("answer", "")
+        
+        # Extract letter from answer format like "(A)" or "A"
+        import re
+        answer_match = re.search(r'[ABCD]', answer.upper())
+        if not answer_match:
+            return []
+        
+        answer_letter = answer_match.group()
+        
+        # Map answer letter to choice
+        choices_map = {
+            "A": choice1,
+            "B": choice2,
+            "C": choice3,
+            "D": choice4
+        }
+        
+        correct_answer = choices_map.get(answer_letter, "")
+        if not correct_answer:
+            return []
+        
+        # Create pairs with each incorrect option
+        pairs = []
+        for letter, choice in choices_map.items():
+            if letter != answer_letter and choice:
+                pairs.append({
+                    "context": question,
+                    "good_response": correct_answer,
+                    "bad_response": choice,
+                    "metadata": {
+                        "answer_key": answer_letter,
+                        "raw_answer": answer,
+                        "benchmark_type": "gpqa",
+                        "subdomain": sample.get("Subdomain", ""),
+                        "high_level_domain": sample.get("High-level domain", ""),
+                        "difficulty_estimate": sample.get("Writer's Difficulty Estimate", ""),
+                        "expert_accuracy": sample.get("Expert Validator Accuracy", ""),
+                        "explanation": sample.get("Explanation", "")[:200] if sample.get("Explanation") else ""  # Truncate long explanations
+                    }
+                })
+        
+        return pairs
+
+    def _convert_hle_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert HLE format (question, answer, answer_type, category)."""
+        question = sample.get("question", "")
+        answer = sample.get("answer", "")
+        answer_type = sample.get("answer_type", "")
+        category = sample.get("category", "")
+        
+        if not question or not answer:
+            return []
+        
+        # Use the HLE extractor to get contrastive pairs
+        from wisent_guard.core.benchmark_extractors import HLEExtractor
+        
+        try:
+            extractor = HLEExtractor()
+            contrastive_pair = extractor.extract_contrastive_pair(sample)
+            
+            if contrastive_pair:
+                return [{
+                    "question": contrastive_pair["question"],
+                    "good_response": contrastive_pair["correct_answer"],
+                    "bad_response": contrastive_pair["incorrect_answer"],
+                    "metadata": {
+                        "answer_type": answer_type,
+                        "category": category,
+                        "raw_subject": sample.get("raw_subject", ""),
+                        "benchmark_type": "hle"
+                    }
+                }]
+            else:
+                return []
+        except Exception as e:
+            print(f"         ⚠️ Error converting HLE sample: {e}")
             return []
 
 def main():

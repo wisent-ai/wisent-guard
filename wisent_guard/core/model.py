@@ -854,6 +854,104 @@ class Model:
         if task_name == "livecodebench":
             from .tasks.livecodebench_task import LiveCodeBenchTask
             return LiveCodeBenchTask(release_version="release_v1", limit=limit)
+        
+        # Check if it's HLE task
+        if task_name in ["hle", "hle_exact_match", "hle_multiple_choice"]:
+            from .tasks.hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
+            
+            if task_name == "hle":
+                return HLETask(limit=limit)
+            elif task_name == "hle_exact_match":
+                return HLEExactMatchTask(limit=limit)
+            elif task_name == "hle_multiple_choice":
+                return HLEMultipleChoiceTask(limit=limit)
+            
+        # Check if it's MATH-500
+        if task_name in ["math500", "math", "hendrycks_math"]:
+            from .tasks.math500_task import Math500Task
+            return Math500Task(limit=limit)
+            
+        # Check if it's AIME (general or year-specific)
+        if task_name.startswith("aime"):
+            from .tasks.aime_task import AIMETask
+            
+            if task_name == "aime":
+                return AIMETask(year="2025", limit=limit)  # Default: latest year
+            elif task_name == "aime2025":
+                return AIMETask(year="2025", limit=limit)
+            elif task_name == "aime2024":
+                return AIMETask(year="2024", limit=limit)
+            else:
+                # Try to extract year from task name (e.g., "aime2026")
+                year = task_name.replace("aime", "")
+                return AIMETask(year=year, limit=limit)
+            
+        # Check if it's HMMT (general or competition-specific)
+        if task_name.startswith("hmmt"):
+            from .tasks.hmmt_task import HMMTTask
+            
+            if task_name == "hmmt":
+                return HMMTTask(competition="feb_2025", limit=limit)  # Default: latest competition
+            elif task_name == "hmmt_feb_2025":
+                return HMMTTask(competition="feb_2025", limit=limit)
+            else:
+                # Try to extract competition from task name (e.g., "hmmt_aug_2025")
+                competition = task_name.replace("hmmt_", "")
+                return HMMTTask(competition=competition, limit=limit)
+        
+        # Check if it's SuperGPQA task
+        if task_name.startswith("supergpqa"):
+            from .tasks.supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
+            
+            if task_name == "supergpqa":
+                return SuperGPQATask(limit=limit)
+            elif task_name == "supergpqa_physics":
+                return SuperGPQAPhysicsTask(limit=limit)
+            elif task_name == "supergpqa_chemistry":
+                return SuperGPQAChemistryTask(limit=limit)
+            elif task_name == "supergpqa_biology":
+                return SuperGPQABiologyTask(limit=limit)
+            
+        # Check if it's PolyMath (general or language-difficulty specific)
+        if task_name.startswith("polymath"):
+            from .tasks.polymath_task import PolyMathTask
+            
+            if task_name == "polymath":
+                return PolyMathTask(language="en", difficulty="medium", limit=limit)  # Default: English medium
+            elif task_name == "polymath_en_medium":
+                return PolyMathTask(language="en", difficulty="medium", limit=limit)
+            elif task_name == "polymath_zh_medium":
+                return PolyMathTask(language="zh", difficulty="medium", limit=limit)
+            elif task_name == "polymath_en_high":
+                return PolyMathTask(language="en", difficulty="high", limit=limit)
+            elif task_name == "polymath_zh_high":
+                return PolyMathTask(language="zh", difficulty="high", limit=limit)
+            else:
+                # Try to extract language and difficulty from task name (e.g., "polymath_fr_low")
+                parts = task_name.replace("polymath_", "").split("_")
+                if len(parts) >= 2:
+                    language, difficulty = parts[0], parts[1]
+                    return PolyMathTask(language=language, difficulty=difficulty, limit=limit)
+                else:
+                    # Fallback to default
+                    return PolyMathTask(language="en", difficulty="medium", limit=limit)
+            
+        # Check if it's LiveMathBench (general or language specific)
+        if task_name.startswith("livemathbench"):
+            from .tasks.livemathbench_task import LiveMathBenchTask
+            
+            if task_name == "livemathbench":
+                return LiveMathBenchTask(language="en", limit=limit)  # Default: English
+            elif task_name == "livemathbench_cnmo_en":
+                return LiveMathBenchTask(language="en", limit=limit)
+            elif task_name == "livemathbench_cnmo_zh":
+                return LiveMathBenchTask(language="zh", limit=limit)
+            else:
+                # Try to extract language from task name (e.g., "livemathbench_cnmo_fr")
+                if "_zh" in task_name or "_cn" in task_name:
+                    return LiveMathBenchTask(language="zh", limit=limit)
+                else:
+                    return LiveMathBenchTask(language="en", limit=limit)  # Default to English
             
         # Check if it's a BigCode task
         try:

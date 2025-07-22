@@ -1156,6 +1156,18 @@ class ContrastivePairSet:
                         question = doc.get('question_content', doc.get('text', doc.get('prompt', '')))
                     if not question and 'question_title' in doc:
                         question = doc.get('question_title', '')
+                elif task_name.startswith('supergpqa'):
+                    # SuperGPQA tasks use 'question' field directly
+                    question = doc.get('question', '')
+                elif task_name.startswith('hle'):
+                    # HLE tasks use 'question' field directly
+                    question = doc.get('question', '')
+                elif task_name.startswith('aime'):
+                    # AIME tasks use 'Problem' or 'problem' field
+                    question = doc.get('Problem', doc.get('problem', ''))
+                elif task_name.startswith('math500') or task_name in ['math', 'hendrycks_math']:
+                    # MATH tasks use 'problem' field
+                    question = doc.get('problem', '')
                 else:
                     # For other tasks, use the template method
                     try:
@@ -1301,6 +1313,85 @@ class ContrastivePairSet:
                     # LiveCodeBench will be handled separately after the loop
                     # using the model outputs extractor
                     continue
+                
+                elif task_name.startswith('supergpqa'):
+                    # SuperGPQA-specific extraction
+                    options = doc.get('options', [])
+                    answer_text = doc.get('answer', '')
+                    answer_letter = doc.get('answer_letter', '')
+                    
+                    if options and answer_text:
+                        correct_answer = answer_text
+                        # Find an incorrect answer from options
+                        for option in options:
+                            if option != answer_text:
+                                incorrect_answer = option
+                                break
+                        
+                        # Format the question with options
+                        if options:
+                            formatted_options = []
+                            for i, option in enumerate(options):
+                                letter = chr(ord('A') + i)
+                                formatted_options.append(f"{letter}. {option}")
+                            formatted_question = f"{question}\n\n" + "\n".join(formatted_options)
+                        else:
+                            formatted_question = question
+                
+                elif task_name.startswith('hle'):
+                    # HLE-specific extraction
+                    answer = doc.get('answer', '')
+                    answer_type = doc.get('answer_type', '')
+                    
+                    if answer_type == 'multipleChoice':
+                        # For multiple choice, try to extract the text from the question
+                        import re
+                        patterns = [
+                            rf'{answer}\.\s+(.+?)(?=\n[A-E]\.|$)',  # "A. option" format
+                            rf'{answer}\)\s+(.+?)(?=\n[A-E]\)|$)',  # "A) option" format
+                        ]
+                        
+                        correct_text = None
+                        for pattern in patterns:
+                            match = re.search(pattern, question, re.MULTILINE | re.DOTALL)
+                            if match:
+                                correct_text = match.group(1).strip()
+                                break
+                        
+                        if correct_text:
+                            correct_answer = correct_text
+                            # Find an incorrect choice
+                            other_letters = [letter for letter in ['A', 'B', 'C', 'D', 'E'] if letter != answer]
+                            for letter in other_letters:
+                                for pattern in patterns:
+                                    pattern_with_letter = pattern.replace(answer, letter)
+                                    match = re.search(pattern_with_letter, question, re.MULTILINE | re.DOTALL)
+                                    if match:
+                                        incorrect_answer = match.group(1).strip()
+                                        break
+                                if incorrect_answer:
+                                    break
+                        else:
+                            correct_answer = answer  # Fallback to letter
+                            incorrect_answer = "Incorrect answer"
+                    else:
+                        # Exact match
+                        correct_answer = answer
+                        incorrect_answer = "Wrong answer"
+                    
+                    formatted_question = question  # Question already contains choices if MC
+                
+                elif task_name.startswith('aime') or task_name.startswith('math500') or task_name in ['math', 'hendrycks_math']:
+                    # Math task extraction
+                    answer = doc.get('Answer', doc.get('answer', doc.get('solution', '')))
+                    if answer:
+                        correct_answer = str(answer)
+                        # Generate a simple incorrect answer for math problems
+                        if answer.isdigit():
+                            incorrect_answer = str(int(answer) + 1)
+                        else:
+                            incorrect_answer = "Wrong answer"
+                    formatted_question = question
                 
                 else:
                     # Use benchmark-specific extractors for all other tasks

@@ -124,12 +124,45 @@ ALLOWED_TASKS = {
     "copa",
     "openbookqa",
     "race",
+    # GPQA benchmarks
+    "gpqa",
+    "gpqa_diamond", 
+    "gpqa_extended",
+    # GPQA specific variants (zeroshot only for focused testing)
+    "gpqa_main_zeroshot",
+    "gpqa_diamond_zeroshot",
+    "gpqa_extended_zeroshot",
+    # GPQA Chain-of-Thought variants for text generation testing
+    "gpqa_main_cot_zeroshot",
+    "gpqa_diamond_cot_zeroshot", 
+    "gpqa_extended_cot_zeroshot",
     # Boolean benchmarks
     "boolq",
     # Math benchmarks
     "gsm8k",
     "asdiv",
     "arithmetic",
+    # MATH-500 mathematical reasoning benchmarks
+    "math",
+    "math500",
+    "hendrycks_math",
+    # AIME contest math problems (general + year-specific)
+    "aime",        # Latest AIME (2025)
+    "aime2025",    # AIME 2025
+    "aime2024",    # AIME 2024
+    # HMMT contest math problems (general + competition-specific)
+    "hmmt",        # Latest HMMT (February 2025)
+    "hmmt_feb_2025",  # HMMT February 2025
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    "polymath",    # Default: English medium
+    "polymath_en_medium",  # English medium
+    "polymath_zh_medium",  # Chinese medium
+    "polymath_en_high",    # English high
+    "polymath_zh_high",    # Chinese high
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    "livemathbench",       # Default: English
+    "livemathbench_cnmo_en",  # CNMO 2024 English
+    "livemathbench_cnmo_zh",  # CNMO 2024 Chinese
     # QA benchmarks
     "coqa",
     "naturalqs",
@@ -177,6 +210,15 @@ ALLOWED_TASKS = {
     "codexglue_code_to_text_javascript",
     "codexglue_code_to_text_php",
     "mercury",
+    # HLE (Human-Level Evaluation) benchmarks
+    "hle",
+    "hle_exact_match",
+    "hle_multiple_choice",
+    # SuperGPQA scientific reasoning benchmarks
+    "supergpqa",
+    "supergpqa_physics",
+    "supergpqa_chemistry", 
+    "supergpqa_biology",
 }
 
 # Filter to only available (working) benchmarks - this gives us the validated benchmarks
@@ -1476,9 +1518,17 @@ def run_task_pipeline(
                     task_data = model.load_lm_eval_task(
                         actual_task_name, shots=shots, limit=total_limit
                     )
-                    train_docs, test_docs = model.split_task_data(
-                        task_data, split_ratio=split_ratio, random_seed=seed
-                    )
+                    #TODO Code below should be refactored. Originally It had been built to support Lm-eval-harness, but it was rebuilt to be suitable for benchamarks outside lm-eval-harness
+                    # Check if this is a TaskInterface task (skip split_task_data for these)
+                    if hasattr(task_data, 'get_name') and hasattr(task_data, 'load_data'):
+                        # TaskInterface task - data loading handled internally
+                        train_docs = task_data.load_data(limit=training_limit)
+                        test_docs = task_data.load_data(limit=testing_limit)
+                    else:
+                        # Standard lm-eval task  
+                        train_docs, test_docs = model.split_task_data(
+                            task_data, split_ratio=split_ratio, random_seed=seed
+                        )
                     
                     # Apply training and testing limits if specified
                     original_train_size = len(train_docs)

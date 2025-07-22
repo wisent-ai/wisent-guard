@@ -7,6 +7,7 @@ The actual response is NEVER analyzed as text - only its activations are classif
 """
 
 import time
+import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
@@ -52,7 +53,7 @@ class AutomaticTraitDiscovery:
         # Calculate max traits based on time budget
         max_traits = calculate_max_tasks_for_time_budget("classifier_training", time_budget_minutes)
         max_traits = max(1, min(max_traits, 5))  # Cap between 1-5 traits
-        print(f"   💰 Budget system: {time_budget_minutes:.1f} min budget → max {max_traits} traits")
+        logging.info(f"Budget system: {time_budget_minutes:.1f} min budget → max {max_traits} traits")
         
         # Generate dynamic trait prompt based on budget
         trait_lines = "\n".join([f"TRAIT_{i+1}:" for i in range(max_traits)])
@@ -71,11 +72,11 @@ List {max_traits} quality traits for responses:
                 do_sample=True
             )
             
-            print(f"   🔍 Model generated analysis: {analysis[:200]}...")
+            logging.info(f"Model generated analysis: {analysis[:200]}...")
             return self._parse_discovery_result(analysis)
             
         except Exception as e:
-            print(f"   ⚠️ Error in trait discovery: {e}")
+            logging.info(f"Error in trait discovery: {e}")
             # Fallback to general traits
             return TraitDiscoveryResult(
                 traits_discovered=["accuracy and truthfulness", "helpfulness", "safety"]
@@ -137,56 +138,56 @@ class SyntheticClassifierFactory:
             positive_activations = []
             negative_activations = []
             
-            print(f"      🧠 Extracting activations from {len(pair_set.pairs)} pairs...")
+            logging.info(f"Extracting activations from {len(pair_set.pairs)} pairs...")
             
             # Create Layer object for activation extraction
             from wisent_guard.core.layer import Layer
             layer_obj = Layer(index=15, type="transformer")
-            print(f"      🔧 Created Layer object: index={layer_obj.index}, type={layer_obj.type}")
+            logging.info(f"Created Layer object: index={layer_obj.index}, type={layer_obj.type}")
             
             for i, pair in enumerate(pair_set.pairs):
-                print(f"      🔍 Processing pair {i+1}/{len(pair_set.pairs)}...")
+                logging.debug(f"Processing pair {i+1}/{len(pair_set.pairs)}...")
                 try:
                     # Get activations for positive response
-                    print(f"         📊 Extracting positive activations for: {repr(pair.positive_response.text[:100])}")
+                    logging.debug(f"Extracting positive activations for: {repr(pair.positive_response.text[:100])}")
                     pos_activations = self.model.extract_activations(pair.positive_response.text, layer_obj)
-                    print(f"         ✅ Positive activations shape: {pos_activations.shape if hasattr(pos_activations, 'shape') else 'N/A'}")
+                    logging.debug(f"Positive activations shape: {pos_activations.shape if hasattr(pos_activations, 'shape') else 'N/A'}")
                     positive_activations.append(pos_activations)
                     
                     # Get activations for negative response
-                    print(f"         📊 Extracting negative activations for: {repr(pair.negative_response.text[:100])}")
+                    logging.debug(f"Extracting negative activations for: {repr(pair.negative_response.text[:100])}")
                     neg_activations = self.model.extract_activations(pair.negative_response.text, layer_obj)
-                    print(f"         ✅ Negative activations shape: {neg_activations.shape if hasattr(neg_activations, 'shape') else 'N/A'}")
+                    logging.debug(f"Negative activations shape: {neg_activations.shape if hasattr(neg_activations, 'shape') else 'N/A'}")
                     negative_activations.append(neg_activations)
                     
-                    print(f"         ✅ Successfully processed pair {i+1}")
+                    logging.debug(f"Successfully processed pair {i+1}")
                     
                 except Exception as e:
-                    print(f"         ⚠️ Error extracting activations for pair {i+1}: {e}")
+                    logging.debug(f"Error extracting activations for pair {i+1}: {e}")
                     import traceback
                     error_details = traceback.format_exc()
-                    print(f"         📜 Full error traceback:\n{error_details}")
+                    logging.debug(f"Full error traceback:\n{error_details}")
                     continue
             
-            print(f"      📊 ACTIVATION EXTRACTION SUMMARY:")
-            print(f"         Positive activations collected: {len(positive_activations)}")
-            print(f"         Negative activations collected: {len(negative_activations)}")
-            print(f"         Total pairs processed: {len(pair_set.pairs)}")
-            print(f"         Success rate: {(len(positive_activations) / len(pair_set.pairs) * 100):.1f}%")
+            logging.info(f"ACTIVATION EXTRACTION SUMMARY:")
+            logging.info(f"Positive activations collected: {len(positive_activations)}")
+            logging.info(f"Negative activations collected: {len(negative_activations)}")
+            logging.info(f"Total pairs processed: {len(pair_set.pairs)}")
+            logging.info(f"Success rate: {(len(positive_activations) / len(pair_set.pairs) * 100):.1f}%")
             
             if len(positive_activations) < 2 or len(negative_activations) < 2:
                 error_msg = f"Insufficient activation data for training: {len(positive_activations)} positive, {len(negative_activations)} negative"
-                print(f"      ❌ ERROR: {error_msg}")
+                logging.info(f"ERROR: {error_msg}")
                 raise ValueError(error_msg)
             
             # Train classifier on activations
-            print(f"      🏋️ Training classifier on {len(positive_activations)} positive, {len(negative_activations)} negative activations...")
+            logging.info(f"Training classifier on {len(positive_activations)} positive, {len(negative_activations)} negative activations...")
             
-            print(f"      🔧 Creating ActivationClassifier instance...")
+            logging.info(f"Creating ActivationClassifier instance...")
             classifier = ActivationClassifier()
-            print(f"      ✅ ActivationClassifier created")
+            logging.info(f"ActivationClassifier created")
             
-            print(f"      🎯 Starting classifier training...")
+            logging.info(f"Starting classifier training...")
             try:
                 # Convert activations to the format expected by train_on_activations method
                 from wisent_guard.core.activations import Activations
@@ -214,22 +215,22 @@ class SyntheticClassifierFactory:
                     else:
                         harmless_activations.append(neg_act)
                 
-                print(f"      🔧 Converted to Activations objects: {len(harmful_activations)} harmful, {len(harmless_activations)} harmless")
+                logging.info(f"Converted to Activations objects: {len(harmful_activations)} harmful, {len(harmless_activations)} harmless")
                 
                 # Train using the correct method
                 training_result = classifier.train_on_activations(harmful_activations, harmless_activations)
-                print(f"      ✅ Classifier training completed successfully! Result: {training_result}")
+                logging.info(f"Classifier training completed successfully! Result: {training_result}")
             except Exception as e:
-                print(f"      ❌ ERROR during classifier training: {e}")
+                logging.info(f"ERROR during classifier training: {e}")
                 import traceback
                 error_details = traceback.format_exc()
-                print(f"      📜 Full training error traceback:\n{error_details}")
+                logging.info(f"Full training error traceback:\n{error_details}")
                 raise
             
             return classifier, len(pair_set.pairs)
             
         except Exception as e:
-            print(f"   ❌ Error creating classifier for trait '{trait_description}': {e}")
+            logging.info(f"Error creating classifier for trait '{trait_description}': {e}")
             raise
 
 
@@ -264,7 +265,7 @@ class SyntheticClassifierSystem:
         Returns:
             Tuple of (list of trained classifiers, trait discovery result)
         """
-        print(f"🔍 Creating synthetic classifiers for prompt (budget: {time_budget_minutes:.1f} minutes)...")
+        logging.info(f"Creating synthetic classifiers for prompt (budget: {time_budget_minutes:.1f} minutes)...")
         
         # Get cost estimates from device benchmarks
         try:
@@ -276,14 +277,14 @@ class SyntheticClassifierSystem:
             data_generation_cost = estimate_task_time_direct("data_generation", 1)  # Per pair
             classifier_training_cost = estimate_task_time_direct("classifier_training", 100) / 100  # Per classifier (benchmark is per 100) 
             
-            print(f"   💰 Cost estimates per unit:")
-            print(f"      • Trait discovery: ~{trait_discovery_cost:.0f}s")
-            print(f"      • Data generation: ~{data_generation_cost:.0f}s per pair")
-            print(f"      • Classifier training: ~{classifier_training_cost:.0f}s per classifier")
+            logging.info(f"Cost estimates per unit:")
+            logging.info(f"• Trait discovery: ~{trait_discovery_cost:.0f}s")
+            logging.info(f"• Data generation: ~{data_generation_cost:.0f}s per pair")
+            logging.info(f"• Classifier training: ~{classifier_training_cost:.0f}s per classifier")
             
         except Exception as e:
-            print(f"   ⚠️ Could not get benchmark data: {e}")
-            print(f"   ⚠️ Using fallback estimates")
+            logging.info(f"Could not get benchmark data: {e}")
+            logging.info(f"Using fallback estimates")
             # Fallback estimates if benchmarks aren't available
             trait_discovery_cost = 10.0
             data_generation_cost = 30.0  # Per pair
@@ -292,20 +293,20 @@ class SyntheticClassifierSystem:
         budget_seconds = time_budget_minutes * 60.0
         
         # Step 1: Budget-aware trait discovery
-        print("   🎯 Discovering relevant traits for this prompt...")
+        logging.info("Discovering relevant traits for this prompt...")
         
         # Estimate if we have enough budget for even basic operations
         min_required_time = trait_discovery_cost + (data_generation_cost * 3) + classifier_training_cost
         
         if budget_seconds < min_required_time:
-            print(f"   💰 Budget ({budget_seconds:.0f}s) too small for full classifier training")
-            print(f"   💰 Minimum required: {min_required_time:.0f}s")
-            print(f"   🔄 Falling back to simple trait analysis only...")
+            logging.info(f"Budget ({budget_seconds:.0f}s) too small for full classifier training")
+            logging.info(f"Minimum required: {min_required_time:.0f}s")
+            logging.info(f"Falling back to simple trait analysis only...")
             
             # Just do trait discovery without training classifiers
             discovery_result = self.trait_discovery.discover_relevant_traits(prompt, time_budget_minutes)
-            print(f"   ✅ Discovered {len(discovery_result.traits_discovered)} traits: {discovery_result.traits_discovered}")
-            print(f"   ⚠️ Skipping classifier training due to budget constraints")
+            logging.info(f"Discovered {len(discovery_result.traits_discovered)} traits: {discovery_result.traits_discovered}")
+            logging.info(f"Skipping classifier training due to budget constraints")
             return [], discovery_result
         
         # Calculate how many traits we can afford
@@ -313,31 +314,31 @@ class SyntheticClassifierSystem:
         available_for_traits = budget_seconds - trait_discovery_cost
         max_affordable_traits = max(1, int(available_for_traits / cost_per_trait))
         
-        print(f"   💰 Budget analysis:")
-        print(f"      • Available time: {budget_seconds:.0f}s")
-        print(f"      • Cost per trait ({pairs_per_trait} pairs): {cost_per_trait:.0f}s")
-        print(f"      • Max affordable traits: {max_affordable_traits}")
+        logging.info(f"Budget analysis:")
+        logging.info(f"• Available time: {budget_seconds:.0f}s")
+        logging.info(f"• Cost per trait ({pairs_per_trait} pairs): {cost_per_trait:.0f}s")
+        logging.info(f"• Max affordable traits: {max_affordable_traits}")
         
         discovery_result = self.trait_discovery.discover_relevant_traits(prompt, time_budget_minutes)
         
         if not discovery_result.traits_discovered:
-            print("   ⚠️ No traits discovered, cannot create classifiers")
+            logging.info("No traits discovered, cannot create classifiers")
             return [], discovery_result
         
         # Limit traits to what we can afford
         affordable_traits = discovery_result.traits_discovered[:max_affordable_traits]
         if len(affordable_traits) < len(discovery_result.traits_discovered):
-            print(f"   💰 Budget limiting to {len(affordable_traits)}/{len(discovery_result.traits_discovered)} traits")
+            logging.info(f"Budget limiting to {len(affordable_traits)}/{len(discovery_result.traits_discovered)} traits")
         
-        print(f"   ✅ Processing {len(affordable_traits)} traits: {affordable_traits}")
+        logging.info(f"Processing {len(affordable_traits)} traits: {affordable_traits}")
         
         # Step 2: Create classifiers for affordable traits with smart resource allocation
         classifiers = []
         remaining_budget = budget_seconds - trait_discovery_cost
         
         for i, trait_description in enumerate(affordable_traits):
-            print(f"   🎯 Creating classifier {i+1}/{len(affordable_traits)}: {trait_description}")
-            print(f"      💰 Remaining budget: {remaining_budget:.0f}s")
+            logging.info(f"Creating classifier {i+1}/{len(affordable_traits)}: {trait_description}")
+            logging.info(f"Remaining budget: {remaining_budget:.0f}s")
             
             # Estimate cost for this specific classifier
             estimated_pairs_cost = data_generation_cost * pairs_per_trait
@@ -348,10 +349,10 @@ class SyntheticClassifierSystem:
                 # Try with fewer pairs
                 max_affordable_pairs = max(3, int((remaining_budget - classifier_training_cost) / data_generation_cost))
                 if max_affordable_pairs < 3:
-                    print(f"      💰 Insufficient budget ({remaining_budget:.0f}s) for training, skipping")
+                    logging.info(f"Insufficient budget ({remaining_budget:.0f}s) for training, skipping")
                     continue
                 else:
-                    print(f"      💰 Reducing pairs from {pairs_per_trait} to {max_affordable_pairs} to fit budget")
+                    logging.info(f"Reducing pairs from {pairs_per_trait} to {max_affordable_pairs} to fit budget")
                     actual_pairs = max_affordable_pairs
             else:
                 actual_pairs = pairs_per_trait
@@ -360,7 +361,7 @@ class SyntheticClassifierSystem:
                 start_time = time.time()
                 
                 # Create classifier for this trait
-                print(f"      🏗️ Creating classifier with {actual_pairs} pairs...")
+                logging.info(f"Creating classifier with {actual_pairs} pairs...")
                 classifier, pairs_count = self.classifier_factory.create_classifier_from_trait(
                     trait_description=trait_description,
                     num_pairs=actual_pairs
@@ -375,13 +376,13 @@ class SyntheticClassifierSystem:
                 
                 classifiers.append(classifier)
                 
-                print(f"      ✅ Classifier created with {pairs_count} training pairs ({actual_time:.0f}s)")
+                logging.info(f"Classifier created with {pairs_count} training pairs ({actual_time:.0f}s)")
                 
             except Exception as e:
-                print(f"      ❌ Error creating classifier for trait '{trait_description}': {e}")
+                logging.info(f"Error creating classifier for trait '{trait_description}': {e}")
                 continue
         
-        print(f"   🎉 Created {len(classifiers)} synthetic classifiers within budget")
+        logging.info(f"Created {len(classifiers)} synthetic classifiers within budget")
         
         # Update discovery result to reflect what we actually processed
         final_discovery = TraitDiscoveryResult(traits_discovered=affordable_traits)
@@ -404,14 +405,14 @@ class SyntheticClassifierSystem:
         Returns:
             List of classification results
         """
-        print(f"🔬 Applying {len(classifiers)} synthetic classifiers to response...")
+        logging.info(f"Applying {len(classifiers)} synthetic classifiers to response...")
         
         # Extract activations from the response ONCE
-        print("   🧠 Extracting activations from response...")
+        logging.info("Extracting activations from response...")
         try:
             response_activations, _ = self.model.extract_activations(response_text, layer=15)
         except Exception as e:
-            print(f"   ❌ Error extracting response activations: {e}")
+            logging.info(f"Error extracting response activations: {e}")
             return []
         
         results = []
@@ -420,7 +421,7 @@ class SyntheticClassifierSystem:
             trait_description = getattr(classifier, '_trait_description', f'trait_{i}')
             pairs_count = getattr(classifier, '_pairs_count', 0)
             
-            print(f"   🔬 Applying classifier {i+1}/{len(classifiers)}: {trait_description}")
+            logging.info(f"Applying classifier {i+1}/{len(classifiers)}: {trait_description}")
             
             try:
                 start_time = time.time()
@@ -448,13 +449,13 @@ class SyntheticClassifierSystem:
                 
                 results.append(result)
                 
-                print(f"      ✅ Result: prediction={prediction}, confidence={confidence_score:.3f}")
+                logging.info(f"Result: prediction={prediction}, confidence={confidence_score:.3f}")
                 
             except Exception as e:
-                print(f"      ❌ Error applying classifier for trait '{trait_description}': {e}")
+                logging.info(f"Error applying classifier for trait '{trait_description}': {e}")
                 continue
         
-        print(f"   🎉 Applied {len(results)} classifiers successfully")
+        logging.info(f"Applied {len(results)} classifiers successfully")
         return results
 
 
@@ -708,7 +709,7 @@ def evaluate_response_with_trait_classifier(
     trait_description = getattr(trait_classifier, '_trait_description', 'unknown_trait')
     pairs_count = getattr(trait_classifier, '_pairs_count', 0)
     
-    print(f"🔬 Evaluating response with '{trait_description}' classifier...")
+    logging.info(f"Evaluating response with '{trait_description}' classifier...")
     
     # Extract activations from response
     try:
@@ -738,5 +739,5 @@ def evaluate_response_with_trait_classifier(
         generation_time=generation_time
     )
     
-    print(f"✅ Result: prediction={prediction}, confidence={confidence_score:.3f}")
+    logging.info(f"Result: prediction={prediction}, confidence={confidence_score:.3f}")
     return result 

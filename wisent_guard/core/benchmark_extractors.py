@@ -5,7 +5,7 @@ Each benchmark has its own data structure and format. This module centralizes
 the extraction logic to cleanly handle the differences between benchmarks.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 import re
 
@@ -419,20 +419,22 @@ class BoolQExtractor(BenchmarkExtractor):
             return None
 
 
-class GSM8KExtractor(BenchmarkExtractor):
-    """Extractor for GSM8K benchmark."""
+class GSM8KExtractor(BenchmarkExtractor): 
+    """Extractor for GSM8K, MATH-500, and AIME_2024 benchmarks."""
     
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """
-        GSM8K format:
-        - doc['question']: the math problem
-        - doc['answer']: the answer with explanation
+        Supports multiple formats:
+        - GSM8K format: doc['question'] -> doc['answer'] 
+        - MATH-500 format: doc['problem'] -> doc['answer']
+        - AIME_2024 format: doc['Problem'] -> doc['Answer']
         """
         try:
-            question = doc.get('question', '')
-            answer = doc.get('answer', '')
+            # Handle multiple field name variants
+            question = doc.get('question', '') or doc.get('problem', '') or doc.get('Problem', '')
+            answer = doc.get('answer', '') or doc.get('Answer', '')
             
-            if not all([question, answer]):
+            if not all([question, str(answer) if answer is not None else None]):
                 return None
                 
             # Format the question
@@ -443,9 +445,10 @@ class GSM8KExtractor(BenchmarkExtractor):
                 
             # Extract numerical answer from the answer string
             # GSM8K answers typically end with #### followed by the number
-            numerical_answer = answer
-            if '####' in answer:
-                numerical_answer = answer.split('####')[-1].strip()
+            answer_str = str(answer)
+            numerical_answer = answer_str
+            if '####' in answer_str:
+                numerical_answer = answer_str.split('####')[-1].strip()
                 
             return {
                 'question': question,
@@ -2771,6 +2774,318 @@ class LiveCodeBenchExtractor(BenchmarkExtractor):
 
 
 # Registry of extractors
+class GPQAExtractor(BenchmarkExtractor):
+    """Extractor for GPQA (Graduate-Level Google-Proof Q&A) benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract question-answer pair from GPQA document."""
+        try:
+            # Handle both raw format (from Idavidrein/gpqa dataset) and processed format (from lm-eval)
+            
+            # Raw format: Question, Correct Answer, Incorrect Answer 1-3
+            if all(key in doc for key in ['Question', 'Correct Answer', 'Incorrect Answer 1']):
+                question = doc['Question']
+                correct_answer = doc['Correct Answer']
+                incorrect_answers = [
+                    doc.get('Incorrect Answer 1', ''),
+                    doc.get('Incorrect Answer 2', ''),
+                    doc.get('Incorrect Answer 3', '')
+                ]
+                # Filter out empty answers
+                incorrect_answers = [ans for ans in incorrect_answers if ans.strip()]
+                
+                # Create choices list with correct answer first
+                choices = [correct_answer] + incorrect_answers
+                
+                # Format as multiple choice question
+                choice_letters = ['A', 'B', 'C', 'D']
+                formatted_choices = []
+                for i, choice in enumerate(choices[:4]):
+                    if choice:
+                        formatted_choices.append(f"({choice_letters[i]}) {choice}")
+                
+                formatted_question = f"{question}\n\nChoices:\n" + "\n".join(formatted_choices)
+                
+                return {
+                    'question': question,
+                    'formatted_question': formatted_question,
+                    'correct_answer': correct_answer,
+                    'answer_letter': 'A',  # Correct answer is always first in raw format
+                    'choices': choices
+                }
+            
+            # Processed format: Question, choice1-4, answer (letter format like "(B)")
+            elif all(key in doc for key in ['Question', 'choice1', 'choice2', 'choice3', 'choice4', 'answer']):
+                question = doc['Question']
+                choices = [doc['choice1'], doc['choice2'], doc['choice3'], doc['choice4']]
+                answer = doc['answer']
+                
+                # Extract letter from answer format like "(B)" or "B"
+                answer_match = re.search(r'[ABCD]', answer.upper())
+                if not answer_match:
+                    return None
+                
+                answer_letter = answer_match.group()
+                answer_index = ord(answer_letter) - ord('A')
+                
+                if answer_index >= len(choices):
+                    return None
+                    
+                correct_answer = choices[answer_index]
+                
+                # Format as multiple choice question
+                choice_letters = ['A', 'B', 'C', 'D']
+                formatted_choices = []
+                for i, choice in enumerate(choices):
+                    formatted_choices.append(f"({choice_letters[i]}) {choice}")
+                
+                formatted_question = f"{question}\n\nChoices:\n" + "\n".join(formatted_choices)
+                
+                return {
+                    'question': question,
+                    'formatted_question': formatted_question,
+                    'correct_answer': correct_answer,
+                    'answer_letter': answer_letter,
+                    'choices': choices
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error extracting GPQA QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for GPQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            correct_answer = qa_pair['correct_answer']
+            choices = qa_pair['choices']
+            
+            # Find incorrect answers (all choices except the correct one)
+            incorrect_answers = [choice for choice in choices if choice != correct_answer]
+            
+            if not incorrect_answers:
+                return None
+            
+            # Randomly select one incorrect answer
+            import random
+            incorrect_answer = random.choice(incorrect_answers)
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting GPQA contrastive pair: {e}")
+            return None
+
+
+class HLEExtractor(BenchmarkExtractor):
+    """Extractor for HLE (Human-Level Evaluation) benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        HLE format:
+        - doc['question']: the question (includes choices for multipleChoice)
+        - doc['answer']: correct answer (letter for multipleChoice, text for exactMatch)
+        - doc['answer_type']: 'multipleChoice' or 'exactMatch'
+        """
+        try:
+            question = doc.get('question', '')
+            answer = doc.get('answer', '')
+            answer_type = doc.get('answer_type', '')
+            
+            if not all([question, answer, answer_type]):
+                return None
+            
+            if answer_type == 'multipleChoice':
+                # For multiple choice, extract the correct answer text from choices
+                correct_answer_text = self._extract_choice_text(question, answer)
+                if not correct_answer_text:
+                    correct_answer_text = answer  # Fallback to letter
+            else:
+                # For exact match, the answer is the text itself
+                correct_answer_text = answer
+            
+            return {
+                'question': question,
+                'formatted_question': question,  # Question already formatted with choices
+                'correct_answer': correct_answer_text,
+                'answer_letter': answer if answer_type == 'multipleChoice' else None,
+                'answer_type': answer_type
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting HLE QA pair: {e}")
+            return None
+    
+    def _extract_choice_text(self, question: str, answer_letter: str) -> Optional[str]:
+        """Extract the text of the correct choice from the question."""
+        import re
+        
+        # Look for patterns like "A. text" or "A) text"
+        patterns = [
+            rf'{answer_letter}\.\s+(.+?)(?=\n[A-E]\.|$)',  # "A. option" format
+            rf'{answer_letter}\)\s+(.+?)(?=\n[A-E]\)|$)',  # "A) option" format
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, question, re.MULTILINE | re.DOTALL)
+            if match:
+                return match.group(1).strip()
+        
+        return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for HLE."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            answer_type = doc.get('answer_type', '')
+            
+            if answer_type == 'multipleChoice':
+                # For multiple choice, get an incorrect choice
+                incorrect_answer = self._get_incorrect_choice(doc.get('question', ''), doc.get('answer', ''))
+                if not incorrect_answer:
+                    return None
+            else:
+                # For exact match, replace one third of words with 'X'
+                correct_answer = qa_pair['correct_answer']
+                words = correct_answer.split()
+                if len(words) > 1:
+                    # Replace approximately 1/3 of the words with 'X'
+                    num_to_replace = max(1, len(words) // 3)
+                    import random
+                    indices_to_replace = random.sample(range(len(words)), num_to_replace)
+                    for idx in indices_to_replace:
+                        words[idx] = 'X'
+                    incorrect_answer = ' '.join(words)
+                else:
+                    # For single word answers, change part of it
+                    if len(correct_answer) > 3:
+                        mid = len(correct_answer) // 2
+                        incorrect_answer = correct_answer[:mid] + 'X' * (len(correct_answer) - mid)
+                    else:
+                        incorrect_answer = 'X' * len(correct_answer)
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': qa_pair['correct_answer'],
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting HLE contrastive pair: {e}")
+            return None
+    
+    def _get_incorrect_choice(self, question: str, correct_letter: str) -> Optional[str]:
+        """Get text of an incorrect choice for multiple choice questions."""
+        import re
+        
+        # Find all choices
+        choices = []
+        patterns = [
+            r'([A-E])\.\s+(.+?)(?=\n[A-E]\.|$)',  # "A. option" format
+            r'([A-E])\)\s+(.+?)(?=\n[A-E]\)|$)',  # "A) option" format
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, question, re.MULTILINE | re.DOTALL)
+            if matches:
+                choices = matches
+                break
+        
+        # Find an incorrect choice (not the correct one)
+        for letter, text in choices:
+            if letter != correct_letter:
+                return text.strip()
+        
+        return None
+
+
+class SuperGPQAExtractor(BenchmarkExtractor):
+    """Extractor for SuperGPQA scientific reasoning benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        SuperGPQA format:
+        - doc['question']: The question text
+        - doc['options']: List of answer options
+        - doc['answer']: The correct answer text
+        - doc['answer_letter']: The correct answer letter (A, B, C, D, E)
+        """
+        try:
+            question = doc.get('question', '')
+            options = doc.get('options', [])
+            correct_answer = doc.get('answer', '')
+            answer_letter = doc.get('answer_letter', '')
+            
+            if not question or not options or not correct_answer:
+                return None
+            
+            # Format the question with multiple choice options
+            formatted_options = []
+            for i, option in enumerate(options):
+                letter = chr(ord('A') + i)
+                formatted_options.append(f"{letter}. {option}")
+            
+            formatted_question = f"{question}\n\n" + "\n".join(formatted_options)
+            
+            return {
+                'question': question,
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer,
+                'answer_letter': answer_letter
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting SuperGPQA QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for SuperGPQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            options = doc.get('options', [])
+            correct_answer = qa_pair['correct_answer']
+            
+            # Find an incorrect answer from options
+            incorrect_answer = self._get_incorrect_option(options, correct_answer)
+            if not incorrect_answer:
+                return None
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting SuperGPQA contrastive pair: {e}")
+            return None
+    
+    def _get_incorrect_option(self, options: List[str], correct_answer: str) -> Optional[str]:
+        """Get an incorrect option from the list."""
+        # Find options that are not the correct answer
+        for option in options:
+            if option != correct_answer:
+                return option
+        
+        # Fallback if something goes wrong
+        return None
+
+
 EXTRACTORS = {
     'winogrande': WinograndeExtractor,
     'arc_challenge': ARCExtractor,
@@ -2782,6 +3097,27 @@ EXTRACTORS = {
     'truthfulqa_gen': TruthfulQAExtractor,
     'boolq': BoolQExtractor,
     'gsm8k': GSM8KExtractor,
+    # MATH-500 mathematical reasoning benchmarks (reuse GSM8KExtractor)
+    'math': GSM8KExtractor,
+    'math500': GSM8KExtractor,
+    'hendrycks_math': GSM8KExtractor,  # Already exists, but documenting here
+    # AIME contest math problems (general + year-specific)
+    'aime': GSM8KExtractor,
+    'aime2025': GSM8KExtractor,
+    'aime2024': GSM8KExtractor,  # Backward compatibility
+    # HMMT contest math problems (general + competition-specific)
+    'hmmt': GSM8KExtractor,
+    'hmmt_feb_2025': GSM8KExtractor,
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    'polymath': GSM8KExtractor,
+    'polymath_en_medium': GSM8KExtractor,
+    'polymath_zh_medium': GSM8KExtractor,
+    'polymath_en_high': GSM8KExtractor,
+    'polymath_zh_high': GSM8KExtractor,
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    'livemathbench': GSM8KExtractor,
+    'livemathbench_cnmo_en': GSM8KExtractor,
+    'livemathbench_cnmo_zh': GSM8KExtractor,
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval
@@ -2854,6 +3190,39 @@ EXTRACTORS = {
     'xnli': MultilingualExtractor,  # Cross-lingual NLI
     'xstorycloze': MultilingualExtractor,  # Multilingual story cloze
     'xwinograd': MultilingualExtractor,  # Multilingual Winograd
+    
+    # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
+    'gpqa': GPQAExtractor,
+    'gpqa_main_zeroshot': GPQAExtractor,
+    'gpqa_main_n_shot': GPQAExtractor,
+    'gpqa_main_cot_zeroshot': GPQAExtractor,
+    'gpqa_main_cot_n_shot': GPQAExtractor,
+    'gpqa_main_generative_n_shot': GPQAExtractor,
+    'gpqa_diamond_zeroshot': GPQAExtractor,
+    'gpqa_diamond_n_shot': GPQAExtractor,
+    'gpqa_diamond_cot_zeroshot': GPQAExtractor,
+    'gpqa_diamond_cot_n_shot': GPQAExtractor,
+    'gpqa_diamond_generative_n_shot': GPQAExtractor,
+    'gpqa_extended_zeroshot': GPQAExtractor,
+    'gpqa_extended_n_shot': GPQAExtractor,
+    'gpqa_extended_cot_zeroshot': GPQAExtractor,
+    'gpqa_extended_cot_n_shot': GPQAExtractor,
+    'gpqa_extended_generative_n_shot': GPQAExtractor,
+    'leaderboard_gpqa': GPQAExtractor,
+    'leaderboard_gpqa_main': GPQAExtractor,
+    'leaderboard_gpqa_diamond': GPQAExtractor,
+    'leaderboard_gpqa_extended': GPQAExtractor,
+    
+    # HLE (Human-Level Evaluation) benchmarks
+    'hle': HLEExtractor,
+    'hle_exact_match': HLEExtractor,
+    'hle_multiple_choice': HLEExtractor,
+    
+    # SuperGPQA scientific reasoning benchmarks
+    'supergpqa': SuperGPQAExtractor,
+    'supergpqa_physics': SuperGPQAExtractor,
+    'supergpqa_chemistry': SuperGPQAExtractor,
+    'supergpqa_biology': SuperGPQAExtractor,
 }
 
 # Add BigCode benchmarks manually if import failed

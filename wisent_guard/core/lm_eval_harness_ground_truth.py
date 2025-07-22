@@ -114,9 +114,14 @@ class LMEvalHarnessGroundTruth:
         try:
             logger.info(f"🎯 TEXT GENERATION EVALUATION: {task_name}")
             
-            # Use existing task loading infrastructure
-            task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
-            docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
+            # TODO In general LMEvalHarness should be rebuild to be BenchmarkGroundTruth
+            # Check if this is a TaskInterface task 
+            if self._is_task_interface_task(task_name):
+                docs, task_data = self._load_task_interface_data(task_name, num_samples)
+            else:
+                # Use existing lm-eval task loading infrastructure
+                task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
+                docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
             
             if not docs:
                 return self._error_result(f"No documents retrieved from task: {task_name}")
@@ -145,8 +150,17 @@ class LMEvalHarnessGroundTruth:
                     )
                     
                     # Extract ground truth answer
+                    # HLE task handling
+                    if task_name.startswith('hle'):
+                        ground_truth = doc.get('answer', '')
+                    # MATH-500 task handling  
+                    elif task_name in ['math500', 'math', 'hendrycks_math']:
+                        ground_truth = doc.get('answer', '')
+                    # AIME task handling 
+                    elif task_name.startswith('aime'):
+                        ground_truth = str(doc.get('Answer', '') or doc.get('answer', ''))
                     # FIXED: For DROP task, use raw document data to preserve structured format
-                    if task_name == "drop":
+                    elif task_name == "drop":
                         # Use raw answer field which contains the structured data
                         ground_truth = doc.get('answer', {})
                     elif hasattr(task_data, 'doc_to_target'):
@@ -624,6 +638,29 @@ class LMEvalHarnessGroundTruth:
         
         return mapping.get(token_aggregation.lower(), ActivationAggregationMethod.MEAN)
     
+    def _is_task_interface_task(self, task_name: str) -> bool:
+        """Check if this is a TaskInterface task (not an lm-eval task)."""
+        # List of known TaskInterface tasks
+        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench', 'math500', 'math', 'hendrycks_math', 'aime', 'aime2025', 'aime2024', 'hmmt', 'hmmt_feb_2025', 'polymath', 'polymath_en_medium', 'polymath_zh_medium', 'polymath_en_high', 'polymath_zh_high', 'livemathbench', 'livemathbench_cnmo_en', 'livemathbench_cnmo_zh'}
+        return task_name in task_interface_tasks
+    
+    def _load_task_interface_data(self, task_name: str, num_samples: int):
+        """Load data from TaskInterface tasks."""
+        try:
+            from .task_interface import get_task
+            
+            # Get the task instance
+            task = get_task(task_name)
+            
+            # Load data
+            docs = task.load_data(limit=num_samples)
+            
+            return docs, task
+            
+        except Exception as e:
+            logger.error(f"Failed to load TaskInterface task {task_name}: {e}")
+            return [], None
+    
     def _calculate_perplexity(self, model, text: str) -> float:
         """Calculate perplexity of text using the model."""
         try:
@@ -785,6 +822,9 @@ class LMEvalHarnessGroundTruth:
                 if task_name == "gsm8k":
                     # GSM8K uses exact match on numerical answer
                     is_correct = self._evaluate_gsm8k_response(generated, ground_truth)
+                elif task_name.startswith("math") or task_name in ["hendrycks_math"]:
+                    # MATH-500 and related benchmarks use same evaluation as GSM8K (numerical extraction)
+                    is_correct = self._evaluate_gsm8k_response(generated, ground_truth)
                 elif task_name in ["arc_easy", "arc_challenge"]:
                     # ARC uses exact match on choice letter/number
                     is_correct = self._evaluate_arc_response(generated, ground_truth)
@@ -797,6 +837,12 @@ class LMEvalHarnessGroundTruth:
                 elif task_name == "drop":
                     # DROP uses structured answer format with numbers, spans, and dates
                     is_correct = self._evaluate_drop_response(generated, ground_truth)
+                elif task_name.startswith("gpqa"):
+                    # GPQA uses multiple-choice answer extraction (A, B, C, D)
+                    is_correct = self._evaluate_multiple_choice_response(generated, ground_truth)
+                elif task_name.startswith("hle") and "multiple_choice" in task_name:
+                    # HLE multiple choice uses letter extraction (A, B, C, D, E)
+                    is_correct = self._evaluate_multiple_choice_response(generated, ground_truth)
                 else:
                     # Default: string matching with some flexibility
                     is_correct = self._evaluate_default_response(generated, ground_truth)
@@ -1073,6 +1119,54 @@ class LMEvalHarnessGroundTruth:
             
         except Exception as e:
             logger.error(f"Error in default evaluation: {e}")
+            return False
+
+    def _evaluate_multiple_choice_response(self, generated: str, ground_truth) -> bool:
+        """Evaluate multiple choice response by extracting choice letter (A, B, C, D, E)."""
+        import re
+        
+        try:
+            # Clean the generated response
+            gen_clean = generated.strip()
+            
+            # Convert ground truth to string and extract expected letter
+            gt_str = str(ground_truth).strip()
+            expected_letter = None
+            
+            # Extract letter from ground truth (could be "(A)", "A", etc.)
+            gt_match = re.search(r'[ABCDE]', gt_str.upper())
+            if gt_match:
+                expected_letter = gt_match.group()
+            else:
+                return False
+            
+            # Try multiple patterns to extract answer from generated response
+            patterns = [
+                r'(?:answer|choice|option)\s*(?:is\s*)?(?::\s*)?(?:\()?([ABCDE])(?:\))?',  # "Answer: A" or "Answer is (B)"
+                r'(?:^|\s)(?:\()?([ABCDE])(?:\))?(?:\s|$)',  # Standalone letter
+                r'(?:the\s+)?(?:correct\s+)?(?:answer\s+)?(?:is\s*)?(?:\()?([ABCDE])(?:\))?',  # "The answer is A"
+                r'(?:^|\n)([ABCDE])(?:\.|,|\s|$)',  # Letter at start of line
+                r'(?:select\s*|choose\s*)?(?:\()?([ABCDE])(?:\))?',  # "Select A" or "(A)"
+            ]
+            
+            # Try each pattern
+            for pattern in patterns:
+                matches = re.finditer(pattern, gen_clean.upper(), re.IGNORECASE | re.MULTILINE)
+                for match in matches:
+                    extracted_letter = match.group(1).upper()
+                    if extracted_letter == expected_letter:
+                        return True
+            
+            # Final fallback: check if the expected letter appears anywhere in reasonable context
+            # But be careful not to match letters within words
+            letter_pattern = f'\\b{expected_letter}\\b'
+            if re.search(letter_pattern, gen_clean.upper()):
+                return True
+                
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error evaluating multiple choice response: {e}")
             return False
     
     def _evaluate_code_execution(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:

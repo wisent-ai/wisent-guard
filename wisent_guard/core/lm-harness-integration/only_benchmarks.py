@@ -597,6 +597,92 @@ CORE_BENCHMARKS = {
         "tags": ["long context", "science", "reasoning"],
         "priority": "high"  # 12.7s - fast for agentic use
     },
+    
+    # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
+    "gpqa": {
+        "task": "gpqa_main_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_diamond": {
+        "task": "gpqa_diamond_zeroshot", 
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_extended": {
+        "task": "gpqa_extended_zeroshot",
+        "tags": ["science", "reasoning", "advanced"], 
+        "priority": "high"
+    },
+    "gpqa_main_cot": {
+        "task": "gpqa_main_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_diamond_cot": {
+        "task": "gpqa_diamond_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_extended_cot": {
+        "task": "gpqa_extended_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    # GPQA specific task variants for direct access
+    "gpqa_main_zeroshot": {
+        "task": "gpqa_main_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_diamond_zeroshot": {
+        "task": "gpqa_diamond_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_extended_zeroshot": {
+        "task": "gpqa_extended_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_main_cot_zeroshot": {
+        "task": "gpqa_main_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_diamond_cot_zeroshot": {
+        "task": "gpqa_diamond_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_extended_cot_zeroshot": {
+        "task": "gpqa_extended_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    
+    # SuperGPQA (Large-scale scientific reasoning)
+    "supergpqa": {
+        "task": "supergpqa",
+        "tags": ["science", "reasoning", "multiple_choice"],
+        "priority": "high"
+    },
+    "supergpqa_physics": {
+        "task": "supergpqa_physics",
+        "tags": ["science", "reasoning", "physics", "multiple_choice"],
+        "priority": "high"
+    },
+    "supergpqa_chemistry": {
+        "task": "supergpqa_chemistry",
+        "tags": ["science", "reasoning", "chemistry", "multiple_choice"],
+        "priority": "high"
+    },
+    "supergpqa_biology": {
+        "task": "supergpqa_biology",
+        "tags": ["science", "reasoning", "biology", "multiple_choice"],
+        "priority": "high"
+    },
+    
     "social_i_qa": {
         "task": "siqa",  # Fixed: correct task name
         "tags": ["reasoning", "general knowledge", "science"],
@@ -608,6 +694,91 @@ CORE_BENCHMARKS = {
         "task": "gsm8k",
         "tags": ["mathematics", "reasoning", "science"],
         "priority": "high"  # 12.1s - fast for agentic use
+    },
+    # MATH-500 mathematical reasoning benchmarks
+    "math": {
+        "task": "math",
+        "tags": ["mathematics", "reasoning", "advanced"],
+        "priority": "high"  # Mathematical reasoning - same as GSM8K
+    },
+    "math500": {
+        "task": "math500",
+        "tags": ["mathematics", "reasoning", "advanced"],
+        "priority": "high"  # MATH-500 subset
+    },
+    "hendrycks_math": {
+        "task": "hendrycks_math",
+        "tags": ["mathematics", "reasoning", "advanced"],
+        "priority": "high"  # Competition-level math
+    },
+    # AIME contest math problems (general + year-specific)
+    "aime": {
+        "task": "aime",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # Latest AIME contest problems (2025)
+    },
+    "aime2025": {
+        "task": "aime2025",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # AIME 2025 contest problems (MathArena)
+    },
+    "aime2024": {
+        "task": "aime2024",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # AIME 2024 contest problems
+    },
+    # HMMT contest math problems (general + competition-specific)
+    "hmmt": {
+        "task": "hmmt",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # Latest HMMT contest problems (February 2025)
+    },
+    "hmmt_feb_2025": {
+        "task": "hmmt_feb_2025",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # HMMT February 2025 contest problems
+    },
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    "polymath": {
+        "task": "polymath",
+        "tags": ["mathematics", "reasoning", "multilingual", "medium"],
+        "priority": "high"  # Default: English medium
+    },
+    "polymath_en_medium": {
+        "task": "polymath_en_medium",
+        "tags": ["mathematics", "reasoning", "multilingual", "english", "medium"],
+        "priority": "high"  # English medium difficulty
+    },
+    "polymath_zh_medium": {
+        "task": "polymath_zh_medium",
+        "tags": ["mathematics", "reasoning", "multilingual", "chinese", "medium"],
+        "priority": "high"  # Chinese medium difficulty
+    },
+    "polymath_en_high": {
+        "task": "polymath_en_high",
+        "tags": ["mathematics", "reasoning", "multilingual", "english", "high"],
+        "priority": "high"  # English high difficulty
+    },
+    "polymath_zh_high": {
+        "task": "polymath_zh_high",
+        "tags": ["mathematics", "reasoning", "multilingual", "chinese", "high"],
+        "priority": "high"  # Chinese high difficulty
+    },
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    "livemathbench": {
+        "task": "livemathbench",
+        "tags": ["mathematics", "reasoning", "olympiad", "multilingual"],
+        "priority": "high"  # Default: English
+    },
+    "livemathbench_cnmo_en": {
+        "task": "livemathbench_cnmo_en",
+        "tags": ["mathematics", "reasoning", "olympiad", "multilingual", "english"],
+        "priority": "high"  # CNMO 2024 English
+    },
+    "livemathbench_cnmo_zh": {
+        "task": "livemathbench_cnmo_zh",
+        "tags": ["mathematics", "reasoning", "olympiad", "multilingual", "chinese"],
+        "priority": "high"  # CNMO 2024 Chinese
     },
     "math_qa": {
         "task": "mathqa",  # Fixed: correct task name
@@ -910,6 +1081,23 @@ CORE_BENCHMARKS = {
         "task": "mercury",
         "tags": ["coding", "python", "code generation", "efficiency"],
         "priority": "medium"
+    },
+    
+    # HLE (Human-Level Evaluation) benchmarks
+    "hle": {
+        "task": "hle",
+        "tags": ["reasoning", "knowledge", "multimodal", "evaluation"],
+        "priority": "high"
+    },
+    "hle_exact_match": {
+        "task": "hle_exact_match", 
+        "tags": ["reasoning", "knowledge", "text-generation"],
+        "priority": "high"
+    },
+    "hle_multiple_choice": {
+        "task": "hle_multiple_choice",
+        "tags": ["reasoning", "knowledge", "multiple-choice"],
+        "priority": "high"
     }
 }
 
@@ -1664,6 +1852,26 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "sciq": "Scientific questions and explanations",
         "social_i_qa": "Social situations and common sense reasoning",
         "openbookqa": "Elementary science with open-book style questions",
+        "gpqa": "Graduate-level scientific reasoning in biology, physics, and chemistry",
+        "gpqa_diamond": "High-quality graduate-level scientific questions (premium subset)",
+        "gpqa_extended": "Extended graduate-level scientific reasoning dataset",
+        "gpqa_main_zeroshot": "Graduate-level scientific reasoning (main subset, zero-shot)",
+        "gpqa_diamond_zeroshot": "Premium graduate-level scientific questions (zero-shot)",
+        "gpqa_extended_zeroshot": "Extended graduate-level scientific reasoning (zero-shot)",
+        "gpqa_main_cot_zeroshot": "Graduate-level scientific reasoning with chain-of-thought",
+        "gpqa_diamond_cot_zeroshot": "Premium graduate-level scientific questions with reasoning",
+        "gpqa_extended_cot_zeroshot": "Extended graduate-level scientific reasoning with CoT",
+        
+        # SuperGPQA (Large-scale scientific reasoning)
+        "supergpqa": "Large-scale dataset of scientific multiple-choice questions across disciplines",
+        "supergpqa_physics": "Large-scale physics multiple-choice questions",
+        "supergpqa_chemistry": "Large-scale chemistry multiple-choice questions", 
+        "supergpqa_biology": "Large-scale biology multiple-choice questions",
+        
+        # HLE (Human-Level Evaluation)
+        "hle": "Human-Level Evaluation: Multimodal reasoning across multiple domains (text-only subset)",
+        "hle_exact_match": "Human-Level Evaluation: Exact string matching questions across multiple domains",
+        "hle_multiple_choice": "Human-Level Evaluation: Multiple choice questions across multiple domains",
         
         # Reading Comprehension & Long Context
         "coqa": "Conversational question answering with context",
@@ -1687,8 +1895,28 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         
         # Mathematics & Computation
         "gsm8k": "Grade school math word problems",
+        # MATH-500 mathematical reasoning benchmarks
+        "math": "Mathematical reasoning problems requiring multi-step solutions",
+        "math500": "500-problem subset of MATH benchmark for mathematical reasoning",
+        "hendrycks_math": "Competition-level mathematics problems from Hendrycks et al.",
+        # AIME contest math problems (general + year-specific)
+        "aime": "High-difficulty AIME contest problems (latest: 2025)",
+        "aime2025": "High-difficulty AIME contest problems from 2025 (MathArena)", 
+        "aime2024": "High-difficulty AIME contest problems from 2024",
+        # HMMT contest math problems (general + competition-specific)
+        "hmmt": "High-difficulty HMMT contest problems (latest: February 2025)",
+        "hmmt_feb_2025": "High-difficulty HMMT February 2025 contest problems",
+        # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+        "polymath": "PolyMath multilingual mathematical reasoning (default: English medium)",
+        "polymath_en_medium": "PolyMath medium-difficulty mathematical problems in English",
+        "polymath_zh_medium": "PolyMath medium-difficulty mathematical problems in Chinese",
+        "polymath_en_high": "PolyMath high-difficulty mathematical problems in English", 
+        "polymath_zh_high": "PolyMath high-difficulty mathematical problems in Chinese",
+        # LiveMathBench CNMO 2024 (Chinese and English)
+        "livemathbench": "LiveMathBench CNMO 2024 mathematical olympiad problems (default: English)",
+        "livemathbench_cnmo_en": "LiveMathBench CNMO 2024 mathematical olympiad problems in English",
+        "livemathbench_cnmo_zh": "LiveMathBench CNMO 2024 mathematical olympiad problems in Chinese",
         "math_qa": "Mathematical reasoning and problem solving",
-        "hendrycks_math": "Competition-level mathematics problems",
         "arithmetic": "Basic arithmetic operations and calculations",
         "asdiv": "Arithmetic story problems for children",
         "mgsm": "Multilingual grade school math problems",
@@ -1923,7 +2151,7 @@ Respond with JSON only, no additional text."""
                     reasons.append("medical tag")
             
             # Popular benchmark bonus
-            if benchmark_name in ["mmlu", "truthfulqa_mc1", "gsm8k", "humaneval", "hellaswag"]:
+            if benchmark_name in ["mmlu", "truthfulqa_mc1", "gsm8k", "humaneval", "hellaswag", "gpqa", "gpqa_main_zeroshot"]:
                 score += 0.5
                 reasons.append("popular benchmark")
             
