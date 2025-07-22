@@ -597,6 +597,69 @@ CORE_BENCHMARKS = {
         "tags": ["long context", "science", "reasoning"],
         "priority": "high"  # 12.7s - fast for agentic use
     },
+    
+    # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
+    "gpqa": {
+        "task": "gpqa_main_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_diamond": {
+        "task": "gpqa_diamond_zeroshot", 
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_extended": {
+        "task": "gpqa_extended_zeroshot",
+        "tags": ["science", "reasoning", "advanced"], 
+        "priority": "high"
+    },
+    "gpqa_main_cot": {
+        "task": "gpqa_main_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_diamond_cot": {
+        "task": "gpqa_diamond_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_extended_cot": {
+        "task": "gpqa_extended_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    # GPQA specific task variants for direct access
+    "gpqa_main_zeroshot": {
+        "task": "gpqa_main_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_diamond_zeroshot": {
+        "task": "gpqa_diamond_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_extended_zeroshot": {
+        "task": "gpqa_extended_zeroshot",
+        "tags": ["science", "reasoning", "advanced"],
+        "priority": "high"
+    },
+    "gpqa_main_cot_zeroshot": {
+        "task": "gpqa_main_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_diamond_cot_zeroshot": {
+        "task": "gpqa_diamond_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
+    "gpqa_extended_cot_zeroshot": {
+        "task": "gpqa_extended_cot_zeroshot",
+        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
+        "priority": "medium"
+    },
     "social_i_qa": {
         "task": "siqa",  # Fixed: correct task name
         "tags": ["reasoning", "general knowledge", "science"],
@@ -1664,6 +1727,15 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "sciq": "Scientific questions and explanations",
         "social_i_qa": "Social situations and common sense reasoning",
         "openbookqa": "Elementary science with open-book style questions",
+        "gpqa": "Graduate-level scientific reasoning in biology, physics, and chemistry",
+        "gpqa_diamond": "High-quality graduate-level scientific questions (premium subset)",
+        "gpqa_extended": "Extended graduate-level scientific reasoning dataset",
+        "gpqa_main_zeroshot": "Graduate-level scientific reasoning (main subset, zero-shot)",
+        "gpqa_diamond_zeroshot": "Premium graduate-level scientific questions (zero-shot)",
+        "gpqa_extended_zeroshot": "Extended graduate-level scientific reasoning (zero-shot)",
+        "gpqa_main_cot_zeroshot": "Graduate-level scientific reasoning with chain-of-thought",
+        "gpqa_diamond_cot_zeroshot": "Premium graduate-level scientific questions with reasoning",
+        "gpqa_extended_cot_zeroshot": "Extended graduate-level scientific reasoning with CoT",
         
         # Reading Comprehension & Long Context
         "coqa": "Conversational question answering with context",
@@ -1923,7 +1995,7 @@ Respond with JSON only, no additional text."""
                     reasons.append("medical tag")
             
             # Popular benchmark bonus
-            if benchmark_name in ["mmlu", "truthfulqa_mc1", "gsm8k", "humaneval", "hellaswag"]:
+            if benchmark_name in ["mmlu", "truthfulqa_mc1", "gsm8k", "humaneval", "hellaswag", "gpqa", "gpqa_main_zeroshot"]:
                 score += 0.5
                 reasons.append("popular benchmark")
             

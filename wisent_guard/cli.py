@@ -124,6 +124,18 @@ ALLOWED_TASKS = {
     "copa",
     "openbookqa",
     "race",
+    # GPQA benchmarks
+    "gpqa",
+    "gpqa_diamond", 
+    "gpqa_extended",
+    # GPQA specific variants (zeroshot only for focused testing)
+    "gpqa_main_zeroshot",
+    "gpqa_diamond_zeroshot",
+    "gpqa_extended_zeroshot",
+    # GPQA Chain-of-Thought variants for text generation testing
+    "gpqa_main_cot_zeroshot",
+    "gpqa_diamond_cot_zeroshot", 
+    "gpqa_extended_cot_zeroshot",
     # Boolean benchmarks
     "boolq",
     # Math benchmarks

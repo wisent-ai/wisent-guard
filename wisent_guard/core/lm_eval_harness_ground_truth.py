@@ -797,6 +797,9 @@ class LMEvalHarnessGroundTruth:
                 elif task_name == "drop":
                     # DROP uses structured answer format with numbers, spans, and dates
                     is_correct = self._evaluate_drop_response(generated, ground_truth)
+                elif task_name.startswith("gpqa"):
+                    # GPQA uses multiple-choice answer extraction (A, B, C, D)
+                    is_correct = self._evaluate_gpqa_response(generated, ground_truth)
                 else:
                     # Default: string matching with some flexibility
                     is_correct = self._evaluate_default_response(generated, ground_truth)
@@ -1073,6 +1076,54 @@ class LMEvalHarnessGroundTruth:
             
         except Exception as e:
             logger.error(f"Error in default evaluation: {e}")
+            return False
+
+    def _evaluate_gpqa_response(self, generated: str, ground_truth) -> bool:
+        """Evaluate GPQA response by extracting choice letter (A, B, C, D)."""
+        import re
+        
+        try:
+            # Clean the generated response
+            gen_clean = generated.strip()
+            
+            # Convert ground truth to string and extract expected letter
+            gt_str = str(ground_truth).strip()
+            expected_letter = None
+            
+            # Extract letter from ground truth (could be "(A)", "A", etc.)
+            gt_match = re.search(r'[ABCD]', gt_str.upper())
+            if gt_match:
+                expected_letter = gt_match.group()
+            else:
+                return False
+            
+            # Try multiple patterns to extract answer from generated response
+            patterns = [
+                r'(?:answer|choice|option)\s*(?:is\s*)?(?::\s*)?(?:\()?([ABCD])(?:\))?',  # "Answer: A" or "Answer is (B)"
+                r'(?:^|\s)(?:\()?([ABCD])(?:\))?(?:\s|$)',  # Standalone letter
+                r'(?:the\s+)?(?:correct\s+)?(?:answer\s+)?(?:is\s*)?(?:\()?([ABCD])(?:\))?',  # "The answer is A"
+                r'(?:^|\n)([ABCD])(?:\.|,|\s|$)',  # Letter at start of line
+                r'(?:select\s*|choose\s*)?(?:\()?([ABCD])(?:\))?',  # "Select A" or "(A)"
+            ]
+            
+            # Try each pattern
+            for pattern in patterns:
+                matches = re.finditer(pattern, gen_clean.upper(), re.IGNORECASE | re.MULTILINE)
+                for match in matches:
+                    extracted_letter = match.group(1).upper()
+                    if extracted_letter == expected_letter:
+                        return True
+            
+            # Final fallback: check if the expected letter appears anywhere in reasonable context
+            # But be careful not to match letters within words
+            letter_pattern = f'\\b{expected_letter}\\b'
+            if re.search(letter_pattern, gen_clean.upper()):
+                return True
+                
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error evaluating GPQA response: {e}")
             return False
     
     def _evaluate_code_execution(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:

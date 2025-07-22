@@ -346,6 +346,11 @@ class FullBenchmarkDownloader:
         elif "story" in sample or "passage" in sample:
             return self._convert_reading_comprehension(sample)
         
+        # GPQA format (Question, choice1-4, answer, plus rich metadata)
+        elif ("Question" in sample and "choice1" in sample and "choice2" in sample and 
+              "choice3" in sample and "choice4" in sample and "answer" in sample):
+            return self._convert_gpqa_format(sample)
+        
         # Generic multiple choice fallback
         elif "choices" in sample:
             return self._convert_generic_multiple_choice(sample)
@@ -741,6 +746,57 @@ class FullBenchmarkDownloader:
         except Exception as e:
             print(f"         ⚠️ Error converting MBPP sample: {e}")
             return []
+
+    def _convert_gpqa_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert GPQA format (Question, choice1-4, answer, plus rich metadata)."""
+        question = sample.get("Question", "")
+        choice1 = sample.get("choice1", "")
+        choice2 = sample.get("choice2", "")
+        choice3 = sample.get("choice3", "")
+        choice4 = sample.get("choice4", "")
+        answer = sample.get("answer", "")
+        
+        # Extract letter from answer format like "(A)" or "A"
+        import re
+        answer_match = re.search(r'[ABCD]', answer.upper())
+        if not answer_match:
+            return []
+        
+        answer_letter = answer_match.group()
+        
+        # Map answer letter to choice
+        choices_map = {
+            "A": choice1,
+            "B": choice2,
+            "C": choice3,
+            "D": choice4
+        }
+        
+        correct_answer = choices_map.get(answer_letter, "")
+        if not correct_answer:
+            return []
+        
+        # Create pairs with each incorrect option
+        pairs = []
+        for letter, choice in choices_map.items():
+            if letter != answer_letter and choice:
+                pairs.append({
+                    "context": question,
+                    "good_response": correct_answer,
+                    "bad_response": choice,
+                    "metadata": {
+                        "answer_key": answer_letter,
+                        "raw_answer": answer,
+                        "benchmark_type": "gpqa",
+                        "subdomain": sample.get("Subdomain", ""),
+                        "high_level_domain": sample.get("High-level domain", ""),
+                        "difficulty_estimate": sample.get("Writer's Difficulty Estimate", ""),
+                        "expert_accuracy": sample.get("Expert Validator Accuracy", ""),
+                        "explanation": sample.get("Explanation", "")[:200] if sample.get("Explanation") else ""  # Truncate long explanations
+                    }
+                })
+        
+        return pairs
 
 def main():
     """Main function for CLI usage."""
