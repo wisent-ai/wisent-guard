@@ -18,7 +18,6 @@ class Math500Task(TaskInterface):
     
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Load MATH-500 data from HuggingFace."""
-        # Load MATH-500 from HuggingFace
         dataset = datasets.load_dataset("HuggingFaceH4/MATH-500", split="test")
         
         # Apply limit
