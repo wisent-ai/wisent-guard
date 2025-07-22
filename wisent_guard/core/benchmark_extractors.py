@@ -434,7 +434,7 @@ class GSM8KExtractor(BenchmarkExtractor):
             question = doc.get('question', '') or doc.get('problem', '') or doc.get('Problem', '')
             answer = doc.get('answer', '') or doc.get('Answer', '')
             
-            if not all([question, str(answer) if answer is not None else '']):
+            if not all([question, str(answer) if answer is not None else None]):
                 return None
                 
             # Format the question
