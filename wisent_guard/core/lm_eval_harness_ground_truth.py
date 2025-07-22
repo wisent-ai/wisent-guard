@@ -641,7 +641,7 @@ class LMEvalHarnessGroundTruth:
     def _is_task_interface_task(self, task_name: str) -> bool:
         """Check if this is a TaskInterface task (not an lm-eval task)."""
         # List of known TaskInterface tasks
-        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench', 'math500', 'math', 'hendrycks_math', 'aime', 'aime2025', 'aime2024'}
+        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench', 'math500', 'math', 'hendrycks_math', 'aime', 'aime2025', 'aime2024', 'hmmt', 'hmmt_feb_2025'}
         return task_name in task_interface_tasks
     
     def _load_task_interface_data(self, task_name: str, num_samples: int):

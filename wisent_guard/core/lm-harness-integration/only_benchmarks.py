@@ -704,6 +704,17 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "contest", "advanced"],
         "priority": "high"  # AIME 2024 contest problems
     },
+    # HMMT contest math problems (general + competition-specific)
+    "hmmt": {
+        "task": "hmmt",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # Latest HMMT contest problems (February 2025)
+    },
+    "hmmt_feb_2025": {
+        "task": "hmmt_feb_2025",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # HMMT February 2025 contest problems
+    },
     "math_qa": {
         "task": "mathqa",  # Fixed: correct task name
         "tags": ["mathematics", "reasoning", "science"],
@@ -1821,6 +1832,9 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "aime": "High-difficulty AIME contest problems (latest: 2025)",
         "aime2025": "High-difficulty AIME contest problems from 2025 (MathArena)", 
         "aime2024": "High-difficulty AIME contest problems from 2024",
+        # HMMT contest math problems (general + competition-specific)
+        "hmmt": "High-difficulty HMMT contest problems (latest: February 2025)",
+        "hmmt_feb_2025": "High-difficulty HMMT February 2025 contest problems",
         "math_qa": "Mathematical reasoning and problem solving",
         "arithmetic": "Basic arithmetic operations and calculations",
         "asdiv": "Arithmetic story problems for children",

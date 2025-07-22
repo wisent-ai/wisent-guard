@@ -150,6 +150,9 @@ ALLOWED_TASKS = {
     "aime",        # Latest AIME (2025)
     "aime2025",    # AIME 2025
     "aime2024",    # AIME 2024
+    # HMMT contest math problems (general + competition-specific)
+    "hmmt",        # Latest HMMT (February 2025)
+    "hmmt_feb_2025",  # HMMT February 2025
     # QA benchmarks
     "coqa",
     "naturalqs",

@@ -3030,6 +3030,9 @@ EXTRACTORS = {
     'aime': GSM8KExtractor,
     'aime2025': GSM8KExtractor,
     'aime2024': GSM8KExtractor,  # Backward compatibility
+    # HMMT contest math problems (general + competition-specific)
+    'hmmt': GSM8KExtractor,
+    'hmmt_feb_2025': GSM8KExtractor,
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval

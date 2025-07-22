@@ -10,6 +10,7 @@ from .lm_eval_task import MBPPTask, GSM8KTask, TruthfulQATask, MMLUTask
 from .hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
 from .math500_task import Math500Task
 from .aime_task import AIMETask
+from .hmmt_task import HMMTTask
 
 
 def register_all_tasks():
@@ -37,6 +38,10 @@ def register_all_tasks():
     register_task("aime", lambda limit=None: AIMETask(year="2025", limit=limit))  # Default: latest year (2025)
     register_task("aime2025", lambda limit=None: AIMETask(year="2025", limit=limit))
     register_task("aime2024", lambda limit=None: AIMETask(year="2024", limit=limit))
+    
+    # Register HMMT tasks (general + competition-specific)
+    register_task("hmmt", lambda limit=None: HMMTTask(competition="feb_2025", limit=limit))  # Default: latest competition
+    register_task("hmmt_feb_2025", lambda limit=None: HMMTTask(competition="feb_2025", limit=limit))
 
 
 # Auto-register tasks when the module is imported
@@ -54,5 +59,6 @@ __all__ = [
     "HLEMultipleChoiceTask",
     "Math500Task",
     "AIMETask",
+    "HMMTTask",
     "register_all_tasks"
 ]

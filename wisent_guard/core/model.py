@@ -886,6 +886,19 @@ class Model:
                 year = task_name.replace("aime", "")
                 return AIMETask(year=year, limit=limit)
             
+        # Check if it's HMMT (general or competition-specific)
+        if task_name.startswith("hmmt"):
+            from .tasks.hmmt_task import HMMTTask
+            
+            if task_name == "hmmt":
+                return HMMTTask(competition="feb_2025", limit=limit)  # Default: latest competition
+            elif task_name == "hmmt_feb_2025":
+                return HMMTTask(competition="feb_2025", limit=limit)
+            else:
+                # Try to extract competition from task name (e.g., "hmmt_aug_2025")
+                competition = task_name.replace("hmmt_", "")
+                return HMMTTask(competition=competition, limit=limit)
+            
         # Check if it's a BigCode task
         try:
             from .bigcode_integration import is_bigcode_task, load_bigcode_task
