@@ -871,6 +871,11 @@ class Model:
             from .tasks.math500_task import Math500Task
             return Math500Task(limit=limit)
             
+        # Check if it's AIME 2024
+        if task_name == "aime2024":
+            from .tasks.aime2024_task import AIME2024Task
+            return AIME2024Task(limit=limit)
+            
         # Check if it's a BigCode task
         try:
             from .bigcode_integration import is_bigcode_task, load_bigcode_task

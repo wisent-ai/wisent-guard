@@ -688,6 +688,11 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "advanced"],
         "priority": "high"  # Competition-level math
     },
+    "aime2024": {
+        "task": "aime2024",
+        "tags": ["mathematics", "reasoning", "contest", "advanced"],
+        "priority": "high"  # AIME 2024 contest problems
+    },
     "math_qa": {
         "task": "mathqa",  # Fixed: correct task name
         "tags": ["mathematics", "reasoning", "science"],
@@ -1801,6 +1806,7 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "math": "Mathematical reasoning problems requiring multi-step solutions",
         "math500": "500-problem subset of MATH benchmark for mathematical reasoning",
         "hendrycks_math": "Competition-level mathematics problems from Hendrycks et al.",
+        "aime2024": "High-difficulty AIME contest problems from 2024",
         "math_qa": "Mathematical reasoning and problem solving",
         "arithmetic": "Basic arithmetic operations and calculations",
         "asdiv": "Arithmetic story problems for children",

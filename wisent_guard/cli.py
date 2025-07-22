@@ -146,6 +146,8 @@ ALLOWED_TASKS = {
     "math",
     "math500",
     "hendrycks_math",
+    # AIME 2024 contest math problems
+    "aime2024",
     # QA benchmarks
     "coqa",
     "naturalqs",

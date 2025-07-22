@@ -420,20 +420,21 @@ class BoolQExtractor(BenchmarkExtractor):
 
 
 class GSM8KExtractor(BenchmarkExtractor):
-    """Extractor for GSM8K and MATH-500 benchmarks."""
+    """Extractor for GSM8K, MATH-500, and AIME_2024 benchmarks."""
     
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """
         Supports multiple formats:
         - GSM8K format: doc['question'] -> doc['answer'] 
         - MATH-500 format: doc['problem'] -> doc['answer']
+        - AIME_2024 format: doc['Problem'] -> doc['Answer']
         """
         try:
-            # Handle both GSM8K ('question') and MATH-500 ('problem') formats
-            question = doc.get('question', '') or doc.get('problem', '')
-            answer = doc.get('answer', '')
+            # Handle multiple field name variants
+            question = doc.get('question', '') or doc.get('problem', '') or doc.get('Problem', '')
+            answer = doc.get('answer', '') or doc.get('Answer', '')
             
-            if not all([question, answer]):
+            if not all([question, str(answer) if answer is not None else '']):
                 return None
                 
             # Format the question
@@ -444,9 +445,10 @@ class GSM8KExtractor(BenchmarkExtractor):
                 
             # Extract numerical answer from the answer string
             # GSM8K answers typically end with #### followed by the number
-            numerical_answer = answer
-            if '####' in answer:
-                numerical_answer = answer.split('####')[-1].strip()
+            answer_str = str(answer)
+            numerical_answer = answer_str
+            if '####' in answer_str:
+                numerical_answer = answer_str.split('####')[-1].strip()
                 
             return {
                 'question': question,
@@ -3012,6 +3014,7 @@ EXTRACTORS = {
     'math': GSM8KExtractor,
     'math500': GSM8KExtractor,
     'hendrycks_math': GSM8KExtractor,  # Already exists, but documenting here
+    'aime2024': GSM8KExtractor,
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval

@@ -11,6 +11,7 @@
   "math": "text-generation",
   "math500": "text-generation",
   "hendrycks_math": "text-generation",
+  "aime2024": "text-generation",
   "hellaswag": "log-likelihoods",
   "logiqa": "log-likelihoods",
   "math_qa": "text-generation",
