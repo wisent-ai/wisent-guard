@@ -14,6 +14,7 @@ to capturing model internal representations.
 """
 
 import torch
+import logging
 from typing import List, Dict, Tuple, Callable
 from enum import Enum
 from .layer import Layer
@@ -312,49 +313,49 @@ class ActivationCollectionLogic:
         Returns:
             Activation tensor [hidden_dim]
         """
-        print(f"🎯 _get_activation_with_strategy called:")
-        print(f"   📊 Strategy: {strategy.value}")
-        print(f"   📊 Target token: {target_token}")
-        print(f"   📊 Tokens: {tokens[:5]}..." if len(tokens) > 5 else f"   📊 Tokens: {tokens}")
-        print(f"   📊 Hidden states shape: {hidden_states.shape}")
+        logging.debug(f"_get_activation_with_strategy called:")
+        logging.debug(f"Strategy: {strategy.value}")
+        logging.debug(f"Target token: {target_token}")
+        logging.debug(f"Tokens: {tokens[:5]}..." if len(tokens) > 5 else f"Tokens: {tokens}")
+        logging.debug(f"Hidden states shape: {hidden_states.shape}")
         if strategy == TokenTargetingStrategy.CHOICE_TOKEN:
             # Look for A/B choice tokens (backward search)
             position = self._get_token_position_choice_token(tokens, target_token)
-            print(f"   🎯 CHOICE_TOKEN: Using position {position}")
+            logging.debug(f"CHOICE_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
             
         elif strategy == TokenTargetingStrategy.CONTINUATION_TOKEN:
             # Look for continuation tokens like "I" (forward search)
             position = self._get_token_position_continuation_token(tokens, target_token)
-            print(f"   🎯 CONTINUATION_TOKEN: Using position {position}")
+            logging.debug(f"CONTINUATION_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
             
         elif strategy == TokenTargetingStrategy.LAST_TOKEN:
             # Always use last token
             position = self._get_token_position_last_token(tokens, target_token)
-            print(f"   🎯 LAST_TOKEN: Using position {position}")
+            logging.debug(f"LAST_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
             
         elif strategy == TokenTargetingStrategy.FIRST_TOKEN:
             # Always use first token
             position = self._get_token_position_first_token(tokens, target_token)
-            print(f"   🎯 FIRST_TOKEN: Using position {position}")
+            logging.debug(f"FIRST_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
             
         elif strategy == TokenTargetingStrategy.MEAN_POOLING:
             # Use mean pooling across all tokens
-            print(f"   🎯 MEAN_POOLING: Using mean across all {hidden_states.shape[1]} tokens")
+            logging.debug(f"MEAN_POOLING: Using mean across all {hidden_states.shape[1]} tokens")
             return hidden_states[0].mean(dim=0)  # [hidden_dim]
             
         elif strategy == TokenTargetingStrategy.MAX_POOLING:
             # Use max pooling across all tokens
-            print(f"   🎯 MAX_POOLING: Using max across all {hidden_states.shape[1]} tokens")
+            logging.debug(f"MAX_POOLING: Using max across all {hidden_states.shape[1]} tokens")
             return hidden_states[0].max(dim=0)[0]  # [hidden_dim]
             
         else:
             # Fallback to choice token strategy
             position = self._get_token_position_choice_token(tokens, target_token)
-            print(f"   🎯 FALLBACK: Using position {position}")
+            logging.debug(f"FALLBACK: Using position {position}")
             return hidden_states[0, position, :]
     
     def extract_activations_from_pair(
@@ -445,7 +446,7 @@ class ActivationCollectionLogic:
             pair.negative_activations = negative_activation
             
         except Exception as e:
-            print(f"Error extracting activations: {e}")
+            logging.info(f"Error extracting activations: {e}")
             # Create dummy activations to prevent crashes
             dummy_size = 4096  # Common hidden size
             pair.positive_activations = torch.zeros(dummy_size)
@@ -474,41 +475,41 @@ class ActivationCollectionLogic:
         """
         processed_pairs = []
         
-        print(f"Processing {len(pairs)} contrastive pairs...")
-        print(f"Token targeting strategy: {token_targeting_strategy.value}")
-        print(f"🔍 ACTIVATION COLLECTION DEBUG:")
-        print(f"   📊 Strategy passed to method: {token_targeting_strategy}")
-        print(f"   📊 Strategy value: {token_targeting_strategy.value}")
-        print(f"   📊 Strategy type: {type(token_targeting_strategy)}")
+        logging.info(f"Processing {len(pairs)} contrastive pairs...")
+        logging.info(f"Token targeting strategy: {token_targeting_strategy.value}")
+        logging.info(f"ACTIVATION COLLECTION DEBUG:")
+        logging.info(f"Strategy passed to method: {token_targeting_strategy}")
+        logging.info(f"Strategy value: {token_targeting_strategy.value}")
+        logging.info(f"Strategy type: {type(token_targeting_strategy)}")
         
         # Determine prompt strategy from first pair if available
         prompt_strategy = "unknown"
         if pairs and hasattr(pairs[0], '_prompt_strategy'):
             prompt_strategy = pairs[0]._prompt_strategy.value
-        print(f"Prompt construction strategy: {prompt_strategy}")
+        logging.info(f"Prompt construction strategy: {prompt_strategy}")
         
         # Debug first pair details
         if pairs:
             first_pair = pairs[0]
-            print(f"🔍 FIRST PAIR DEBUG:")
-            print(f"   📝 Pair type: {type(first_pair).__name__}")
-            print(f"   📝 Has _prompt_strategy: {hasattr(first_pair, '_prompt_strategy')}")
-            print(f"   📝 Has _prompt_pair: {hasattr(first_pair, '_prompt_pair')}")
+            logging.info(f"FIRST PAIR DEBUG:")
+            logging.info(f"Pair type: {type(first_pair).__name__}")
+            logging.info(f"Has _prompt_strategy: {hasattr(first_pair, '_prompt_strategy')}")
+            logging.info(f"Has _prompt_pair: {hasattr(first_pair, '_prompt_pair')}")
             if hasattr(first_pair, '_prompt_strategy'):
-                print(f"   📝 Prompt strategy: {first_pair._prompt_strategy}")
+                logging.info(f"Prompt strategy: {first_pair._prompt_strategy}")
             if hasattr(first_pair, '_prompt_pair'):
-                print(f"   📝 Target token: {first_pair._prompt_pair.target_token}")
-            print(f"   📝 Prompt: {first_pair.prompt[:50]}..." if hasattr(first_pair, 'prompt') else "   📝 No prompt attr")
-            print(f"   📝 Positive response: {first_pair.positive_response}" if hasattr(first_pair, 'positive_response') else "   📝 No positive_response attr")
+                logging.info(f"Target token: {first_pair._prompt_pair.target_token}")
+            logging.info(f"Prompt: {first_pair.prompt[:50]}..." if hasattr(first_pair, 'prompt') else "No prompt attr")
+            logging.info(f"Positive response: {first_pair.positive_response}" if hasattr(first_pair, 'positive_response') else "No positive_response attr")
         
         for i, pair in enumerate(pairs):
-            print(f"  Processing pair {i+1}/{len(pairs)}")
+            logging.debug(f"Processing pair {i+1}/{len(pairs)}")
             processed_pair = self.extract_activations_from_pair(
                 pair, layer_index, device, token_targeting_strategy
             )
             processed_pairs.append(processed_pair)
         
-        print(f"Successfully processed {len(processed_pairs)} pairs")
+        logging.info(f"Successfully processed {len(processed_pairs)} pairs")
         return processed_pairs
     
     def create_activations_from_pairs(
