@@ -660,6 +660,29 @@ CORE_BENCHMARKS = {
         "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
         "priority": "medium"
     },
+    
+    # SuperGPQA (Large-scale scientific reasoning)
+    "supergpqa": {
+        "task": "supergpqa",
+        "tags": ["science", "reasoning", "multiple_choice"],
+        "priority": "high"
+    },
+    "supergpqa_physics": {
+        "task": "supergpqa_physics",
+        "tags": ["science", "reasoning", "physics", "multiple_choice"],
+        "priority": "high"
+    },
+    "supergpqa_chemistry": {
+        "task": "supergpqa_chemistry",
+        "tags": ["science", "reasoning", "chemistry", "multiple_choice"],
+        "priority": "high"
+    },
+    "supergpqa_biology": {
+        "task": "supergpqa_biology",
+        "tags": ["science", "reasoning", "biology", "multiple_choice"],
+        "priority": "high"
+    },
+    
     "social_i_qa": {
         "task": "siqa",  # Fixed: correct task name
         "tags": ["reasoning", "general knowledge", "science"],
@@ -1838,6 +1861,12 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "gpqa_main_cot_zeroshot": "Graduate-level scientific reasoning with chain-of-thought",
         "gpqa_diamond_cot_zeroshot": "Premium graduate-level scientific questions with reasoning",
         "gpqa_extended_cot_zeroshot": "Extended graduate-level scientific reasoning with CoT",
+        
+        # SuperGPQA (Large-scale scientific reasoning)
+        "supergpqa": "Large-scale dataset of scientific multiple-choice questions across disciplines",
+        "supergpqa_physics": "Large-scale physics multiple-choice questions",
+        "supergpqa_chemistry": "Large-scale chemistry multiple-choice questions", 
+        "supergpqa_biology": "Large-scale biology multiple-choice questions",
         
         # HLE (Human-Level Evaluation)
         "hle": "Human-Level Evaluation: Multimodal reasoning across multiple domains (text-only subset)",

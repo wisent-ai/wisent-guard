@@ -898,6 +898,19 @@ class Model:
                 # Try to extract competition from task name (e.g., "hmmt_aug_2025")
                 competition = task_name.replace("hmmt_", "")
                 return HMMTTask(competition=competition, limit=limit)
+        
+        # Check if it's SuperGPQA task
+        if task_name.startswith("supergpqa"):
+            from .tasks.supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
+            
+            if task_name == "supergpqa":
+                return SuperGPQATask(limit=limit)
+            elif task_name == "supergpqa_physics":
+                return SuperGPQAPhysicsTask(limit=limit)
+            elif task_name == "supergpqa_chemistry":
+                return SuperGPQAChemistryTask(limit=limit)
+            elif task_name == "supergpqa_biology":
+                return SuperGPQABiologyTask(limit=limit)
             
         # Check if it's PolyMath (general or language-difficulty specific)
         if task_name.startswith("polymath"):

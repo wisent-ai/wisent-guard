@@ -5,7 +5,7 @@ Each benchmark has its own data structure and format. This module centralizes
 the extraction logic to cleanly handle the differences between benchmarks.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 import re
 
@@ -3011,6 +3011,81 @@ class HLEExtractor(BenchmarkExtractor):
         return None
 
 
+class SuperGPQAExtractor(BenchmarkExtractor):
+    """Extractor for SuperGPQA scientific reasoning benchmark."""
+    
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        SuperGPQA format:
+        - doc['question']: The question text
+        - doc['options']: List of answer options
+        - doc['answer']: The correct answer text
+        - doc['answer_letter']: The correct answer letter (A, B, C, D, E)
+        """
+        try:
+            question = doc.get('question', '')
+            options = doc.get('options', [])
+            correct_answer = doc.get('answer', '')
+            answer_letter = doc.get('answer_letter', '')
+            
+            if not question or not options or not correct_answer:
+                return None
+            
+            # Format the question with multiple choice options
+            formatted_options = []
+            for i, option in enumerate(options):
+                letter = chr(ord('A') + i)
+                formatted_options.append(f"{letter}. {option}")
+            
+            formatted_question = f"{question}\n\n" + "\n".join(formatted_options)
+            
+            return {
+                'question': question,
+                'formatted_question': formatted_question,
+                'correct_answer': correct_answer,
+                'answer_letter': answer_letter
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting SuperGPQA QA pair: {e}")
+            return None
+    
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for SuperGPQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            options = doc.get('options', [])
+            correct_answer = qa_pair['correct_answer']
+            
+            # Find an incorrect answer from options
+            incorrect_answer = self._get_incorrect_option(options, correct_answer)
+            if not incorrect_answer:
+                return None
+            
+            return {
+                'question': qa_pair['formatted_question'],
+                'correct_answer': correct_answer,
+                'incorrect_answer': incorrect_answer
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extracting SuperGPQA contrastive pair: {e}")
+            return None
+    
+    def _get_incorrect_option(self, options: List[str], correct_answer: str) -> Optional[str]:
+        """Get an incorrect option from the list."""
+        # Find options that are not the correct answer
+        for option in options:
+            if option != correct_answer:
+                return option
+        
+        # Fallback if something goes wrong
+        return None
+
+
 EXTRACTORS = {
     'winogrande': WinograndeExtractor,
     'arc_challenge': ARCExtractor,
@@ -3142,6 +3217,12 @@ EXTRACTORS = {
     'hle': HLEExtractor,
     'hle_exact_match': HLEExtractor,
     'hle_multiple_choice': HLEExtractor,
+    
+    # SuperGPQA scientific reasoning benchmarks
+    'supergpqa': SuperGPQAExtractor,
+    'supergpqa_physics': SuperGPQAExtractor,
+    'supergpqa_chemistry': SuperGPQAExtractor,
+    'supergpqa_biology': SuperGPQAExtractor,
 }
 
 # Add BigCode benchmarks manually if import failed

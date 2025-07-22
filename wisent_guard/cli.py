@@ -214,6 +214,11 @@ ALLOWED_TASKS = {
     "hle",
     "hle_exact_match",
     "hle_multiple_choice",
+    # SuperGPQA scientific reasoning benchmarks
+    "supergpqa",
+    "supergpqa_physics",
+    "supergpqa_chemistry", 
+    "supergpqa_biology",
 }
 
 # Filter to only available (working) benchmarks - this gives us the validated benchmarks

@@ -331,7 +331,8 @@ class ManagedCachedBenchmarks:
             'aime2024', 'aime2025-1', 'aime2025-2',  # AIME tasks
             'hle', 'hle_exact_match', 'hle_multiple_choice',  # HLE tasks
             'livecodebench',  # LiveCodeBench
-            'math500', 'math', 'hendrycks_math'  # Math500 tasks
+            'math500', 'math', 'hendrycks_math',  # Math500 tasks
+            'supergpqa', 'supergpqa_physics', 'supergpqa_chemistry', 'supergpqa_biology'  # SuperGPQA tasks
         ]
         return task_name in taskinterface_tasks
     
@@ -373,6 +374,21 @@ class ManagedCachedBenchmarks:
             elif task_name == "livecodebench":
                 from .tasks.livecodebench_task import LiveCodeBenchTask
                 return LiveCodeBenchTask(release_version="release_v1")
+            
+            # Handle SuperGPQA tasks
+            elif task_name.startswith("supergpqa"):
+                from .tasks.supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
+                
+                if task_name == "supergpqa":
+                    return SuperGPQATask()
+                elif task_name == "supergpqa_physics":
+                    return SuperGPQAPhysicsTask()
+                elif task_name == "supergpqa_chemistry":
+                    return SuperGPQAChemistryTask()
+                elif task_name == "supergpqa_biology":
+                    return SuperGPQABiologyTask()
+                else:
+                    raise ValueError(f"Unknown SuperGPQA task: {task_name}")
             
             else:
                 raise ValueError(f"Unknown TaskInterface task: {task_name}")
