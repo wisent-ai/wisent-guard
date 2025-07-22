@@ -3039,6 +3039,10 @@ EXTRACTORS = {
     'polymath_zh_medium': GSM8KExtractor,
     'polymath_en_high': GSM8KExtractor,
     'polymath_zh_high': GSM8KExtractor,
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    'livemathbench': GSM8KExtractor,
+    'livemathbench_cnmo_en': GSM8KExtractor,
+    'livemathbench_cnmo_zh': GSM8KExtractor,
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval

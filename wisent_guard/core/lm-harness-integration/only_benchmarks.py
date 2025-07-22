@@ -741,6 +741,22 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "multilingual", "chinese", "high"],
         "priority": "high"  # Chinese high difficulty
     },
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    "livemathbench": {
+        "task": "livemathbench",
+        "tags": ["mathematics", "reasoning", "olympiad", "multilingual"],
+        "priority": "high"  # Default: English
+    },
+    "livemathbench_cnmo_en": {
+        "task": "livemathbench_cnmo_en",
+        "tags": ["mathematics", "reasoning", "olympiad", "multilingual", "english"],
+        "priority": "high"  # CNMO 2024 English
+    },
+    "livemathbench_cnmo_zh": {
+        "task": "livemathbench_cnmo_zh",
+        "tags": ["mathematics", "reasoning", "olympiad", "multilingual", "chinese"],
+        "priority": "high"  # CNMO 2024 Chinese
+    },
     "math_qa": {
         "task": "mathqa",  # Fixed: correct task name
         "tags": ["mathematics", "reasoning", "science"],
@@ -1867,6 +1883,10 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "polymath_zh_medium": "PolyMath medium-difficulty mathematical problems in Chinese",
         "polymath_en_high": "PolyMath high-difficulty mathematical problems in English", 
         "polymath_zh_high": "PolyMath high-difficulty mathematical problems in Chinese",
+        # LiveMathBench CNMO 2024 (Chinese and English)
+        "livemathbench": "LiveMathBench CNMO 2024 mathematical olympiad problems (default: English)",
+        "livemathbench_cnmo_en": "LiveMathBench CNMO 2024 mathematical olympiad problems in English",
+        "livemathbench_cnmo_zh": "LiveMathBench CNMO 2024 mathematical olympiad problems in Chinese",
         "math_qa": "Mathematical reasoning and problem solving",
         "arithmetic": "Basic arithmetic operations and calculations",
         "asdiv": "Arithmetic story problems for children",

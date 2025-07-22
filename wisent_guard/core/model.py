@@ -923,6 +923,23 @@ class Model:
                     # Fallback to default
                     return PolyMathTask(language="en", difficulty="medium", limit=limit)
             
+        # Check if it's LiveMathBench (general or language specific)
+        if task_name.startswith("livemathbench"):
+            from .tasks.livemathbench_task import LiveMathBenchTask
+            
+            if task_name == "livemathbench":
+                return LiveMathBenchTask(language="en", limit=limit)  # Default: English
+            elif task_name == "livemathbench_cnmo_en":
+                return LiveMathBenchTask(language="en", limit=limit)
+            elif task_name == "livemathbench_cnmo_zh":
+                return LiveMathBenchTask(language="zh", limit=limit)
+            else:
+                # Try to extract language from task name (e.g., "livemathbench_cnmo_fr")
+                if "_zh" in task_name or "_cn" in task_name:
+                    return LiveMathBenchTask(language="zh", limit=limit)
+                else:
+                    return LiveMathBenchTask(language="en", limit=limit)  # Default to English
+            
         # Check if it's a BigCode task
         try:
             from .bigcode_integration import is_bigcode_task, load_bigcode_task

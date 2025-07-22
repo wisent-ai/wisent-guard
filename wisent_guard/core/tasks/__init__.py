@@ -12,6 +12,7 @@ from .math500_task import Math500Task
 from .aime_task import AIMETask
 from .hmmt_task import HMMTTask
 from .polymath_task import PolyMathTask
+from .livemathbench_task import LiveMathBenchTask
 
 
 def register_all_tasks():
@@ -50,6 +51,11 @@ def register_all_tasks():
     register_task("polymath_zh_medium", lambda limit=None: PolyMathTask(language="zh", difficulty="medium", limit=limit))
     register_task("polymath_en_high", lambda limit=None: PolyMathTask(language="en", difficulty="high", limit=limit))
     register_task("polymath_zh_high", lambda limit=None: PolyMathTask(language="zh", difficulty="high", limit=limit))
+    
+    # Register LiveMathBench tasks (CNMO 2024 Chinese and English)
+    register_task("livemathbench", lambda limit=None: LiveMathBenchTask(language="en", limit=limit))  # Default: English
+    register_task("livemathbench_cnmo_en", lambda limit=None: LiveMathBenchTask(language="en", limit=limit))
+    register_task("livemathbench_cnmo_zh", lambda limit=None: LiveMathBenchTask(language="zh", limit=limit))
 
 
 # Auto-register tasks when the module is imported
@@ -69,5 +75,6 @@ __all__ = [
     "AIMETask",
     "HMMTTask",
     "PolyMathTask",
+    "LiveMathBenchTask",
     "register_all_tasks"
 ]

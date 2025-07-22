@@ -159,6 +159,10 @@ ALLOWED_TASKS = {
     "polymath_zh_medium",  # Chinese medium
     "polymath_en_high",    # English high
     "polymath_zh_high",    # Chinese high
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    "livemathbench",       # Default: English
+    "livemathbench_cnmo_en",  # CNMO 2024 English
+    "livemathbench_cnmo_zh",  # CNMO 2024 Chinese
     # QA benchmarks
     "coqa",
     "naturalqs",
