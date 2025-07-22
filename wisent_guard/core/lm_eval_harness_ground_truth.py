@@ -153,6 +153,9 @@ class LMEvalHarnessGroundTruth:
                     # HLE task handling
                     if task_name.startswith('hle'):
                         ground_truth = doc.get('answer', '')
+                    # MATH-500 task handling  
+                    elif task_name in ['math500', 'math', 'hendrycks_math']:
+                        ground_truth = doc.get('answer', '')
                     # FIXED: For DROP task, use raw document data to preserve structured format
                     elif task_name == "drop":
                         # Use raw answer field which contains the structured data
@@ -635,7 +638,7 @@ class LMEvalHarnessGroundTruth:
     def _is_task_interface_task(self, task_name: str) -> bool:
         """Check if this is a TaskInterface task (not an lm-eval task)."""
         # List of known TaskInterface tasks
-        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench'}
+        task_interface_tasks = {'hle', 'hle_exact_match', 'hle_multiple_choice', 'livecodebench', 'math500', 'math', 'hendrycks_math'}
         return task_name in task_interface_tasks
     
     def _load_task_interface_data(self, task_name: str, num_samples: int):
@@ -815,6 +818,9 @@ class LMEvalHarnessGroundTruth:
                 # Task-specific evaluation logic
                 if task_name == "gsm8k":
                     # GSM8K uses exact match on numerical answer
+                    is_correct = self._evaluate_gsm8k_response(generated, ground_truth)
+                elif task_name.startswith("math") or task_name in ["hendrycks_math"]:
+                    # MATH-500 and related benchmarks use same evaluation as GSM8K (numerical extraction)
                     is_correct = self._evaluate_gsm8k_response(generated, ground_truth)
                 elif task_name in ["arc_easy", "arc_challenge"]:
                     # ARC uses exact match on choice letter/number

@@ -8,6 +8,7 @@ from ..task_interface import register_task
 from .livecodebench_task import LiveCodeBenchTask
 from .lm_eval_task import MBPPTask, GSM8KTask, TruthfulQATask, MMLUTask
 from .hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
+from .math500_task import Math500Task
 
 
 def register_all_tasks():
@@ -25,6 +26,11 @@ def register_all_tasks():
     register_task("hle", HLETask)
     register_task("hle_exact_match", HLEExactMatchTask)
     register_task("hle_multiple_choice", HLEMultipleChoiceTask)
+    
+    # Register MATH-500 tasks
+    register_task("math500", Math500Task)
+    register_task("math", Math500Task)  
+    register_task("hendrycks_math", Math500Task)
 
 
 # Auto-register tasks when the module is imported
@@ -40,5 +46,6 @@ __all__ = [
     "HLETask",
     "HLEExactMatchTask", 
     "HLEMultipleChoiceTask",
+    "Math500Task",
     "register_all_tasks"
 ]

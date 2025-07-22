@@ -338,6 +338,11 @@ class FullBenchmarkDownloader:
         elif "task_id" in sample and "text" in sample and "code" in sample:
             return self._convert_mbpp_format(sample)
         
+        # MATH-500 format (problem, solution, answer, subject, level)
+        elif ("problem" in sample and "solution" in sample and "answer" in sample 
+              and "subject" in sample and "level" in sample):
+            return self._convert_math500_format(sample)
+        
         # Text generation with question/answer (GSM8K, math problems)
         elif "question" in sample and "answer" in sample:
             return self._convert_text_generation(sample)
@@ -611,6 +616,35 @@ class FullBenchmarkDownloader:
                 "metadata": {
                     "sample_id": sample.get("id", ""),
                     "benchmark_type": "text_generation"
+                }
+            })
+        
+        return pairs
+    
+    def _convert_math500_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert MATH-500 format (problem, solution, answer, subject, level)."""
+        problem = sample.get("problem", "")
+        correct_answer = sample.get("answer", "")
+        solution = sample.get("solution", "")
+        subject = sample.get("subject", "")
+        level = sample.get("level", 0)
+        unique_id = sample.get("unique_id", "")
+        
+        # Generate mathematical incorrect answers based on correct answer
+        incorrect_answers = self._generate_math_distractors(correct_answer)
+        
+        pairs = []
+        for incorrect in incorrect_answers:
+            pairs.append({
+                "context": problem,
+                "good_response": correct_answer,
+                "bad_response": incorrect,
+                "metadata": {
+                    "benchmark_type": "math500",
+                    "subject": subject,
+                    "level": level,
+                    "sample_id": unique_id,
+                    "has_solution": bool(solution.strip())  # Track if step-by-step solution available
                 }
             })
         

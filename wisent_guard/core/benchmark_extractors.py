@@ -420,16 +420,17 @@ class BoolQExtractor(BenchmarkExtractor):
 
 
 class GSM8KExtractor(BenchmarkExtractor):
-    """Extractor for GSM8K benchmark."""
+    """Extractor for GSM8K and MATH-500 benchmarks."""
     
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """
-        GSM8K format:
-        - doc['question']: the math problem
-        - doc['answer']: the answer with explanation
+        Supports multiple formats:
+        - GSM8K format: doc['question'] -> doc['answer'] 
+        - MATH-500 format: doc['problem'] -> doc['answer']
         """
         try:
-            question = doc.get('question', '')
+            # Handle both GSM8K ('question') and MATH-500 ('problem') formats
+            question = doc.get('question', '') or doc.get('problem', '')
             answer = doc.get('answer', '')
             
             if not all([question, answer]):
@@ -3007,6 +3008,10 @@ EXTRACTORS = {
     'truthfulqa_gen': TruthfulQAExtractor,
     'boolq': BoolQExtractor,
     'gsm8k': GSM8KExtractor,
+    # MATH-500 mathematical reasoning benchmarks (reuse GSM8KExtractor)
+    'math': GSM8KExtractor,
+    'math500': GSM8KExtractor,
+    'hendrycks_math': GSM8KExtractor,  # Already exists, but documenting here
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval

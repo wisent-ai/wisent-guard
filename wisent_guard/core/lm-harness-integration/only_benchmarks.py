@@ -672,6 +672,22 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "science"],
         "priority": "high"  # 12.1s - fast for agentic use
     },
+    # MATH-500 mathematical reasoning benchmarks
+    "math": {
+        "task": "math",
+        "tags": ["mathematics", "reasoning", "advanced"],
+        "priority": "high"  # Mathematical reasoning - same as GSM8K
+    },
+    "math500": {
+        "task": "math500",
+        "tags": ["mathematics", "reasoning", "advanced"],
+        "priority": "high"  # MATH-500 subset
+    },
+    "hendrycks_math": {
+        "task": "hendrycks_math",
+        "tags": ["mathematics", "reasoning", "advanced"],
+        "priority": "high"  # Competition-level math
+    },
     "math_qa": {
         "task": "mathqa",  # Fixed: correct task name
         "tags": ["mathematics", "reasoning", "science"],
@@ -1781,8 +1797,11 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         
         # Mathematics & Computation
         "gsm8k": "Grade school math word problems",
+        # MATH-500 mathematical reasoning benchmarks
+        "math": "Mathematical reasoning problems requiring multi-step solutions",
+        "math500": "500-problem subset of MATH benchmark for mathematical reasoning",
+        "hendrycks_math": "Competition-level mathematics problems from Hendrycks et al.",
         "math_qa": "Mathematical reasoning and problem solving",
-        "hendrycks_math": "Competition-level mathematics problems",
         "arithmetic": "Basic arithmetic operations and calculations",
         "asdiv": "Arithmetic story problems for children",
         "mgsm": "Multilingual grade school math problems",

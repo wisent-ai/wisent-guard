@@ -142,6 +142,10 @@ ALLOWED_TASKS = {
     "gsm8k",
     "asdiv",
     "arithmetic",
+    # MATH-500 mathematical reasoning benchmarks
+    "math",
+    "math500",
+    "hendrycks_math",
     # QA benchmarks
     "coqa",
     "naturalqs",
@@ -1492,9 +1496,16 @@ def run_task_pipeline(
                     task_data = model.load_lm_eval_task(
                         actual_task_name, shots=shots, limit=total_limit
                     )
-                    train_docs, test_docs = model.split_task_data(
-                        task_data, split_ratio=split_ratio, random_seed=seed
-                    )
+                    # Check if this is a TaskInterface task (skip split_task_data for these)
+                    if hasattr(task_data, 'get_name') and hasattr(task_data, 'load_data'):
+                        # TaskInterface task - data loading handled internally
+                        train_docs = task_data.load_data(limit=training_limit)
+                        test_docs = task_data.load_data(limit=testing_limit)
+                    else:
+                        # Standard lm-eval task  
+                        train_docs, test_docs = model.split_task_data(
+                            task_data, split_ratio=split_ratio, random_seed=seed
+                        )
                     
                     # Apply training and testing limits if specified
                     original_train_size = len(train_docs)

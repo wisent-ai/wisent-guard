@@ -866,6 +866,11 @@ class Model:
             elif task_name == "hle_multiple_choice":
                 return HLEMultipleChoiceTask(limit=limit)
             
+        # Check if it's MATH-500
+        if task_name in ["math500", "math", "hendrycks_math"]:
+            from .tasks.math500_task import Math500Task
+            return Math500Task(limit=limit)
+            
         # Check if it's a BigCode task
         try:
             from .bigcode_integration import is_bigcode_task, load_bigcode_task
