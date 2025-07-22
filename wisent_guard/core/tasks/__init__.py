@@ -11,6 +11,7 @@ from .hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
 from .math500_task import Math500Task
 from .aime_task import AIMETask
 from .hmmt_task import HMMTTask
+from .polymath_task import PolyMathTask
 
 
 def register_all_tasks():
@@ -42,6 +43,13 @@ def register_all_tasks():
     # Register HMMT tasks (general + competition-specific)
     register_task("hmmt", lambda limit=None: HMMTTask(competition="feb_2025", limit=limit))  # Default: latest competition
     register_task("hmmt_feb_2025", lambda limit=None: HMMTTask(competition="feb_2025", limit=limit))
+    
+    # Register PolyMath tasks (Chinese and English, medium difficulty)
+    register_task("polymath", lambda limit=None: PolyMathTask(language="en", difficulty="medium", limit=limit))  # Default: English medium
+    register_task("polymath_en_medium", lambda limit=None: PolyMathTask(language="en", difficulty="medium", limit=limit))
+    register_task("polymath_zh_medium", lambda limit=None: PolyMathTask(language="zh", difficulty="medium", limit=limit))
+    register_task("polymath_en_high", lambda limit=None: PolyMathTask(language="en", difficulty="high", limit=limit))
+    register_task("polymath_zh_high", lambda limit=None: PolyMathTask(language="zh", difficulty="high", limit=limit))
 
 
 # Auto-register tasks when the module is imported
@@ -60,5 +68,6 @@ __all__ = [
     "Math500Task",
     "AIMETask",
     "HMMTTask",
+    "PolyMathTask",
     "register_all_tasks"
 ]

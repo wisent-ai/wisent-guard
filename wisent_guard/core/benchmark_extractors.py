@@ -3033,6 +3033,12 @@ EXTRACTORS = {
     # HMMT contest math problems (general + competition-specific)
     'hmmt': GSM8KExtractor,
     'hmmt_feb_2025': GSM8KExtractor,
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    'polymath': GSM8KExtractor,
+    'polymath_en_medium': GSM8KExtractor,
+    'polymath_zh_medium': GSM8KExtractor,
+    'polymath_en_high': GSM8KExtractor,
+    'polymath_zh_high': GSM8KExtractor,
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval

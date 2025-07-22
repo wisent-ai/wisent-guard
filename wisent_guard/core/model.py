@@ -899,6 +899,30 @@ class Model:
                 competition = task_name.replace("hmmt_", "")
                 return HMMTTask(competition=competition, limit=limit)
             
+        # Check if it's PolyMath (general or language-difficulty specific)
+        if task_name.startswith("polymath"):
+            from .tasks.polymath_task import PolyMathTask
+            
+            if task_name == "polymath":
+                return PolyMathTask(language="en", difficulty="medium", limit=limit)  # Default: English medium
+            elif task_name == "polymath_en_medium":
+                return PolyMathTask(language="en", difficulty="medium", limit=limit)
+            elif task_name == "polymath_zh_medium":
+                return PolyMathTask(language="zh", difficulty="medium", limit=limit)
+            elif task_name == "polymath_en_high":
+                return PolyMathTask(language="en", difficulty="high", limit=limit)
+            elif task_name == "polymath_zh_high":
+                return PolyMathTask(language="zh", difficulty="high", limit=limit)
+            else:
+                # Try to extract language and difficulty from task name (e.g., "polymath_fr_low")
+                parts = task_name.replace("polymath_", "").split("_")
+                if len(parts) >= 2:
+                    language, difficulty = parts[0], parts[1]
+                    return PolyMathTask(language=language, difficulty=difficulty, limit=limit)
+                else:
+                    # Fallback to default
+                    return PolyMathTask(language="en", difficulty="medium", limit=limit)
+            
         # Check if it's a BigCode task
         try:
             from .bigcode_integration import is_bigcode_task, load_bigcode_task

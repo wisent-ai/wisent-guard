@@ -715,6 +715,32 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "contest", "advanced"],
         "priority": "high"  # HMMT February 2025 contest problems
     },
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    "polymath": {
+        "task": "polymath",
+        "tags": ["mathematics", "reasoning", "multilingual", "medium"],
+        "priority": "high"  # Default: English medium
+    },
+    "polymath_en_medium": {
+        "task": "polymath_en_medium",
+        "tags": ["mathematics", "reasoning", "multilingual", "english", "medium"],
+        "priority": "high"  # English medium difficulty
+    },
+    "polymath_zh_medium": {
+        "task": "polymath_zh_medium",
+        "tags": ["mathematics", "reasoning", "multilingual", "chinese", "medium"],
+        "priority": "high"  # Chinese medium difficulty
+    },
+    "polymath_en_high": {
+        "task": "polymath_en_high",
+        "tags": ["mathematics", "reasoning", "multilingual", "english", "high"],
+        "priority": "high"  # English high difficulty
+    },
+    "polymath_zh_high": {
+        "task": "polymath_zh_high",
+        "tags": ["mathematics", "reasoning", "multilingual", "chinese", "high"],
+        "priority": "high"  # Chinese high difficulty
+    },
     "math_qa": {
         "task": "mathqa",  # Fixed: correct task name
         "tags": ["mathematics", "reasoning", "science"],
@@ -1835,6 +1861,12 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         # HMMT contest math problems (general + competition-specific)
         "hmmt": "High-difficulty HMMT contest problems (latest: February 2025)",
         "hmmt_feb_2025": "High-difficulty HMMT February 2025 contest problems",
+        # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+        "polymath": "PolyMath multilingual mathematical reasoning (default: English medium)",
+        "polymath_en_medium": "PolyMath medium-difficulty mathematical problems in English",
+        "polymath_zh_medium": "PolyMath medium-difficulty mathematical problems in Chinese",
+        "polymath_en_high": "PolyMath high-difficulty mathematical problems in English", 
+        "polymath_zh_high": "PolyMath high-difficulty mathematical problems in Chinese",
         "math_qa": "Mathematical reasoning and problem solving",
         "arithmetic": "Basic arithmetic operations and calculations",
         "asdiv": "Arithmetic story problems for children",

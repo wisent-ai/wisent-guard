@@ -153,6 +153,12 @@ ALLOWED_TASKS = {
     # HMMT contest math problems (general + competition-specific)
     "hmmt",        # Latest HMMT (February 2025)
     "hmmt_feb_2025",  # HMMT February 2025
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    "polymath",    # Default: English medium
+    "polymath_en_medium",  # English medium
+    "polymath_zh_medium",  # Chinese medium
+    "polymath_en_high",    # English high
+    "polymath_zh_high",    # Chinese high
     # QA benchmarks
     "coqa",
     "naturalqs",
