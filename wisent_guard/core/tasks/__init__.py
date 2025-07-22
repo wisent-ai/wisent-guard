@@ -34,8 +34,8 @@ def register_all_tasks():
     register_task("hendrycks_math", Math500Task)
     
     # Register AIME tasks (general + year-specific)
-    register_task("aime2025-1", lambda limit=None: AIMETask(year="2025", limit=limit, config_name="AIME2025-I"))
-    register_task("aime2025-2", lambda limit=None: AIMETask(year="2025", limit=limit, config_name="AIME2025-II"))
+    register_task("aime", lambda limit=None: AIMETask(year="2025", limit=limit))  # Default: latest year (2025)
+    register_task("aime2025", lambda limit=None: AIMETask(year="2025", limit=limit))
     register_task("aime2024", lambda limit=None: AIMETask(year="2024", limit=limit))
 
 

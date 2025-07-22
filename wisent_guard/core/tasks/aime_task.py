@@ -9,51 +9,97 @@ import datasets
 
 
 class AIMETask(TaskInterface):
-    """AIME mathematical contest task implementation."""
+    """General AIME mathematical contest task implementation."""
     
-    def __init__(self, year: str = "2025", config_name: Optional[str] = None, limit: Optional[int] = None):
-        self._year = year
-        self._config_name = config_name
+    # Dataset configurations for different years
+    DATASET_CONFIGS = {
+        "2024": {
+            "source": "Maxwell-Jia/AIME_2024",
+            "split": "train",
+            "fields": {"problem": "Problem", "answer": "Answer"},
+            "description": "30 high-difficulty AIME contest problems from 2024"
+        },
+        "2025": {
+            "source": "MathArena/aime_2025", 
+            "split": "train",
+            "fields": {"problem": "problem", "answer": "answer"},
+            "description": "30 high-difficulty AIME contest problems from 2025 (MathArena)"
+        }
+    }
+    
+    def __init__(self, year: str = "2025", limit: Optional[int] = None):
+        """
+        Initialize AIME task for specified year.
+        
+        Args:
+            year: AIME year to load ("2024", "2025"). Default: "2025" (latest)
+            limit: Maximum number of samples to load
+        """
+        if year not in self.DATASET_CONFIGS:
+            available = list(self.DATASET_CONFIGS.keys())
+            raise ValueError(f"AIME year '{year}' not supported. Available: {available}")
+            
+        self.year = year
+        self.config = self.DATASET_CONFIGS[year]
         self._limit = limit
         self._data = None  # Cache for loaded data
-        self._extractor = GSM8KExtractor()  # Reuse GSM8K extractor
+        self._extractor = GSM8KExtractor()  # Reuse enhanced GSM8K extractor
     
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Load AIME data from HuggingFace."""
-        # Load AIME dataset based on year
-        if self._year == "2024":
-            dataset = datasets.load_dataset("HuggingFaceH4/aime_2024", split="train")
-        elif self._year == "2025":
-            if not self._config_name:
-                raise ValueError("Config name is missing for AIME2025. Please pick one among the available configs: ['AIME2025-I', 'AIME2025-II']")
-            dataset = datasets.load_dataset("opencompass/AIME2025", self._config_name, split="test")
-        else:
-            # Fallback for other years
-            dataset = datasets.load_dataset(f"opencompass/AIME{self._year}", split="train")
+        """Load AIME data from HuggingFace for specified year."""
+        # Load dataset based on year configuration
+        dataset = datasets.load_dataset(
+            self.config["source"], 
+            split=self.config["split"]
+        )
         
         # Apply limit
         effective_limit = limit or self._limit
         if effective_limit:
             dataset = dataset.select(range(min(effective_limit, len(dataset))))
         
-        # Convert to list of dictionaries
-        return [dict(item) for item in dataset]
+        # Convert to list and normalize field names
+        data = [dict(item) for item in dataset]
+        
+        # Normalize field names for consistent processing
+        normalized_data = []
+        problem_field = self.config["fields"]["problem"]
+        answer_field = self.config["fields"]["answer"]
+        
+        for item in data:
+            normalized_item = dict(item)  # Keep all original fields
+            
+            # Ensure consistent field names for extractor
+            if problem_field in item:
+                normalized_item["Problem"] = item[problem_field]
+                normalized_item["question"] = item[problem_field]  # For question/answer format
+            
+            if answer_field in item:
+                normalized_item["Answer"] = item[answer_field]
+                normalized_item["answer"] = item[answer_field]  # For question/answer format
+            
+            normalized_data.append(normalized_item)
+        
+        return normalized_data
             
     
     def get_task_info(self) -> Dict[str, Any]:
         """Get information about the AIME task."""
         return {
-            "task_name": f"aime{self._year}",
-            "description": f"30 high-difficulty AIME contest problems from {self._year}",
-            "source": f"Maxwell-Jia/AIME_{self._year}",
+            "task_name": f"aime{self.year}" if self.year != "2025" else "aime",
+            "year": self.year,
+            "description": self.config["description"],
+            "source": self.config["source"],
             "task_type": "text_generation",
             "evaluation_method": "mathematical_equivalence"
         }
     
     def validate_sample(self, sample: Dict[str, Any]) -> bool:
         """Validate that a sample has required AIME fields."""
-        required_fields = ["Problem", "Answer"]
-        return all(field in sample for field in required_fields)
+        problem_field = self.config["fields"]["problem"]
+        answer_field = self.config["fields"]["answer"]
+        
+        return all(field in sample for field in [problem_field, answer_field])
     
     def get_extractor(self) -> GSM8KExtractor:
         """Get the benchmark extractor for this task."""
@@ -61,11 +107,11 @@ class AIMETask(TaskInterface):
     
     def get_name(self) -> str:
         """Get the task name."""
-        return f"aime{self._year}"
+        return f"aime{self.year}" if self.year != "2025" else "aime"
     
     def get_description(self) -> str:
         """Get the task description."""
-        return f"30 high-difficulty AIME contest problems from {self._year} requiring advanced mathematical reasoning"
+        return f"AIME {self.year} contest problems requiring advanced mathematical reasoning"
     
     def get_categories(self) -> List[str]:
         """Get the task categories."""

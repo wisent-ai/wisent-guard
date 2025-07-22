@@ -875,12 +875,16 @@ class Model:
         if task_name.startswith("aime"):
             from .tasks.aime_task import AIMETask
             
-            if task_name == "aime2025-1":
-                return AIMETask(year="2025", limit=limit, config_name="AIME2025-I")
-            elif task_name == "aime2025-2":
-                return AIMETask(year="2025", limit=limit, config_name="AIME2025-II")
+            if task_name == "aime":
+                return AIMETask(year="2025", limit=limit)  # Default: latest year
+            elif task_name == "aime2025":
+                return AIMETask(year="2025", limit=limit)
             elif task_name == "aime2024":
                 return AIMETask(year="2024", limit=limit)
+            else:
+                # Try to extract year from task name (e.g., "aime2026")
+                year = task_name.replace("aime", "")
+                return AIMETask(year=year, limit=limit)
             
         # Check if it's a BigCode task
         try:

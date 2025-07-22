@@ -3027,9 +3027,9 @@ EXTRACTORS = {
     'math500': GSM8KExtractor,
     'hendrycks_math': GSM8KExtractor,  # Already exists, but documenting here
     # AIME contest math problems (general + year-specific)
-    'aime2025-1': GSM8KExtractor,
-    'aime2025-2': GSM8KExtractor, 
-    'aime2024': GSM8KExtractor,
+    'aime': GSM8KExtractor,
+    'aime2025': GSM8KExtractor,
+    'aime2024': GSM8KExtractor,  # Backward compatibility
     'mmlu': MMLUExtractor,
     'mmmlu': MMLUExtractor,
     'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval
