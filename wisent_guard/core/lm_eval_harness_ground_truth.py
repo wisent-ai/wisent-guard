@@ -839,7 +839,10 @@ class LMEvalHarnessGroundTruth:
                     is_correct = self._evaluate_drop_response(generated, ground_truth)
                 elif task_name.startswith("gpqa"):
                     # GPQA uses multiple-choice answer extraction (A, B, C, D)
-                    is_correct = self._evaluate_gpqa_response(generated, ground_truth)
+                    is_correct = self._evaluate_multiple_choice_response(generated, ground_truth)
+                elif task_name.startswith("hle") and "multiple_choice" in task_name:
+                    # HLE multiple choice uses letter extraction (A, B, C, D, E)
+                    is_correct = self._evaluate_multiple_choice_response(generated, ground_truth)
                 else:
                     # Default: string matching with some flexibility
                     is_correct = self._evaluate_default_response(generated, ground_truth)
@@ -1118,8 +1121,8 @@ class LMEvalHarnessGroundTruth:
             logger.error(f"Error in default evaluation: {e}")
             return False
 
-    def _evaluate_gpqa_response(self, generated: str, ground_truth) -> bool:
-        """Evaluate GPQA response by extracting choice letter (A, B, C, D)."""
+    def _evaluate_multiple_choice_response(self, generated: str, ground_truth) -> bool:
+        """Evaluate multiple choice response by extracting choice letter (A, B, C, D, E)."""
         import re
         
         try:
@@ -1131,7 +1134,7 @@ class LMEvalHarnessGroundTruth:
             expected_letter = None
             
             # Extract letter from ground truth (could be "(A)", "A", etc.)
-            gt_match = re.search(r'[ABCD]', gt_str.upper())
+            gt_match = re.search(r'[ABCDE]', gt_str.upper())
             if gt_match:
                 expected_letter = gt_match.group()
             else:
@@ -1139,11 +1142,11 @@ class LMEvalHarnessGroundTruth:
             
             # Try multiple patterns to extract answer from generated response
             patterns = [
-                r'(?:answer|choice|option)\s*(?:is\s*)?(?::\s*)?(?:\()?([ABCD])(?:\))?',  # "Answer: A" or "Answer is (B)"
-                r'(?:^|\s)(?:\()?([ABCD])(?:\))?(?:\s|$)',  # Standalone letter
-                r'(?:the\s+)?(?:correct\s+)?(?:answer\s+)?(?:is\s*)?(?:\()?([ABCD])(?:\))?',  # "The answer is A"
-                r'(?:^|\n)([ABCD])(?:\.|,|\s|$)',  # Letter at start of line
-                r'(?:select\s*|choose\s*)?(?:\()?([ABCD])(?:\))?',  # "Select A" or "(A)"
+                r'(?:answer|choice|option)\s*(?:is\s*)?(?::\s*)?(?:\()?([ABCDE])(?:\))?',  # "Answer: A" or "Answer is (B)"
+                r'(?:^|\s)(?:\()?([ABCDE])(?:\))?(?:\s|$)',  # Standalone letter
+                r'(?:the\s+)?(?:correct\s+)?(?:answer\s+)?(?:is\s*)?(?:\()?([ABCDE])(?:\))?',  # "The answer is A"
+                r'(?:^|\n)([ABCDE])(?:\.|,|\s|$)',  # Letter at start of line
+                r'(?:select\s*|choose\s*)?(?:\()?([ABCDE])(?:\))?',  # "Select A" or "(A)"
             ]
             
             # Try each pattern
@@ -1163,7 +1166,7 @@ class LMEvalHarnessGroundTruth:
             return False
             
         except Exception as e:
-            logger.error(f"Error evaluating GPQA response: {e}")
+            logger.error(f"Error evaluating multiple choice response: {e}")
             return False
     
     def _evaluate_code_execution(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:
