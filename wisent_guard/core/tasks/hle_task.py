@@ -3,6 +3,7 @@ HLE (Human-Level Evaluation) task implementation for task-agnostic architecture.
 """
 
 from typing import Dict, Any, List, Optional
+from datasets import load_dataset
 from ..task_interface import TaskInterface
 from ..benchmark_extractors import HLEExtractor
 
@@ -28,33 +29,23 @@ class HLETask(TaskInterface):
     
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Load HLE data from HuggingFace datasets."""
-        try:
-            from datasets import load_dataset
-            
-            # Load the HLE dataset
-            dataset = load_dataset(self.dataset_name, split="test")
-            
-            # Filter out multimodal examples for initial implementation
-            text_only_data = [
-                item for item in dataset 
-                if not item.get('image') and not item.get('image_1') and not item.get('image_2')
-            ]
-            
-            # Apply additional filters
-            filtered_data = self._filter_and_process(text_only_data)
-            
-            # Apply limit
-            effective_limit = limit or self.limit
-            if effective_limit:
-                filtered_data = filtered_data[:effective_limit]
-            
-            return filtered_data
-            
-        except Exception as e:
-            # Fallback to sample data if loading fails
-            import logging
-            logging.warning(f"Failed to load HLE dataset: {e}. Using sample data.")
-            return self._generate_sample_data_fallback(limit or self.limit)
+        dataset = load_dataset(self.dataset_name, split="test")
+        
+        # Filter out multimodal examples for initial implementation
+        text_only_data = [
+            item for item in dataset 
+            if not item.get('image') and not item.get('image_1') and not item.get('image_2')
+        ]
+        
+        # Apply additional filters
+        filtered_data = self._filter_and_process(text_only_data)
+        
+        # Apply limit
+        effective_limit = limit or self.limit
+        if effective_limit:
+            filtered_data = filtered_data[:effective_limit]
+        
+        return filtered_data
     
     def _filter_and_process(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter data by category and answer type, and convert to internal format."""
@@ -110,76 +101,6 @@ class HLETask(TaskInterface):
                 break
         
         return choices
-    
-    def _generate_sample_data_fallback(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Generate sample HLE data for testing when dataset loading fails."""
-        sample_data = [
-            {
-                'question': 'What is the capital of France?',
-                'answer': 'Paris',
-                'answer_type': 'exactMatch',
-                'category': 'Geography',
-                'raw_subject': 'European Geography',
-                'id': 'sample_001',
-                'metadata': {
-                    'dataset': self.dataset_name
-                }
-            },
-            {
-                'question': 'Which of the following is NOT a prime number?\n\nA. 17\nB. 21\nC. 23\nD. 29\nE. 31',
-                'answer': 'B',
-                'answer_type': 'multipleChoice',
-                'parsed_choices': ['A. 17', 'B. 21', 'C. 23', 'D. 29', 'E. 31'],
-                'category': 'Math',
-                'raw_subject': 'Number Theory',
-                'id': 'sample_002',
-                'metadata': {
-                    'dataset': self.dataset_name
-                }
-            },
-            {
-                'question': 'What is the time complexity of binary search?',
-                'answer': 'O(log n)',
-                'answer_type': 'exactMatch',
-                'category': 'Computer Science',
-                'raw_subject': 'Algorithms',
-                'id': 'sample_003',
-                'metadata': {
-                    'dataset': self.dataset_name
-                }
-            },
-            {
-                'question': 'Which law states that energy cannot be created or destroyed?\n\nA. Newton\'s First Law\nB. Law of Universal Gravitation\nC. Law of Conservation of Energy\nD. Second Law of Thermodynamics\nE. Ohm\'s Law',
-                'answer': 'C',
-                'answer_type': 'multipleChoice',
-                'parsed_choices': ['A. Newton\'s First Law', 'B. Law of Universal Gravitation', 
-                          'C. Law of Conservation of Energy', 'D. Second Law of Thermodynamics', 
-                          'E. Ohm\'s Law'],
-                'category': 'Physics',
-                'raw_subject': 'Thermodynamics',
-                'id': 'sample_004',
-                'metadata': {
-                    'dataset': self.dataset_name
-                }
-            },
-            {
-                'question': 'What is the chemical formula for water?',
-                'answer': 'H2O',
-                'answer_type': 'exactMatch',
-                'category': 'Chemistry',
-                'raw_subject': 'Basic Chemistry',
-                'id': 'sample_005',
-                'metadata': {
-                    'dataset': self.dataset_name
-                }
-            }
-        ]
-        
-        # Apply limit if specified
-        if limit:
-            sample_data = sample_data[:limit]
-        
-        return sample_data
     
     def get_extractor(self) -> HLEExtractor:
         """Get the HLE benchmark extractor."""
