@@ -61,7 +61,8 @@ ignore = [
     "PLW2901", # Redefined loop variable
     "B008",    # Do not perform function calls in argument defaults
     "ARG002",  # Unused method argument
-    "PIE800",  # Unnecessary spread operator
+    "PIE800",  # Unnecessary spread operator,
+    "T201" # print
 ]
 fixable = ["ALL"]
 unfixable = []
