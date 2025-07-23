@@ -7,9 +7,9 @@ Tests the actual CLI commands that users run, validating:
 3. Error handling and messaging
 4. Full execution (when model is pre-configured)
 
-Commands tested (as requested by boss):
-1. Basic classifier: `python -m wisent_guard tasks gsm8k --model hf-internal-testing/tiny-random-gpt2 --layer 5 --limit 10`
-2. Steering: `python -m wisent_guard tasks gsm8k --model hf-internal-testing/tiny-random-gpt2 --steering-mode --steering-method CAA`
+Commands tested:
+1. Basic classifier: `python -m wisent_guard tasks gsm8k --model TEST_MODEL --layer 5 --limit 10`
+2. Steering: `python -m wisent_guard tasks gsm8k --model TEST_MODEL --steering-mode --steering-method CAA`
 
 This validates the complete pipeline from CLI parsing to model execution.
 Full execution tests are skipped by default until model configuration is resolved.
@@ -22,6 +22,12 @@ import os
 import tempfile
 from pathlib import Path
 from typing import List
+
+ALLOWED_TASKS = [
+    "gsm8k",
+    "gpqa",
+    "hle",
+]
 
 
 # Use tiny testing model for fast, reliable CI/CD testing
@@ -114,16 +120,17 @@ class TestBenchmarkCLIIntegration:
             pytest.fail(f"Failed to run CLI command: {e}")
     
     @pytest.mark.slow
-    def test_gsm8k_basic_classifier_full_execution(self):
-        """SLOW TEST: Full execution of basic classifier functionality on GSM8K.
+    @pytest.mark.parametrize("task_name", ALLOWED_TASKS)
+    def test_basic_classifier_full_execution(self, task_name):
+        """SLOW TEST: Full execution of basic classifier functionality on all allowed tasks.
         
-        Command: python -m wisent_guard tasks gsm8k --model hf-internal-testing/tiny-random-gpt2 --layer 5 --limit 3
+        Command: python -m wisent_guard tasks {task_name} --model TEST_MODEL --layer 5 --limit 3
         
-        This test downloads models and processes data, making it slow (~60s).
+        This test downloads models and processes data, making it slow (~60s per task).
         Run with: pytest -m slow or pytest -m "not slow" to exclude.
         """
         cmd_args = [
-            "tasks", "gsm8k",
+            "tasks", task_name,
             "--model", TEST_MODEL,
             "--layer", "5", 
             "--limit", str(TEST_LIMIT)
@@ -145,27 +152,28 @@ class TestBenchmarkCLIIntegration:
         
         # Verify expected output patterns (check both stdout and stderr)
         full_output = (result.stdout + result.stderr).lower()
-        assert "gsm8k" in full_output, f"Should mention GSM8K task in output: {full_output[:300]}"
+        assert task_name in full_output, f"Should mention {task_name} task in output: {full_output[:300]}"
         
         # Should contain processing information
         processing_indicators = ["model", "loading", "processing", "samples", "questions", "results", "pipeline"]
         found_processing = any(indicator in full_output for indicator in processing_indicators)
         assert found_processing, f"Should contain processing indicators: {full_output[:300]}"
         
-        print("✅ GSM8K basic classifier FULL EXECUTION test passed!")
+        print(f"✅ {task_name} basic classifier FULL EXECUTION test passed!")
     
     @pytest.mark.slow
-    def test_gsm8k_steering_functionality_full_execution(self):
-        """SLOW TEST: Full execution of steering functionality on GSM8K.
+    @pytest.mark.parametrize("task_name", ALLOWED_TASKS)
+    def test_steering_functionality_full_execution(self, task_name):
+        """SLOW TEST: Full execution of steering functionality on all allowed tasks.
         
-        Command: python -m wisent_guard tasks gsm8k --model hf-internal-testing/tiny-random-gpt2 --layer 5 --limit 3 
+        Command: python -m wisent_guard tasks {task_name} --model TEST_MODEL --layer 5 --limit 3 
                  --steering-mode --steering-method CAA --steering-strength 1.5
         
-        This test downloads models and processes data with steering, making it slow (~60s).
+        This test downloads models and processes data with steering, making it slow (~60s per task).
         Run with: pytest -m slow or pytest -m "not slow" to exclude.
         """
         cmd_args = [
-            "tasks", "gsm8k",
+            "tasks", task_name,
             "--model", TEST_MODEL,
             "--layer", "5",
             "--limit", str(TEST_LIMIT),
@@ -199,7 +207,7 @@ class TestBenchmarkCLIIntegration:
         found_processing = any(indicator in full_output for indicator in processing_indicators)
         assert found_processing, f"Should contain processing indicators: {full_output[:300]}"
         
-        print("✅ GSM8K steering functionality FULL EXECUTION test passed!")
+        print(f"✅ {task_name} steering functionality FULL EXECUTION test passed!")
 
 
 if __name__ == "__main__":
