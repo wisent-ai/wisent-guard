@@ -23,18 +23,64 @@ import tempfile
 from pathlib import Path
 from typing import List
 
+# TODO All tasks definied in CLI 
 ALLOWED_TASKS = [
-    "gsm8k",
+    # GPQA benchmarks
     "gpqa",
+    "gpqa_diamond", 
+    "gpqa_extended",
+    # GPQA specific variants (zeroshot only for focused testing)
+    "gpqa_main_zeroshot",
+    "gpqa_diamond_zeroshot",
+    "gpqa_extended_zeroshot",
+    # GPQA Chain-of-Thought variants for text generation testing
+    "gpqa_main_cot_zeroshot",
+    "gpqa_diamond_cot_zeroshot", 
+    "gpqa_extended_cot_zeroshot",
+    # Boolean benchmarks
+    "boolq",
+    # Math benchmarks
+    "gsm8k",
+    "asdiv",
+    "arithmetic",
+    # MATH-500 mathematical reasoning benchmarks
+    "math",
+    "math500",
+    "hendrycks_math",
+    # AIME contest math problems (general + year-specific)
+    "aime",        # Latest AIME (2025)
+    "aime2025",    # AIME 2025
+    "aime2024",    # AIME 2024
+    # HMMT contest math problems (general + competition-specific)
+    "hmmt",        # Latest HMMT (February 2025)
+    "hmmt_feb_2025",  # HMMT February 2025
+    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
+    "polymath",    # Default: English medium
+    "polymath_en_medium",  # English medium
+    "polymath_zh_medium",  # Chinese medium
+    "polymath_en_high",    # English high
+    "polymath_zh_high",    # Chinese high
+    # LiveMathBench CNMO 2024 (Chinese and English)
+    "livemathbench",       # Default: English
+    "livemathbench_cnmo_en",  # CNMO 2024 English
+    "livemathbench_cnmo_zh",  # CNMO 2024 Chinese,
+    # HLE (Human-Level Evaluation) benchmarks
     "hle",
+    "hle_exact_match",
+    "hle_multiple_choice",
+    # SuperGPQA scientific reasoning benchmarks
+    "supergpqa",
+    "supergpqa_physics",
+    "supergpqa_chemistry", 
+    "supergpqa_biology",
 ]
 
 
 # Use tiny testing model for fast, reliable CI/CD testing
 TEST_MODEL = "hf-internal-testing/tiny-random-gpt2"
 
-# Test with limited samples for speed
-TEST_LIMIT = 3
+# Test with limited samples for speed (minimum 5 to ensure 80/20 split gives >0 training samples)
+TEST_LIMIT = 5
 
 class TestBenchmarkCLIIntegration:
     """Test actual CLI commands for math benchmarks.
@@ -132,7 +178,7 @@ class TestBenchmarkCLIIntegration:
         cmd_args = [
             "tasks", task_name,
             "--model", TEST_MODEL,
-            "--layer", "5", 
+            "--layer", "4",  # hf-internal-testing/tiny-random-gpt2 has 6 layers (0-5)
             "--limit", str(TEST_LIMIT)
         ]
         
@@ -175,7 +221,7 @@ class TestBenchmarkCLIIntegration:
         cmd_args = [
             "tasks", task_name,
             "--model", TEST_MODEL,
-            "--layer", "5",
+            "--layer", "4",  # hf-internal-testing/tiny-random-gpt2 has 6 layers (0-5)
             "--limit", str(TEST_LIMIT),
             "--steering-mode",
             "--steering-method", "CAA", 
@@ -199,8 +245,8 @@ class TestBenchmarkCLIIntegration:
         # Verify steering worked (check both stdout and stderr)
         full_output = (result.stdout + result.stderr).lower()
         
-        # GSM8K should be mentioned somewhere
-        assert "gsm8k" in full_output, f"Should mention GSM8K task: {full_output[:300]}"
+        # Task name should be mentioned somewhere
+        assert task_name.lower() in full_output, f"Should mention {task_name} task: {full_output[:300]}"
         
         # Should have some processing indicators (steering may not explicitly mention steering in output)
         processing_indicators = ["results", "pipeline", "processing", "samples"]
