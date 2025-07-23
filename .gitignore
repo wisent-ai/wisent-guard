@@ -121,6 +121,7 @@ smoke_test_results/
 references/
 
 # Cache directories for our tools
+wisent_guard/benchmark_cache/
 
 # Keys and secrets
 keys/
