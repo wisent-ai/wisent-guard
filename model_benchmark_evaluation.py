@@ -18,7 +18,7 @@ import logging
 import argparse
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import subprocess
 import sys
@@ -27,18 +27,12 @@ import sys
 from dotenv import load_dotenv
 load_dotenv("/workspace/.env")
 
-try:
-    from clearml import Task, Logger
-    CLEARML_AVAILABLE = True
-except ImportError:
-    CLEARML_AVAILABLE = False
-    print("Warning: ClearML not available. Install with: pip install clearml")
+from clearml import Task
 
 # Add wisent_guard to path for importing
 sys.path.insert(0, str(Path(__file__).parent))
 
 from wisent_guard.core.tasks import register_all_tasks
-from wisent_guard.core.task_interface import get_task
 
 
 @dataclass
@@ -91,8 +85,8 @@ class BenchmarkEvaluator:
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(exist_ok=True)
         
-        # Initialize ClearML if available and enabled
-        if CLEARML_AVAILABLE and config.enable_clearml:
+        # Initialize ClearML if enabled
+        if config.enable_clearml:
             self._setup_clearml()
     
     def _setup_logging(self) -> logging.Logger:
@@ -105,20 +99,15 @@ class BenchmarkEvaluator:
     
     def _setup_clearml(self):
         """Initialize ClearML experiment tracking."""
-        try:
-            self.clearml_task = Task.init(
-                project_name=self.config.clearml_project,
-                task_name=f"{self.config.experiment_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                tags=self.config.clearml_tags
-            )
-            
-            # Log configuration
-            self.clearml_task.connect(asdict(self.config))
-            self.logger.info("ClearML experiment initialized successfully")
-            
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize ClearML: {e}")
-            self.clearml_task = None
+        self.clearml_task = Task.init(
+            project_name=self.config.clearml_project,
+            task_name=f"{self.config.experiment_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            tags=self.config.clearml_tags
+        )
+        
+        # Log configuration
+        self.clearml_task.connect(asdict(self.config))
+        self.logger.info("ClearML experiment initialized successfully")
     
     def _run_wisent_command(self, benchmark: str, phase: str, additional_args: List[str] = None) -> Dict[str, Any]:
         """Run wisent_guard command and capture results."""
