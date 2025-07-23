@@ -1,16 +1,15 @@
 [tool.pytest.ini_options]
-testpaths = ["wisent_guard/tests"]
+testpaths = ["wisent_guard/tests", "huggingface_llama"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["-v", "--tb=short", "--ignore=bigcode-evaluation-harness", "--ignore=evaluation"]
+addopts = ["-v", "--tb=short", "--ignore=bigcode-evaluation-harness", "--ignore=evaluation", "-m", "not heavy"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "heavy: marks tests as very resource-intensive with large model downloads (deselect with '-m \"not heavy\"')",
+    "model_download: marks tests that download models from HuggingFace (deselect with '-m \"not model_download\"')",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
-    "mbpp: marks tests specific to MBPP task",
-    "gsm8k: marks tests specific to GSM8K task",
-    "task_pipeline: marks tests for task pipeline functionality",
     "docker: marks tests for Docker-based execution",
     "performance: marks tests for performance evaluation",
     "cli: marks tests for CLI integration",
