@@ -13,12 +13,13 @@ from .aime_task import AIMETask
 from .hmmt_task import HMMTTask
 from .polymath_task import PolyMathTask
 from .livemathbench_task import LiveMathBenchTask
+from .supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
 
 
 def register_all_tasks():
     """Register all available tasks."""
     # Register LiveCodeBench task
-    register_task("livecodebench", LiveCodeBenchTask)
+    register_task("livecodebench", lambda limit=None: LiveCodeBenchTask(release_version="release_v1", limit=limit))
     
     # Register common lm-eval tasks
     register_task("mbpp", MBPPTask)
@@ -27,14 +28,14 @@ def register_all_tasks():
     register_task("mmlu", MMLUTask)
     
     # Register HLE tasks
-    register_task("hle", HLETask)
-    register_task("hle_exact_match", HLEExactMatchTask)
-    register_task("hle_multiple_choice", HLEMultipleChoiceTask)
+    register_task("hle", lambda limit=None: HLETask(limit=limit))
+    register_task("hle_exact_match", lambda limit=None: HLEExactMatchTask(limit=limit))
+    register_task("hle_multiple_choice", lambda limit=None: HLEMultipleChoiceTask(limit=limit))
     
     # Register MATH-500 tasks
-    register_task("math500", Math500Task)
-    register_task("math", Math500Task)  
-    register_task("hendrycks_math", Math500Task)
+    register_task("math500", lambda limit=None: Math500Task(limit=limit))
+    register_task("math", lambda limit=None: Math500Task(limit=limit))  
+    register_task("hendrycks_math", lambda limit=None: Math500Task(limit=limit))
     
     # Register AIME tasks (general + year-specific)
     register_task("aime", lambda limit=None: AIMETask(year="2025", limit=limit))  # Default: latest year (2025)
@@ -56,6 +57,12 @@ def register_all_tasks():
     register_task("livemathbench", lambda limit=None: LiveMathBenchTask(language="en", limit=limit))  # Default: English
     register_task("livemathbench_cnmo_en", lambda limit=None: LiveMathBenchTask(language="en", limit=limit))
     register_task("livemathbench_cnmo_zh", lambda limit=None: LiveMathBenchTask(language="zh", limit=limit))
+    
+    # Register SuperGPQA tasks (scientific reasoning)
+    register_task("supergpqa", lambda limit=None: SuperGPQATask(limit=limit))  # Default: all subjects
+    register_task("supergpqa_physics", lambda limit=None: SuperGPQAPhysicsTask(limit=limit))
+    register_task("supergpqa_chemistry", lambda limit=None: SuperGPQAChemistryTask(limit=limit))
+    register_task("supergpqa_biology", lambda limit=None: SuperGPQABiologyTask(limit=limit))
 
 
 # Auto-register tasks when the module is imported
@@ -76,5 +83,9 @@ __all__ = [
     "HMMTTask",
     "PolyMathTask",
     "LiveMathBenchTask",
+    "SuperGPQATask",
+    "SuperGPQAPhysicsTask",
+    "SuperGPQAChemistryTask", 
+    "SuperGPQABiologyTask",
     "register_all_tasks"
 ]
