@@ -1,9 +1,9 @@
 [tool.pytest.ini_options]
-testpaths = ["wisent_guard/tests", "huggingface_llama"]
+testpaths = ["wisent_guard/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["-v", "--tb=short", "--ignore=bigcode-evaluation-harness", "--ignore=evaluation", "-m", "not heavy"]
+addopts = ["-v", "--tb=short", "--ignore=evaluation", "-m", "not heavy and not docker"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "heavy: marks tests as very resource-intensive with large model downloads (deselect with '-m \"not heavy\"')",

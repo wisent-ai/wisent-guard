@@ -64,7 +64,7 @@ class TestContrastiveVectors:
         # Check that pair set was created
         assert pair_set is not None
         assert "test_pairs" in vectors.pair_sets
-        assert len(pair_set.phrase_pairs) == 2
+        assert len(pair_set.pairs) == 2
     
     def test_compute_vectors_basic(self):
         """Test basic vector computation."""
