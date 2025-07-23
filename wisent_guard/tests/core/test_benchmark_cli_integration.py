@@ -23,57 +23,8 @@ import tempfile
 from pathlib import Path
 from typing import List
 
-# TODO All tasks definied in CLI 
-ALLOWED_TASKS = [
-    # GPQA benchmarks
-    "gpqa",
-    "gpqa_diamond", 
-    "gpqa_extended",
-    # GPQA specific variants (zeroshot only for focused testing)
-    "gpqa_main_zeroshot",
-    "gpqa_diamond_zeroshot",
-    "gpqa_extended_zeroshot",
-    # GPQA Chain-of-Thought variants for text generation testing
-    "gpqa_main_cot_zeroshot",
-    "gpqa_diamond_cot_zeroshot", 
-    "gpqa_extended_cot_zeroshot",
-    # Boolean benchmarks
-    "boolq",
-    # Math benchmarks
-    "gsm8k",
-    "asdiv",
-    "arithmetic",
-    # MATH-500 mathematical reasoning benchmarks
-    "math",
-    "math500",
-    "hendrycks_math",
-    # AIME contest math problems (general + year-specific)
-    "aime",        # Latest AIME (2025)
-    "aime2025",    # AIME 2025
-    "aime2024",    # AIME 2024
-    # HMMT contest math problems (general + competition-specific)
-    "hmmt",        # Latest HMMT (February 2025)
-    "hmmt_feb_2025",  # HMMT February 2025
-    # PolyMath multilingual mathematical reasoning (Chinese and English, medium difficulty)
-    "polymath",    # Default: English medium
-    "polymath_en_medium",  # English medium
-    "polymath_zh_medium",  # Chinese medium
-    "polymath_en_high",    # English high
-    "polymath_zh_high",    # Chinese high
-    # LiveMathBench CNMO 2024 (Chinese and English)
-    "livemathbench",       # Default: English
-    "livemathbench_cnmo_en",  # CNMO 2024 English
-    "livemathbench_cnmo_zh",  # CNMO 2024 Chinese,
-    # HLE (Human-Level Evaluation) benchmarks
-    "hle",
-    "hle_exact_match",
-    "hle_multiple_choice",
-    # SuperGPQA scientific reasoning benchmarks
-    "supergpqa",
-    "supergpqa_physics",
-    "supergpqa_chemistry", 
-    "supergpqa_biology",
-]
+# Import allowed tasks from centralized configuration
+from wisent_guard.parameters.task_config import TEST_ALLOWED_TASKS as ALLOWED_TASKS
 
 
 # Use tiny testing model for fast, reliable CI/CD testing
