@@ -76,7 +76,7 @@ class EfficientEvaluationConfig:
     wandb_project: str = "wisent-guard-efficient-evaluation"
     wandb_tags: List[str] = None
     wandb_entity: Optional[str] = None
-    enable_wandb: bool = False  # Disabled by default for efficiency
+    enable_wandb: bool = True  # Enabled by default for debugging
     
     # Advanced configuration
     batch_size: int = 8
@@ -328,6 +328,16 @@ class EfficientBenchmarkEvaluator:
         
         return layer_activations
     
+    def _prepare_dataset_activations_with_samples(self, dataset_name: str, limit: int) -> Tuple[Dict[int, Tuple[np.ndarray, np.ndarray]], List[Dict]]:
+        """Prepare activations for all layers for a dataset, returning both activations and raw samples."""
+        # Load samples first
+        samples = self._load_dataset_samples(dataset_name, limit)
+        
+        # Get activations using existing method
+        layer_activations = self._prepare_dataset_activations(dataset_name, limit)
+        
+        return layer_activations, samples
+    
     def _free_model_memory(self):
         """Free model memory after activation extraction."""
         self.logger.info("🧹 Freeing model memory...")
@@ -341,6 +351,100 @@ class EfficientBenchmarkEvaluator:
         if torch.cuda.is_available():
             memory_gb = torch.cuda.memory_allocated() / 1024**3
             self.logger.info(f"GPU memory after cleanup: {memory_gb:.2f} GB")
+    
+    def _log_detailed_predictions_to_wandb(self, test_samples: List[Dict], y_true: np.ndarray, y_pred: np.ndarray, y_pred_proba: np.ndarray, layer: int):
+        """Log detailed predictions to wandb for debugging."""
+        self.logger.info("📊 Logging detailed predictions to wandb...")
+        
+        # Create detailed prediction data
+        prediction_data = []
+        sample_idx = 0
+        
+        for sample in test_samples:
+            if 'question' in sample and 'choices' in sample:
+                # Multiple choice format
+                question = sample['question']
+                correct_idx = sample.get('gold', 0)
+                
+                for i, choice in enumerate(sample['choices']):
+                    if sample_idx < len(y_true):
+                        prediction_data.append({
+                            'question': question,
+                            'choice': choice,
+                            'choice_idx': i,
+                            'is_correct_answer': (i == correct_idx),
+                            'true_label': int(y_true[sample_idx]),
+                            'pred_label': int(y_pred[sample_idx]),
+                            'pred_proba_0': float(y_pred_proba[sample_idx][0]),
+                            'pred_proba_1': float(y_pred_proba[sample_idx][1]),
+                            'correct_prediction': (y_true[sample_idx] == y_pred[sample_idx]),
+                            'layer': layer,
+                            'sample_type': 'multiple_choice'
+                        })
+                        sample_idx += 1
+            else:
+                # Simple format
+                text = str(sample.get('text', sample))
+                
+                # Positive example
+                if sample_idx < len(y_true):
+                    prediction_data.append({
+                        'question': text,
+                        'choice': 'This is correct',
+                        'choice_idx': 1,
+                        'is_correct_answer': True,
+                        'true_label': int(y_true[sample_idx]),
+                        'pred_label': int(y_pred[sample_idx]),
+                        'pred_proba_0': float(y_pred_proba[sample_idx][0]),
+                        'pred_proba_1': float(y_pred_proba[sample_idx][1]),
+                        'correct_prediction': (y_true[sample_idx] == y_pred[sample_idx]),
+                        'layer': layer,
+                        'sample_type': 'positive_statement'
+                    })
+                    sample_idx += 1
+                
+                # Negative example
+                if sample_idx < len(y_true):
+                    prediction_data.append({
+                        'question': text,
+                        'choice': 'This is incorrect',
+                        'choice_idx': 0,
+                        'is_correct_answer': False,
+                        'true_label': int(y_true[sample_idx]),
+                        'pred_label': int(y_pred[sample_idx]),
+                        'pred_proba_0': float(y_pred_proba[sample_idx][0]),
+                        'pred_proba_1': float(y_pred_proba[sample_idx][1]),
+                        'correct_prediction': (y_true[sample_idx] == y_pred[sample_idx]),
+                        'layer': layer,
+                        'sample_type': 'negative_statement'
+                    })
+                    sample_idx += 1
+        
+        # Log as wandb table
+        import wandb
+        table = wandb.Table(
+            columns=[
+                'question', 'choice', 'choice_idx', 'is_correct_answer',
+                'true_label', 'pred_label', 'pred_proba_0', 'pred_proba_1',
+                'correct_prediction', 'layer', 'sample_type'
+            ],
+            data=[[row[col] for col in [
+                'question', 'choice', 'choice_idx', 'is_correct_answer',
+                'true_label', 'pred_label', 'pred_proba_0', 'pred_proba_1',
+                'correct_prediction', 'layer', 'sample_type'
+            ]] for row in prediction_data]
+        )
+        
+        self.wandb_run.log({
+            'test_predictions_detailed': table,
+            'test_accuracy_breakdown': {
+                'correct_predictions': sum(row['correct_prediction'] for row in prediction_data),
+                'total_predictions': len(prediction_data),
+                'accuracy': sum(row['correct_prediction'] for row in prediction_data) / len(prediction_data) if prediction_data else 0
+            }
+        })
+        
+        self.logger.info(f"Logged {len(prediction_data)} detailed predictions to wandb")
     
     def run_efficient_three_phase_pipeline(self) -> Dict[str, Any]:
         """Run efficient three-phase evaluation: train/validate/test."""
@@ -358,10 +462,10 @@ class EfficientBenchmarkEvaluator:
         # Load model once
         self._load_model_once()
         
-        # Extract activations for all datasets
-        train_acts = self._prepare_dataset_activations(self.config.train_benchmark, self.config.train_limit)
-        val_acts = self._prepare_dataset_activations(self.config.val_benchmark, self.config.val_limit)
-        test_acts = self._prepare_dataset_activations(self.config.test_benchmark, self.config.test_limit)
+        # Extract activations for all datasets (keeping raw samples for wandb logging)
+        train_acts, train_samples = self._prepare_dataset_activations_with_samples(self.config.train_benchmark, self.config.train_limit)
+        val_acts, val_samples = self._prepare_dataset_activations_with_samples(self.config.val_benchmark, self.config.val_limit)
+        test_acts, test_samples = self._prepare_dataset_activations_with_samples(self.config.test_benchmark, self.config.test_limit)
         
         # Free model memory
         self._free_model_memory()
@@ -428,9 +532,14 @@ class EfficientBenchmarkEvaluator:
             # Test on held-out test set
             X_test, y_test = test_acts[best_config['layer']]
             test_pred = best_config['classifier'].predict(X_test)
+            test_pred_proba = best_config['classifier'].predict_proba(X_test)
             test_acc = accuracy_score(y_test, test_pred)
             
             self.logger.info(f"Test accuracy: {test_acc:.3f}")
+            
+            # Log detailed predictions to wandb for debugging
+            if self.config.enable_wandb and self.wandb_run:
+                self._log_detailed_predictions_to_wandb(test_samples, y_test, test_pred, test_pred_proba, best_config['layer'])
             
             # Save results
             self.results.update({
@@ -440,6 +549,11 @@ class EfficientBenchmarkEvaluator:
                 ],
                 'best_hyperparams': {k: v for k, v in best_config.items() if k != 'classifier'},
                 'test_accuracy': test_acc,
+                'test_predictions': {
+                    'y_true': y_test.tolist(),
+                    'y_pred': test_pred.tolist(),
+                    'y_pred_proba': test_pred_proba.tolist()
+                },
                 'summary': {
                     'total_configs_tested': len(all_results),
                     'best_layer': best_config['layer'],
