@@ -86,6 +86,8 @@ class ComprehensiveEvaluationPipeline:
         
         # Phase 1: Train Probes
         self.logger.info("\n🎯 Phase 1: Training Probes...")
+        self.logger.info(f"📊 Configured probe layers: {self.config.probe_layers}")
+        self.logger.info(f"⚙️ Configured steering layers: {self.config.steering_layers}")
         probe_training_results = self._train_probes(train_samples)
         self.results["probe_training_results"] = probe_training_results
         
@@ -116,6 +118,8 @@ class ComprehensiveEvaluationPipeline:
     def _train_probes(self, train_samples: List[Dict]) -> Dict[str, Any]:
         """Train probes on training set to classify correctness."""
         probe_results = {}
+        
+        self.logger.info(f"Training probes for {len(self.config.probe_layers)} configured layers: {self.config.probe_layers}")
         
         for layer in self.config.probe_layers:
             self.logger.info(f"Training probes for layer {layer}...")

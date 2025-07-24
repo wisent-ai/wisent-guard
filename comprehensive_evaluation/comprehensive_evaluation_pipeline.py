@@ -45,9 +45,47 @@ sys.path.append('/workspace/wisent-guard')
 # Import math tasks configuration
 from wisent_guard.parameters.task_config import MATH_TASKS
 
+# Import steering methods
+from wisent_guard.core.steering_methods.caa import CAA
+from wisent_guard.core.steering_methods.hpr import HPR
+from wisent_guard.core.steering_methods.dac import DAC
+from wisent_guard.core.steering_methods.bipo import BiPO
+from wisent_guard.core.steering_methods.k_steering import KSteering
+from wisent_guard.core.steering_methods.control_vector_steering import ControlVectorSteering
+
 # Import task classes for dataset loading
 from wisent_guard.core.tasks.math500_task import Math500Task
 from wisent_guard.core.tasks.aime_task import AIMETask
+
+# Available steering methods
+STEERING_METHODS = {
+    'baseline': 'Baseline (No Steering)',
+    'caa': 'CAA (Contrastive Activation Addition)',
+    'hpr': 'HPR (Householder Pseudo-Rotation)', 
+    'dac': 'DAC (Dynamic Activation Composition)',
+    'bipo': 'BiPO (Bi-directional Preference Optimization)',
+    'k_steering': 'K-Steering (Multi-directional)',
+    'control_vector': 'Control Vector Steering'
+}
+
+
+def detect_model_layers(model_name):
+    """Detect number of layers in a model without loading it fully."""
+    try:
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(model_name)
+        
+        # Different models store layer count differently
+        if hasattr(config, 'n_layer'):
+            return config.n_layer
+        elif hasattr(config, 'num_hidden_layers'):
+            return config.num_hidden_layers
+        elif hasattr(config, 'num_layers'):
+            return config.num_layers
+        else:
+            return "Unknown"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 @dataclass
@@ -858,7 +896,9 @@ def main():
     parser.add_argument("--probe-c-values", nargs="+", type=float, help="C values for probe training")
     
     # Steering configuration  
-    parser.add_argument("--steering-methods", nargs="+", default=["baseline"], help="Steering methods")
+    steering_choices = list(STEERING_METHODS.keys())
+    parser.add_argument("--steering-methods", nargs="+", default=["baseline"], 
+                       choices=steering_choices, help=f"Steering methods: {', '.join(steering_choices)}")
     parser.add_argument("--steering-layers", nargs="+", type=int, help="Layers for steering")
     parser.add_argument("--steering-strengths", nargs="+", type=float, help="Steering strengths")
     
@@ -868,6 +908,36 @@ def main():
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size")
     
     args = parser.parse_args()
+    
+    # Display model information before creating configuration
+    print("🤖 MODEL INFORMATION")
+    print("="*40)
+    print(f"Model: {args.model_name}")
+    
+    num_layers = detect_model_layers(args.model_name)
+    if isinstance(num_layers, int):
+        print(f"Layers: {num_layers}")
+        
+        # Suggest appropriate layers based on model size
+        if num_layers <= 6:  # DistilGPT2
+            suggested_probe_layers = [2, 3, 4, 5]
+            suggested_steering_layers = [3, 4, 5]
+        elif num_layers <= 12:  # GPT2
+            suggested_probe_layers = [4, 6, 8, 10]
+            suggested_steering_layers = [6, 8, 10]
+        else:  # Large models
+            step = max(1, num_layers // 8)
+            suggested_probe_layers = [i for i in range(step*2, num_layers, step*2)][:4]
+            suggested_steering_layers = [i for i in range(step*3, num_layers, step*2)][:3]
+        
+        print(f"Suggested probe layers: {suggested_probe_layers}")
+        print(f"Suggested steering layers: {suggested_steering_layers}")
+    else:
+        print(f"Layers: {num_layers}")
+    
+    print(f"Selected steering methods: {args.steering_methods}")
+    print("="*40)
+    print()
     
     # Create configuration
     config = ComprehensiveEvaluationConfig(

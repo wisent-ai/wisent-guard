@@ -53,23 +53,24 @@ class ComprehensiveEvaluationConfig:
     verbose: bool = False
     
     def __post_init__(self):
-        """Set defaults based on model choice."""
-        # Set layer defaults based on model
-        if "distilgpt2" in self.model_name.lower():
-            if self.probe_layers is None:
+        """Set defaults based on model choice.""" 
+        # Set layer defaults based on model ONLY if None
+        if self.probe_layers is None:
+            if "distilgpt2" in self.model_name.lower():
                 self.probe_layers = [2, 3, 4, 5]  # distilgpt2 has 6 layers (0-5)
-            if self.steering_layers is None:
-                self.steering_layers = [3, 4, 5]
-        elif "llama" in self.model_name.lower():
-            if self.probe_layers is None:
+            elif "llama" in self.model_name.lower():
                 self.probe_layers = [8, 16, 24, 32]  # Assuming 32-layer model
-            if self.steering_layers is None:
-                self.steering_layers = [16, 24, 32]
-        else:
-            # Generic defaults
-            if self.probe_layers is None:
+            else:
+                # Generic defaults
                 self.probe_layers = [4, 6, 8]
-            if self.steering_layers is None:
+        
+        if self.steering_layers is None:
+            if "distilgpt2" in self.model_name.lower():
+                self.steering_layers = [3, 4, 5]
+            elif "llama" in self.model_name.lower():
+                self.steering_layers = [16, 24, 32]
+            else:
+                # Generic defaults
                 self.steering_layers = [6, 8]
         
         # Set other defaults
