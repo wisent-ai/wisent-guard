@@ -27,10 +27,15 @@ class ComprehensiveEvaluationConfig:
     probe_layers: List[int] = None  # Will default based on model
     probe_c_values: List[float] = None  # Will default to [0.1, 1.0, 10.0]
     
-    # Steering configuration for grid search
-    steering_methods: List[str] = None  # Will default to ["baseline"]
+    # Steering configuration for grid search (now fixed to DAC)
+    steering_methods: List[str] = None  # Will default to ["dac"]
     steering_layers: List[int] = None   # Will default based on model
     steering_strengths: List[float] = None  # Will default to [1.0]
+    
+    # DAC-specific hyperparameters for grid search
+    dac_entropy_thresholds: List[float] = None  # Will default to [1.0]
+    dac_ptop_values: List[float] = None  # Will default to [0.4]
+    dac_max_alpha_values: List[float] = None  # Will default to [2.0]
     
     # Optimization weights
     benchmark_weight: float = 0.7  # Weight for benchmark performance in combined score
@@ -77,9 +82,18 @@ class ComprehensiveEvaluationConfig:
         if self.probe_c_values is None:
             self.probe_c_values = [0.1, 1.0, 10.0]
         if self.steering_methods is None:
-            self.steering_methods = ["baseline"]  # Start with baseline (no steering)
+            self.steering_methods = ["dac"]  # Fixed to DAC only
         if self.steering_strengths is None:
             self.steering_strengths = [1.0]  # Start with strength 1.0
+        
+        # Set DAC hyperparameter defaults
+        if self.dac_entropy_thresholds is None:
+            self.dac_entropy_thresholds = [1.0]
+        if self.dac_ptop_values is None:
+            self.dac_ptop_values = [0.4]
+        if self.dac_max_alpha_values is None:
+            self.dac_max_alpha_values = [2.0]
+            
         if self.wandb_tags is None:
             self.wandb_tags = ["comprehensive_evaluation", self.train_dataset, self.val_dataset, self.test_dataset]
     
@@ -99,6 +113,9 @@ class ComprehensiveEvaluationConfig:
             "steering_methods": self.steering_methods,
             "steering_layers": self.steering_layers,
             "steering_strengths": self.steering_strengths,
+            "dac_entropy_thresholds": self.dac_entropy_thresholds,
+            "dac_ptop_values": self.dac_ptop_values,
+            "dac_max_alpha_values": self.dac_max_alpha_values,
             "benchmark_weight": self.benchmark_weight,
             "probe_weight": self.probe_weight,
             "output_dir": self.output_dir,
@@ -141,9 +158,11 @@ class ComprehensiveEvaluationConfig:
         }
     
     def get_hyperparameter_search_space_size(self) -> int:
-        """Calculate total number of hyperparameter combinations."""
-        return (len(self.steering_methods) * 
-                len(self.steering_layers) * 
+        """Calculate total number of hyperparameter combinations for DAC grid search."""
+        return (len(self.steering_layers) * 
                 len(self.steering_strengths) *
+                len(self.dac_entropy_thresholds) *
+                len(self.dac_ptop_values) *
+                len(self.dac_max_alpha_values) *
                 len(self.probe_layers) *
                 len(self.probe_c_values))

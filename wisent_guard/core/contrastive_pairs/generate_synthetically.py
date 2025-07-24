@@ -69,7 +69,6 @@ class SyntheticContrastivePairGenerator:
                     template,
                     layer_index=15,  # Use middle layer
                     max_new_tokens=500,
-                    temperature=0.9,  # Higher temperature for creativity
                     do_sample=True
                 )
                 
@@ -247,7 +246,6 @@ Respond directly with {trait_description} (no preamble):"""
             positive_prompt,
             layer_index=15,
             max_new_tokens=50,
-            temperature=0.8,
             do_sample=True
         )
         
@@ -264,7 +262,6 @@ Respond directly with the opposite of {trait_description} (no preamble):"""
             negative_prompt,
             layer_index=15,
             max_new_tokens=50,
-            temperature=0.8,
             do_sample=True
         )
         

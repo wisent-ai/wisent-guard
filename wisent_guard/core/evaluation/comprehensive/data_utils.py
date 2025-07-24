@@ -131,7 +131,7 @@ def generate_benchmark_predictions(model, tokenizer, samples: List[Dict],
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=50,
-                do_sample=False,
+                do_sample=True,
                 pad_token_id=tokenizer.eos_token_id
             )
         
@@ -173,7 +173,7 @@ def create_probe_training_data(model, tokenizer, samples: List[Dict], layer: int
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=50,
-                do_sample=False,
+                do_sample=True,
                 pad_token_id=tokenizer.eos_token_id
             )
         
