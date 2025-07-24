@@ -4,7 +4,7 @@ LiveCodeBench task implementation for task-agnostic architecture.
 
 from typing import Dict, Any, List, Optional
 from ..task_interface import TaskInterface
-# from wisent_guard.core.benchmark_extractors import LiveCodeBenchExtractor
+from ..benchmark_extractors import LiveCodeBenchExtractor
 from ..data_loaders import LiveCodeBenchLoader
 
 
@@ -12,7 +12,7 @@ class LiveCodeBenchTask(TaskInterface):
     """LiveCodeBench task implementation."""
     
     def __init__(self, release_version: str = "release_v1", limit: Optional[int] = None):
-        # self._extractor = LiveCodeBenchExtractor()  # Not needed with model outputs approach
+        self._extractor = LiveCodeBenchExtractor()
         self._data_loader = LiveCodeBenchLoader()
         self._release_version = release_version
         self._validate_release_version(release_version)
@@ -21,13 +21,30 @@ class LiveCodeBenchTask(TaskInterface):
     
     def _validate_release_version(self, release_version: str) -> None:
         """Validate release version."""
-        valid_versions = set(self._data_loader.list_available_versions())
-        if release_version not in valid_versions:
-            raise ValueError(f"Invalid release version: {release_version}. Valid versions: {valid_versions}")
+        try:
+            valid_versions = set(self._data_loader.list_available_versions())
+            if release_version not in valid_versions:
+                raise ValueError(f"Invalid release version: {release_version}. Valid versions: {valid_versions}")
+        except ValueError:
+            # Re-raise validation errors
+            raise
+        except Exception:
+            # If we can't load versions (e.g., due to dataset issues), just log a warning
+            import logging
+            logging.warning(f"Could not validate release version {release_version} due to data loader issues. Proceeding with fallback data.")
     
     def _get_version_info(self) -> Dict[str, Any]:
         """Get version-specific information."""
-        return self._data_loader.get_version_info(self._release_version)
+        try:
+            return self._data_loader.get_version_info(self._release_version)
+        except Exception:
+            # Return default info if data loader fails
+            return {
+                "version": self._release_version,
+                "description": f"LiveCodeBench {self._release_version} (fallback mode)",
+                "contest_start": "2023-01-01",
+                "contest_end": "2023-12-31"
+            }
     
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Load LiveCodeBench data for the specified release version."""
@@ -163,8 +180,8 @@ class LiveCodeBenchTask(TaskInterface):
         return base_problems
     
     def get_extractor(self):
-        """Get the LiveCodeBench extractor - not used with model outputs approach."""
-        return None  # Using model outputs instead
+        """Get the LiveCodeBench extractor."""
+        return self._extractor
     
     def get_name(self) -> str:
         """Get the task name."""

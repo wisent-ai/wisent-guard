@@ -3193,6 +3193,8 @@ EXTRACTORS = {
     
     # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
     'gpqa': GPQAExtractor,
+    'gpqa_diamond': GPQAExtractor,  # Maps to gpqa_diamond_zeroshot
+    'gpqa_extended': GPQAExtractor,  # Maps to gpqa_extended_zeroshot
     'gpqa_main_zeroshot': GPQAExtractor,
     'gpqa_main_n_shot': GPQAExtractor,
     'gpqa_main_cot_zeroshot': GPQAExtractor,
