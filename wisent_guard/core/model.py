@@ -850,41 +850,25 @@ class Model:
         Returns:
             Task object from lm_eval
         """
-        # Check if it's LiveCodeBench
+        # Check if it's LiveCodeBench - use task registry
         if task_name == "livecodebench":
-            from .tasks.livecodebench_task import LiveCodeBenchTask
-            return LiveCodeBenchTask(release_version="release_v1", limit=limit)
+            from .task_interface import get_task
+            return get_task(task_name, limit=limit)
         
-        # Check if it's HLE task
+        # Check if it's HLE task - use task registry
         if task_name in ["hle", "hle_exact_match", "hle_multiple_choice"]:
-            from .tasks.hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
+            from .task_interface import get_task
+            return get_task(task_name, limit=limit)
             
-            if task_name == "hle":
-                return HLETask(limit=limit)
-            elif task_name == "hle_exact_match":
-                return HLEExactMatchTask(limit=limit)
-            elif task_name == "hle_multiple_choice":
-                return HLEMultipleChoiceTask(limit=limit)
-            
-        # Check if it's MATH-500
+        # Check if it's MATH-500 - use task registry
         if task_name in ["math500", "math", "hendrycks_math"]:
-            from .tasks.math500_task import Math500Task
-            return Math500Task(limit=limit)
+            from .task_interface import get_task
+            return get_task(task_name, limit=limit)
             
-        # Check if it's AIME (general or year-specific)
+        # Check if it's AIME (general or year-specific) - use task registry
         if task_name.startswith("aime"):
-            from .tasks.aime_task import AIMETask
-            
-            if task_name == "aime":
-                return AIMETask(year="2025", limit=limit)  # Default: latest year
-            elif task_name == "aime2025":
-                return AIMETask(year="2025", limit=limit)
-            elif task_name == "aime2024":
-                return AIMETask(year="2024", limit=limit)
-            else:
-                # Try to extract year from task name (e.g., "aime2026")
-                year = task_name.replace("aime", "")
-                return AIMETask(year=year, limit=limit)
+            from .task_interface import get_task
+            return get_task(task_name, limit=limit)
             
         # Check if it's HMMT (general or competition-specific)
         if task_name.startswith("hmmt"):
