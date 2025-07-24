@@ -183,7 +183,35 @@ class EfficientBenchmarkEvaluator:
         self.logger.info(f"Loading {limit} samples from {dataset_name}...")
         
         try:
-            # Try lm-eval first
+            # Handle custom task implementations first
+            if dataset_name.lower() in ['aime2024', 'aime2025', 'aime']:
+                from wisent_guard.core.tasks.aime_task import AIMETask
+                
+                # Map dataset names to years
+                year_mapping = {
+                    'aime2024': '2024',
+                    'aime2025': '2025', 
+                    'aime': '2025'  # Default to latest
+                }
+                
+                year = year_mapping.get(dataset_name.lower(), '2025')
+                task = AIMETask(year=year, limit=limit)
+                samples = task.load_data(limit=limit)
+                
+                self.logger.info(f"Loaded {len(samples)} samples from {dataset_name} via AIMETask")
+                return samples
+            
+            elif dataset_name.lower() == 'math500':
+                # Use custom Math500Task implementation
+                from wisent_guard.core.tasks.math500_task import Math500Task
+                
+                task = Math500Task(limit=limit)
+                samples = task.load_data(limit=limit)
+                
+                self.logger.info(f"Loaded {len(samples)} samples from {dataset_name} via Math500Task")
+                return samples
+            
+            # Try lm-eval as fallback
             task_dict = tasks.get_task_dict([dataset_name])
             task = list(task_dict.values())[0]
             
@@ -216,7 +244,7 @@ class EfficientBenchmarkEvaluator:
             return samples
             
         except Exception as e:
-            self.logger.warning(f"Failed to load {dataset_name} via lm-eval: {e}")
+            self.logger.warning(f"Failed to load {dataset_name}: {e}")
             # Fallback to dummy samples
             return self._create_dummy_samples(dataset_name, limit)
     
