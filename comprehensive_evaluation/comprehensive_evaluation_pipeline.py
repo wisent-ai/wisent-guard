@@ -17,6 +17,8 @@ import argparse
 import json
 import logging
 import gc
+import os
+import sys
 import numpy as np
 import torch
 from datetime import datetime
@@ -27,6 +29,21 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import wandb
+
+# Set HuggingFace cache to permanent directory
+os.environ['HF_HOME'] = '/workspace/.cache/huggingface'
+os.environ['TRANSFORMERS_CACHE'] = '/workspace/.cache/huggingface/transformers'
+os.environ['HF_DATASETS_CACHE'] = '/workspace/.cache/huggingface/datasets'
+
+# Create cache directories if they don't exist
+os.makedirs('/workspace/.cache/huggingface/transformers', exist_ok=True)
+os.makedirs('/workspace/.cache/huggingface/datasets', exist_ok=True)
+
+# Add project root to path for imports
+sys.path.append('/workspace/wisent-guard')
+
+# Import math tasks configuration
+from wisent_guard.parameters.task_config import MATH_TASKS
 
 # Import task classes for dataset loading
 from wisent_guard.core.tasks.math500_task import Math500Task
@@ -41,36 +58,38 @@ class ComprehensiveEvaluationConfig:
     model_name: str = "distilbert/distilgpt2"  # Start with lightweight model
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # Dataset configuration (fully configurable)
+    # Dataset configuration (fully configurable) - defaults to 100 samples for math tasks
     train_dataset: str = "math500"
     val_dataset: str = "aime2024" 
     test_dataset: str = "aime2025"
-    train_limit: int = 50
-    val_limit: int = 25
-    test_limit: int = 25
+    train_limit: int = 100  # Default 100 for math tasks
+    val_limit: int = 30     # Adjusted for AIME datasets
+    test_limit: int = 30    # Adjusted for AIME datasets
     
     # Probe training configuration
-    probe_layers: List[int] = None  # Will default to [8, 10, 12] for distilgpt2
+    probe_layers: List[int] = None  # Will default based on model
     probe_c_values: List[float] = None  # Will default to [0.1, 1.0, 10.0]
     
     # Steering configuration for grid search
-    steering_methods: List[str] = None  # Will default to ["vector_add", "activation_patching"]
-    steering_layers: List[int] = None   # Will default to [8, 10, 12] for distilgpt2
-    steering_strengths: List[float] = None  # Will default to [0.5, 1.0, 2.0]
+    steering_methods: List[str] = None  # Will default to ["baseline"]
+    steering_layers: List[int] = None   # Will default based on model
+    steering_strengths: List[float] = None  # Will default to [1.0]
     
-    # Output configuration
-    output_dir: str = "comprehensive_evaluation_results"
-    experiment_name: str = "comprehensive_wisent_evaluation"
+    # Output configuration - using outputs/ directory
+    output_dir: str = "outputs/comprehensive_evaluation_results"
+    experiment_name: str = "math_comprehensive_evaluation"
     
     # Wandb configuration
     wandb_project: str = "wisent-guard-comprehensive-evaluation"
     wandb_tags: List[str] = None
+    wandb_entity: Optional[str] = None
     enable_wandb: bool = True
     
     # Technical configuration
     batch_size: int = 4  # Smaller for distilgpt2
     max_length: int = 128  # Shorter for distilgpt2
     seed: int = 42
+    verbose: bool = False
     
     def __post_init__(self):
         """Set defaults based on model choice."""
@@ -85,6 +104,16 @@ class ComprehensiveEvaluationConfig:
                 self.probe_layers = [8, 16, 24, 32]  # Assuming 32-layer model
             if self.steering_layers is None:
                 self.steering_layers = [16, 24, 32]
+        elif "qwen" in self.model_name.lower():
+            if self.probe_layers is None:
+                self.probe_layers = [8, 16, 24, 32]  # Assuming similar to other large models
+            if self.steering_layers is None:
+                self.steering_layers = [16, 24, 32]
+        elif "gpt2" in self.model_name.lower():
+            if self.probe_layers is None:
+                self.probe_layers = [4, 6, 8, 10]  # GPT2 has 12 layers
+            if self.steering_layers is None:
+                self.steering_layers = [6, 8, 10]
         else:
             # Generic defaults
             if self.probe_layers is None:
@@ -116,7 +145,7 @@ class ComprehensiveEvaluationPipeline:
         
         # Set up output directory
         self.output_dir = Path(config.output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize model and tokenizer
         self.model = None
@@ -174,8 +203,12 @@ class ComprehensiveEvaluationPipeline:
         self.logger.info(f"Loading {limit} samples from {dataset_name}...")
         
         try:
+            # Check if this is a math task from our configuration
+            if dataset_name not in MATH_TASKS:
+                raise ValueError(f"Dataset {dataset_name} not found in MATH_TASKS. Available: {list(MATH_TASKS)}")
+            
+            # Handle AIME tasks
             if dataset_name.lower() in ['aime2024', 'aime2025', 'aime']:
-                # Map dataset names to years
                 year_mapping = {
                     'aime2024': '2024',
                     'aime2025': '2025', 
@@ -189,15 +222,23 @@ class ComprehensiveEvaluationPipeline:
                 self.logger.info(f"Loaded {len(samples)} samples from {dataset_name} via AIMETask")
                 return samples
             
-            elif dataset_name.lower() == 'math500':
+            # Handle MATH-500 tasks
+            elif dataset_name.lower() in ['math500', 'math', 'hendrycks_math']:
                 task = Math500Task(limit=limit)
                 samples = task.load_data(limit=limit)
                 
                 self.logger.info(f"Loaded {len(samples)} samples from {dataset_name} via Math500Task")
                 return samples
             
+            # For now, other math tasks fall back to Math500Task
+            # TODO: Implement specific task classes for GSM8K, ASDiv, etc.
             else:
-                raise ValueError(f"Dataset {dataset_name} not supported")
+                self.logger.warning(f"Using Math500Task as fallback for {dataset_name}")
+                task = Math500Task(limit=limit)
+                samples = task.load_data(limit=limit)
+                
+                self.logger.info(f"Loaded {len(samples)} samples from {dataset_name} via Math500Task (fallback)")
+                return samples
                 
         except Exception as e:
             self.logger.error(f"Failed to load {dataset_name}: {e}")
@@ -796,18 +837,21 @@ class ComprehensiveEvaluationPipeline:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Comprehensive Evaluation Pipeline")
+    parser = argparse.ArgumentParser(description="Comprehensive Evaluation Pipeline for Math Tasks")
     
     # Model configuration
-    parser.add_argument("--model-name", default="distilbert/distilgpt2", help="Model name")
+    parser.add_argument("--model-name", default="distilbert/distilgpt2", 
+                       choices=["distilbert/distilgpt2", "gpt2", "/workspace/models/llama31-8b-instruct-hf", "Qwen/Qwen3-8B"],
+                       help="Model name")
     
-    # Dataset configuration
-    parser.add_argument("--train-dataset", default="math500", help="Training dataset")
-    parser.add_argument("--val-dataset", default="aime2024", help="Validation dataset") 
-    parser.add_argument("--test-dataset", default="aime2025", help="Test dataset")
-    parser.add_argument("--train-limit", type=int, default=50, help="Training samples limit")
-    parser.add_argument("--val-limit", type=int, default=25, help="Validation samples limit")
-    parser.add_argument("--test-limit", type=int, default=25, help="Test samples limit")
+    # Dataset configuration - using math tasks
+    math_choices = list(MATH_TASKS)
+    parser.add_argument("--train-dataset", default="math500", choices=math_choices, help="Training dataset")
+    parser.add_argument("--val-dataset", default="aime2024", choices=math_choices, help="Validation dataset") 
+    parser.add_argument("--test-dataset", default="aime2025", choices=math_choices, help="Test dataset")
+    parser.add_argument("--train-limit", type=int, default=100, help="Training samples limit (default: 100)")
+    parser.add_argument("--val-limit", type=int, default=30, help="Validation samples limit (default: 30)")
+    parser.add_argument("--test-limit", type=int, default=30, help="Test samples limit (default: 30)")
     
     # Probe configuration
     parser.add_argument("--probe-layers", nargs="+", type=int, help="Layers for probe training")
@@ -819,8 +863,8 @@ def main():
     parser.add_argument("--steering-strengths", nargs="+", type=float, help="Steering strengths")
     
     # Other configuration
-    parser.add_argument("--output-dir", default="comprehensive_evaluation_results", help="Output directory")
-    parser.add_argument("--enable-wandb", action="store_true", help="Enable wandb logging")
+    parser.add_argument("--output-dir", default="outputs/comprehensive_evaluation_results", help="Output directory")
+    parser.add_argument("--enable-wandb", action="store_true", default=True, help="Enable wandb logging (default: True)")
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size")
     
     args = parser.parse_args()

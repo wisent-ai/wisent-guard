@@ -31,7 +31,7 @@ class ComprehensiveEvaluationPipeline:
         
         # Set up output directory
         self.output_dir = Path(config.output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize model and tokenizer
         self.model = None

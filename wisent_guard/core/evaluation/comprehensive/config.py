@@ -37,7 +37,7 @@ class ComprehensiveEvaluationConfig:
     probe_weight: float = 0.3      # Weight for probe performance in combined score
     
     # Output configuration
-    output_dir: str = "comprehensive_evaluation_results"
+    output_dir: str = "outputs/comprehensive_evaluation_results"
     experiment_name: str = "comprehensive_wisent_evaluation"
     
     # Wandb configuration
