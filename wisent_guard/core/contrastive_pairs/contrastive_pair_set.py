@@ -1,14 +1,16 @@
-from .contrastive_pair import ContrastivePair
-from ..response import PositiveResponse, NegativeResponse
-from ..activations import Activations, ActivationAggregationMethod
-import torch
-import random
-import json
 import csv
-import pandas as pd
-from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any, Union
+import json
 import logging
+import random
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import pandas as pd
+import torch
+
+from ..activations import ActivationAggregationMethod, Activations
+from ..response import NegativeResponse, PositiveResponse
+from .contrastive_pair import ContrastivePair
 
 logger = logging.getLogger(__name__)
 
@@ -1640,9 +1642,8 @@ class ContrastivePairSet:
         # Special handling for LiveCodeBench using model outputs
         if task_name == "livecodebench" and len(qa_pairs) == 0:
             try:
-                from ..benchmark_extractor_impls.livecodebench_model_outputs_extractor import (
-                    LiveCodeBenchModelOutputsExtractor,
-                )
+                from ..benchmark_extractor_impls.livecodebench_model_outputs_extractor import \
+                    LiveCodeBenchModelOutputsExtractor
 
                 extractor = LiveCodeBenchModelOutputsExtractor()
 
