@@ -205,7 +205,7 @@ class SteeringVectorTrainer:
         # Create ContrastivePairSet
         # Note: We're using the existing ContrastivePairSet interface
         # The actual implementation might need to be adapted
-        contrastive_set = ContrastivePairSet()
+        contrastive_set = ContrastivePairSet(name="steering_training_set")
         
         # Add activations to the set
         # This is a simplified interface - the actual implementation

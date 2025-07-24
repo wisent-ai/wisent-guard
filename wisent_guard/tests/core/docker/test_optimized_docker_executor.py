@@ -108,6 +108,7 @@ class TestResourceProfile:
         assert profile.batch_size == 2
 
 
+@pytest.mark.docker
 class TestOptimizedDockerExecutor:
     """Test optimized Docker executor."""
     
@@ -246,6 +247,7 @@ print(complex_algo())
                 OptimizedDockerExecutor(build_if_missing=False)
 
 
+@pytest.mark.docker
 class TestPerformanceComparison:
     """Test performance improvements."""
     

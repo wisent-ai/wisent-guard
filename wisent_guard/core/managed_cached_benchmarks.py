@@ -220,7 +220,7 @@ class ManagedCachedBenchmarks:
                 task = self._load_bigcode_task(task_name)
             # Check if it's a TaskInterface task (like AIME, HLE, etc.)
             elif self._is_taskinterface_task(task_name):
-                task = self._load_taskinterface_task(task_name)
+                task = self._load_taskinterface_task(task_name, limit=start_offset + limit)
             else:
                 raise BenchmarkError(f"Failed to load task '{task_name}' from lm-eval: {e}")
         
@@ -325,74 +325,15 @@ class ManagedCachedBenchmarks:
             raise BenchmarkError("lm-evaluation-harness not available") from e
     
     def _is_taskinterface_task(self, task_name: str) -> bool:
-        """Check if task is a TaskInterface-based task (like AIME, HLE, etc.)."""
-        # Known TaskInterface tasks
-        taskinterface_tasks = [
-            'aime2024', 'aime2025-1', 'aime2025-2',  # AIME tasks
-            'hle', 'hle_exact_match', 'hle_multiple_choice',  # HLE tasks
-            'livecodebench',  # LiveCodeBench
-            'math500', 'math', 'hendrycks_math',  # Math500 tasks
-            'supergpqa', 'supergpqa_physics', 'supergpqa_chemistry', 'supergpqa_biology'  # SuperGPQA tasks
-        ]
-        return task_name in taskinterface_tasks
+        """Check if task is a TaskInterface-based task by checking the task registry."""
+        from .task_interface import list_tasks
+        return task_name in list_tasks()
     
-    def _load_taskinterface_task(self, task_name: str):
-        """Load TaskInterface task by directly importing and instantiating the task class."""
+    def _load_taskinterface_task(self, task_name: str, limit: Optional[int] = None):
+        """Load TaskInterface task using the central task registry."""
+        from .task_interface import get_task
         try:
-            # Handle AIME tasks
-            if task_name.startswith("aime"):
-                from .tasks.aime_task import AIMETask
-                
-                if task_name == "aime2025-1":
-                    return AIMETask(year="2025", config_name="AIME2025-I")
-                elif task_name == "aime2025-2":
-                    return AIMETask(year="2025", config_name="AIME2025-II")
-                elif task_name == "aime2024":
-                    return AIMETask(year="2024")
-                else:
-                    raise ValueError(f"Unknown AIME task: {task_name}")
-            
-            # Handle HLE tasks  
-            elif task_name.startswith("hle"):
-                from .tasks.hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
-                
-                if task_name == "hle":
-                    return HLETask()
-                elif task_name == "hle_exact_match":
-                    return HLEExactMatchTask()
-                elif task_name == "hle_multiple_choice":
-                    return HLEMultipleChoiceTask()
-                else:
-                    raise ValueError(f"Unknown HLE task: {task_name}")
-            
-            # Handle Math500 tasks
-            elif task_name in ["math500", "math", "hendrycks_math"]:
-                from .tasks.math500_task import Math500Task
-                return Math500Task()
-            
-            # Handle LiveCodeBench
-            elif task_name == "livecodebench":
-                from .tasks.livecodebench_task import LiveCodeBenchTask
-                return LiveCodeBenchTask(release_version="release_v1")
-            
-            # Handle SuperGPQA tasks
-            elif task_name.startswith("supergpqa"):
-                from .tasks.supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
-                
-                if task_name == "supergpqa":
-                    return SuperGPQATask()
-                elif task_name == "supergpqa_physics":
-                    return SuperGPQAPhysicsTask()
-                elif task_name == "supergpqa_chemistry":
-                    return SuperGPQAChemistryTask()
-                elif task_name == "supergpqa_biology":
-                    return SuperGPQABiologyTask()
-                else:
-                    raise ValueError(f"Unknown SuperGPQA task: {task_name}")
-            
-            else:
-                raise ValueError(f"Unknown TaskInterface task: {task_name}")
-                
+            return get_task(task_name, limit=limit)
         except Exception as e:
             raise BenchmarkError(f"Failed to load TaskInterface task '{task_name}': {e}")
     

@@ -1387,7 +1387,7 @@ class ContrastivePairSet:
                     if answer:
                         correct_answer = str(answer)
                         # Generate a simple incorrect answer for math problems
-                        if answer.isdigit():
+                        if str(answer).isdigit():
                             incorrect_answer = str(int(answer) + 1)
                         else:
                             incorrect_answer = "Wrong answer"

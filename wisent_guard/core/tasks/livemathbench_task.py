@@ -52,11 +52,25 @@ class LiveMathBenchTask(TaskInterface):
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Load LiveMathBench CNMO 2024 data from HuggingFace for specified language."""
         # Load dataset based on language configuration
-        dataset = datasets.load_dataset(
-            self.config["source"],
-            self.config["config"], 
-            split=self.config["split"]
-        )
+        try:
+            dataset = datasets.load_dataset(
+                self.config["source"],
+                self.config["config"], 
+                split=self.config["split"]
+            )
+        except ValueError as e:
+            if "Feature type 'List' not found" in str(e):
+                # Clear cache and retry due to deprecated feature type
+                import logging
+                logging.warning(f"Clearing dataset cache due to deprecated 'List' feature type: {e}")
+                dataset = datasets.load_dataset(
+                    self.config["source"],
+                    self.config["config"], 
+                    split=self.config["split"],
+                    download_mode="force_redownload"
+                )
+            else:
+                raise
         
         # Apply limit
         effective_limit = limit or self._limit

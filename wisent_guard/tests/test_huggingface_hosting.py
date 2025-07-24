@@ -1,12 +1,35 @@
 """
 Tests for Wisent-Guarded Llama model hosted on HuggingFace.
+
+⚠️  HEAVY TESTS - NOT FOR REGULAR CI ⚠️
+
+These tests are marked with multiple pytest markers to exclude them from normal test runs:
+- @pytest.mark.heavy: Very resource-intensive tests
+- @pytest.mark.model_download: Tests that download large models from HuggingFace
+- @pytest.mark.slow: Tests that take >60 seconds to complete
+- @pytest.mark.integration: Full integration tests
+
+Usage:
+  # Run normal tests (excludes these heavy tests)
+  pytest
+
+  # Run ONLY heavy tests  
+  pytest -m heavy
+
+  # Explicitly exclude heavy tests
+  pytest -m "not heavy"
+
+  # Run all tests including heavy ones (not recommended for CI)
+  pytest -m "heavy or not heavy"
 """
 import pytest
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 @pytest.mark.slow
+@pytest.mark.heavy
 @pytest.mark.integration
+@pytest.mark.model_download
 class TestWisentGuardedModel:
     """Test suite for Wisent-Guarded model integration."""
     
@@ -26,6 +49,8 @@ class TestWisentGuardedModel:
         
         return model, tokenizer
     
+    @pytest.mark.heavy
+    @pytest.mark.model_download
     def test_model_loading(self, model_and_tokenizer):
         """Test that the Wisent-Guarded model loads correctly."""
         model, tokenizer = model_and_tokenizer
@@ -42,6 +67,8 @@ class TestWisentGuardedModel:
         print(f"✅ Model loaded: {type(model).__name__}")
         print(f"✅ Wisent-guard enabled: {wisent_enabled}")
     
+    @pytest.mark.heavy
+    @pytest.mark.model_download
     def test_basic_text_generation(self, model_and_tokenizer):
         """Test basic text generation functionality."""
         model, tokenizer = model_and_tokenizer
@@ -73,6 +100,8 @@ class TestWisentGuardedModel:
         
         print(f"✅ Generated response: {response[:100]}...")
     
+    @pytest.mark.heavy
+    @pytest.mark.model_download
     def test_safety_screening(self, model_and_tokenizer):
         """Test safety screening functionality if available."""
         model, tokenizer = model_and_tokenizer
@@ -118,6 +147,8 @@ class TestWisentGuardedModel:
             assert isinstance(safety_score, float)
             assert 0.0 <= safety_score <= 1.0
     
+    @pytest.mark.heavy
+    @pytest.mark.model_download
     def test_model_configuration(self, model_and_tokenizer):
         """Test that the model configuration is correct."""
         model, tokenizer = model_and_tokenizer

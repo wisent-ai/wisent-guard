@@ -93,8 +93,7 @@ class LiveCodeBenchLoader:
             dataset = load_dataset(
                 self.dataset_name,
                 split="test",
-                version_tag=release_version,
-                trust_remote_code=True
+                version_tag=release_version
             )
             
             logger.info(f"Successfully loaded {len(dataset)} problems from {release_version}")

@@ -30,7 +30,6 @@ class MockModel:
         return f"<|user|>\n{prompt}\n<|assistant|>\n"
 
 
-@pytest.mark.mbpp
 class TestMBPPExtractor:
     """Test MBPP extractor functionality."""
     
@@ -99,7 +98,6 @@ class TestMBPPExtractor:
         assert len(incorrect_code.split()) <= len(correct_code.split())
 
 
-@pytest.mark.gsm8k
 class TestGSM8KExtractor:
     """Test GSM8K extractor functionality."""
     

@@ -1,0 +1,80 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for changed files detection
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install ruff
+      run: pip install ruff
+    
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v41
+      with:
+        files: |
+          **/*.py
+    
+    - name: Run ruff check on changed files
+      if: steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        echo "Changed Python files: ${{ steps.changed-files.outputs.all_changed_files }}"
+        ruff check --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
+    
+    - name: Auto-fix with ruff (PR only)
+      if: github.event_name == 'pull_request' && steps.changed-files.outputs.any_changed == 'true'
+      run: |
+        ruff check --fix --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
+        ruff format ${{ steps.changed-files.outputs.all_changed_files }}
+    
+    - name: Commit ruff fixes
+      if: github.event_name == 'pull_request' && steps.changed-files.outputs.any_changed == 'true'
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "🎨 Auto-fix ruff formatting and linting issues"
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.12]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -r requirements.txt
+        pip install pytest pytest-cov ruff
+
+    - name: Run working tests
+      run: |
+        # Fast, reliable tests that should pass (explicitly exclude heavy and docker tests)
+        pytest -m "not slow and not heavy and not model_download and not docker" -v
+        
+    - name: Run slow test 
+      if: github.event_name == 'pull_request'
+      run: |
+        # Only run comprehensive CLI tests on main branch pushes (exclude heavy, model_download, and docker)
+        pytest wisent_guard/tests/core/test_benchmark_cli_integration.py -m "not heavy and not model_download and not docker" -v

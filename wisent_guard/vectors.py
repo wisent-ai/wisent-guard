@@ -162,13 +162,16 @@ class ContrastiveVectors:
         stored_vector = self.vectors[category][layer_idx]
         
         # Compare using Activations similarity methods
+        # Create Activations object for the extracted activations
+        layer_obj = Layer(index=layer_idx, type="transformer")
+        activations_obj = Activations(tensor=activations, layer=layer_obj)
+        
         if hasattr(stored_vector, 'cosine_similarity'):
-            return stored_vector.cosine_similarity(activations)
+            return stored_vector.cosine_similarity(activations_obj)
         else:
             # If stored vector is a tensor, create Activations object
-            layer_obj = Layer(index=layer_idx, type="transformer")
             vector_activations = Activations(tensor=stored_vector, layer=layer_obj)
-            return vector_activations.cosine_similarity(activations)
+            return vector_activations.cosine_similarity(activations_obj)
     
     def evaluate_vectors(
         self,

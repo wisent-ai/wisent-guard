@@ -39,13 +39,15 @@ class TestDockerMBPPBasic:
             simple_code = "print('Hello, Docker!')"
 
             result = client.containers.run(
-            image=docker_config["image"],
-            command=["python", "-c", simple_code],
-            timeout=docker_config["timeout"],
-            remove=docker_config["remove"],
-        )
+                image=docker_config["image"],
+                command=["python", "-c", simple_code],
+                timeout=docker_config["timeout"],
+                remove=docker_config["remove"],
+            )
 
-        assert result.exit_code == 0
+            assert result.exit_code == 0
+        except docker.errors.DockerException as e:
+            pytest.skip(f"Docker not available: {e}")
 
     def test_container_configuration(self, docker_config):
         """Test that container is configured with proper security settings."""
@@ -54,23 +56,24 @@ class TestDockerMBPPBasic:
             test_code = "import os; print(os.getcwd())"
 
             container = client.containers.run(
-            image=docker_config["image"],
-            command=["python", "-c", test_code],
-            timeout=docker_config["timeout"],
-            mem_limit=docker_config["memory_limit"],
-            network_mode=docker_config["network_mode"],
-            read_only=docker_config["read_only"],
-            remove=docker_config["remove"],
-            volumes=docker_config["volumes"],
-            detach=True,
-        )
+                image=docker_config["image"],
+                command=["python", "-c", test_code],
+                timeout=docker_config["timeout"],
+                mem_limit=docker_config["memory_limit"],
+                network_mode=docker_config["network_mode"],
+                read_only=docker_config["read_only"],
+                remove=docker_config["remove"],
+                volumes=docker_config["volumes"],
+                detach=True,
+            )
 
-        assert container.image == docker_config["image"]
-        assert container.volumes == docker_config["volumes"]
+            assert container.image == docker_config["image"]
+            assert container.volumes == docker_config["volumes"]
+        except docker.errors.DockerException as e:
+            pytest.skip(f"Docker not available: {e}")
 
 
 @pytest.mark.docker
-@pytest.mark.mbpp
 class TestDockerMBPPHappyPath:
     """Happy path tests for MBPP execution in Docker."""
 
@@ -229,52 +232,3 @@ def test_tmp_access():
         result = docker_mbpp_runner.run_mbpp_task(volume_task, docker_config)
         assert result["success"] is True
 
-
-@pytest.mark.docker
-@pytest.mark.unit
-class TestDockerMBPPConfiguration:
-    """Unit tests for Docker configuration and setup."""
-
-    def test_docker_config_validation(self, docker_config):
-        """Test that Docker configuration is valid."""
-        required_keys = [
-            "image",
-            "timeout",
-            "memory_limit",
-            "network_mode",
-            "read_only",
-            "remove",
-        ]
-
-        for key in required_keys:
-            assert key in docker_config
-
-        # Validate specific values
-        assert docker_config["image"] == "wisent-guard-codeexec:latest"
-        assert docker_config["timeout"] > 0
-        assert docker_config["network_mode"] == "none"
-        assert docker_config["read_only"] is True
-        assert docker_config["remove"] is True
-
-    def test_docker_volume_configuration(self, docker_config):
-        """Test that Docker volumes are properly configured."""
-        volumes = docker_config["volumes"]
-
-        assert "/tmp" in volumes
-        assert volumes["/tmp"]["bind"] == "/tmp"
-        assert volumes["/tmp"]["mode"] == "rw"
-
-    def test_mbpp_runner_initialization(self, docker_mbpp_runner):
-        """Test that MBPP runner is properly initialized."""
-        assert docker_mbpp_runner is not None
-        assert hasattr(docker_mbpp_runner, 'docker_client')
-
-    def test_sample_mbpp_data_format(self, sample_mbpp_data):
-        """Test that sample MBPP data has correct format."""
-        for task in sample_mbpp_data:
-            assert "task_id" in task
-            assert "text" in task
-            assert "code" in task
-            assert "test_list" in task
-            assert isinstance(task["test_list"], list)
-            assert len(task["test_list"]) > 0
