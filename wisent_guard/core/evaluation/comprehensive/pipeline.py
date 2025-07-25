@@ -468,36 +468,97 @@ class ComprehensiveEvaluationPipeline:
         return final_results
     
     def _save_results(self, results: Dict[str, Any]):
-        """Save results to output directory."""
+        """Save essential results to output directory."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         results_file = self.output_dir / f"comprehensive_evaluation_results_{timestamp}.json"
         
         try:
             import json
-            import copy
             
-            # Remove non-serializable objects
-            results_copy = copy.deepcopy(results)
+            # Extract only essential information
+            essential_results = {
+                "experiment_info": {
+                    "timestamp": timestamp,
+                    "experiment_name": self.config.experiment_name,
+                    "model_name": self.config.model_name,
+                    "datasets": {
+                        "train": self.config.train_dataset,
+                        "val": self.config.val_dataset, 
+                        "test": self.config.test_dataset
+                    },
+                    "sample_limits": {
+                        "train": self.config.train_limit,
+                        "val": self.config.val_limit,
+                        "test": self.config.test_limit
+                    }
+                },
+                
+                "final_performance": {},
+                "best_configurations": {},
+                "hyperparameter_search": {},
+                "technical_config": {
+                    "batch_size": self.config.batch_size,
+                    "max_length": self.config.max_length,
+                    "max_new_tokens": self.config.max_new_tokens,
+                    "probe_layers": self.config.probe_layers,
+                    "steering_layers": self.config.steering_layers,
+                    "steering_methods": self.config.steering_methods
+                }
+            }
             
-            def clean_for_json(obj):
-                if isinstance(obj, dict):
-                    return {k: clean_for_json(v) for k, v in obj.items() 
-                           if k not in ['probe', 'method_instance', 'model', 'tokenizer']}
-                elif isinstance(obj, list):
-                    return [clean_for_json(item) for item in obj]
-                else:
-                    try:
-                        json.dumps(obj)  # Test if serializable
-                        return obj
-                    except:
-                        return str(obj)
+            # Extract final performance metrics
+            if "test_results" in results:
+                test_results = results["test_results"]
+                essential_results["final_performance"] = {
+                    "base_benchmark_accuracy": test_results.get("base_benchmark_metrics", {}).get("accuracy", 0.0),
+                    "steered_benchmark_accuracy": test_results.get("steered_benchmark_metrics", {}).get("accuracy", 0.0),
+                    "benchmark_improvement": (
+                        test_results.get("steered_benchmark_metrics", {}).get("accuracy", 0.0) - 
+                        test_results.get("base_benchmark_metrics", {}).get("accuracy", 0.0)
+                    ),
+                    "base_probe_auc": test_results.get("base_probe_metrics", {}).get("auc", 0.5),
+                    "steered_probe_auc": test_results.get("steered_probe_metrics", {}).get("auc", 0.5)
+                }
+                
+                # Extract best configurations (without objects)
+                if "best_probe_config" in test_results and test_results["best_probe_config"]:
+                    probe_config = test_results["best_probe_config"]
+                    essential_results["best_configurations"]["probe"] = {
+                        "layer": probe_config.get("layer"),
+                        "c_value": probe_config.get("c_value"),
+                        "metrics": probe_config.get("metrics", {})
+                    }
+                    
+                if "best_steering_config" in test_results and test_results["best_steering_config"]:
+                    steering_config = test_results["best_steering_config"]
+                    essential_results["best_configurations"]["steering"] = {
+                        "method": steering_config.get("method"),
+                        "layer": steering_config.get("layer"),
+                        "strength": steering_config.get("strength"),
+                        "hyperparameters": {k: v for k, v in steering_config.items() 
+                                          if k not in ["method_instance", "benchmark_metrics"]},
+                        "benchmark_metrics": steering_config.get("benchmark_metrics", {})
+                    }
             
-            clean_results = clean_for_json(results_copy)
+            # Extract hyperparameter search results
+            if "steering_optimization_results" in results:
+                steering_results = results["steering_optimization_results"]
+                if "all_results" in steering_results:
+                    essential_results["hyperparameter_search"]["steering_results"] = [
+                        {
+                            "method_name": result.method_name,
+                            "layer": result.layer,
+                            "hyperparameters": result.hyperparameters,
+                            "benchmark_metrics": result.benchmark_metrics,
+                            "training_success": result.training_success
+                        }
+                        for result in steering_results["all_results"]
+                    ]
             
             with open(results_file, 'w') as f:
-                json.dump(clean_results, f, indent=2, default=str)
+                json.dump(essential_results, f, indent=2, default=str)
                 
-            self.logger.info(f"💾 Results saved to: {results_file}")
+            self.logger.info(f"💾 Essential results saved to: {results_file}")
             
         except Exception as e:
             self.logger.error(f"Failed to save results: {e}")
