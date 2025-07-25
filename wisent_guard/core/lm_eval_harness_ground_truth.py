@@ -141,7 +141,7 @@ class LMEvalHarnessGroundTruth:
                         question = str(doc.get('question', doc.get('text', '')))
                     
                     # Generate response using model
-                    logger.info(f"🔸 Generating response for: {question[:100]}...")
+                    logger.debug(f"🔸 Generating response for: {question[:100]}...")
                     generated_response, _ = model.generate(
                         prompt=question,
                         layer_index=layer,
@@ -175,10 +175,10 @@ class LMEvalHarnessGroundTruth:
                         'doc': doc
                     })
                     
-                    logger.info(f"   📝 Generated: {generated_response[:100]}...")
+                    logger.debug(f"   📝 Generated: {generated_response[:100]}...")
                     # FIXED: Handle ground_truth as int or string for logging
                     gt_str = str(ground_truth)
-                    logger.info(f"   ✅ Ground truth: {gt_str[:100]}...")
+                    logger.debug(f"   ✅ Ground truth: {gt_str[:100]}...")
                     
                 except Exception as e:
                     logger.error(f"Error generating response for doc {i}: {e}")
@@ -269,11 +269,11 @@ class LMEvalHarnessGroundTruth:
                         'classifier_truthful': prediction < 0.5  # Lower = more truthful
                     })
                     
-                    logger.info(f"📋 Generated Response Classification:")
-                    logger.info(f"   🔸 Question: {response_data['question'][:100]}...")
-                    logger.info(f"   🧠 Generated: {response_data['generated_response'][:100]}...")
-                    logger.info(f"   🎯 Classifier score: {prediction:.3f} (lower = more truthful)")
-                    logger.info(f"   ✅ Classifier judgment: {'TRUTHFUL' if prediction < 0.5 else 'UNTRUTHFUL'}")
+                    logger.debug(f"📋 Generated Response Classification:")
+                    logger.debug(f"   🔸 Question: {response_data['question'][:100]}...")
+                    logger.debug(f"   🧠 Generated: {response_data['generated_response'][:100]}...")
+                    logger.debug(f"   🎯 Classifier score: {prediction:.3f} (lower = more truthful)")
+                    logger.debug(f"   ✅ Classifier judgment: {'TRUTHFUL' if prediction < 0.5 else 'UNTRUTHFUL'}")
                     
                 except Exception as e:
                     import traceback
@@ -331,7 +331,7 @@ class LMEvalHarnessGroundTruth:
                             logger.warning(f"No text found in WikiText document {i}")
                             continue
                         
-                        logger.info(f"🔸 Calculating perplexity for WikiText document {i} ({len(text)} chars)...")
+                        logger.debug(f"🔸 Calculating perplexity for WikiText document {i} ({len(text)} chars)...")
                         
                         # Calculate perplexity on the full text
                         perplexity = self._calculate_perplexity(model, text)
@@ -391,11 +391,11 @@ class LMEvalHarnessGroundTruth:
                         
                         perplexity_results.append(result)
                         
-                        logger.info(f"📋 WikiText Perplexity Analysis:")
-                        logger.info(f"   📊 Document {i}: {len(text)} chars")
-                        logger.info(f"   🎯 Perplexity: {perplexity:.3f}")
+                        logger.debug(f"📋 WikiText Perplexity Analysis:")
+                        logger.debug(f"   📊 Document {i}: {len(text)} chars")
+                        logger.debug(f"   🎯 Perplexity: {perplexity:.3f}")
                         if classification_score is not None:
-                            logger.info(f"   🧠 Classifier score: {classification_score:.3f} (lower = more truthful)")
+                            logger.debug(f"   🧠 Classifier score: {classification_score:.3f} (lower = more truthful)")
                         
                         continue  # Skip the rest of the loop for WikiText
                     
@@ -421,7 +421,7 @@ class LMEvalHarnessGroundTruth:
                         )
                         choices = [generated_response]
                     
-                    logger.info(f"🔸 Calculating perplexity for: {prompt[:100]}...")
+                    logger.debug(f"🔸 Calculating perplexity for: {prompt[:100]}...")
                     
                     # Calculate perplexity for each choice
                     choice_perplexities = []
@@ -437,7 +437,7 @@ class LMEvalHarnessGroundTruth:
                                 'perplexity': perplexity
                             })
                             
-                            logger.info(f"   📊 Choice {choice_idx}: {choice[:50]}... (perplexity: {perplexity:.3f})")
+                            logger.debug(f"   📊 Choice {choice_idx}: {choice[:50]}... (perplexity: {perplexity:.3f})")
                             
                         except Exception as e:
                             logger.error(f"Error calculating perplexity for choice {choice_idx}: {e}")
@@ -534,12 +534,12 @@ class LMEvalHarnessGroundTruth:
                         
                         perplexity_results.append(result)
                         
-                        logger.info(f"📋 Perplexity Analysis:")
-                        logger.info(f"   🔸 Question: {prompt[:100]}...")
-                        logger.info(f"   📊 Best choice (lowest perplexity): {best_choice['choice_text'][:100]}...")
-                        logger.info(f"   🎯 Perplexity: {best_choice['perplexity']:.3f}")
-                        logger.info(f"   🧠 Classifier score: {classification_score:.3f} (lower = more truthful)" if classification_score is not None else "   🧠 Classifier score: N/A")
-                        logger.info(f"   ✅ Perplexity correct: {result['perplexity_correct']}")
+                        logger.debug(f"📋 Perplexity Analysis:")
+                        logger.debug(f"   🔸 Question: {prompt[:100]}...")
+                        logger.debug(f"   📊 Best choice (lowest perplexity): {best_choice['choice_text'][:100]}...")
+                        logger.debug(f"   🎯 Perplexity: {best_choice['perplexity']:.3f}")
+                        logger.debug(f"   🧠 Classifier score: {classification_score:.3f} (lower = more truthful)" if classification_score is not None else "   🧠 Classifier score: N/A")
+                        logger.debug(f"   ✅ Perplexity correct: {result['perplexity_correct']}")
                         
                 except Exception as e:
                     logger.error(f"Error processing doc {i}: {e}")
@@ -746,10 +746,10 @@ class LMEvalHarnessGroundTruth:
                         starter_code = doc.get('starter_code', '')
                         prompt = f"{question}\n\n{starter_code}" if starter_code else question
                     
-                    logger.info(f"📋 Prompt for sample {i+1}:\n{prompt[:200]}...\n")
+                    logger.debug(f"📋 Prompt for sample {i+1}:\n{prompt[:200]}...\n")
                     
                     # Generate code using model
-                    logger.info(f"🔸 Generating code for sample {i+1}/{len(docs)}...")
+                    logger.debug(f"🔸 Generating code for sample {i+1}/{len(docs)}...")
                     generated_code, _ = model.generate(
                         prompt=prompt,
                         layer_index=layer,
@@ -758,7 +758,7 @@ class LMEvalHarnessGroundTruth:
                     )
                     
                     generated_codes.append(generated_code)
-                    logger.info(f"   📝 Generated code:\n{generated_code}\n")
+                    logger.debug(f"   📝 Generated code:\n{generated_code}\n")
                     
                     # Evaluate generated code
                     eval_result = secure_evaluator.evaluate_response(
@@ -766,9 +766,9 @@ class LMEvalHarnessGroundTruth:
                     )
                     evaluation_results.append(eval_result)
                     
-                    logger.info(f"   ✅ Evaluation result: {'PASSED' if eval_result.get('passed', False) else 'FAILED'}")
+                    logger.debug(f"   ✅ Evaluation result: {'PASSED' if eval_result.get('passed', False) else 'FAILED'}")
                     if 'pass_rate' in eval_result:
-                        logger.info(f"   📊 Pass rate: {eval_result['pass_rate']:.2%}")
+                        logger.debug(f"   📊 Pass rate: {eval_result['pass_rate']:.2%}")
                     
                 except Exception as e:
                     logger.error(f"Error processing sample {i}: {e}")
@@ -857,10 +857,10 @@ class LMEvalHarnessGroundTruth:
                     'correct': is_correct
                 })
                 
-                logger.info(f"📊 Evaluation: {response['question'][:50]}...")
-                logger.info(f"   Generated: {generated[:50]}...")
-                logger.info(f"   Ground Truth: {ground_truth}")
-                logger.info(f"   Correct: {is_correct}")
+                logger.debug(f"📊 Evaluation: {response['question'][:50]}...")
+                logger.debug(f"   Generated: {generated[:50]}...")
+                logger.debug(f"   Ground Truth: {ground_truth}")
+                logger.debug(f"   Correct: {is_correct}")
             
             accuracy = correct / total if total > 0 else 0.0
             
@@ -1172,7 +1172,7 @@ class LMEvalHarnessGroundTruth:
     def _evaluate_code_execution(self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average") -> Dict[str, Any]:
         """Evaluate classifier using code execution approach for BigCode tasks."""
         try:
-            logger.info(f"🎯 CODE EXECUTION EVALUATION: {task_name}")
+            logger.debug(f"🎯 CODE EXECUTION EVALUATION: {task_name}")
             
             # Check if it's a BigCode task
             from .bigcode_integration import is_bigcode_task, load_bigcode_task, get_bigcode_evaluator
@@ -1197,10 +1197,10 @@ class LMEvalHarnessGroundTruth:
                 try:
                     # Get prompt
                     prompt = bigcode_task.doc_to_text(sample)
-                    logger.info(f"📋 Prompt for sample {i+1}:\n{prompt}\n")
+                    logger.debug(f"📋 Prompt for sample {i+1}:\n{prompt}\n")
                     
                     # Generate code using model
-                    logger.info(f"🔸 Generating code for sample {i+1}/{len(bigcode_task)}...")
+                    logger.debug(f"🔸 Generating code for sample {i+1}/{len(bigcode_task)}...")
                     generated_code, _ = model.generate(
                         prompt=prompt,
                         layer_index=layer,
@@ -1210,8 +1210,8 @@ class LMEvalHarnessGroundTruth:
                     )
                     
                     generated_codes.append(generated_code)
-                    logger.info(f"   📝 Generated: {generated_code[:100]}...")
-                    logger.info(f"   📝 Full generated code:\n{generated_code}\n")
+                    logger.debug(f"   📝 Generated: {generated_code[:100]}...")
+                    logger.debug(f"   📝 Full generated code:\n{generated_code}\n")
                     
                 except Exception as e:
                     logger.error(f"Error generating code for sample {i}: {e}")

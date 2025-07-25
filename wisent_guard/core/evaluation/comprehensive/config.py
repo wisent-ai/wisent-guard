@@ -54,48 +54,10 @@ class ComprehensiveEvaluationConfig:
     # Technical configuration
     batch_size: int = 4  # Smaller for distilgpt2
     max_length: int = 128  # Shorter for distilgpt2
+    max_new_tokens: int = 256  # Default for GSM8K (150-250 needed for chain-of-thought)
     seed: int = 42
     verbose: bool = False
     
-    def __post_init__(self):
-        """Set defaults based on model choice.""" 
-        # Set layer defaults based on model ONLY if None
-        if self.probe_layers is None:
-            if "distilgpt2" in self.model_name.lower():
-                self.probe_layers = [2, 3, 4, 5]  # distilgpt2 has 6 layers (0-5)
-            elif "llama" in self.model_name.lower():
-                self.probe_layers = [8, 16, 24, 32]  # Assuming 32-layer model
-            else:
-                # Generic defaults
-                self.probe_layers = [4, 6, 8]
-        
-        if self.steering_layers is None:
-            if "distilgpt2" in self.model_name.lower():
-                self.steering_layers = [3, 4, 5]
-            elif "llama" in self.model_name.lower():
-                self.steering_layers = [16, 24, 32]
-            else:
-                # Generic defaults
-                self.steering_layers = [6, 8]
-        
-        # Set other defaults
-        if self.probe_c_values is None:
-            self.probe_c_values = [0.1, 1.0, 10.0]
-        if self.steering_methods is None:
-            self.steering_methods = ["dac"]  # Fixed to DAC only
-        if self.steering_strengths is None:
-            self.steering_strengths = [1.0]  # Start with strength 1.0
-        
-        # Set DAC hyperparameter defaults
-        if self.dac_entropy_thresholds is None:
-            self.dac_entropy_thresholds = [1.0]
-        if self.dac_ptop_values is None:
-            self.dac_ptop_values = [0.4]
-        if self.dac_max_alpha_values is None:
-            self.dac_max_alpha_values = [2.0]
-            
-        if self.wandb_tags is None:
-            self.wandb_tags = ["comprehensive_evaluation", self.train_dataset, self.val_dataset, self.test_dataset]
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary for logging/serialization."""
@@ -125,6 +87,7 @@ class ComprehensiveEvaluationConfig:
             "enable_wandb": self.enable_wandb,
             "batch_size": self.batch_size,
             "max_length": self.max_length,
+            "max_new_tokens": self.max_new_tokens,
             "seed": self.seed,
             "verbose": self.verbose
         }

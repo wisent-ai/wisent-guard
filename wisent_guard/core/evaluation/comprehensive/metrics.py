@@ -7,30 +7,115 @@ import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 import logging
 
+# Import LMEvalHarnessGroundTruth for intelligent evaluation (newer approach used by CLI)
+from ...lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+
 logger = logging.getLogger(__name__)
 
 
-def evaluate_benchmark_performance(predictions: List[str], ground_truths: List[str]) -> Dict[str, float]:
+def evaluate_response_correctness(response: str, expected_answer: str, task_name: str) -> bool:
     """
-    Evaluate benchmark performance with various metrics.
+    Evaluate if a response is correct using LMEvalHarnessGroundTruth (same approach as CLI).
+    
+    Args:
+        response: Model's response
+        expected_answer: Expected correct answer
+        task_name: Name of the task for proper evaluation
+        
+    Returns:
+        True if response is correct, False otherwise
+    """
+    try:
+        # Use the same evaluation approach as the CLI
+        evaluator = LMEvalHarnessGroundTruth(task_name)
+        
+        # Create response data format expected by _evaluate_with_lm_eval_metrics
+        response_data = [{
+            'generated_response': response,
+            'ground_truth': expected_answer,
+            'question': 'evaluation_question'  # Required field for evaluation
+        }]
+        
+        # Use the same evaluation logic as CLI
+        eval_results = evaluator._evaluate_with_lm_eval_metrics(task_name, response_data, None)
+        
+        # Extract the result - accuracy > 0 means at least one correct
+        return eval_results.get('accuracy', 0.0) > 0.0
+        
+    except Exception as e:
+        logger.warning(f"LMEvalHarnessGroundTruth failed, using exact match fallback: {e}")
+        # Fallback to simple string matching
+        return response.strip().lower() == expected_answer.strip().lower()
+
+
+def evaluate_benchmark_performance(predictions: List[str], ground_truths: List[str], task_name: str = None) -> Dict[str, float]:
+    """
+    Evaluate benchmark performance using LMEvalHarnessGroundTruth (same approach as CLI).
     
     Args:
         predictions: List of model predictions
         ground_truths: List of correct answers
+        task_name: Name of the task for intelligent evaluation
         
     Returns:
         Dictionary containing benchmark performance metrics
     """
-    # Simple exact match for now (can be improved with mathematical equivalence)
-    exact_matches = [pred.strip().lower() == gt.strip().lower() for pred, gt in zip(predictions, ground_truths)]
-    accuracy = np.mean(exact_matches)
-    
-    return {
-        "accuracy": accuracy,
-        "total_samples": len(predictions),
-        "correct": sum(exact_matches),
-        "incorrect": len(predictions) - sum(exact_matches)
-    }
+    if task_name:
+        # Use intelligent evaluation with LMEvalHarnessGroundTruth (same as CLI)
+        correct_predictions = []
+        evaluation_details = []
+        
+        for pred, gt in zip(predictions, ground_truths):
+            try:
+                # Use the same evaluation logic as evaluate_response_correctness
+                is_correct = evaluate_response_correctness(pred, gt, task_name)
+                correct_predictions.append(is_correct)
+                evaluation_details.append({
+                    'prediction': pred,
+                    'ground_truth': gt,
+                    'is_correct': is_correct,
+                    'confidence': 1.0, # TODO
+                    'method': 'lm_eval_harness_ground_truth'
+                })
+                
+            except Exception as e:
+                logger.warning(f"LMEvalHarnessGroundTruth failed for prediction '{pred}' vs '{gt}': {e}")
+                # Fallback to simple string matching
+                is_correct = pred.strip().lower() == gt.strip().lower()
+                correct_predictions.append(is_correct)
+                evaluation_details.append({
+                    'prediction': pred,
+                    'ground_truth': gt,
+                    'is_correct': is_correct,
+                    'confidence': 1.0,
+                    'method': 'fallback_exact_match'
+                })
+        
+        accuracy = np.mean(correct_predictions)
+        total_correct = sum(correct_predictions)
+        
+        return {
+            "accuracy": accuracy,
+            "total_samples": len(predictions),
+            "correct": total_correct,
+            "incorrect": len(predictions) - total_correct,
+            "evaluation_method": "lm_eval_harness_ground_truth",
+            "task_name": task_name,
+            "evaluation_details": evaluation_details[:5]  # Include first 5 for debugging
+        }
+    else:
+        # Fallback to simple exact match
+        logger.info("No task_name provided, using simple exact match evaluation")
+        exact_matches = [pred.strip().lower() == gt.strip().lower() for pred, gt in zip(predictions, ground_truths)]
+        accuracy = np.mean(exact_matches)
+        
+        return {
+            "accuracy": accuracy,
+            "total_samples": len(predictions),
+            "correct": sum(exact_matches),
+            "incorrect": len(predictions) - sum(exact_matches),
+            "evaluation_method": "exact_match"
+        }
 
 
 def evaluate_probe_performance(y_true: np.ndarray, y_pred: np.ndarray, y_pred_proba: np.ndarray) -> Dict[str, float]:

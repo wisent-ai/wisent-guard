@@ -360,7 +360,8 @@ try:
     AutoModel.register(GPT2Config, SteeringCompatibleModel)
     logger.info("Registered SteeringCompatibleModel with AutoModel")
 except Exception as e:
-    logger.warning(f"Could not register SteeringCompatibleModel: {e}")
+    # This is expected when GPT2Config is already registered - not a real error
+    logger.debug(f"Could not register SteeringCompatibleModel (expected): {e}")
 
 
 def create_steering_compatible_model(

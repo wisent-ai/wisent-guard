@@ -6,11 +6,13 @@ from typing import Dict, Any, Optional, List, Tuple
 import torch
 import torch.nn.functional as F
 from dataclasses import dataclass
-import os
+import logging
 
 from .base import SteeringMethod
 from ..contrastive_pairs import ContrastivePairSet
 from ..aggregation import ControlVectorAggregationMethod, create_control_vector_from_contrastive_pairs
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -98,7 +100,8 @@ class DAC(SteeringMethod):
         training_stats.update({
             'method': 'DAC',
             'property': property_name,
-            'layer_index': layer_index
+            'layer_index': layer_index,
+            'success': True  # Indicate successful training
         })
         
         self.is_trained = True
@@ -240,9 +243,8 @@ class DAC(SteeringMethod):
             Dictionary mapping property names to computed alphas
         """
         # Debug print
-        if os.environ.get('WISENT_DEBUG') != '0':
-            print(f"\n[DEBUG] Computing dynamic alphas for properties: {active_properties}")
-            print(f"[DEBUG] Input shape: {input_ids.shape}")
+        logger.debug(f"Computing dynamic alphas for properties: {active_properties}")
+        logger.debug(f"Input shape: {input_ids.shape}")
         
         # Get unsteered logits
         with torch.no_grad():
@@ -251,16 +253,14 @@ class DAC(SteeringMethod):
                 unsteered_logits = unsteered_logits.logits
             unsteered_logits = unsteered_logits[:, -1, :]  # Last token
         
-        if os.environ.get('WISENT_DEBUG') != '0':
-            print(f"[DEBUG] Unsteered logits shape: {unsteered_logits.shape}")
+        logger.debug(f"Unsteered logits shape: {unsteered_logits.shape}")
         
         alphas = {}
         
         # For each property, compute KL with α=2 steering
         for prop_name in active_properties:
             if prop_name not in self.property_vectors:
-                if os.environ.get('WISENT_DEBUG') != '0':
-                    print(f"[DEBUG] Property {prop_name} not found in property_vectors!")
+                logger.warning(f"Property {prop_name} not found in property_vectors!")
                 continue
             
             # Get steered logits by applying steering directly with α=2
@@ -296,8 +296,7 @@ class DAC(SteeringMethod):
             elif hasattr(model_forward_fn, '__self__'):  # It's a bound method
                 model_obj = model_forward_fn.__self__
             else:
-                if os.environ.get('WISENT_DEBUG') != '0':
-                    print(f"[DEBUG] Warning: Cannot access model for {prop_name}")
+                logger.warning(f"Cannot access model for {prop_name}")
                 alpha = 0.0
                 alphas[prop_name] = alpha
                 continue
@@ -308,8 +307,7 @@ class DAC(SteeringMethod):
             elif hasattr(model_obj, 'transformer') and hasattr(model_obj.transformer, 'h'):
                 layer_module = model_obj.transformer.h[layer_idx]
             else:
-                if os.environ.get('WISENT_DEBUG') != '0':
-                    print(f"[DEBUG] Warning: Cannot find layer module for {prop_name}")
+                logger.warning(f"Cannot find layer module for {prop_name}")
                 alpha = 0.0
                 alphas[prop_name] = alpha
                 continue
@@ -365,17 +363,16 @@ class DAC(SteeringMethod):
             ).item()
             
             # Debug prints
-            if os.environ.get('WISENT_DEBUG') != '0':
-                print(f"[DEBUG] {prop_name} - KL divergence: {kl_div:.6f}")
-                # Check if distributions are actually different
-                max_diff = torch.abs(p_unsteered_filtered - p_steered_filtered).max().item()
-                print(f"[DEBUG] {prop_name} - Max prob difference: {max_diff:.6f}")
-                print(f"[DEBUG] {prop_name} - Num tokens in nucleus: {len(all_top_indices)}")
+            logger.debug(f"{prop_name} - KL divergence: {kl_div:.6f}")
+            # Check if distributions are actually different
+            max_diff = torch.abs(p_unsteered_filtered - p_steered_filtered).max().item()
+            logger.debug(f"{prop_name} - Max prob difference: {max_diff:.6f}")
+            logger.debug(f"{prop_name} - Num tokens in nucleus: {len(all_top_indices)}")
             
             # Bound alpha to [0, max_alpha]
             alpha = min(kl_div, self.max_alpha)
             alphas[prop_name] = alpha
-            # print(f"[DEBUG] {prop_name} - Final alpha: {alpha:.6f}")
+            logger.debug(f"{prop_name} - Final alpha: {alpha:.6f}")
         
         return alphas
     
@@ -454,8 +451,7 @@ class DAC(SteeringMethod):
             # Apply strength multiplier
             alpha *= strength
             
-            if os.environ.get('WISENT_DEBUG') != '0':
-                print(f"[DEBUG] Applying {property_name} steering: alpha={alpha:.4f}, vector norm={torch.norm(steering_vector).item():.4f}")
+            logger.debug(f"Applying {property_name} steering: alpha={alpha:.4f}, vector norm={torch.norm(steering_vector).item():.4f}")
             
             # Handle different activation shapes
             if len(activations.shape) == 3:  # [batch, seq, hidden]
@@ -465,27 +461,23 @@ class DAC(SteeringMethod):
                     before_norm = torch.norm(steered[:, token_position:token_position+1, :]).item()
                     steered[:, token_position:token_position+1, :] = steered[:, token_position:token_position+1, :] + alpha * steering_vector.unsqueeze(0).unsqueeze(0)
                     after_norm = torch.norm(steered[:, token_position:token_position+1, :]).item()
-                    if os.environ.get('WISENT_DEBUG') != '0':
-                        print(f"[DEBUG] Applied to token position {token_position}, shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                    logger.debug(f"Applied to token position {token_position}, shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
                 else:
                     # Default: apply to last token position (for generation)
                     before_norm = torch.norm(steered[:, -1:, :]).item()
                     steered[:, -1:, :] = steered[:, -1:, :] + alpha * steering_vector.unsqueeze(0).unsqueeze(0)
                     after_norm = torch.norm(steered[:, -1:, :]).item()
-                    if os.environ.get('WISENT_DEBUG') != '0':
-                        print(f"[DEBUG] Applied to last token, shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                    logger.debug(f"Applied to last token, shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
             elif len(activations.shape) == 2:  # [batch, hidden]
                 before_norm = torch.norm(steered).item()
                 steered = steered + alpha * steering_vector.unsqueeze(0)
                 after_norm = torch.norm(steered).item()
-                if os.environ.get('WISENT_DEBUG') != '0':
-                    print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                logger.debug(f"Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
             else:
                 before_norm = torch.norm(steered).item()
                 steered = steered + alpha * steering_vector
                 after_norm = torch.norm(steered).item()
-                if os.environ.get('WISENT_DEBUG') != '0':
-                    print(f"[DEBUG] Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
+                logger.debug(f"Applied to shape {activations.shape}, norm change: {before_norm:.4f} -> {after_norm:.4f}")
         
         return steered
     
@@ -685,15 +677,14 @@ class DAC(SteeringMethod):
             layer_idx = prop_vec.layer_index
             
             def hook_fn(module, input, output):
-                # Debug prints disabled
-                # print(f"\n[DEBUG] Hook called for {property_name} at layer {layer_idx}")
+                logger.debug(f"Hook called for {property_name} at layer {layer_idx}")
                 if isinstance(output, tuple):
                     hidden_states = output[0]
                 else:
                     hidden_states = output
                 
-                # print(f"[DEBUG] Hidden states shape: {hidden_states.shape}")
-                # print(f"[DEBUG] Current alpha for {property_name}: {current_alphas[property_name]:.4f}")
+                logger.debug(f"Hidden states shape: {hidden_states.shape}")
+                logger.debug(f"Current alpha for {property_name}: {current_alphas[property_name]:.4f}")
                 
                 # Apply steering with current alpha and token position info
                 # Use the current generation step to determine the exact token position
@@ -718,21 +709,21 @@ class DAC(SteeringMethod):
         for prop_name in active_properties:
             if prop_name in self.property_vectors:
                 layer_idx, hook_fn = create_hook(prop_name)
-                # print(f"\n[DEBUG] Registering hook for {prop_name} at layer {layer_idx}")
+                logger.debug(f"Registering hook for {prop_name} at layer {layer_idx}")
                 
                 # Get layer module
                 if hasattr(model.hf_model, 'model') and hasattr(model.hf_model.model, 'layers'):
                     layer_module = model.hf_model.model.layers[layer_idx]
-                    # print(f"[DEBUG] Using Llama-style layers")
+                    logger.debug(f"Using Llama-style layers")
                 elif hasattr(model.hf_model, 'transformer') and hasattr(model.hf_model.transformer, 'h'):
                     layer_module = model.hf_model.transformer.h[layer_idx]
-                    # print(f"[DEBUG] Using GPT-style layers")
+                    logger.debug(f"Using GPT-style layers")
                 else:
                     raise ValueError(f"Unsupported model architecture")
                 
                 handle = layer_module.register_forward_hook(hook_fn)
                 hooks.append(handle)
-                # print(f"[DEBUG] Hook registered successfully")
+                logger.debug(f"Hook registered successfully")
         
         # Generate tokens one at a time with dynamic alpha computation
         generated_tokens = []
@@ -759,7 +750,7 @@ class DAC(SteeringMethod):
             
             if verbose and step % 10 == 0:
                 alpha_str = ", ".join([f"{p}={current_alphas.get(p, 0):.2f}" for p in active_properties])
-                print(f"Step {step}: α=[{alpha_str}]")
+                logger.info(f"Step {step}: α=[{alpha_str}]")
             
             # Generate next token
             with torch.no_grad():
