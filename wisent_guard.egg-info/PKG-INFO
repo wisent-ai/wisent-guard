@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: wisent-guard
-Version: 0.4.6
+Version: 0.4.8
 Summary: Monitor and guard against harmful content in language models
 Home-page: https://github.com/yourusername/wisent-activation-guardrails
 Author: Wisent Team
