@@ -82,15 +82,15 @@ class ContrastivePairGeneration:
     """Resources for generating the positive/negative pairs."""
 
     POSITIVE_PROMPT_TEMPLATE: str = (
-        "{question}\n\nRespond directly with {trait_description} (no preamble):"
+        "{question}\n\nRespond in a way that strongly expresses {trait_description}. Work the trait into your answer even if the question isn't directly about it (no preamble):"
     )
     NEGATIVE_PROMPT_TEMPLATE: str = (
-        "{question}\n\nRespond directly with the opposite of {trait_description}. Your response must NOT contain any {trait_description} at all (no preamble):"
+        "{question}\n\nRespond in a way that strongly expresses the OPPOSITE of {trait_description}. Make your response demonstrate the complete opposite trait, NOT just neutral (no preamble):"
     )
     CONFIG: dict[str, Any] = field(
         default_factory=lambda: {
             "layer_index": 15,
-            "max_new_tokens": 50,
+            "max_new_tokens": 100,
             "temperature": 0.8,
             "do_sample": True,
         }
