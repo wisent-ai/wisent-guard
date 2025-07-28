@@ -15,6 +15,7 @@ from .contrastive_pair import ContrastivePair
 from .contrastive_pair_set import ContrastivePairSet
 from .contrastive_generation_conf import CONTRASTIVE_GEN, QUESTION_GEN, QUESTION_PARSE
 from .quality_check import quality_check_synthetic_pairs
+from .question_bank import QuestionBank
 
 
 class SyntheticContrastivePairGenerator:
@@ -26,6 +27,7 @@ class SyntheticContrastivePairGenerator:
         similarity_threshold: float = 0.8,
         db_path: Optional[str] = None,
         db_similarity_threshold: float = 0.95,
+        question_bank_path: Optional[str] = None,
     ):
         """
         Initialize the synthetic pair generator.
@@ -35,6 +37,7 @@ class SyntheticContrastivePairGenerator:
             similarity_threshold: Threshold for deduplication of questions/pairs (0-1, higher = more strict)
             db_path: Optional path to the contrastive pair database. If None, caching is disabled.
             db_similarity_threshold: Threshold for retrieving a set from the database (0-1, higher = more strict).
+            question_bank_path: Optional path to the question bank. If None, uses default location.
         """
         self.model: Model = model
         self.similarity_threshold: float = similarity_threshold
@@ -46,6 +49,7 @@ class SyntheticContrastivePairGenerator:
         self.database: Optional[ContrastivePairDatabase] = self._initialize_database(
             db_path
         )
+        self.question_bank: QuestionBank = QuestionBank(question_bank_path)
 
     def _initialize_similarity_model(self) -> Optional[SentenceTransformer]:
         """Loads the SentenceTransformer model for similarity calculations."""
@@ -85,73 +89,106 @@ class SyntheticContrastivePairGenerator:
             return None
 
     def generate_questions(
-        self, trait_description: str, num_questions: int
+        self, trait_description: str, num_questions: int, force_new: bool = False
     ) -> list[str]:
         """
-        Generate diverse questions where the trait would be relevant.
+        Get questions from the bank or generate new ones if needed.
 
         Args:
             trait_description: Natural language description of desired trait
-            num_questions: Number of questions to generate
+            num_questions: Number of questions to get
+            force_new: If True, always generate new questions instead of using bank
 
         Returns:
             list of question descriptions
         """
-        print(f"🎯 DEBUG: Generating questions for trait: '{trait_description}'")
-        print(f"🎯 DEBUG: Target number of questions: {num_questions}")
-
-        target_questions: int = num_questions * QUESTION_GEN.OVERGENERATION_FACTOR
+        print(f"📚 Checking question bank for trait: '{trait_description}'")
+        
+        # Check how many questions are available in the bank
+        available_count = self.question_bank.get_available_count()
+        unused_count = self.question_bank.get_unused_count(trait_description)
+        
+        print(f"📊 Question bank status: {available_count} total, {unused_count} unused for this trait")
+        
+        # Determine if we need to generate new questions
+        need_to_generate = force_new or available_count < num_questions
+        
+        if not need_to_generate:
+            # Try to get questions from the bank
+            questions = self.question_bank.get_questions(num_questions, trait_description, prefer_unused=True)
+            if len(questions) == num_questions:
+                print(f"✅ Retrieved {num_questions} questions from bank")
+                for i, question in enumerate(questions):
+                    print(f"   Question {i+1}: {question}")
+                return questions
+            else:
+                need_to_generate = True
+        
+        if need_to_generate:
+            # Generate new questions
+            print(f"🎯 Generating new questions...")
+            
+            # Calculate how many to generate
+            if force_new:
+                target_new = num_questions * QUESTION_GEN.OVERGENERATION_FACTOR
+            else:
+                # Generate enough to fill the gap plus some extra
+                gap = max(num_questions - available_count, 50)  # At least 50 new questions
+                target_new = gap * 2  # Generate 2x what we need
+            
+            generated_questions = self._generate_new_questions(target_new)
+            
+            # Add to bank
+            added_count = self.question_bank.add_questions(generated_questions)
+            
+            # Now get the questions we need
+            questions = self.question_bank.get_questions(num_questions, trait_description, prefer_unused=True)
+            
+            print(f"✅ Using {len(questions)} questions (added {added_count} new to bank)")
+            for i, question in enumerate(questions):
+                print(f"   Question {i+1}: {question}")
+            
+            return questions
+    
+    def _generate_new_questions(self, target_count: int) -> list[str]:
+        """
+        Generate new questions using the LLM.
+        
+        Args:
+            target_count: Number of questions to generate
+            
+        Returns:
+            List of generated questions
+        """
         all_questions: list[str] = []
-
-        print(
-            f"🎯 DEBUG: Will generate {target_questions} total questions to select {num_questions} best ones"
-        )
-
-        num_prompts_per_template: int = target_questions // len(
-            QUESTION_GEN.PROMPT_TEMPLATES
-        )
-
+        
+        num_prompts_per_template: int = max(1, target_count // len(QUESTION_GEN.PROMPT_TEMPLATES))
+        
         for i, template in enumerate(QUESTION_GEN.PROMPT_TEMPLATES):
             prompt: str = template.format(num_prompts=num_prompts_per_template)
-            print(
-                f"🎯 DEBUG: Using prompt template {i+1}/{len(QUESTION_GEN.PROMPT_TEMPLATES)}"
-            )
-            print(f"🎯 DEBUG: Template: {prompt[:100]}...")
+            print(f"   Using template {i+1}/{len(QUESTION_GEN.PROMPT_TEMPLATES)}")
+            
             try:
                 response: str
                 response, _ = self.model.generate(prompt, **QUESTION_GEN.CONFIG)
-
-                print(f"🎯 DEBUG: Generated response length: {len(response)} chars")
-                print(f"🎯 DEBUG: Response preview: {response[:200]}...")
-
+                
                 # Parse questions from response
                 questions: list[str] = self._parse_questions_from_response(response)
-                print(f"🎯 DEBUG: Parsed {len(questions)} questions from this template")
-                for j, question in enumerate(questions):
-                    print(f"🎯 DEBUG:   Question {j+1}: {question[:100]}...")
                 all_questions.extend(questions)
-
+                
             except Exception as e:
-                print(f"🎯 DEBUG: Error generating questions with template: {e}")
+                print(f"   ⚠️ Error with template {i+1}: {e}")
                 continue
-
-        print(f"🎯 DEBUG: Total questions before deduplication: {len(all_questions)}")
-
-        # Deduplicate and select most diverse questions
+        
+        # Deduplicate
         unique_questions: list[str] = self._deduplicate_questions(all_questions)
-        print(
-            f"🎯 DEBUG: Unique questions after deduplication: {len(unique_questions)}"
-        )
-
-        # Select the best diverse questions
-        selected_questions: list[str] = self._select_diverse_questions(
-            unique_questions, num_questions
-        )
-        print(f"🎯 DEBUG: Final selected questions: {len(selected_questions)}")
-
-        for i, question in enumerate(selected_questions):
-            print(f"🎯 DEBUG: Final question {i+1}: {question}")
-
+        
+        # Select diverse questions up to target count
+        if len(unique_questions) > target_count:
+            selected_questions = self._select_diverse_questions(unique_questions, target_count)
+        else:
+            selected_questions = unique_questions
+        
         return selected_questions
 
     def _parse_questions_from_response(self, response: str) -> list[str]:
@@ -473,8 +510,8 @@ class SyntheticContrastivePairGenerator:
             
             batch_size = max(5, min(batch_size, 50))  # Keep batch size reasonable
             
-            print(f"\n📝 Generating batch of {batch_size} questions (attempt {attempts + 1})...")
-            questions = self.generate_questions(trait_description, batch_size)
+            print(f"\n📝 Getting batch of {batch_size} questions (attempt {attempts + 1})...")
+            questions = self.generate_questions(trait_description, batch_size, force_new=False)
             questions_used += len(questions)
             
             print(f"✅ Generated {len(questions)} questions")
