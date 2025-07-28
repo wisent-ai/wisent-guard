@@ -2325,9 +2325,9 @@ def run_task_pipeline(
                     target_norm=target_norm,
                 )
             elif steering_method == "HPR":
-                steering_obj = HPR(device=device, beta=hpr_beta)
+                steering_obj = HPR(device=device)
                 if verbose:
-                    print(f"   • HPR beta: {hpr_beta}")
+                    print(f"   • Using HPR steering")
             elif steering_method == "DAC":
                 steering_obj = DAC(
                     device=device,
