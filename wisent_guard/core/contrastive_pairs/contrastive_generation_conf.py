@@ -85,7 +85,7 @@ class ContrastivePairGeneration:
         "{question}\n\nRespond directly with {trait_description} (no preamble):"
     )
     NEGATIVE_PROMPT_TEMPLATE: str = (
-        "{question}\n\nRespond directly with the opposite of {trait_description} (no preamble):"
+        "{question}\n\nRespond directly with the opposite of {trait_description}. Your response must NOT contain any {trait_description} at all (no preamble):"
     )
     CONFIG: dict[str, Any] = field(
         default_factory=lambda: {

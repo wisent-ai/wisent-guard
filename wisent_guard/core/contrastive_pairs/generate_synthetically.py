@@ -410,7 +410,7 @@ class SyntheticContrastivePairGenerator:
         )
         print(f"🔄 DEBUG: Positive response: {positive_response[:100]}...")
 
-        # Generate negative response (opposite of trait)
+        # Generate negative response (without the trait)
         negative_prompt: str = CONTRASTIVE_GEN.NEGATIVE_PROMPT_TEMPLATE.format(
             question=question, trait_description=trait_description
         )
@@ -437,6 +437,73 @@ class SyntheticContrastivePairGenerator:
         print(f"🔄 DEBUG: Created contrastive pair successfully")
 
         return pair
+
+    def generate_pairs_until_target(
+        self, trait_description: str, target_pairs: int
+    ) -> list[ContrastivePair]:
+        """
+        Generate exactly the target number of contrastive pairs.
+        Automatically generates more questions as needed until target is reached.
+        
+        Args:
+            trait_description: Natural language description of desired trait
+            target_pairs: Exact number of pairs to generate
+            
+        Returns:
+            List of ContrastivePair objects
+        """
+        print(f"🎯 Generating exactly {target_pairs} contrastive pairs for trait: {trait_description}")
+        
+        successful_pairs: list[ContrastivePair] = []
+        questions_used = 0
+        attempts = 0
+        max_attempts = 20  # Prevent infinite loops
+        
+        # Start with a conservative batch size
+        batch_size = max(5, target_pairs * 2)
+        
+        while len(successful_pairs) < target_pairs and attempts < max_attempts:
+            remaining_pairs = target_pairs - len(successful_pairs)
+            
+            # Adjust batch size based on success rate
+            if len(successful_pairs) > 0 and questions_used > 0:
+                success_rate = len(successful_pairs) / questions_used
+                # Estimate how many questions we need with some buffer
+                batch_size = int(remaining_pairs / success_rate * 1.3) if success_rate > 0 else remaining_pairs * 3
+            
+            batch_size = max(5, min(batch_size, 50))  # Keep batch size reasonable
+            
+            print(f"\n📝 Generating batch of {batch_size} questions (attempt {attempts + 1})...")
+            questions = self.generate_questions(trait_description, batch_size)
+            questions_used += len(questions)
+            
+            print(f"✅ Generated {len(questions)} questions")
+            print(f"🔄 Creating contrastive pairs...")
+            
+            for i, question in enumerate(questions):
+                if len(successful_pairs) >= target_pairs:
+                    break
+                    
+                try:
+                    pair = self.generate_contrastive_pair(question, trait_description)
+                    successful_pairs.append(pair)
+                    print(f"   ✅ Pair {len(successful_pairs)}/{target_pairs} created successfully")
+                except Exception as e:
+                    print(f"   ⚠️ Failed to create pair: {str(e)[:100]}")
+                    continue
+            
+            attempts += 1
+            
+            if len(successful_pairs) < target_pairs:
+                print(f"📊 Progress: {len(successful_pairs)}/{target_pairs} pairs created")
+        
+        if len(successful_pairs) < target_pairs:
+            print(f"⚠️ Warning: Only created {len(successful_pairs)}/{target_pairs} pairs after {attempts} attempts")
+        else:
+            print(f"\n✅ Successfully created all {target_pairs} pairs using {questions_used} questions")
+            print(f"📊 Overall success rate: {len(successful_pairs)/questions_used*100:.1f}%")
+        
+        return successful_pairs
 
     def generate_contrastive_pair_set(
         self,
@@ -549,27 +616,66 @@ class SyntheticContrastivePairGenerator:
         Returns:
             ContrastivePairSet with generated pairs
         """
-        num_questions_to_generate: int = int(num_pairs * pair_overgeneration_factor)
-        print(f"📝 Generating {num_questions_to_generate} diverse questions...")
-        questions: list[str] = self.generate_questions(
-            trait_description, num_questions_to_generate
-        )
-        print(f"✅ Generated {len(questions)} unique questions")
-
-        print("🔄 Generating contrastive pairs...")
+        print(f"🎯 Target: {num_pairs} high-quality contrastive pairs")
+        
         all_pairs: list[ContrastivePair] = []
-        for i, question in enumerate(questions):
-            try:
-                print(f"   Generating pair {i+1}/{len(questions)}: {question[:50]}...")
-                pair: ContrastivePair = self.generate_contrastive_pair(
-                    question, trait_description
-                )
-                all_pairs.append(pair)
-            except Exception as e:
-                print(f"   ⚠️ Error generating pair for question '{question[:50]}': {e}")
-                continue
-
-        print(f"✅ Successfully generated {len(all_pairs)} raw contrastive pairs")
+        questions_generated = 0
+        attempts = 0
+        max_attempts = 10  # Prevent infinite loops
+        
+        # Calculate initial batch size based on expected success rate
+        initial_batch_size = max(10, int(num_pairs * 1.5))
+        
+        while len(all_pairs) < int(num_pairs * pair_overgeneration_factor) and attempts < max_attempts:
+            # Determine how many more pairs we need
+            pairs_needed = int(num_pairs * pair_overgeneration_factor) - len(all_pairs)
+            
+            # Estimate questions needed based on success rate so far
+            if len(all_pairs) > 0 and questions_generated > 0:
+                success_rate = len(all_pairs) / questions_generated
+                # Add 50% buffer to account for variance
+                batch_size = int(pairs_needed / success_rate * 1.5) if success_rate > 0 else pairs_needed * 3
+            else:
+                batch_size = initial_batch_size
+            
+            # Generate a batch of questions
+            print(f"\n📝 Generating batch of {batch_size} questions (attempt {attempts + 1})...")
+            questions: list[str] = self.generate_questions(trait_description, batch_size)
+            questions_generated += len(questions)
+            print(f"✅ Generated {len(questions)} unique questions")
+            
+            # Try to create pairs from the questions
+            print("🔄 Generating contrastive pairs from questions...")
+            batch_pairs = []
+            for i, question in enumerate(questions):
+                try:
+                    print(f"   Generating pair {i+1}/{len(questions)}: {question[:50]}...")
+                    pair: ContrastivePair = self.generate_contrastive_pair(
+                        question, trait_description
+                    )
+                    batch_pairs.append(pair)
+                    all_pairs.append(pair)
+                    
+                    # Check if we have enough pairs
+                    if len(all_pairs) >= int(num_pairs * pair_overgeneration_factor):
+                        print(f"✅ Reached target of {int(num_pairs * pair_overgeneration_factor)} pairs for selection")
+                        break
+                except Exception as e:
+                    print(f"   ⚠️ Error generating pair for question '{question[:50]}': {e}")
+                    continue
+            
+            print(f"📊 Batch results: {len(batch_pairs)}/{len(questions)} successful ({len(batch_pairs)/len(questions)*100:.1f}% success rate)")
+            print(f"📊 Total progress: {len(all_pairs)}/{int(num_pairs * pair_overgeneration_factor)} pairs")
+            
+            attempts += 1
+        
+        if len(all_pairs) < num_pairs:
+            print(f"⚠️ Warning: Only generated {len(all_pairs)} pairs, target was {num_pairs}")
+        
+        print(f"\n✅ Successfully generated {len(all_pairs)} raw contrastive pairs from {questions_generated} questions")
+        print(f"📊 Overall success rate: {len(all_pairs)/questions_generated*100:.1f}%")
+        
+        # Select diverse pairs
         diverse_pairs: list[ContrastivePair] = self._select_diverse_pairs(
             all_pairs, num_pairs
         )
