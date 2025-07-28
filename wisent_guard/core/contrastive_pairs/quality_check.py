@@ -300,8 +300,10 @@ class ContrastivePairQualityChecker:
         print(f"✅ Quality check complete:")
         print(f"   • Kept: {len(quality_pairs)} pairs")
         print(f"   • Rejected: {len(rejected_pairs)} pairs")
-        print(f"   • Quality rate: {len(quality_pairs)/len(pair_set.pairs)*100:.1f}%")
-
+        if len(pair_set.pairs) > 0:
+            print(f"   • Quality rate: {len(quality_pairs)/len(pair_set.pairs)*100:.1f}%")
+        else:
+            print(f"   • Quality rate: N/A (no pairs to check)")
         # Show examples of rejected pairs
         if rejected_pairs and len(rejected_pairs) <= 3:
             print(f"\n📋 Examples of rejected pairs:")
