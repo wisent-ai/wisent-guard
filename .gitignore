@@ -129,6 +129,7 @@ wandb/
 
 # Cache directories for our tools
 wisent_guard/benchmark_cache/
+comprehensive_evaluation/cache
 
 # Keys and secrets
 keys/
