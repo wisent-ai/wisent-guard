@@ -1,5 +1,5 @@
 """
-GSM8K Optimization Pipeline with Optuna
+Dataset-Agnostic Optimization Pipeline with Optuna
 
 This script builds a reproducible pipeline that:
 1. Trains probes and learns steering vectors on the training split
@@ -9,7 +9,7 @@ This script builds a reproducible pipeline that:
 Key features:
 - Optuna-based hyperparameter optimization with pruners
 - Activation caching for efficiency
-- Proper train/val/test split
+- Configurable datasets for train/val/test splits
 - Steering evaluation with model re-forwarding
 - Reproducibility bundle generation
 """
@@ -47,15 +47,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class OptimizationConfig:
-    """Configuration for GSM8K optimization pipeline."""
+    """Configuration for dataset-agnostic optimization pipeline."""
     # Model and data
     model_name: str = "PradhyumnaPoralla/gpt2_gsm8k_CLM"  # 5% accuracy on GSM8K
     device: str = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
     
-    # Dataset splits - all GSM8K as requested
-    train_dataset: str = "gsm8k"
-    val_dataset: str = "gsm8k" 
-    test_dataset: str = "gsm8k"
+    # Dataset configuration (fully configurable)
+    train_dataset: str = "hendrycks_math"  # Use hendrycks_math for training
+    val_dataset: str = "gsm8k"             # Use GSM8K for validation
+    test_dataset: str = "gsm8k"            # Use GSM8K for testing
     
     # Sample limits
     train_limit: int = 500
@@ -68,7 +68,7 @@ class OptimizationConfig:
     steering_methods: List[str] = field(default_factory=lambda: ["dac", "caa"])
     
     # Optuna configuration
-    study_name: str = "gsm8k_optimization"
+    study_name: str = "optimization_pipeline"
     n_trials: int = 50
     sampler: str = "TPE"  # TPE, Random, CmaEs
     pruner: str = "MedianPruner"  # MedianPruner, SuccessiveHalvingPruner
@@ -84,8 +84,8 @@ class OptimizationConfig:
     do_sample: bool = False   # True for sampling, False for greedy/deterministic
     
     # Output configuration
-    output_dir: str = "outputs/gsm8k_optimization"
-    cache_dir: str = "cache/gsm8k_optimization"
+    output_dir: str = "outputs/optimization_pipeline"
+    cache_dir: str = "cache/optimization_pipeline"
     
     # Efficiency controls
     max_layers_to_search: int = 6
@@ -166,7 +166,7 @@ class ActivationCache:
         return cache_data['activations'], cache_data['labels']
 
 
-class GSM8KOptimizationPipeline:
+class OptimizationPipeline:
     """Main optimization pipeline using Optuna for hyperparameter search."""
     
     def __init__(self, config: OptimizationConfig):
@@ -199,7 +199,7 @@ class GSM8KOptimizationPipeline:
     def run_optimization(self) -> Dict[str, Any]:
         """Run the complete optimization pipeline."""
         self.logger.info("="*80)
-        self.logger.info("🚀 STARTING GSM8K OPTIMIZATION PIPELINE WITH OPTUNA")
+        self.logger.info("🚀 STARTING OPTIMIZATION PIPELINE WITH OPTUNA")
         self.logger.info("="*80)
         
         # Phase 0: Setup
@@ -218,7 +218,7 @@ class GSM8KOptimizationPipeline:
         # Phase 4: Save reproducibility bundle
         self._save_reproducibility_bundle(study, final_results)
         
-        self.logger.info("✅ GSM8K optimization completed successfully!")
+        self.logger.info("✅ Optimization completed successfully!")
         return final_results
     
     def _setup_experiment(self):
@@ -268,7 +268,14 @@ class GSM8KOptimizationPipeline:
                     self.logger.info(f"Caching activations for {split_name} split, layer {layer_id}")
                     
                     # Create probe training data (positive and negative examples)
-                    activations, labels = self._create_probe_data(samples, layer_id)
+                    # Use appropriate dataset for each split
+                    dataset_name = {
+                        "train": self.config.train_dataset,
+                        "val": self.config.val_dataset,
+                        "test": self.config.test_dataset
+                    }[split_name]
+                    
+                    activations, labels = self._create_probe_data(samples, layer_id, dataset_name)
                     
                     # Cache the activations
                     self.cache.save_activations(
@@ -277,10 +284,10 @@ class GSM8KOptimizationPipeline:
                 else:
                     self.logger.info(f"Activations already cached for {split_name} split, layer {layer_id}")
     
-    def _create_probe_data(self, samples: List[Dict], layer_id: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_probe_data(self, samples: List[Dict], layer_id: int, dataset_name: str) -> Tuple[np.ndarray, np.ndarray]:
         """Create contrastive probe training data for a specific layer."""
-        # Get task for GSM8K
-        task = get_task(self.config.train_dataset)
+        # Get task for the specified dataset
+        task = get_task(dataset_name)
         extractor = task.get_extractor()
         
         texts = []
@@ -432,7 +439,7 @@ class GSM8KOptimizationPipeline:
                               layer_id: int, hyperparams: Dict[str, Any]) -> Any:
         """Train steering method on training data."""
         # Create contrastive pairs from training data
-        contrastive_pairs = self._create_contrastive_pairs(self.train_samples, layer_id, limit=50)
+        contrastive_pairs = self._create_contrastive_pairs(self.train_samples, layer_id, self.config.train_dataset, limit=50)
         
         if method_name == "dac":
             # Create DAC instance
@@ -458,10 +465,10 @@ class GSM8KOptimizationPipeline:
         else:
             raise ValueError(f"Unsupported steering method: {method_name}")
     
-    def _create_contrastive_pairs(self, samples: List[Dict], layer_id: int, limit: int = None) -> ContrastivePairSet:
+    def _create_contrastive_pairs(self, samples: List[Dict], layer_id: int, dataset_name: str, limit: int = None) -> ContrastivePairSet:
         """Create contrastive pairs with activations for steering training."""
         contrastive_pairs = []
-        task = get_task(self.config.train_dataset)
+        task = get_task(dataset_name)
         extractor = task.get_extractor()
         
         samples_to_use = samples[:limit] if limit else samples
@@ -486,7 +493,7 @@ class GSM8KOptimizationPipeline:
                 contrastive_pairs.append(pair)
         
         # Create pair set and extract activations
-        pair_set = ContrastivePairSet(name="gsm8k_training", pairs=contrastive_pairs)
+        pair_set = ContrastivePairSet(name=f"{dataset_name}_training", pairs=contrastive_pairs)
         
         # Extract activations for the contrastive pairs
         for pair in pair_set.pairs:
@@ -865,7 +872,7 @@ class GSM8KOptimizationPipeline:
 
 
 def main():
-    """Main entry point for GSM8K optimization."""
+    """Main entry point for optimization pipeline."""
     # Setup logging
     logging.basicConfig(
         level=logging.INFO,
@@ -883,7 +890,7 @@ def main():
     )
     
     # Run optimization
-    pipeline = GSM8KOptimizationPipeline(config)
+    pipeline = OptimizationPipeline(config)
     try:
         results = pipeline.run_optimization()
         

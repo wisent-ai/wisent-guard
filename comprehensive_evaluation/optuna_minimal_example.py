@@ -24,7 +24,7 @@ import optuna
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from gsm8k_optimization_pipeline import GSM8KOptimizationPipeline, OptimizationConfig
+from optimization_pipeline import OptimizationPipeline, OptimizationConfig
 
 
 def create_minimal_config() -> OptimizationConfig:
@@ -33,10 +33,15 @@ def create_minimal_config() -> OptimizationConfig:
         # Model: Fine-tuned on GSM8K with ~27% accuracy
         model_name="realtreetune/rho-1b-sft-GSM8K",
         
+        # Datasets: Use hendrycks_math for training, GSM8K for val/test
+        train_dataset="hendrycks_math",
+        val_dataset="gsm8k",
+        test_dataset="gsm8k",
+        
         # Dataset sizes: Small but stable for clear trends
         train_limit=20,  # Enough for training steering
         val_limit=20,    # Enough for optimization signal
-        test_limit=20,   # Enough for final evaluation
+        test_limit=50,   # Enough for final evaluation
         
         # Optuna configuration: Few trials to see clear pattern
         n_trials=3,  # 8 trials to explore small range
@@ -61,7 +66,7 @@ def create_minimal_config() -> OptimizationConfig:
     )
 
 
-class MinimalSteeringPipeline(GSM8KOptimizationPipeline):
+class MinimalSteeringPipeline(OptimizationPipeline):
     """Custom pipeline with small steering range for fine-tuned models."""
     
     def _objective_function(self, trial):
