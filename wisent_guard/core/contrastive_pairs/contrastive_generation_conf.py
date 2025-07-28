@@ -5,8 +5,8 @@ from typing import Any
 
 
 @dataclass
-class ScenarioGeneration:
-    """Resources for generating scenarios."""
+class QuestionGeneration:
+    """Resources for generating questions."""
 
     PROMPT_TEMPLATES: list[str] = field(
         default_factory=lambda: [
@@ -28,8 +28,8 @@ class ScenarioGeneration:
 
 
 @dataclass
-class ScenarioParsing:
-    """Constants for parsing and filtering generated scenarios."""
+class QuestionParsing:
+    """Constants for parsing and filtering generated questions."""
 
     SKIP_PHRASES: list[str] = field(
         default_factory=lambda: [
@@ -39,7 +39,7 @@ class ScenarioParsing:
             "this is",
             "the following",
             "examples of",
-            "scenarios where",
+            "questions where",
             "situations where",
             "cases where",
             "questions that",
@@ -50,7 +50,7 @@ class ScenarioParsing:
             "opinion:",
             "conversation starter:",
             "prompt:",
-            "scenario:",
+            "question:",
         ]
     )
     REFUSAL_PHRASES: list[str] = field(
@@ -67,8 +67,8 @@ class ScenarioParsing:
         ]
     )
 
-    MIN_SCENARIO_LENGTH: int = 10
-    MAX_SCENARIO_LENGTH: int = 220
+    MIN_QUESTION_LENGTH: int = 10
+    MAX_QUESTION_LENGTH: int = 220
     MAX_QUESTION_WORDS: int = 50
     MAX_IMPERATIVE_WORDS: int = 50
     CANDIDATE_LIMIT: int = 25
@@ -82,10 +82,10 @@ class ContrastivePairGeneration:
     """Resources for generating the positive/negative pairs."""
 
     POSITIVE_PROMPT_TEMPLATE: str = (
-        "{scenario}\n\nRespond directly with {trait_description} (no preamble):"
+        "{question}\n\nRespond directly with {trait_description} (no preamble):"
     )
     NEGATIVE_PROMPT_TEMPLATE: str = (
-        "{scenario}\n\nRespond directly with the opposite of {trait_description} (no preamble):"
+        "{question}\n\nRespond directly with the opposite of {trait_description} (no preamble):"
     )
     CONFIG: dict[str, Any] = field(
         default_factory=lambda: {
@@ -98,6 +98,6 @@ class ContrastivePairGeneration:
 
 
 # Instantiate for easy import
-SCENARIO_GEN = ScenarioGeneration()
-SCENARIO_PARSE = ScenarioParsing()
+QUESTION_GEN = QuestionGeneration()
+QUESTION_PARSE = QuestionParsing()
 CONTRASTIVE_GEN = ContrastivePairGeneration()

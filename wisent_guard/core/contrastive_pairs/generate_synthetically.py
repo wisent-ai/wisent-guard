@@ -13,7 +13,7 @@ from ..response import NegativeResponse, PositiveResponse
 from .contrastive_database import ContrastivePairDatabase
 from .contrastive_pair import ContrastivePair
 from .contrastive_pair_set import ContrastivePairSet
-from .contrastive_generation_conf import CONTRASTIVE_GEN, SCENARIO_GEN, SCENARIO_PARSE
+from .contrastive_generation_conf import CONTRASTIVE_GEN, QUESTION_GEN, QUESTION_PARSE
 from .quality_check import quality_check_synthetic_pairs
 
 
@@ -32,7 +32,7 @@ class SyntheticContrastivePairGenerator:
 
         Args:
             model: The language model to use for generation
-            similarity_threshold: Threshold for deduplication of scenarios/pairs (0-1, higher = more strict)
+            similarity_threshold: Threshold for deduplication of questions/pairs (0-1, higher = more strict)
             db_path: Optional path to the contrastive pair database. If None, caching is disabled.
             db_similarity_threshold: Threshold for retrieving a set from the database (0-1, higher = more strict).
         """
@@ -84,84 +84,84 @@ class SyntheticContrastivePairGenerator:
             )
             return None
 
-    def generate_scenarios(
-        self, trait_description: str, num_scenarios: int
+    def generate_questions(
+        self, trait_description: str, num_questions: int
     ) -> list[str]:
         """
-        Generate diverse scenarios where the trait would be relevant.
+        Generate diverse questions where the trait would be relevant.
 
         Args:
             trait_description: Natural language description of desired trait
-            num_scenarios: Number of scenarios to generate
+            num_questions: Number of questions to generate
 
         Returns:
-            list of scenario descriptions
+            list of question descriptions
         """
-        print(f"🎯 DEBUG: Generating scenarios for trait: '{trait_description}'")
-        print(f"🎯 DEBUG: Target number of scenarios: {num_scenarios}")
+        print(f"🎯 DEBUG: Generating questions for trait: '{trait_description}'")
+        print(f"🎯 DEBUG: Target number of questions: {num_questions}")
 
-        target_scenarios: int = num_scenarios * SCENARIO_GEN.OVERGENERATION_FACTOR
-        all_scenarios: list[str] = []
+        target_questions: int = num_questions * QUESTION_GEN.OVERGENERATION_FACTOR
+        all_questions: list[str] = []
 
         print(
-            f"🎯 DEBUG: Will generate {target_scenarios} total scenarios to select {num_scenarios} best ones"
+            f"🎯 DEBUG: Will generate {target_questions} total questions to select {num_questions} best ones"
         )
 
-        num_prompts_per_template: int = target_scenarios // len(
-            SCENARIO_GEN.PROMPT_TEMPLATES
+        num_prompts_per_template: int = target_questions // len(
+            QUESTION_GEN.PROMPT_TEMPLATES
         )
 
-        for i, template in enumerate(SCENARIO_GEN.PROMPT_TEMPLATES):
+        for i, template in enumerate(QUESTION_GEN.PROMPT_TEMPLATES):
             prompt: str = template.format(num_prompts=num_prompts_per_template)
             print(
-                f"🎯 DEBUG: Using prompt template {i+1}/{len(SCENARIO_GEN.PROMPT_TEMPLATES)}"
+                f"🎯 DEBUG: Using prompt template {i+1}/{len(QUESTION_GEN.PROMPT_TEMPLATES)}"
             )
             print(f"🎯 DEBUG: Template: {prompt[:100]}...")
             try:
                 response: str
-                response, _ = self.model.generate(prompt, **SCENARIO_GEN.CONFIG)
+                response, _ = self.model.generate(prompt, **QUESTION_GEN.CONFIG)
 
                 print(f"🎯 DEBUG: Generated response length: {len(response)} chars")
                 print(f"🎯 DEBUG: Response preview: {response[:200]}...")
 
-                # Parse scenarios from response
-                scenarios: list[str] = self._parse_scenarios_from_response(response)
-                print(f"🎯 DEBUG: Parsed {len(scenarios)} scenarios from this template")
-                for j, scenario in enumerate(scenarios):
-                    print(f"🎯 DEBUG:   Scenario {j+1}: {scenario[:100]}...")
-                all_scenarios.extend(scenarios)
+                # Parse questions from response
+                questions: list[str] = self._parse_questions_from_response(response)
+                print(f"🎯 DEBUG: Parsed {len(questions)} questions from this template")
+                for j, question in enumerate(questions):
+                    print(f"🎯 DEBUG:   Question {j+1}: {question[:100]}...")
+                all_questions.extend(questions)
 
             except Exception as e:
-                print(f"🎯 DEBUG: Error generating scenarios with template: {e}")
+                print(f"🎯 DEBUG: Error generating questions with template: {e}")
                 continue
 
-        print(f"🎯 DEBUG: Total scenarios before deduplication: {len(all_scenarios)}")
+        print(f"🎯 DEBUG: Total questions before deduplication: {len(all_questions)}")
 
-        # Deduplicate and select most diverse scenarios
-        unique_scenarios: list[str] = self._deduplicate_scenarios(all_scenarios)
+        # Deduplicate and select most diverse questions
+        unique_questions: list[str] = self._deduplicate_questions(all_questions)
         print(
-            f"🎯 DEBUG: Unique scenarios after deduplication: {len(unique_scenarios)}"
+            f"🎯 DEBUG: Unique questions after deduplication: {len(unique_questions)}"
         )
 
-        # Select the best diverse scenarios
-        selected_scenarios: list[str] = self._select_diverse_scenarios(
-            unique_scenarios, num_scenarios
+        # Select the best diverse questions
+        selected_questions: list[str] = self._select_diverse_questions(
+            unique_questions, num_questions
         )
-        print(f"🎯 DEBUG: Final selected scenarios: {len(selected_scenarios)}")
+        print(f"🎯 DEBUG: Final selected questions: {len(selected_questions)}")
 
-        for i, scenario in enumerate(selected_scenarios):
-            print(f"🎯 DEBUG: Final scenario {i+1}: {scenario}")
+        for i, question in enumerate(selected_questions):
+            print(f"🎯 DEBUG: Final question {i+1}: {question}")
 
-        return selected_scenarios
+        return selected_questions
 
-    def _parse_scenarios_from_response(self, response: str) -> list[str]:
-        """Parse individual scenarios from model response using regex and filters.
+    def _parse_questions_from_response(self, response: str) -> list[str]:
+        """Parse individual questions from model response using regex and filters.
         Args:
             response: The raw response text from the model
         Returns:
-            A list of parsed scenario strings
+            A list of parsed question strings
         """
-        scenarios: list[str] = []
+        questions: list[str] = []
 
         # Regex to remove common list prefixes (e.g., "1.", "-", "* ") and markdown
         prefix_re: re.Pattern = re.compile(r"^\s*(?:\d+\.|\-|\*|•|[a-e]\))\s*")
@@ -175,9 +175,9 @@ class SyntheticContrastivePairGenerator:
 
             # 2. Basic filtering
             if not cleaned or not (
-                SCENARIO_PARSE.MIN_SCENARIO_LENGTH
+                QUESTION_PARSE.MIN_QUESTION_LENGTH
                 < len(cleaned)
-                < SCENARIO_PARSE.MAX_SCENARIO_LENGTH
+                < QUESTION_PARSE.MAX_QUESTION_LENGTH
             ):
                 continue
 
@@ -185,101 +185,101 @@ class SyntheticContrastivePairGenerator:
 
             # 3. Filter based on content
             if any(
-                phrase in cleaned_lower for phrase in SCENARIO_PARSE.SKIP_PHRASES
+                phrase in cleaned_lower for phrase in QUESTION_PARSE.SKIP_PHRASES
             ) or any(
-                phrase in cleaned_lower for phrase in SCENARIO_PARSE.REFUSAL_PHRASES
+                phrase in cleaned_lower for phrase in QUESTION_PARSE.REFUSAL_PHRASES
             ):
                 continue
 
             # 4. Validate based on structure (question or imperative)
             word_count: int = len(cleaned.split())
             is_question: bool = (
-                "?" in cleaned and word_count <= SCENARIO_PARSE.MAX_QUESTION_WORDS
+                "?" in cleaned and word_count <= QUESTION_PARSE.MAX_QUESTION_WORDS
             )
             is_imperative: bool = (
-                any(kw in cleaned_lower for kw in SCENARIO_PARSE.IMPERATIVE_KEYWORDS)
-                and word_count <= SCENARIO_PARSE.MAX_IMPERATIVE_WORDS
+                any(kw in cleaned_lower for kw in QUESTION_PARSE.IMPERATIVE_KEYWORDS)
+                and word_count <= QUESTION_PARSE.MAX_IMPERATIVE_WORDS
             )
 
             if is_question or is_imperative:
-                scenarios.append(cleaned)
+                questions.append(cleaned)
 
-        return scenarios[: SCENARIO_PARSE.CANDIDATE_LIMIT]
+        return questions[: QUESTION_PARSE.CANDIDATE_LIMIT]
 
-    def _deduplicate_scenarios(self, scenarios: list[str]) -> list[str]:
-        """Remove duplicate or very similar scenarios.
+    def _deduplicate_questions(self, questions: list[str]) -> list[str]:
+        """Remove duplicate or very similar questions.
         Args:
-            scenarios: The list of scenario strings to deduplicate
+            questions: The list of question strings to deduplicate
         Returns:
-            A list of unique scenario strings
+            A list of unique question strings
         """
-        if not self.similarity_model or len(scenarios) <= 1:
+        if not self.similarity_model or len(questions) <= 1:
             # Fallback to simple text-based deduplication
-            return list(set(scenarios))
+            return list(set(questions))
 
-        unique_scenarios: list[str] = []
+        unique_questions: list[str] = []
 
-        for scenario in scenarios:
+        for question in questions:
             is_duplicate: bool = False
 
-            if unique_scenarios:
-                # Check similarity with existing scenarios
-                scenario_embedding: np.ndarray = self.similarity_model.encode(
-                    [scenario]
+            if unique_questions:
+                # Check similarity with existing questions
+                question_embedding: np.ndarray = self.similarity_model.encode(
+                    [question]
                 )
                 existing_embeddings: np.ndarray = self.similarity_model.encode(
-                    unique_scenarios
+                    unique_questions
                 )
 
                 # Calculate cosine similarities
                 similarities: np.ndarray = np.dot(
-                    scenario_embedding, existing_embeddings.T
+                    question_embedding, existing_embeddings.T
                 )[0]
 
                 if np.max(similarities) > self.similarity_threshold:
                     is_duplicate = True
 
             if not is_duplicate:
-                unique_scenarios.append(scenario)
+                unique_questions.append(question)
 
-        return unique_scenarios
+        return unique_questions
 
-    def _select_diverse_scenarios(
-        self, scenarios: list[str], target_count: int
+    def _select_diverse_questions(
+        self, questions: list[str], target_count: int
     ) -> list[str]:
-        """Select the most diverse scenarios up to target count.
+        """Select the most diverse questions up to target count.
         Args:
-            scenarios: The list of scenario strings to select from
-            target_count: The number of diverse scenarios to select
+            questions: The list of question strings to select from
+            target_count: The number of diverse questions to select
         Returns:
-            A list of diverse scenario strings
+            A list of diverse question strings
         """
-        if len(scenarios) <= target_count:
-            return scenarios
+        if len(questions) <= target_count:
+            return questions
 
         if not self.similarity_model:
             # Random selection fallback
-            return random.sample(scenarios, target_count)
+            return random.sample(questions, target_count)
 
-        # Use embeddings to select diverse scenarios
-        embeddings: np.ndarray = self.similarity_model.encode(scenarios)
+        # Use embeddings to select diverse questions
+        embeddings: np.ndarray = self.similarity_model.encode(questions)
 
-        selected_indices: list[int] = [0]  # Start with first scenario
+        selected_indices: list[int] = [0]  # Start with first question
 
         for _ in range(target_count - 1):
             remaining_indices: list[int] = [
-                i for i in range(len(scenarios)) if i not in selected_indices
+                i for i in range(len(questions)) if i not in selected_indices
             ]
 
             if not remaining_indices:
                 break
 
-            # Find scenario most different from already selected ones
+            # Find question most different from already selected ones
             max_min_distance: float = -1.0
             best_idx: int = remaining_indices[0]
 
             for idx in remaining_indices:
-                # Calculate minimum distance to any selected scenario
+                # Calculate minimum distance to any selected question
                 distances: list[float] = []
                 for selected_idx in selected_indices:
                     distance: float = 1 - np.dot(
@@ -294,7 +294,7 @@ class SyntheticContrastivePairGenerator:
 
             selected_indices.append(best_idx)
 
-        return [scenarios[i] for i in selected_indices]
+        return [questions[i] for i in selected_indices]
 
     def _get_pair_embedding(self, pair: ContrastivePair) -> np.ndarray:
         """Computes a single embedding for a contrastive pair.
@@ -383,26 +383,26 @@ class SyntheticContrastivePairGenerator:
         return response.strip()
 
     def generate_contrastive_pair(
-        self, scenario: str, trait_description: str
+        self, question: str, trait_description: str
     ) -> ContrastivePair:
         """
-        Generate a contrastive pair for a specific scenario.
+        Generate a contrastive pair for a specific question.
 
         Args:
-            scenario: The scenario to generate responses for
+            question: The question to generate responses for
             trait_description: The trait description for context
 
         Returns:
             ContrastivePair object
         """
         print(
-            f"🔄 DEBUG: Generating contrastive pair for scenario: {scenario[:100]}..."
+            f"🔄 DEBUG: Generating contrastive pair for question: {question[:100]}..."
         )
         print(f"🔄 DEBUG: Trait: {trait_description}")
 
         # Generate positive response (demonstrates the trait)
         positive_prompt: str = CONTRASTIVE_GEN.POSITIVE_PROMPT_TEMPLATE.format(
-            scenario=scenario, trait_description=trait_description
+            question=question, trait_description=trait_description
         )
         print(f"🔄 DEBUG: Positive prompt: {positive_prompt}")
         positive_response: str = self._generate_response(
@@ -412,7 +412,7 @@ class SyntheticContrastivePairGenerator:
 
         # Generate negative response (opposite of trait)
         negative_prompt: str = CONTRASTIVE_GEN.NEGATIVE_PROMPT_TEMPLATE.format(
-            scenario=scenario, trait_description=trait_description
+            question=question, trait_description=trait_description
         )
         print(f"🔄 DEBUG: Negative prompt: {negative_prompt}")
         negative_response: str = self._generate_response(
@@ -421,7 +421,7 @@ class SyntheticContrastivePairGenerator:
         print(f"🔄 DEBUG: Negative response: {negative_response[:100]}...")
 
         # Create contrastive pair - always use the question directly
-        prompt: str = scenario.strip()
+        prompt: str = question.strip()
         print(f"🔄 DEBUG: Using question as direct prompt: {prompt}")
 
         pair: ContrastivePair = ContrastivePair(
@@ -431,7 +431,7 @@ class SyntheticContrastivePairGenerator:
         )
 
         # Store metadata
-        pair.scenario = scenario
+        pair.question = question
         pair.trait_description = trait_description
 
         print(f"🔄 DEBUG: Created contrastive pair successfully")
@@ -493,9 +493,9 @@ class SyntheticContrastivePairGenerator:
                     )
                     additional_pairs_needed: int = num_pairs - cached_pair_count
 
-                    # We need to generate more scenarios and pairs, avoiding duplicates from the existing set
+                    # We need to generate more questions and pairs, avoiding duplicates from the existing set
                     # For simplicity, we'll generate a new batch and combine, then re-filter for diversity.
-                    # A more advanced implementation could try to find scenarios dissimilar to existing ones.
+                    # A more advanced implementation could try to find questions dissimilar to existing ones.
 
                     print(
                         f"🔄 Generating {additional_pairs_needed} additional pairs..."
@@ -549,24 +549,24 @@ class SyntheticContrastivePairGenerator:
         Returns:
             ContrastivePairSet with generated pairs
         """
-        num_scenarios_to_generate: int = int(num_pairs * pair_overgeneration_factor)
-        print(f"📝 Generating {num_scenarios_to_generate} diverse scenarios...")
-        scenarios: list[str] = self.generate_scenarios(
-            trait_description, num_scenarios_to_generate
+        num_questions_to_generate: int = int(num_pairs * pair_overgeneration_factor)
+        print(f"📝 Generating {num_questions_to_generate} diverse questions...")
+        questions: list[str] = self.generate_questions(
+            trait_description, num_questions_to_generate
         )
-        print(f"✅ Generated {len(scenarios)} unique scenarios")
+        print(f"✅ Generated {len(questions)} unique questions")
 
         print("🔄 Generating contrastive pairs...")
         all_pairs: list[ContrastivePair] = []
-        for i, scenario in enumerate(scenarios):
+        for i, question in enumerate(questions):
             try:
-                print(f"   Generating pair {i+1}/{len(scenarios)}: {scenario[:50]}...")
+                print(f"   Generating pair {i+1}/{len(questions)}: {question[:50]}...")
                 pair: ContrastivePair = self.generate_contrastive_pair(
-                    scenario, trait_description
+                    question, trait_description
                 )
                 all_pairs.append(pair)
             except Exception as e:
-                print(f"   ⚠️ Error generating pair for scenario '{scenario[:50]}': {e}")
+                print(f"   ⚠️ Error generating pair for question '{question[:50]}': {e}")
                 continue
 
         print(f"✅ Successfully generated {len(all_pairs)} raw contrastive pairs")

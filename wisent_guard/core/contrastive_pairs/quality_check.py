@@ -22,7 +22,7 @@ class ContrastivePairQualityChecker:
         """
         self.strict_mode = strict_mode
 
-        # Common signs of poor quality scenarios
+        # Common signs of poor quality questions
         self.bad_patterns = [
             r"користувач",  # Strange Unicode characters
             r"елек",  # Garbled text
@@ -32,11 +32,11 @@ class ContrastivePairQualityChecker:
             r"these are",  # Meta-commentary
             r"list of",  # Meta-commentary
             r"examples of",  # Meta-commentary
-            r"scenarios where",  # Meta-commentary
+            r"questions where",  # Meta-commentary
             r"situations where",  # Meta-commentary
         ]
 
-        # Signs of good scenarios
+        # Signs of good questions
         self.good_indicators = [
             r"\?$",  # Ends with question mark
             r"^(what|how|why|when|where|who|which)",  # Question words
@@ -46,14 +46,14 @@ class ContrastivePairQualityChecker:
             r"can you",  # Polite request
         ]
 
-    def check_scenario_quality(
-        self, scenario: str, trait_description: str
+    def check_question_quality(
+        self, question: str, trait_description: str
     ) -> Dict[str, Any]:
         """
-        Check the quality of a scenario.
+        Check the quality of a question.
 
         Args:
-            scenario: The scenario text
+            question: The question text
             trait_description: The trait being tested
 
         Returns:
@@ -64,24 +64,24 @@ class ContrastivePairQualityChecker:
 
         # Check for bad patterns
         for pattern in self.bad_patterns:
-            if re.search(pattern, scenario, re.IGNORECASE):
+            if re.search(pattern, question, re.IGNORECASE):
                 issues.append(f"Contains bad pattern: {pattern}")
                 score -= 30
 
-        # Check scenario length - prefer shorter questions
-        if len(scenario) < 10:
+        # Check question length - prefer shorter questions
+        if len(question) < 10:
             issues.append("Too short")
             score -= 40
-        elif len(scenario) > 150:
+        elif len(question) > 150:
             issues.append("Too long")
             score -= 30
-        elif len(scenario) > 100:
+        elif len(question) > 100:
             issues.append("Quite long")
             score -= 10
 
         # Check if it's actually a question or prompt
         has_good_indicator = any(
-            re.search(pattern, scenario, re.IGNORECASE)
+            re.search(pattern, question, re.IGNORECASE)
             for pattern in self.good_indicators
         )
 
@@ -91,17 +91,17 @@ class ContrastivePairQualityChecker:
 
         # Check for relevance to trait (basic heuristics)
         trait_keywords = trait_description.lower().split()
-        scenario_lower = scenario.lower()
+        question_lower = question.lower()
 
-        # Simple relevance check - scenario should relate to the trait somehow
+        # Simple relevance check - question should relate to the trait somehow
         if self.strict_mode:
             # In strict mode, require some connection to the trait
-            trait_related = any(keyword in scenario_lower for keyword in trait_keywords)
+            trait_related = any(keyword in question_lower for keyword in trait_keywords)
             if not trait_related and len(trait_keywords) > 1:
                 # Check for semantic relatedness (basic)
                 semantic_keywords = self._get_semantic_keywords(trait_description)
                 trait_related = any(
-                    keyword in scenario_lower for keyword in semantic_keywords
+                    keyword in question_lower for keyword in semantic_keywords
                 )
 
             if not trait_related:
@@ -109,7 +109,7 @@ class ContrastivePairQualityChecker:
                 score -= 15
 
         # Check for repetitive content
-        words = scenario.split()
+        words = question.split()
         if len(words) > 5:
             unique_words = set(words)
             repetition_ratio = len(unique_words) / len(words)
@@ -121,7 +121,7 @@ class ContrastivePairQualityChecker:
             "score": max(0, score),
             "issues": issues,
             "is_quality": score >= 50,
-            "scenario": scenario,
+            "question": question,
         }
 
     def check_response_quality(
@@ -200,8 +200,8 @@ class ContrastivePairQualityChecker:
         Returns:
             Dictionary with comprehensive quality assessment
         """
-        # Check scenario quality
-        scenario_check = self.check_scenario_quality(pair.prompt, trait_description)
+        # Check question quality
+        question_check = self.check_question_quality(pair.prompt, trait_description)
 
         # Check positive response quality
         pos_check = self.check_response_quality(
@@ -215,16 +215,16 @@ class ContrastivePairQualityChecker:
 
         # Calculate overall score
         overall_score = (
-            scenario_check["score"] * 0.4
+            question_check["score"] * 0.4
             + pos_check["score"] * 0.3
             + neg_check["score"] * 0.3
         )
 
         # Aggregate issues
         all_issues = []
-        if scenario_check["issues"]:
+        if question_check["issues"]:
             all_issues.extend(
-                [f"Scenario: {issue}" for issue in scenario_check["issues"]]
+                [f"Question: {issue}" for issue in question_check["issues"]]
             )
         if pos_check["issues"]:
             all_issues.extend([f"Positive: {issue}" for issue in pos_check["issues"]])
@@ -249,12 +249,12 @@ class ContrastivePairQualityChecker:
 
         return {
             "overall_score": max(0, overall_score),
-            "scenario_score": scenario_check["score"],
+            "question_score": question_check["score"],
             "positive_score": pos_check["score"],
             "negative_score": neg_check["score"],
             "issues": all_issues,
             "is_quality": overall_score >= 60,
-            "scenario_check": scenario_check,
+            "question_check": question_check,
             "positive_check": pos_check,
             "negative_check": neg_check,
         }
@@ -308,7 +308,7 @@ class ContrastivePairQualityChecker:
         if rejected_pairs and len(rejected_pairs) <= 3:
             print(f"\n📋 Examples of rejected pairs:")
             for pair, check in rejected_pairs[:3]:
-                print(f"   Scenario: {pair.prompt[:100]}...")
+                print(f"   Question: {pair.prompt[:100]}...")
                 print(f"   Issues: {', '.join(check['issues'][:2])}")
 
         return filtered_set

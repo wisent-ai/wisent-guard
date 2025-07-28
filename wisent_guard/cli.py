@@ -4679,12 +4679,12 @@ def handle_synthetic_command(args):
         sys.exit(1)
 
 
-def _generate_test_scenarios(
-    trait_description: str, num_scenarios: int, model
+def _generate_test_questions(
+    trait_description: str, num_questions: int, model
 ) -> List[str]:
-    """Generate test scenarios for evaluating the steering method."""
+    """Generate test questions for evaluating the steering method."""
     return [
-        f"Test scenario {i+1} for {trait_description}" for i in range(num_scenarios)
+        f"Test question {i+1} for {trait_description}" for i in range(num_questions)
     ]
 
 
