@@ -486,6 +486,23 @@ class SyntheticContrastivePairGenerator:
                     
                 try:
                     pair = self.generate_contrastive_pair(question, trait_description)
+                    
+                    # Check for safety filter refusals
+                    safety_phrases = [
+                        "I can't assist", "I cannot assist", "I'm not able", "I cannot provide", 
+                        "I can't help", "I cannot create", "I can't fulfill", "I cannot fulfill",
+                        "I'm unable to", "I cannot generate", "explicit content", "I apologize"
+                    ]
+                    pos_text = pair.positive_response.text.lower()
+                    neg_text = pair.negative_response.text.lower()
+                    
+                    if any(phrase.lower() in pos_text for phrase in safety_phrases):
+                        print(f"   🚫 Safety filter triggered on positive response: {pair.positive_response.text[:50]}...")
+                        continue
+                    if any(phrase.lower() in neg_text for phrase in safety_phrases):
+                        print(f"   🚫 Safety filter triggered on negative response: {pair.negative_response.text[:50]}...")
+                        continue
+                    
                     successful_pairs.append(pair)
                     print(f"   ✅ Pair {len(successful_pairs)}/{target_pairs} created successfully")
                 except Exception as e:
