@@ -852,7 +852,7 @@ class LMEvalHarnessGroundTruth:
                 
                 evaluation_details.append({
                     'question': response['question'][:100],
-                    'generated': generated[:100],
+                    'generated': generated[-50:],
                     'ground_truth': ground_truth,
                     'correct': is_correct
                 })

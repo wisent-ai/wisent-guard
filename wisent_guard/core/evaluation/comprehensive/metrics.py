@@ -196,10 +196,10 @@ def calculate_comprehensive_metrics(results: Dict[str, Any]) -> Dict[str, Any]:
         test_results = results["test_results"]
         
         # Extract key metrics
-        base_benchmark_acc = test_results.get("base_model_benchmark_results", {}).get("accuracy", 0.0)
-        steered_benchmark_acc = test_results.get("steered_model_benchmark_results", {}).get("accuracy", 0.0)
-        base_probe_auc = test_results.get("base_model_probe_results", {}).get("auc", 0.5)
-        steered_probe_auc = test_results.get("steered_model_probe_results", {}).get("auc", 0.5)
+        base_benchmark_acc = test_results.get("base_benchmark_metrics", {}).get("accuracy", 0.0)
+        steered_benchmark_acc = test_results.get("steered_benchmark_metrics", {}).get("accuracy", 0.0)
+        base_probe_auc = test_results.get("base_probe_metrics", {}).get("auc", 0.5)
+        steered_probe_auc = test_results.get("steered_probe_metrics", {}).get("auc", 0.5)
         
         # Calculate improvements
         benchmark_improvement = steered_benchmark_acc - base_benchmark_acc
