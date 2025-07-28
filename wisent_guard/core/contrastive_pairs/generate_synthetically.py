@@ -13,7 +13,7 @@ from ..response import NegativeResponse, PositiveResponse
 from .contrastive_database import ContrastivePairDatabase
 from .contrastive_pair import ContrastivePair
 from .contrastive_pair_set import ContrastivePairSet
-from .generation_resources import CONTRASTIVE_GEN, SCENARIO_GEN, SCENARIO_PARSE
+from .contrastive_generation_conf import CONTRASTIVE_GEN, SCENARIO_GEN, SCENARIO_PARSE
 from .quality_check import quality_check_synthetic_pairs
 
 
