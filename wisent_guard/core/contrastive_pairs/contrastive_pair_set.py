@@ -537,9 +537,9 @@ class ContrastivePairSet:
         try:
             # Try to use task's process_results method
             if hasattr(task, "process_results"):
-                # Create a mock result structure
-                mock_result = {"doc": doc, "target": response, "resps": [[response]]}
-                result = task.process_results(doc, [mock_result])
+                # Create a result structure
+                result_structure = {"doc": doc, "target": response, "resps": [[response]]}
+                result = task.process_results(doc, [result_structure])
                 return {
                     "correct": result.get("acc", False),
                     "score": result.get("acc", 0.0),

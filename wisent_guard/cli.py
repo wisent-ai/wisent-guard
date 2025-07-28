@@ -770,7 +770,7 @@ def run_task_pipeline(
                 executor_info = secure_evaluator.get_executor_info()
                 print(f"   • Docker executor ready: {executor_info['image_name']}")
         except Exception as e:
-            # FAIL HARD - No mock execution allowed
+            # FAIL HARD - No fallback execution allowed
             print("\n❌ FATAL ERROR: Docker is required for code execution tasks")
             print(f"   • Task '{task_name}' requires secure Docker execution")
             print(f"   • Docker error: {e}")
@@ -3687,7 +3687,7 @@ The task will be skipped in optimization."""
                         ]  # Single score for cached
                         aggregated_score = classification_result.get("score", 0.5)
 
-                    # Create a mock qa_pair for ground truth evaluation
+                    # Create a qa_pair for ground truth evaluation
                     qa_pair = {
                         "question": cached_item["question"],
                         "correct_answer": "N/A",
