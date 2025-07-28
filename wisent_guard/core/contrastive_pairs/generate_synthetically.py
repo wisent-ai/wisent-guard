@@ -100,7 +100,7 @@ class SyntheticContrastivePairGenerator:
         print(f"🎯 DEBUG: Generating scenarios for trait: '{trait_description}'")
         print(f"🎯 DEBUG: Target number of scenarios: {num_scenarios}")
 
-        target_scenarios: int = num_scenarios
+        target_scenarios: int = num_scenarios * SCENARIO_GEN.OVERGENERATION_FACTOR
         all_scenarios: list[str] = []
 
         print(
