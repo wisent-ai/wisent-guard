@@ -74,6 +74,7 @@ class OptimizationConfig:
     study_name: str = "optimization_pipeline"
     db_url: str = field(default_factory=lambda: f"sqlite:///{os.path.dirname(os.path.dirname(__file__))}/optuna_studies.db")
     n_trials: int = 50
+    n_startup_trials: int = 10  # Random exploration before TPE kicks in
     sampler: str = "TPE"
     pruner: str = "MedianPruner"
     
@@ -339,14 +340,15 @@ class OptimizationPipeline:
         self.logger.info("📋 Creating Optuna study with SQLite persistence...")
         self.logger.info(f"Database: {self.config.db_url}")
         self.logger.info(f"Study name: {self.config.study_name}")
+        self.logger.info(f"🎲 Warmup: {self.config.n_startup_trials} random trials before TPE sampling")
         
         # Setup sampler
         if self.config.sampler == "TPE":
-            sampler = TPESampler(seed=self.config.seed)
+            sampler = TPESampler(seed=self.config.seed, n_startup_trials=self.config.n_startup_trials)
         elif self.config.sampler == "Random":
             sampler = optuna.samplers.RandomSampler(seed=self.config.seed)
         else:
-            sampler = TPESampler(seed=self.config.seed)
+            sampler = TPESampler(seed=self.config.seed, n_startup_trials=self.config.n_startup_trials)
         
         # Setup pruner
         if self.config.pruner == "MedianPruner":

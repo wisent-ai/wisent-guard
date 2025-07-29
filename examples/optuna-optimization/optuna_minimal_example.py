@@ -54,6 +54,7 @@ def create_minimal_config() -> OptimizationConfig:
         study_name="minimal_example_test",
         db_url="sqlite:///optuna_minimal_test.db",
         n_trials=3,  # 3 trials to test the integration
+        n_startup_trials=1,  # 1 random trial then TPE
         sampler="TPE",
         pruner="MedianPruner",
         

@@ -54,14 +54,15 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict
+
 import torch
-import optuna
 
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from comprehensive_evaluation.optimization_pipeline import OptimizationPipeline, OptimizationConfig
+from comprehensive_evaluation.optimization_pipeline import OptimizationConfig, OptimizationPipeline
+
 
 def get_recommended_config_for_llama8b() -> Dict[str, Any]:
     """Get recommended configuration values for Llama 3.1 8B optimization."""
@@ -75,6 +76,7 @@ def get_recommended_config_for_llama8b() -> Dict[str, Any]:
         "val_limit": 100,
         "test_limit": 200,
         "n_trials": 50,
+        "n_startup_trials": 10,  # Random warmup before TPE
     }
 
 
@@ -116,6 +118,7 @@ def create_llama_config(args) -> OptimizationConfig:
         study_name=args.study_name or "llama_8b_steering_optimizationv2",
         db_url=f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/optuna_studies.db",
         n_trials=args.n_trials or defaults["n_trials"],
+        n_startup_trials=args.n_startup_trials or defaults["n_startup_trials"],
         sampler="TPE",  # Tree-structured Parzen Estimator
         pruner="MedianPruner",  # Aggressive pruning for efficiency
         
@@ -166,22 +169,36 @@ class LlamaSteeringPipeline(OptimizationPipeline):
             steering_method = trial.suggest_categorical("steering_method", self.config.steering_methods)
             
             if steering_method == "caa":
-                # CAA: Simple but effective vector addition
-                steering_alpha = trial.suggest_float("steering_alpha", 0.05, 2.0)
-                steering_params = {"steering_alpha": steering_alpha}
+                steering_alpha = trial.suggest_float(      # maps to `strength`
+                    "steering_alpha", 0.10, 1.80, step=0.05
+                )
+                
+                normalization_method = trial.suggest_categorical(
+                    "normalization_method", ["none", "l2_unit"]
+                )
+
+                target_norm = None                         # ask only if relevant
+                if normalization_method != "none":
+                    target_norm = trial.suggest_float(
+                        "target_norm", 0.8, 1.5, step=0.1
+                    )
+
+                steering_params = {
+                    "steering_alpha": steering_alpha,
+                    "normalization_method": normalization_method,
+                    "target_norm":    target_norm,
+                }
                 
             elif steering_method == "dac":
                 # DAC: Dynamic control with entropy-based adaptation
-                steering_alpha = trial.suggest_float("steering_alpha", 0.1, 3.0)
-                entropy_threshold = trial.suggest_float("entropy_threshold", 0.5, 2.5)
-                ptop = trial.suggest_float("ptop", 0.1, 0.9)
-                max_alpha = trial.suggest_float("max_alpha", 1.0, 5.0)
+                
                 steering_params = {
-                    "steering_alpha": steering_alpha,
-                    "entropy_threshold": entropy_threshold,
-                    "ptop": ptop,
-                    "max_alpha": max_alpha
+                    "base_strength":      trial.suggest_float("base_strength", 0.7, 1.3, step=0.05),
+                    "ptop":               trial.suggest_float("ptop", 0.30, 0.60, step=0.05),
+                    "max_alpha":          trial.suggest_float("max_alpha", 1.0, 3.0, step=0.2),
+                    "entropy_threshold":  trial.suggest_float("entropy_threshold", 2.0, 3.5, step=0.1),
                 }
+                
             else:
                 raise ValueError(f"steering_method: {steering_method} not implemented")
             
@@ -237,11 +254,11 @@ class LlamaSteeringPipeline(OptimizationPipeline):
         self.logger.info(f"⚡ Best Alpha: {best_alpha:.4f}")
         self.logger.info(f"🎯 Best Validation Accuracy: {study.best_value:.4f}")
         
-        baseline_acc = final_results['baseline_benchmark_metrics']['accuracy']
-        steered_acc = final_results['steered_benchmark_metrics']['accuracy']
-        improvement = final_results['accuracy_improvement']
+        baseline_acc = final_results["baseline_benchmark_metrics"]["accuracy"]
+        steered_acc = final_results["steered_benchmark_metrics"]["accuracy"]
+        improvement = final_results["accuracy_improvement"]
         
-        self.logger.info(f"📈 Test Results:")
+        self.logger.info("📈 Test Results:")
         self.logger.info(f"   Baseline:  {baseline_acc:.4f}")
         self.logger.info(f"   Steered:   {steered_acc:.4f}")
         self.logger.info(f"   Improvement: {improvement:+.4f}")
@@ -294,6 +311,8 @@ def main():
                        help="Optuna study name (default: llama_8b_steering_optimization)")
     parser.add_argument("--n-trials", type=int, default=None,
                        help="Number of optimization trials (default: 50)")
+    parser.add_argument("--n-startup-trials", type=int, default=None,
+                       help="Random exploration trials before TPE kicks in (default: 10)")
     parser.add_argument("--layer-range", type=int, nargs=2, default=None,
                        help="Layer search range as two integers (default: 15 20)")
     
@@ -323,7 +342,7 @@ def main():
     
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=handlers
     )
     
@@ -372,7 +391,7 @@ def main():
         logger.info(f"🗄️  Study database: {config.db_url}")
         
         if config.use_wandb:
-            logger.info(f"📊 WandB: Check your WandB dashboard for run details")
+            logger.info("📊 WandB: Check your WandB dashboard for run details")
         
         return results
         
@@ -388,7 +407,7 @@ def main():
         
     finally:
         # Cleanup
-        if 'pipeline' in locals():
+        if "pipeline" in locals():
             pipeline.cleanup_memory()
 
 

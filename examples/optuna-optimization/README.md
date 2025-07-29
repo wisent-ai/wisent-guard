@@ -132,8 +132,7 @@ SELECT study_name, trial_id, value, state FROM trials ORDER BY trial_id DESC LIM
 
 1. **CUDA OOM:** Reduce batch_size or limit dataset sizes
 2. **Study not resuming:** Check study_name matches exactly
-3. **WandB authentication:** Run `wandb login` first
-4. **Slow convergence:** Try different sampler or increase n_trials
+3. **Slow convergence:** Try different sampler or increase n_trials
 
 ## Advanced Usage
 
