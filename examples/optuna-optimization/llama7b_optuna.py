@@ -202,7 +202,8 @@ class LlamaSteeringPipeline(OptimizationPipeline):
             else:
                 raise ValueError(f"steering_method: {steering_method} not implemented")
             
-            self.logger.info(f"🎯 Trial {trial.number}: {steering_method.upper()} with α={steering_params.get('steering_alpha', 'N/A'):.3f}")
+            alpha_str = f"{steering_params.get('steering_alpha', 'N/A'):.3f}" if steering_params.get('steering_alpha') is not None else 'N/A'
+            self.logger.info(f"🎯 Trial {trial.number}: {steering_method.upper()} with α={alpha_str}")
             
             # Step 1: Train and evaluate probe
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
