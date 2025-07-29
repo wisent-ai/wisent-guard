@@ -19,12 +19,13 @@ TESTING HYPOTHESIS:
 import logging
 import sys
 from pathlib import Path
+import torch
 import optuna
 
 # Add wisent-guard to path
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from optimization_pipeline import OptimizationPipeline, OptimizationConfig
+from comprehensive_evaluation.optimization_pipeline import OptimizationPipeline, OptimizationConfig
 
 # No environment variables needed - all config in script
 
@@ -33,30 +34,40 @@ def create_minimal_config() -> OptimizationConfig:
     """Create minimal config for fine-tuned model testing."""
     return OptimizationConfig(
         # Model: Fine-tuned on GSM8K with ~27% accuracy
-        model_name="jup",
+        model_name="realtreetune/rho-1b-sft-GSM8K",
+        device="cuda" if torch.cuda.is_available() else "cpu",
         
         # Datasets: Use hendrycks_math for training, GSM8K for val/test
         train_dataset="hendrycks_math",
         val_dataset="gsm8k",
         test_dataset="gsm8k",
         
-        # Dataset sizes: Small but stable for clear trends
-        train_limit=20,  # Enough for training steering
-        val_limit=20,    # Enough for optimization signal
-        test_limit=50,   # Enough for final evaluation
+        # Training configuration
+        train_limit=20,              # Training samples to load
+        contrastive_pairs_limit=15,  # Contrastive pairs for steering training (bounded by train_limit)
+        
+        # Evaluation configuration  
+        val_limit=20,                # Validation samples to load (all used for evaluation)
+        test_limit=50,               # Test samples to load
         
         # Optuna configuration: Few trials to see clear pattern
         study_name="minimal_example_test",
+        db_url="sqlite:///optuna_minimal_test.db",
         n_trials=3,  # 3 trials to test the integration
+        sampler="TPE",
+        pruner="MedianPruner",
         
         # Search space: Single layer, single method for clarity
         layer_search_range=(10, 10),  # Single layer for speed
-        probe_types=["logistic_regression"],
+        probe_type="logistic_regression",  # Fixed probe type
         steering_methods=["caa"],  # CAA is simpler than DAC
         
         # Generation: Deterministic for reproducible results
         temperature=0.0,
         do_sample=False,
+        batch_size=4,
+        max_length=512,
+        max_new_tokens=128,
         
         # Output
         output_dir="outputs/optuna_minimal_example",
@@ -64,11 +75,12 @@ def create_minimal_config() -> OptimizationConfig:
         
         # Disable WandB for testing
         use_wandb=False,
+        wandb_project="minimal_test",
         
-        # Efficiency
-        batch_size=4,
-        max_new_tokens=128,
-        seed=42
+        # Efficiency settings
+        seed=42,
+        max_layers_to_search=1,
+        early_stopping_patience=5
     )
 
 

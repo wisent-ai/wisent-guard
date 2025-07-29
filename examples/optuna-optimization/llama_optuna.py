@@ -71,6 +71,7 @@ def get_recommended_config_for_llama8b() -> Dict[str, Any]:
         "max_new_tokens": 256,
         "layer_search_range": (15, 20),  # Layers 15-20 typically good for 8B models
         "train_limit": 100,
+        "contrastive_pairs_limit": 50,  # Bounded by train_limit
         "val_limit": 100,
         "test_limit": 200,
         "n_trials": 50,
@@ -93,8 +94,11 @@ def create_llama_config(args) -> OptimizationConfig:
         val_dataset="gsm8k",            # GSM8K for optimization target
         test_dataset="gsm8k",           # GSM8K for final evaluation
         
-        # Dataset sizes - Balanced for quality vs speed
+        # Training configuration
         train_limit=args.train_limit or defaults["train_limit"],
+        contrastive_pairs_limit=args.contrastive_pairs_limit or defaults["contrastive_pairs_limit"],
+        
+        # Evaluation configuration  
         val_limit=args.val_limit or defaults["val_limit"],
         test_limit=args.test_limit or defaults["test_limit"],
         
@@ -277,11 +281,13 @@ def main():
     
     # Dataset configuration
     parser.add_argument("--train-limit", type=int, default=None,
-                       help="Number of training samples (default: 100)")
+                       help="Number of training samples to load (default: 100)")
+    parser.add_argument("--contrastive-pairs-limit", type=int, default=None,
+                       help="Number of contrastive pairs for steering training (default: 50, bounded by train-limit)")
     parser.add_argument("--val-limit", type=int, default=None,
-                       help="Number of validation samples (default: 50)")
+                       help="Number of validation samples to load (default: 100)")
     parser.add_argument("--test-limit", type=int, default=None,
-                       help="Number of test samples (default: 100)")
+                       help="Number of test samples to load (default: 200)")
     
     # Optimization configuration
     parser.add_argument("--study-name", type=str, default=None,

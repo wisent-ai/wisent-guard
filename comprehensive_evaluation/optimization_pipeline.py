@@ -58,9 +58,13 @@ class OptimizationConfig:
     val_dataset: str = "gsm8k"
     test_dataset: str = "gsm8k"
     
-    train_limit: int = 50
-    val_limit: int = 50
-    test_limit: int = 50
+    # Training configuration
+    train_limit: int = 50                    # How many training samples to load
+    contrastive_pairs_limit: int = 20        # How many contrastive pairs to extract for steering training
+    
+    # Evaluation configuration  
+    val_limit: int = 50                      # How many validation samples to load
+    test_limit: int = 100                    # How many test samples to load
     
     layer_search_range: Tuple[int, int] = (15, 20)
     probe_type: str = "logistic_regression"  # Fixed probe type
@@ -75,7 +79,7 @@ class OptimizationConfig:
     
     # WandB configuration
     wandb_project: str = "wisent-guard-optimization"
-    use_wandb: bool = False
+    use_wandb: bool = False # TODO
     
     batch_size: int = 8
     max_length: int = 512
@@ -445,7 +449,9 @@ class OptimizationPipeline:
     def _train_steering_method(self, trial: optuna.Trial, method_name: str, 
                               layer_id: int, hyperparams: Dict[str, Any]) -> Any:
         """Train steering method on training data."""
-        contrastive_pairs = self._create_contrastive_pairs(self.train_samples, layer_id, self.config.train_dataset, limit=50)
+        # Use contrastive_pairs_limit with bounds checking
+        contrastive_limit = min(self.config.contrastive_pairs_limit, len(self.train_samples))
+        contrastive_pairs = self._create_contrastive_pairs(self.train_samples, layer_id, self.config.train_dataset, limit=contrastive_limit)
         
         if method_name == "dac":
             # Create DAC instance
@@ -604,36 +610,35 @@ class OptimizationPipeline:
         task = get_task(self.config.val_dataset)
         extractor = task.get_extractor()
         
-        for sample in self.val_samples[:20]:  # Limit for efficiency during optimization
+        # Collect all questions for batched processing (use ALL validation samples)
+        questions = []
+        ground_truths = []
+        
+        for sample in self.val_samples:  # Use all validation samples for reliable evaluation
             qa_pair = extractor.extract_qa_pair(sample, task)
             if not qa_pair:
                 continue
                 
             question = qa_pair['formatted_question']
             ground_truth = qa_pair['correct_answer']
-            
-            # Generate with steering (this must re-run forward passes)
-            try:
-                if method_name == "dac":
-                    prediction = self._generate_with_dac_steering(
-                        steering_instance, question, hyperparams["steering_alpha"], layer_id
-                    )
-                elif method_name == "caa":
-                    prediction = self._generate_with_caa_steering(
-                        steering_instance, question, hyperparams["steering_alpha"], layer_id
-                    )
-                else:
-                    prediction = self._generate_baseline(question)
-            except Exception as e:
-                self.logger.warning(f"Generation failed: {e}")
-                prediction = "Error"
-            
-            # Log model answer and ground truth
-            self.logger.debug(f"Model answer: ...{prediction[-50:]}")
-            self.logger.debug(f"Ground truth: {ground_truth}")
-            
-            predictions.append(prediction)
+            questions.append(question)
             ground_truths.append(ground_truth)
+        
+        # Generate predictions using batched approach
+        if questions:
+            if steering_instance is None:
+                predictions = self._generate_baseline_batched(questions)
+            else:
+                predictions = self._generate_with_steering_batched(
+                    steering_instance, questions, hyperparams["steering_alpha"], layer_id
+                )
+            
+            # Log sample predictions for debugging
+            for i, (pred, gt) in enumerate(zip(predictions[:3], ground_truths[:3])):
+                self.logger.debug(f"{method_name.upper()} Sample {i} - Model: ...{pred[-50:] if pred else 'None'}")
+                self.logger.debug(f"{method_name.upper()} Sample {i} - Ground truth: {gt}")
+        else:
+            predictions = []
         
         if not predictions:
             return 0.0
@@ -717,6 +722,128 @@ class OptimizationPipeline:
         response = self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
         return response.strip()
     
+    def _generate_baseline_batched(self, questions: List[str]) -> List[str]:  # TODO
+        """Generate baseline responses in batches without steering."""
+        if not questions:
+            return []
+        
+        batch_size = self.config.batch_size
+        all_responses = []
+        
+        # Process questions in batches
+        for i in range(0, len(questions), batch_size):
+            batch_questions = questions[i:i + batch_size]
+            
+            # Batch tokenization with padding
+            inputs = self.tokenizer(
+                batch_questions, 
+                return_tensors="pt", 
+                padding=True, 
+                truncation=True,
+                max_length=self.config.max_length
+            ).to(self.device)
+            
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=self.config.max_new_tokens,
+                    do_sample=self.config.do_sample,
+                    temperature=self.config.temperature if self.config.do_sample else 1.0,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id
+                )
+            
+            # Decode responses
+            batch_responses = []
+            for j, output in enumerate(outputs):
+                input_length = inputs.input_ids[j].shape[0]
+                response = self.tokenizer.decode(output[input_length:], skip_special_tokens=True)
+                batch_responses.append(response.strip())
+            
+            all_responses.extend(batch_responses)
+        
+        return all_responses
+    
+    def _generate_with_steering_batched(self, steering_instance: Any, questions: List[str], 
+                                       alpha: float, layer_id: int) -> List[str]:
+        """Generate responses with steering applied in batches using apply_steering()."""
+        if not questions:
+            return []
+        
+        batch_size = self.config.batch_size
+        all_responses = []
+        
+        # Process questions in batches
+        for i in range(0, len(questions), batch_size):
+            batch_questions = questions[i:i + batch_size]
+            
+            # Batch tokenization with padding
+            inputs = self.tokenizer(
+                batch_questions, 
+                return_tensors="pt", 
+                padding=True, 
+                truncation=True,
+                max_length=self.config.max_length
+            ).to(self.device)
+            
+            def steering_hook(module, input, output):
+                """Hook that applies steering using the steering method's apply_steering()."""
+                if isinstance(output, tuple):
+                    hidden_states = output[0]
+                else:
+                    hidden_states = output
+                
+                # Apply steering using the method's apply_steering() function
+                steered = steering_instance.apply_steering(
+                    hidden_states, 
+                    strength=alpha
+                )
+                
+                if isinstance(output, tuple):
+                    return (steered,) + output[1:]
+                else:
+                    return steered
+            
+            # Register hook on target layer
+            if hasattr(self.model, 'transformer'):
+                if layer_id >= len(self.model.transformer.h):
+                    raise ValueError(f"layer_id {layer_id} exceeds model layers")
+                target_layer = self.model.transformer.h[layer_id]
+            elif hasattr(self.model, 'model'):
+                if layer_id >= len(self.model.model.layers):
+                    raise ValueError(f"layer_id {layer_id} exceeds model layers")
+                target_layer = self.model.model.layers[layer_id]
+            else:
+                raise ValueError(f"Unknown model architecture")
+            
+            handle = target_layer.register_forward_hook(steering_hook)
+            
+            try:
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=self.config.max_new_tokens,
+                        do_sample=self.config.do_sample,
+                        temperature=self.config.temperature if self.config.do_sample else 1.0,
+                        pad_token_id=self.tokenizer.eos_token_id,
+                        eos_token_id=self.tokenizer.eos_token_id
+                    )
+                
+                # Decode responses
+                batch_responses = []
+                for j, output in enumerate(outputs):
+                    input_length = inputs.input_ids[j].shape[0]
+                    response = self.tokenizer.decode(output[input_length:], skip_special_tokens=True)
+                    batch_responses.append(response.strip())
+                
+                all_responses.extend(batch_responses)
+                
+            finally:
+                # Always remove the hook
+                handle.remove()
+        
+        return all_responses
+    
     def _final_evaluation(self, best_trial: optuna.Trial) -> Dict[str, Any]:
         """Run final evaluation on test split with best configuration."""
         self.logger.info("🏆 Running final evaluation with best configuration...")
@@ -794,8 +921,9 @@ class OptimizationPipeline:
     
     def _generate_test_predictions(self, steering_instance: Any, method_name: str, 
                                  layer_id: int, alpha: float) -> Tuple[List[str], List[str]]:
-        """Generate predictions on test data with or without steering."""
-        predictions = []
+        """Generate predictions on test data using batched generation."""
+        # Collect all questions and ground truths for batching
+        questions = []
         ground_truths = []
         
         task = get_task(self.config.test_dataset)
@@ -808,32 +936,31 @@ class OptimizationPipeline:
                 
             question = qa_pair['formatted_question']
             ground_truth = qa_pair['correct_answer']
-            
-            # Generate prediction
+            questions.append(question)
+            ground_truths.append(ground_truth)
+        
+        # Process all questions with appropriate batched method
+        if questions:
             try:
                 if steering_instance is None:
-                    # Baseline generation
-                    prediction = self._generate_baseline(question)
-                elif method_name == "dac":
-                    prediction = self._generate_with_dac_steering(
-                        steering_instance, question, alpha, layer_id
-                    )
-                elif method_name == "caa":
-                    prediction = self._generate_with_caa_steering(
-                        steering_instance, question, alpha, layer_id
-                    )
+                    # Baseline generation - use batched method
+                    predictions = self._generate_baseline_batched(questions)
                 else:
-                    prediction = self._generate_baseline(question)
+                    # Use unified batched generation with apply_steering()
+                    predictions = self._generate_with_steering_batched(
+                        steering_instance, questions, alpha, layer_id
+                    )
+                
+                # Log sample predictions for debugging
+                for i, (pred, gt) in enumerate(zip(predictions[:3], ground_truths[:3])):
+                    self.logger.debug(f"Test Sample {i} - Model: ...{pred[-50:] if pred else 'None'}")
+                    self.logger.debug(f"Test Sample {i} - Ground truth: {gt}")
+                    
             except Exception as e:
-                self.logger.warning(f"Generation failed for sample: {e}")
-                prediction = "Error"
-            
-            # Log model answer and ground truth for test evaluation
-            self.logger.debug(f"Test - Model answer: ...{prediction[-50:]}")
-            self.logger.debug(f"Test - Ground truth: {ground_truth}")
-            
-            predictions.append(prediction)
-            ground_truths.append(ground_truth)
+                self.logger.warning(f"Batched generation failed for test: {e}")
+                predictions = ["Error"] * len(questions)
+        else:
+            predictions = []
         
         return predictions, ground_truths
     
@@ -1008,6 +1135,7 @@ def main():
     # Create configuration
     config = OptimizationConfig(
         train_limit=100,
+        contrastive_pairs_limit=30,  # Bounded by train_limit
         val_limit=50,
         test_limit=50,
         n_trials=20,
