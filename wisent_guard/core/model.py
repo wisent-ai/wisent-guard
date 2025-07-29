@@ -11,6 +11,7 @@ class PromptFormat(Enum):
     LEGACY = "legacy"
     LLAMA31 = "llama31"
     MISTRAL = "mistral"
+    QWEN = "qwen"
 
 class TokenScore:
     """Stores information about a token and its similarity to harmful content."""
@@ -135,6 +136,8 @@ class Model:
             return PromptFormat.LLAMA31
         elif "mistral" in model_name:
             return PromptFormat.MISTRAL
+        elif "qwen" in model_name:
+            return PromptFormat.QWEN
         elif "gpt2" in model_name or "distilgpt2" in model_name:
             return PromptFormat.LEGACY
         else:
@@ -167,6 +170,10 @@ class Model:
             # Mistral uses instruction format
             self.user_token = "[INST]"
             self.assistant_token = "[/INST]"
+        elif self.format_type == PromptFormat.QWEN:
+            # Qwen uses system/user/assistant roles with special tokens
+            self.user_token = "user"
+            self.assistant_token = "assistant"
         elif self.format_type == PromptFormat.LEGACY:
             # Check for user-defined tokens
             if user_model_configs.has_config(self.name):
@@ -219,6 +226,15 @@ class Model:
                 return f"{INST_START} {prompt} {INST_END} {response}"
             else:
                 return f"{INST_START} {prompt} {INST_END}"
+        elif self.format_type == PromptFormat.QWEN:
+            # Qwen format using special tokens
+            IM_START = "<|im_start|>"
+            IM_END = "<|im_end|>"
+            
+            if response is not None:
+                return f"{IM_START}user\n{prompt}{IM_END}\n{IM_START}assistant\n{response}{IM_END}"
+            else:
+                return f"{IM_START}user\n{prompt}{IM_END}\n{IM_START}assistant\n"
         else:
             # Legacy format
             if response is not None:
@@ -1118,6 +1134,8 @@ class ActivationHooks:
                 return "llama"
             elif "mistral" in model_name:
                 return "mistral"
+            elif "qwen" in model_name:
+                return "qwen"
             elif "mpt" in model_name:
                 return "mpt"
         
@@ -1128,6 +1146,8 @@ class ActivationHooks:
         if model_type == "llama":
             return f"model.layers.{layer_idx}"
         elif model_type == "mistral":
+            return f"model.layers.{layer_idx}"
+        elif model_type == "qwen":
             return f"model.layers.{layer_idx}"
         elif model_type == "mpt":
             return f"transformer.blocks.{layer_idx}"

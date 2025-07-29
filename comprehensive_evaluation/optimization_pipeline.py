@@ -636,8 +636,16 @@ class OptimizationPipeline:
             if steering_instance is None:
                 predictions = self._generate_baseline_batched(questions)
             else:
+                # Extract the appropriate strength parameter based on method
+                if method_name == "dac":
+                    # DAC uses steering_alpha as base strength multiplier
+                    strength = hyperparams.get("steering_alpha", 1.0)
+                else:
+                    # CAA and other methods use steering_alpha directly
+                    strength = hyperparams["steering_alpha"]
+                
                 predictions = self._generate_with_steering_batched(
-                    steering_instance, questions, hyperparams["steering_alpha"], layer_id
+                    steering_instance, questions, strength, layer_id
                 )
             
             # Log sample predictions for debugging
@@ -659,8 +667,8 @@ class OptimizationPipeline:
     
     def _generate_with_dac_steering(self, dac: DAC, question: str, alpha: float, layer_id: int) -> str:
         """Generate response with DAC steering applied."""
-        # DAC steering is dynamic and complex - for now use simplified approach
-        return self._generate_with_steering_hook(question, dac.steering_vector, layer_id, alpha)
+        # Use the general steering method which calls DAC's apply_steering
+        return self._generate_with_steering(dac, question, alpha, layer_id)
     
     def _generate_with_caa_steering(self, caa, question: str, alpha: float, layer_id: int) -> str:
         """Generate response with CAA steering applied."""
@@ -881,8 +889,18 @@ class OptimizationPipeline:
         
         # Generate steered predictions
         self.logger.info("Generating steered predictions...")
+        
+        # Extract the appropriate strength parameter based on method and available parameters
+        method_name = best_params["steering_method"]
+        if method_name == "dac":
+            # DAC can use base_strength or steering_alpha, with fallback to 1.0
+            strength = best_params.get("base_strength", best_params.get("steering_alpha", 1.0))
+        else:
+            # CAA and other methods use steering_alpha
+            strength = best_params["steering_alpha"]
+        
         steered_predictions, _ = self._generate_test_predictions(
-            steering_instance, best_params["steering_method"], layer_id, best_params["steering_alpha"]
+            steering_instance, method_name, layer_id, strength
         )
         
         # Calculate benchmark metrics

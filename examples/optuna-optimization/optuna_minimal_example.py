@@ -50,18 +50,18 @@ def create_minimal_config() -> OptimizationConfig:
         val_limit=20,                # Validation samples to load (all used for evaluation)
         test_limit=50,               # Test samples to load
         
-        # Optuna configuration: Few trials to see clear pattern
-        study_name="minimal_example_test",
-        db_url="sqlite:///optuna_minimal_test.db",
-        n_trials=3,  # 3 trials to test the integration
-        n_startup_trials=1,  # 1 random trial then TPE
+        # Optuna configuration: More trials to test both methods
+        study_name="minimal_example_test_dac_fix",
+        db_url="sqlite:///optuna_minimal_test_dac_fix.db",
+        n_trials=6,  # 6 trials to test both CAA and DAC methods
+        n_startup_trials=2,  # 2 random trials then TPE
         sampler="TPE",
         pruner="MedianPruner",
         
-        # Search space: Single layer, single method for clarity
+        # Search space: Single layer, test both methods
         layer_search_range=(10, 10),  # Single layer for speed
         probe_type="logistic_regression",  # Fixed probe type
-        steering_methods=["caa"],  # CAA is simpler than DAC
+        steering_methods=["caa", "dac"],  # Test both CAA and DAC to verify fix
         
         # Generation: Deterministic for reproducible results
         temperature=0.0,
@@ -95,12 +95,21 @@ class MinimalSteeringPipeline(OptimizationPipeline):
             layer_id = trial.suggest_int("layer_id", 10, 10)  # Fixed but still in trial params
             probe_type = trial.suggest_categorical("probe_type", ["logistic_regression"])
             probe_c = trial.suggest_float("probe_c", 0.1, 10.0, log=True)
-            steering_method = trial.suggest_categorical("steering_method", ["caa"])
+            steering_method = trial.suggest_categorical("steering_method", ["caa", "dac"])
             
-            # SMALL steering range: expect optimal near 0.0
-            steering_alpha = trial.suggest_float("steering_alpha", 0.0, 0.3)
+            # Set up method-specific hyperparameters
+            hyperparams = {}
+            if steering_method == "dac":
+                # DAC-specific parameters
+                hyperparams["steering_alpha"] = trial.suggest_float("steering_alpha", 0.0, 0.3)
+                hyperparams["entropy_threshold"] = trial.suggest_float("entropy_threshold", 0.5, 2.0)
+                hyperparams["ptop"] = trial.suggest_float("ptop", 0.2, 0.8)
+                hyperparams["max_alpha"] = trial.suggest_float("max_alpha", 1.0, 3.0)
+            elif steering_method == "caa":
+                # CAA-specific parameters
+                hyperparams["steering_alpha"] = trial.suggest_float("steering_alpha", 0.0, 0.3)
             
-            self.logger.info(f"Trial {trial.number}: Testing α={steering_alpha:.3f}")
+            self.logger.info(f"Trial {trial.number}: Testing {steering_method} with α={hyperparams['steering_alpha']:.3f}")
             
             # Step 1: Train probe
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
@@ -111,15 +120,15 @@ class MinimalSteeringPipeline(OptimizationPipeline):
             
             # Step 2: Train steering method
             steering_instance = self._train_steering_method(
-                trial, steering_method, layer_id, {"steering_alpha": steering_alpha}
+                trial, steering_method, layer_id, hyperparams
             )
             
             # Step 3: Evaluate on validation
             validation_accuracy = self._evaluate_steering_on_validation(
-                steering_instance, steering_method, layer_id, {"steering_alpha": steering_alpha}
+                steering_instance, steering_method, layer_id, hyperparams
             )
             
-            self.logger.info(f"Trial {trial.number}: α={steering_alpha:.3f} → accuracy={validation_accuracy:.3f}")
+            self.logger.info(f"Trial {trial.number}: {steering_method} α={hyperparams['steering_alpha']:.3f} → accuracy={validation_accuracy:.3f}")
             
             trial.report(validation_accuracy, step=1)
             return validation_accuracy
