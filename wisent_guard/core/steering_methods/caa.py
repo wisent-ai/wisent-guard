@@ -4,11 +4,14 @@ Contrastive Activation Addition (CAA) steering method.
 
 from typing import Dict, Any, Optional
 import torch
+import logging
 
 from .base import SteeringMethod
 from ..contrastive_pairs import ContrastivePairSet
 from ..aggregation import ControlVectorAggregationMethod, create_control_vector_from_contrastive_pairs
 from ..normalization import VectorNormalizer, VectorNormalizationMethod
+
+logger = logging.getLogger(__name__)
 
 
 class CAA(SteeringMethod):
@@ -190,11 +193,11 @@ class CAA(SteeringMethod):
             steering_vector = self.steering_vector.to(activations.device)
         
         if verbose:
-            print(f"\n🔍 CAA apply_steering called:")
-            print(f"   Input shape: {activations.shape}")
-            print(f"   Strength: {strength}")
-            print(f"   Vector norm: {torch.norm(steering_vector).item():.4f}")
-            print(f"   Input norm (mean): {torch.norm(activations, dim=-1).mean().item():.4f}")
+            logger.debug(f"CAA apply_steering called:")
+            logger.debug(f"   Input shape: {activations.shape}")
+            logger.debug(f"   Strength: {strength}")
+            logger.debug(f"   Vector norm: {torch.norm(steering_vector).item():.4f}")
+            logger.debug(f"   Input norm (mean): {torch.norm(activations, dim=-1).mean().item():.4f}")
         
         # Handle different activation shapes
         if len(activations.shape) == 3:  # [batch, seq, hidden]
@@ -205,23 +208,23 @@ class CAA(SteeringMethod):
                 before_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
                 
                 # LOG THE ACTUAL STEERING BEING APPLIED
-                print(f"\n   🎯 CAA APPLYING STEERING:")
-                print(f"      Strength parameter: {strength}")
-                print(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
-                print(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
+                logger.debug(f"   🎯 CAA APPLYING STEERING:")
+                logger.debug(f"      Strength parameter: {strength}")
+                logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
+                logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
                 
                 steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
                 after_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
                 
-                print(f"      Position -2 norm before: {before_norm:.4f}")
-                print(f"      Position -2 norm after: {after_norm:.4f}")
-                print(f"      Change: {after_norm - before_norm:.4f}")
+                logger.debug(f"      Position -2 norm before: {before_norm:.4f}")
+                logger.debug(f"      Position -2 norm after: {after_norm:.4f}")
+                logger.debug(f"      Change: {after_norm - before_norm:.4f}")
                 
                 # Check if we created inf/nan
                 if torch.any(torch.isinf(steered)) or torch.any(torch.isnan(steered)):
-                    print(f"      ⚠️ CRITICAL: Steering created inf/nan values!")
-                    print(f"      Max in steered: {steered.max().item()}")
-                    print(f"      Min in steered: {steered.min().item()}")
+                    logger.debug(f"      ⚠️ CRITICAL: Steering created inf/nan values!")
+                    logger.debug(f"      Max in steered: {steered.max().item()}")
+                    logger.debug(f"      Min in steered: {steered.min().item()}")
             else:
                 # Fallback to last token for single-token sequences
                 steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
