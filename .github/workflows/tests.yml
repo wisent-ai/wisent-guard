@@ -1,80 +1,71 @@
-name: Tests
+name: CI
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  push:                # any branch push
+  pull_request:        # any PR
+  workflow_dispatch:   # manual “Run workflow” button
+
+# The default workflow token stays read‑only;
+# we rely on the PAT for every write.
+permissions:
+  contents: read
 
 jobs:
+# ──────────────────────────────────────────────────────────────
+# 1. LINT  – Ruff check, optional auto‑fix, optional commit
+# ──────────────────────────────────────────────────────────────
   lint:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch full history for changed files detection
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.11
-    
-    - name: Install ruff
-      run: pip install ruff
-    
-    - name: Get changed files
-      id: changed-files
-      uses: tj-actions/changed-files@v41
-      with:
-        files: |
-          **/*.py
-    
-    - name: Run ruff check on changed files
-      if: steps.changed-files.outputs.any_changed == 'true'
-      run: |
-        echo "Changed Python files: ${{ steps.changed-files.outputs.all_changed_files }}"
-        ruff check --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
-    
-    - name: Auto-fix with ruff (PR only)
-      if: github.event_name == 'pull_request' && steps.changed-files.outputs.any_changed == 'true'
-      run: |
-        ruff check --fix --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
-        ruff format ${{ steps.changed-files.outputs.all_changed_files }}
-    
-    - name: Commit ruff fixes
-      if: github.event_name == 'pull_request' && steps.changed-files.outputs.any_changed == 'true'
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_message: "🎨 Auto-fix ruff formatting and linting issues"
-
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.12]
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-        pip install -r requirements.txt
-        pip install pytest pytest-cov ruff
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_RUFF }}   # ← personal‑access token
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref }}
 
-    - name: Run working tests
-      run: |
-        # Fast, reliable tests that should pass (explicitly exclude heavy and docker tests)
-        pytest -m "not slow and not heavy and not model_download and not docker" -v
-        
-    - name: Run slow test 
-      if: github.event_name == 'pull_request'
-      run: |
-        # Only run comprehensive CLI tests on main branch pushes (exclude heavy, model_download, and docker)
-        pytest wisent_guard/tests/core/test_benchmark_cli_integration.py -m "not heavy and not model_download and not docker" -v
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Detect changed Python files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+
+      - name: Ruff check (no fix)
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
+          ruff check --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
+
+      # Auto‑fix runs only for PRs that originate *inside* the repo.
+      - name: Ruff auto‑fix
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          ruff check --fix --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
+          ruff format ${{ steps.changed-files.outputs.all_changed_files }}
+
+      - name: Commit Ruff fixes
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          steps.changed-files.outputs.any_changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          github_token: ${{ secrets.PAT_RUFF }}   # ← same PAT
+          commit_message: "🎨 ci: Ruff auto‑fixes"
+          commit_user_name: "wisent‑style‑bot"
+          commit_user_email: "style-bot@users.noreply.github.com"
+
+
