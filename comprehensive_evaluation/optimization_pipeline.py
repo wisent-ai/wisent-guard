@@ -185,9 +185,14 @@ class OptimizationPipeline:
         # Initialize cache
         self.cache = ActivationCache(config.cache_dir)
         
-        # Initialize WandB if available and configured
+        # Initialize WandB if configured
         self.wandb_run = None
-        if config.use_wandb and WANDB_AVAILABLE:
+        if config.use_wandb:
+            if not WANDB_AVAILABLE:
+                raise ImportError(
+                    "WandB integration enabled but wandb is not installed. "
+                    "Install with: pip install wandb"
+                )
             self._init_wandb()
         
         self.model = None
@@ -1069,9 +1074,15 @@ class OptimizationPipeline:
             )
             self.logger.info(f"WandB initialized: {wandb.run.url}")
         except Exception as e:
-            self.logger.warning(f"Failed to initialize WandB: {e}")
-            self.config.use_wandb = False
-            self.wandb_run = None
+            # Don't silently disable - user explicitly requested WandB
+            raise RuntimeError(
+                f"Failed to initialize WandB: {e}\n"
+                f"Possible solutions:\n"
+                f"1. Run 'wandb login' to authenticate\n"
+                f"2. Check your internet connection\n"
+                f"3. Verify project name: {self.config.wandb_project}\n"
+                f"4. Set use_wandb=False to disable WandB"
+            ) from e
     
     def _log_trial_to_wandb(self, trial: optuna.Trial, metrics: Dict[str, float]):
         """Log trial results to WandB."""
