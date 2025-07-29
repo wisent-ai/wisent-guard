@@ -10,9 +10,9 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
 
 # Import task interface for dynamic task loading
-from ...task_interface import get_task
+from ..task_interface import get_task
 # Import LMEvalHarnessGroundTruth for intelligent evaluation (same approach as CLI)
-from ...lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+from ..lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 
 
 logger = logging.getLogger(__name__)

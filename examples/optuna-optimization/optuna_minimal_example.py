@@ -25,7 +25,7 @@ import optuna
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from comprehensive_evaluation.optimization_pipeline import OptimizationPipeline, OptimizationConfig
+from wisent_guard.core.optuna.optuna_pipeline import OptimizationPipeline, OptimizationConfig
 
 # No environment variables needed - all config in script
 

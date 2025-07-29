@@ -36,7 +36,7 @@ try:
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
-from wisent_guard.core.evaluation.comprehensive import (
+from wisent_guard.core.optuna import (
     data_utils,
     metrics
 )

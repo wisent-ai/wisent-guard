@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc
 import logging
 
 # Import LMEvalHarnessGroundTruth for intelligent evaluation (newer approach used by CLI)
-from ...lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+from ..lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 
 logger = logging.getLogger(__name__)
 

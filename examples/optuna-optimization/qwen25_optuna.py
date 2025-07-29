@@ -64,14 +64,14 @@ import torch
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from comprehensive_evaluation.optimization_pipeline import OptimizationConfig, OptimizationPipeline
+from wisent_guard.core.optuna.optuna_pipeline import OptimizationConfig, OptimizationPipeline
 
 
 def get_recommended_config_for_qwen7b() -> Dict[str, Any]:
     """Get recommended configuration values for Qwen2.5 7B optimization."""
     return {
         "model_name": "Qwen/Qwen2.5-7B",
-        "batch_size": 4,  # Recommended: ~20GB VRAM, good balance
+        "batch_size": 8,  # Recommended: ~20GB VRAM, good balance
         "max_new_tokens": 256,
         "layer_search_range": (14, 19),  # Layers 14-19 typically good for 7B models
         "train_limit": 100,
