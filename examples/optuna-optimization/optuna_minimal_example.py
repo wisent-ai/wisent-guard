@@ -26,12 +26,14 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from optimization_pipeline import OptimizationPipeline, OptimizationConfig
 
+# No environment variables needed - all config in script
+
 
 def create_minimal_config() -> OptimizationConfig:
     """Create minimal config for fine-tuned model testing."""
     return OptimizationConfig(
         # Model: Fine-tuned on GSM8K with ~27% accuracy
-        model_name="realtreetune/rho-1b-sft-GSM8K",
+        model_name="jup",
         
         # Datasets: Use hendrycks_math for training, GSM8K for val/test
         train_dataset="hendrycks_math",
@@ -44,7 +46,8 @@ def create_minimal_config() -> OptimizationConfig:
         test_limit=50,   # Enough for final evaluation
         
         # Optuna configuration: Few trials to see clear pattern
-        n_trials=3,  # 8 trials to explore small range
+        study_name="minimal_example_test",
+        n_trials=3,  # 3 trials to test the integration
         
         # Search space: Single layer, single method for clarity
         layer_search_range=(10, 10),  # Single layer for speed
@@ -58,6 +61,9 @@ def create_minimal_config() -> OptimizationConfig:
         # Output
         output_dir="outputs/optuna_minimal_example",
         cache_dir="cache/optuna_minimal_example",
+        
+        # Disable WandB for testing
+        use_wandb=False,
         
         # Efficiency
         batch_size=4,

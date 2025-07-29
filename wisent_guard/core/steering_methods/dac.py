@@ -647,7 +647,7 @@ class DAC(SteeringMethod):
             active_properties: List of property names to activate
             max_new_tokens: Maximum tokens to generate
             temperature: Sampling temperature
-            top_p: Nucleus sampling parameter
+            top_p: Nucleus sampling parameter # TODO The following generation flags are not valid and may be ignored: ['top_p']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
             do_sample: Whether to use sampling
             verbose: Whether to print debug info
             

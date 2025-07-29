@@ -14,14 +14,14 @@ Key features:
 - Reproducibility bundle generation
 """
 
-import os
 import json
 import pickle
 import hashlib
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, asdict, field
 import numpy as np
 
@@ -29,11 +29,14 @@ import torch
 import optuna
 from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
 from optuna.samplers import TPESampler
-import joblib
 
-# Wisent Guard imports
+# Optional WandB integration
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 from wisent_guard.core.evaluation.comprehensive import (
-    ComprehensiveEvaluationConfig,
     data_utils,
     metrics
 )
@@ -48,46 +51,43 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OptimizationConfig:
     """Configuration for dataset-agnostic optimization pipeline."""
-    # Model and data
-    model_name: str = "PradhyumnaPoralla/gpt2_gsm8k_CLM"  # 5% accuracy on GSM8K
+    model_name: str = "realtreetune/rho-1b-sft-GSM8K"
     device: str = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
     
-    # Dataset configuration (fully configurable)
-    train_dataset: str = "hendrycks_math"  # Use hendrycks_math for training
-    val_dataset: str = "gsm8k"             # Use GSM8K for validation
-    test_dataset: str = "gsm8k"            # Use GSM8K for testing
+    train_dataset: str = "gsm8k"
+    val_dataset: str = "gsm8k"
+    test_dataset: str = "gsm8k"
     
-    # Sample limits
-    train_limit: int = 500
-    val_limit: int = 200
-    test_limit: int = 300
+    train_limit: int = 50
+    val_limit: int = 50
+    test_limit: int = 50
     
-    # Search space
-    layer_search_range: Tuple[int, int] = (6, 12)  # Last 6 blocks for GPT2-like model
-    probe_types: List[str] = field(default_factory=lambda: ["logistic_regression"])
-    steering_methods: List[str] = field(default_factory=lambda: ["dac", "caa"])
+    layer_search_range: Tuple[int, int] = (15, 20)
+    probe_type: str = "logistic_regression"  # Fixed probe type
+    steering_methods: List[str] = field(default_factory=lambda: ["dac", "caa"]) # TODO add more
     
-    # Optuna configuration
+    # Optuna study configuration
     study_name: str = "optimization_pipeline"
+    db_url: str = field(default_factory=lambda: f"sqlite:///{os.path.dirname(os.path.dirname(__file__))}/optuna_studies.db")
     n_trials: int = 50
-    sampler: str = "TPE"  # TPE, Random, CmaEs
-    pruner: str = "MedianPruner"  # MedianPruner, SuccessiveHalvingPruner
+    sampler: str = "TPE"
+    pruner: str = "MedianPruner"
     
-    # Technical parameters
+    # WandB configuration
+    wandb_project: str = "wisent-guard-optimization"
+    use_wandb: bool = False
+    
     batch_size: int = 8
     max_length: int = 512
     max_new_tokens: int = 256
     seed: int = 42
     
-    # Generation parameters
-    temperature: float = 0.0  # 0.0 for deterministic, >0.0 for random sampling
-    do_sample: bool = False   # True for sampling, False for greedy/deterministic
+    temperature: float = 0.0
+    do_sample: bool = False
     
-    # Output configuration
     output_dir: str = "outputs/optimization_pipeline"
     cache_dir: str = "cache/optimization_pipeline"
     
-    # Efficiency controls
     max_layers_to_search: int = 6
     early_stopping_patience: int = 10
     
@@ -181,14 +181,16 @@ class OptimizationPipeline:
         # Initialize cache
         self.cache = ActivationCache(config.cache_dir)
         
-        # Model and data storage
+        # Initialize WandB if available and configured
+        self.wandb_run = None
+        if config.use_wandb and WANDB_AVAILABLE:
+            self._init_wandb()
+        
         self.model = None
         self.tokenizer = None
         self.train_samples = None
         self.val_samples = None
         self.test_samples = None
-        
-        # Tokenization config for caching
         self.tokenization_config = {
             'max_length': config.max_length,
             'padding': True,
@@ -202,21 +204,15 @@ class OptimizationPipeline:
         self.logger.info("🚀 STARTING OPTIMIZATION PIPELINE WITH OPTUNA")
         self.logger.info("="*80)
         
-        # Phase 0: Setup
         self._setup_experiment()
-        
-        # Phase 1: Create Optuna study
         study = self._create_optuna_study()
-        
-        # Phase 2: Run optimization
         study.optimize(self._objective_function, n_trials=self.config.n_trials)
-        
-        # Phase 3: Final evaluation with best configuration
         best_trial = study.best_trial
         final_results = self._final_evaluation(best_trial)
-        
-        # Phase 4: Save reproducibility bundle
         self._save_reproducibility_bundle(study, final_results)
+        
+        # Log final results to WandB
+        self._log_final_results_to_wandb(study, final_results)
         
         self.logger.info("✅ Optimization completed successfully!")
         return final_results
@@ -225,13 +221,25 @@ class OptimizationPipeline:
         """Setup model, tokenizer, and load datasets."""
         self.logger.info("📊 Setting up experiment...")
         
-        # Load model and tokenizer
+        # Load model and tokenizer with memory optimizations
         from transformers import AutoTokenizer, AutoModelForCausalLM
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.model_name).to(self.device)
+        
+        # Load model with memory optimizations (same as comprehensive evaluation)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.config.model_name,
+            torch_dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
+            device_map={"": 0} if self.device.type == "cuda" else None,
+            low_cpu_mem_usage=True
+        )
+        
+        self.model.eval()  # Set to evaluation mode
         
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # Set left padding for decoder-only models (same as comprehensive evaluation)
+        self.tokenizer.padding_side = "left"
         
         # Load datasets
         self.train_samples = data_utils.load_dataset_samples(
@@ -267,8 +275,6 @@ class OptimizationPipeline:
                 if not self.cache.has_cached_activations(split_name, layer_id, self.tokenization_config):
                     self.logger.info(f"Caching activations for {split_name} split, layer {layer_id}")
                     
-                    # Create probe training data (positive and negative examples)
-                    # Use appropriate dataset for each split
                     dataset_name = {
                         "train": self.config.train_dataset,
                         "val": self.config.val_dataset,
@@ -277,7 +283,6 @@ class OptimizationPipeline:
                     
                     activations, labels = self._create_probe_data(samples, layer_id, dataset_name)
                     
-                    # Cache the activations
                     self.cache.save_activations(
                         activations, labels, split_name, layer_id, self.tokenization_config
                     )
@@ -295,27 +300,24 @@ class OptimizationPipeline:
         
         for sample in samples:
             # Extract QA pair
-            qa_pair = extractor.extract_qa_pair(sample, task)
-            if not qa_pair:
-                continue
+            contrastive_pair = extractor.extract_contrastive_pair(sample, task)
                 
-            question = qa_pair['formatted_question']
-            correct_answer = qa_pair['correct_answer']
+            question = contrastive_pair['question']
+            correct_answer = contrastive_pair['correct_answer']
+            incorrect_answer = contrastive_pair['incorrect_answer']
             
-            # Create positive example (correct)
+            # Log contrastive pair details
+            self.logger.debug(f"Contrastive pair - Question: ...{question[-50:]}")
+            self.logger.debug(f"Contrastive pair - Correct: {correct_answer}, Incorrect: {incorrect_answer}")
+            
             correct_text = f"{question} {correct_answer}"
             texts.append(correct_text)
             labels.append(1)
             
-            # Create negative example (generate incorrect answer)
-            # For now, use a simple incorrect answer - in practice you'd want more sophisticated negatives
-            incorrect_answer = "42"  # Simple incorrect answer
-            if incorrect_answer != correct_answer:
-                incorrect_text = f"{question} {incorrect_answer}"
-                texts.append(incorrect_text)
-                labels.append(0)
+            incorrect_text = f"{question} {incorrect_answer}"
+            texts.append(incorrect_text)
+            labels.append(0)
         
-        # Extract activations
         activations = data_utils.extract_activations_with_hook(
             self.model, self.tokenizer, texts, layer_id,
             self.config.batch_size, self.config.max_length, self.device
@@ -324,8 +326,10 @@ class OptimizationPipeline:
         return activations, np.array(labels)
     
     def _create_optuna_study(self) -> optuna.Study:
-        """Create Optuna study with specified sampler and pruner."""
-        self.logger.info("📋 Creating Optuna study...")
+        """Create Optuna study with SQLite persistence and specified sampler/pruner."""
+        self.logger.info("📋 Creating Optuna study with SQLite persistence...")
+        self.logger.info(f"Database: {self.config.db_url}")
+        self.logger.info(f"Study name: {self.config.study_name}")
         
         # Setup sampler
         if self.config.sampler == "TPE":
@@ -343,13 +347,17 @@ class OptimizationPipeline:
         else:
             pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=10)
         
-        # Create study
+        # Create study with SQLite storage
         study = optuna.create_study(
             study_name=self.config.study_name,
+            storage=self.config.db_url,
             direction="maximize",  # Maximize validation accuracy
             sampler=sampler,
-            pruner=pruner
+            pruner=pruner,
+            load_if_exists=True  # Continue existing study if it exists
         )
+        
+        self.logger.info(f"Study created/loaded with {len(study.trials)} existing trials")
         
         return study
     
@@ -363,13 +371,12 @@ class OptimizationPipeline:
                 self.config.layer_search_range[1]
             )
             
-            probe_type = trial.suggest_categorical("probe_type", self.config.probe_types)
-            probe_c = trial.suggest_float("probe_c", 0.01, 100.0, log=True)
+            # Fixed probe type and regularization
+            probe_type = self.config.probe_type  # Always logistic_regression
+            probe_c = 1.0  # Default regularization strength
             
             steering_method = trial.suggest_categorical("steering_method", self.config.steering_methods)
             
-            # Method-specific hyperparameters
-            # TODO this should be moved to the config. 
             if steering_method == "dac":
                 steering_alpha = trial.suggest_float("steering_alpha", 0.1, 5.0)
                 entropy_threshold = trial.suggest_float("entropy_threshold", 0.5, 2.0)
@@ -378,26 +385,28 @@ class OptimizationPipeline:
             elif steering_method == "caa":
                 steering_alpha = trial.suggest_float("steering_alpha", 0.1, 5.0)
             
-            # Step 1: Train probe on training data using cached activations
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
             
-            # Report intermediate result for pruning
             trial.report(probe_score, step=0)
             if trial.should_prune():
                 raise optuna.TrialPruned()
             
-            # Step 2: Train steering method on training data  
             steering_method_instance = self._train_steering_method(
                 trial, steering_method, layer_id, locals()
             )
             
-            # Step 3: Evaluate steering on validation data (must re-run forward passes)
             validation_accuracy = self._evaluate_steering_on_validation(
                 steering_method_instance, steering_method, layer_id, locals()
             )
             
-            # Report final result
             trial.report(validation_accuracy, step=1)
+            
+            # Log to WandB
+            metrics = {
+                "validation_accuracy": validation_accuracy,
+                "probe_score": probe_score
+            }
+            self._log_trial_to_wandb(trial, metrics)
             
             return validation_accuracy
             
@@ -430,15 +439,14 @@ class OptimizationPipeline:
         y_pred_proba = probe.predict_proba(X_val)[:, 1]
         auc_score = roc_auc_score(y_val, y_pred_proba) if len(np.unique(y_val)) > 1 else 0.5
         
-        # Store probe for later use
-        trial.set_user_attr("trained_probe", probe)
+        # Don't store the probe object - it can't be JSON serialized
+        # The probe will be retrained in the final evaluation if needed
         
         return auc_score
     
     def _train_steering_method(self, trial: optuna.Trial, method_name: str, 
                               layer_id: int, hyperparams: Dict[str, Any]) -> Any:
         """Train steering method on training data."""
-        # Create contrastive pairs from training data
         contrastive_pairs = self._create_contrastive_pairs(self.train_samples, layer_id, self.config.train_dataset, limit=50)
         
         if method_name == "dac":
@@ -474,75 +482,116 @@ class OptimizationPipeline:
         samples_to_use = samples[:limit] if limit else samples
         
         for sample in samples_to_use:
-            qa_pair = extractor.extract_qa_pair(sample, task)
-            if qa_pair:
+            contrastive_pair = extractor.extract_contrastive_pair(sample, task)
+            if contrastive_pair:
+                # Log contrastive pair details
+                self.logger.debug(f"Creating contrastive pair - Question: ...{contrastive_pair['question'][-50:]}")
+                self.logger.debug(f"Creating contrastive pair - Correct: {contrastive_pair['correct_answer']}, Incorrect: {contrastive_pair['incorrect_answer']}")
+                
                 positive_response = Response(
-                    text=qa_pair['correct_answer'],
-                    label=1  # Positive label
+                    text=contrastive_pair['correct_answer'],
+                    label=1
                 )
                 negative_response = Response(
-                    text="Wrong answer",  # Simple incorrect answer
-                    label=0  # Negative label
+                    text=contrastive_pair['incorrect_answer'],
+                    label=0
                 )
                 
                 pair = ContrastivePair(
-                    prompt=qa_pair['formatted_question'],
+                    prompt=contrastive_pair['question'],
                     positive_response=positive_response,
                     negative_response=negative_response
                 )
                 contrastive_pairs.append(pair)
         
-        # Create pair set and extract activations
         pair_set = ContrastivePairSet(name=f"{dataset_name}_training", pairs=contrastive_pairs)
         
-        # Extract activations for the contrastive pairs
-        for pair in pair_set.pairs:
-            pos_text = f"{pair.prompt} {pair.positive_response.text}"
-            neg_text = f"{pair.prompt} {pair.negative_response.text}"
+        # Extract activations for all pairs in batches
+        if pair_set.pairs:
+            all_texts = []
+            text_to_pair_mapping = []
             
-            # Extract activations
-            pos_activations = self._extract_single_activation(pos_text, layer_id)
-            neg_activations = self._extract_single_activation(neg_text, layer_id)
+            for pair_idx, pair in enumerate(pair_set.pairs):
+                pos_text = f"{pair.prompt} {pair.positive_response.text}"
+                neg_text = f"{pair.prompt} {pair.negative_response.text}"
+                
+                all_texts.extend([pos_text, neg_text])
+                text_to_pair_mapping.extend([
+                    (pair_idx, 'positive'),
+                    (pair_idx, 'negative')
+                ])
             
-            # Store activations in the responses (as expected by get_activation_pairs)
-            pair.positive_response.activations = pos_activations
-            pair.negative_response.activations = neg_activations
+            all_activations = self._extract_batch_activations(all_texts, layer_id)
+            
+            for text_idx, (pair_idx, response_type) in enumerate(text_to_pair_mapping):
+                activation = all_activations[text_idx]
+                
+                if response_type == 'positive':
+                    pair_set.pairs[pair_idx].positive_response.activations = activation
+                else:
+                    pair_set.pairs[pair_idx].negative_response.activations = activation
         
         return pair_set
     
+    def _extract_batch_activations(self, texts: List[str], layer_id: int) -> List[torch.Tensor]:
+        """Extract activations for multiple texts in batches."""
+        if not texts:
+            return []
+        
+        all_activations = []
+        batch_size = self.config.batch_size
+        
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            
+            inputs = self.tokenizer(
+                batch_texts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.config.max_length
+            ).to(self.device)
+            
+            batch_activations = []
+            
+            def batch_hook_fn(module, input, output):
+                with torch.no_grad():
+                    if isinstance(output, tuple):
+                        hidden_states = output[0]
+                    else:
+                        hidden_states = output
+                    
+                    last_token_acts = hidden_states[:, -1, :].detach().clone()
+                    batch_activations.append(last_token_acts)
+            
+            if hasattr(self.model, 'transformer'):
+                target_layer = self.model.transformer.h[layer_id]
+            elif hasattr(self.model, 'model'):
+                target_layer = self.model.model.layers[layer_id]
+            else:
+                raise ValueError("Unknown model architecture")
+            
+            handle = target_layer.register_forward_hook(batch_hook_fn)
+            
+            try:
+                with torch.no_grad():
+                    _ = self.model(**inputs)
+            finally:
+                handle.remove()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            
+            if batch_activations:
+                batch_tensor = batch_activations[0]
+                for j in range(batch_tensor.shape[0]):
+                    all_activations.append(batch_tensor[j].unsqueeze(0))
+        
+        return all_activations
+    
     def _extract_single_activation(self, text: str, layer_id: int) -> torch.Tensor:
         """Extract activation for a single text."""
-        inputs = self.tokenizer(text, return_tensors="pt", 
-                               padding=True, truncation=True, 
-                               max_length=self.config.max_length).to(self.device)
-        
-        activations = []
-        
-        def hook_fn(module, input, output):
-            if isinstance(output, tuple):
-                hidden_states = output[0]
-            else:
-                hidden_states = output
-            # Get last token activation
-            activations.append(hidden_states[:, -1, :].detach())
-        
-        # Register hook
-        if hasattr(self.model, 'transformer'):
-            target_layer = self.model.transformer.h[layer_id]
-        elif hasattr(self.model, 'model'):
-            target_layer = self.model.model.layers[layer_id]
-        else:
-            raise ValueError("Unknown model architecture")
-        
-        handle = target_layer.register_forward_hook(hook_fn)
-        
-        try:
-            with torch.no_grad():
-                _ = self.model(**inputs)
-        finally:
-            handle.remove()
-        
-        return activations[0] if activations else torch.zeros(1, self.model.config.hidden_size)
+        activations = self._extract_batch_activations([text], layer_id)
+        return activations[0] if activations else torch.zeros(1, self.model.config.hidden_size, device=self.device)
     
     def _evaluate_steering_on_validation(self, steering_instance: Any, method_name: str,
                                        layer_id: int, hyperparams: Dict[str, Any]) -> float:
@@ -580,6 +629,10 @@ class OptimizationPipeline:
             except Exception as e:
                 self.logger.warning(f"Generation failed: {e}")
                 prediction = "Error"
+            
+            # Log model answer and ground truth
+            self.logger.debug(f"Model answer: ...{prediction[-50:]}")
+            self.logger.debug(f"Ground truth: {ground_truth}")
             
             predictions.append(prediction)
             ground_truths.append(ground_truth)
@@ -777,6 +830,10 @@ class OptimizationPipeline:
                 self.logger.warning(f"Generation failed for sample: {e}")
                 prediction = "Error"
             
+            # Log model answer and ground truth for test evaluation
+            self.logger.debug(f"Test - Model answer: ...{prediction[-50:]}")
+            self.logger.debug(f"Test - Ground truth: {ground_truth}")
+            
             predictions.append(prediction)
             ground_truths.append(ground_truth)
         
@@ -861,6 +918,11 @@ class OptimizationPipeline:
             del self.tokenizer
             self.tokenizer = None
         
+        # Finish WandB run
+        if self.wandb_run is not None:
+            wandb.finish()
+            self.wandb_run = None
+        
         # Clean up device memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -869,6 +931,72 @@ class OptimizationPipeline:
         
         import gc
         gc.collect()
+    
+    def _init_wandb(self):
+        """Initialize WandB for experiment tracking."""
+        try:
+            self.wandb_run = wandb.init(
+                project=self.config.wandb_project,
+                name=f"{self.config.study_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                config=self.config.to_dict(),
+                tags=["optuna", "steering", "optimization"],
+                reinit=True
+            )
+            self.logger.info(f"WandB initialized: {wandb.run.url}")
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize WandB: {e}")
+            self.config.use_wandb = False
+            self.wandb_run = None
+    
+    def _log_trial_to_wandb(self, trial: optuna.Trial, metrics: Dict[str, float]):
+        """Log trial results to WandB."""
+        if not self.config.use_wandb or self.wandb_run is None:
+            return
+        
+        try:
+            # Log trial parameters and metrics
+            log_data = {
+                f"trial/{k}": v for k, v in trial.params.items()
+            }
+            log_data.update({
+                f"metrics/{k}": v for k, v in metrics.items()
+            })
+            log_data["trial/number"] = trial.number
+            
+            wandb.log(log_data)
+        except Exception as e:
+            self.logger.warning(f"Failed to log trial to WandB: {e}")
+    
+    def _log_final_results_to_wandb(self, study: optuna.Study, final_results: Dict[str, Any]):
+        """Log final optimization results to WandB."""
+        if not self.config.use_wandb or self.wandb_run is None:
+            return
+        
+        try:
+            # Log best trial results
+            best_params = {f"best/{k}": v for k, v in study.best_params.items()}
+            best_metrics = {
+                "best/validation_accuracy": study.best_value,
+                "best/baseline_accuracy": final_results['baseline_benchmark_metrics']['accuracy'],
+                "best/steered_accuracy": final_results['steered_benchmark_metrics']['accuracy'],
+                "best/accuracy_improvement": final_results['accuracy_improvement'],
+                "study/n_trials": len(study.trials),
+                "study/n_complete_trials": len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+            }
+            
+            wandb.log({**best_params, **best_metrics})
+            
+            # Log optimization history
+            trial_values = [t.value for t in study.trials if t.value is not None]
+            if trial_values:
+                wandb.log({
+                    "optimization/best_value_so_far": max(trial_values),
+                    "optimization/mean_trial_value": np.mean(trial_values),
+                    "optimization/std_trial_value": np.std(trial_values)
+                })
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to log final results to WandB: {e}")
 
 
 def main():
@@ -881,12 +1009,11 @@ def main():
     
     # Create configuration
     config = OptimizationConfig(
-        model_name="PradhyumnaPoralla/gpt2_gsm8k_CLM",  # 5% accuracy on GSM8K
-        train_limit=100,  # Start small for testing
+        train_limit=100,
         val_limit=50,
         test_limit=50,
         n_trials=20,
-        layer_search_range=(4, 8)  # Smaller range for testing
+        layer_search_range=(10, 15)
     )
     
     # Run optimization
