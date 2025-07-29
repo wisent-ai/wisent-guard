@@ -109,7 +109,7 @@ def create_llama_config(args) -> OptimizationConfig:
         steering_methods=["caa", "dac"],
 
         # Optuna study configuration
-        study_name=args.study_name or "llama_8b_steering_optimization",
+        study_name=args.study_name or "llama_8b_steering_optimizationv2",
         db_url=f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/optuna_studies.db",
         n_trials=args.n_trials or defaults["n_trials"],
         sampler="TPE",  # Tree-structured Parzen Estimator
@@ -185,13 +185,7 @@ class LlamaSteeringPipeline(OptimizationPipeline):
             
             # Step 1: Train and evaluate probe
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
-            
             self.logger.info(f"📊 Trial {trial.number}: Probe {probe_type} AUC = {probe_score:.4f}")
-            trial.report(probe_score, step=0)
-            
-            if trial.should_prune(): # TODO
-                self.logger.info(f"✂️ Trial {trial.number}: Pruned after probe evaluation")
-                raise optuna.TrialPruned()
             
             # Step 2: Train steering method
             steering_instance = self._train_steering_method(

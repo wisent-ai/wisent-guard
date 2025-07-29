@@ -387,9 +387,7 @@ class OptimizationPipeline:
             
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
             
-            trial.report(probe_score, step=0)
-            if trial.should_prune():
-                raise optuna.TrialPruned()
+            # Don't prune based on probe score - focus optimization on steering parameters
             
             steering_method_instance = self._train_steering_method(
                 trial, steering_method, layer_id, locals()
@@ -732,9 +730,9 @@ class OptimizationPipeline:
         # Re-train best probe and steering method on training data
         from sklearn.linear_model import LogisticRegression
         
-        # Train best probe
+        # Train best probe with fixed probe_c
         X_train, y_train = self.cache.load_activations("train", layer_id, self.tokenization_config)
-        probe = LogisticRegression(C=best_params["probe_c"], random_state=self.config.seed, max_iter=1000)
+        probe = LogisticRegression(C=1.0, random_state=self.config.seed, max_iter=1000)  # Fixed probe_c
         probe.fit(X_train, y_train)
         
         # Train best steering method
