@@ -126,12 +126,12 @@ def create_llama70b_config(args) -> OptimizationConfig:
         wandb_project=args.wandb_project or "llama70b-steering-optimization",
         use_wandb=args.use_wandb,
         
-        # Generation configuration - Deterministic for reproducibility
+        # Generation configuration - Sampling enabled
         batch_size=args.batch_size or defaults["batch_size"],
         max_length=512,  # Adequate for math problems
         max_new_tokens=defaults["max_new_tokens"],
-        temperature=0.0,  # Deterministic generation
-        do_sample=False,
+        temperature=0.7,  # Enable sampling
+        do_sample=True,
         
         # Performance optimization
         seed=42,
