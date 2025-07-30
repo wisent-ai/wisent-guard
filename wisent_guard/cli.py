@@ -653,7 +653,7 @@ def run_task_pipeline(
                 executor_info = secure_evaluator.get_executor_info()
                 print(f"   • Docker executor ready: {executor_info['image_name']}")
         except Exception as e:
-            # FAIL HARD - No mock execution allowed
+            # FAIL HARD - No fallback execution allowed
             print("\n❌ FATAL ERROR: Docker is required for code execution tasks")
             print(f"   • Task '{task_name}' requires secure Docker execution")
             print(f"   • Docker error: {e}")
@@ -2208,9 +2208,9 @@ def run_task_pipeline(
                     target_norm=target_norm,
                 )
             elif steering_method == "HPR":
-                steering_obj = HPR(device=device, beta=hpr_beta)
+                steering_obj = HPR(device=device)
                 if verbose:
-                    print(f"   • HPR beta: {hpr_beta}")
+                    print(f"   • Using HPR steering")
             elif steering_method == "DAC":
                 steering_obj = DAC(
                     device=device,
@@ -3570,7 +3570,7 @@ The task will be skipped in optimization."""
                         ]  # Single score for cached
                         aggregated_score = classification_result.get("score", 0.5)
 
-                    # Create a mock qa_pair for ground truth evaluation
+                    # Create a qa_pair for ground truth evaluation
                     qa_pair = {
                         "question": cached_item["question"],
                         "correct_answer": "N/A",
@@ -4562,12 +4562,12 @@ def handle_synthetic_command(args):
         sys.exit(1)
 
 
-def _generate_test_scenarios(
-    trait_description: str, num_scenarios: int, model
+def _generate_test_questions(
+    trait_description: str, num_questions: int, model
 ) -> List[str]:
-    """Generate test scenarios for evaluating the steering method."""
+    """Generate test questions for evaluating the steering method."""
     return [
-        f"Test scenario {i+1} for {trait_description}" for i in range(num_scenarios)
+        f"Test question {i+1} for {trait_description}" for i in range(num_questions)
     ]
 
 

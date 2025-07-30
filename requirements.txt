@@ -13,4 +13,5 @@ docker>=5.0.0
 pytest>=6.0.0
 pyyaml>=5.4.0
 requests>=2.25.0
-sentence-transformers>=2.0.0 
+sentence-transformers>=2.0.0
+faiss-cpu==1.11.0.post1
