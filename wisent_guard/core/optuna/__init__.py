@@ -13,28 +13,19 @@ Key components:
 - Modular design for easy extension and testing
 """
 
-from .config import ComprehensiveEvaluationConfig
-from .pipeline import ComprehensiveEvaluationPipeline
+from .optuna_pipeline import OptimizationConfig, OptimizationPipeline
 from .metrics import (
     evaluate_benchmark_performance,
     evaluate_probe_performance,  
     calculate_comprehensive_metrics,
     generate_performance_summary
 )
-from .visualization import (
-    plot_evaluation_results,
-    create_results_dashboard,
-    generate_summary_report
-)
 
 __all__ = [
-    "ComprehensiveEvaluationConfig",
-    "ComprehensiveEvaluationPipeline", 
+    "OptimizationConfig",
+    "OptimizationPipeline", 
     "evaluate_benchmark_performance",
     "evaluate_probe_performance",
     "calculate_comprehensive_metrics",
     "generate_performance_summary",
-    "plot_evaluation_results",
-    "create_results_dashboard",
-    "generate_summary_report"
 ]
