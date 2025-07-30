@@ -211,6 +211,12 @@ class OptimizationPipeline:
         self.logger.info("🚀 STARTING OPTIMIZATION PIPELINE WITH OPTUNA")
         self.logger.info("="*80)
         
+        # Create timestamped run directory
+        self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.run_dir = self.output_dir / f"run_{self.run_timestamp}"
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"📁 Run directory: {self.run_dir}")
+        
         self._setup_experiment()
         study = self._create_optuna_study()
         study.optimize(self._objective_function, n_trials=self.config.n_trials)
@@ -402,7 +408,7 @@ class OptimizationPipeline:
             )
             
             validation_accuracy = self._evaluate_steering_on_validation(
-                steering_method_instance, steering_method, layer_id, locals()
+                steering_method_instance, steering_method, layer_id, locals(), trial.number
             )
             
             trial.report(validation_accuracy, step=1)
@@ -597,7 +603,7 @@ class OptimizationPipeline:
         return activations[0] if activations else torch.zeros(1, self.model.config.hidden_size, device=self.device)
     
     def _evaluate_steering_on_validation(self, steering_instance: Any, method_name: str,
-                                       layer_id: int, hyperparams: dict[str, Any]) -> float:
+                                       layer_id: int, hyperparams: dict[str, Any], trial_number: int = 0) -> float:
         """Evaluate steering method on validation data by re-running forward passes."""
         if steering_instance is None:
             return 0.0
@@ -649,6 +655,9 @@ class OptimizationPipeline:
         
         if not predictions:
             return 0.0
+        
+        # Save detailed validation results to JSON
+        self._save_detailed_validation_results(questions, ground_truths, predictions, trial_number)
         
         # Evaluate benchmark performance
         benchmark_metrics = metrics.evaluate_benchmark_performance(
@@ -877,7 +886,7 @@ class OptimizationPipeline:
         
         # Generate baseline predictions (no steering)
         self.logger.info("Generating baseline predictions...")
-        baseline_predictions, test_ground_truths = self._generate_test_predictions(
+        baseline_predictions, test_ground_truths, test_questions = self._generate_test_predictions(
             None, None, layer_id, 0.0
         )
         
@@ -893,9 +902,13 @@ class OptimizationPipeline:
             # CAA and other methods use steering_alpha
             strength = best_params["steering_alpha"]
         
-        steered_predictions, _ = self._generate_test_predictions(
+        steered_predictions, _, _ = self._generate_test_predictions(
             steering_instance, method_name, layer_id, strength
         )
+        
+        # Save detailed test results to JSON
+        if test_questions and test_ground_truths and baseline_predictions and steered_predictions:
+            self._save_detailed_test_results(test_questions, test_ground_truths, baseline_predictions, steered_predictions)
         
         # Calculate benchmark metrics
         baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
@@ -939,7 +952,7 @@ class OptimizationPipeline:
         return final_results
     
     def _generate_test_predictions(self, steering_instance: Any, method_name: str, 
-                                 layer_id: int, alpha: float) -> tuple[list[str], list[str]]:
+                                 layer_id: int, alpha: float) -> tuple[list[str], list[str], list[str]]:
         """Generate predictions on test data using batched generation."""
         # Collect all questions and ground truths for batching
         questions = []
@@ -981,7 +994,7 @@ class OptimizationPipeline:
         else:
             predictions = []
         
-        return predictions, ground_truths
+        return predictions, ground_truths, questions
     
     def _evaluate_probe_metrics(self, probe, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """Evaluate probe metrics."""
@@ -998,21 +1011,83 @@ class OptimizationPipeline:
             "auc": roc_auc_score(y_test, y_pred_proba) if len(np.unique(y_test)) > 1 else 0.5
         }
     
+    def _save_detailed_validation_results(self, questions: list[str], ground_truths: list[str], 
+                                        predictions: list[str], trial_number: int):
+        """Save detailed validation results to JSON file."""
+        detailed_results = []
+        
+        for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
+            # Evaluate if the answer is correct using metrics module
+            is_correct = metrics.evaluate_response_correctness(model_answer, correct_answer, self.config.val_dataset)
+            
+            detailed_results.append({
+                "row": i,
+                "question": question,
+                "correct_answer": correct_answer,
+                "model_answer": model_answer,
+                "is_correct": is_correct
+            })
+        
+        # Save to JSON file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"validation_detailed_results_trial_{trial_number:03d}_{timestamp}.json"
+        filepath = self.run_dir / filename
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(detailed_results, f, indent=2, ensure_ascii=False)
+        
+        self.logger.info(f"💾 Saved detailed validation results to: {filename}")
+        
+    def _save_detailed_test_results(self, questions: list[str], ground_truths: list[str], 
+                                  baseline_predictions: list[str], steered_predictions: list[str]):
+        """Save detailed test results to JSON file with both baseline and steered answers."""
+        detailed_results = []
+        
+        # Get task for accuracy evaluation
+        task = get_task(self.config.test_dataset)
+        
+        for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
+            zip(questions, ground_truths, baseline_predictions, steered_predictions)):
+            
+            # Evaluate correctness for both baseline and steered answers
+            is_baseline_correct = metrics.evaluate_response_correctness(baseline_answer, correct_answer, self.config.test_dataset)
+            is_correct = metrics.evaluate_response_correctness(steered_answer, correct_answer, self.config.test_dataset)
+            
+            detailed_results.append({
+                "row": i,
+                "question": question,
+                "correct_answer": correct_answer,
+                "baseline_model_answer": baseline_answer,
+                "model_answer": steered_answer,
+                "is_baseline_correct": is_baseline_correct,
+                "is_correct": is_correct
+            })
+        
+        # Save to JSON file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"test_detailed_results_{timestamp}.json"
+        filepath = self.run_dir / filename
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(detailed_results, f, indent=2, ensure_ascii=False)
+        
+        self.logger.info(f"💾 Saved detailed test results to: {filename}")
+        return filename
+    
     def _save_reproducibility_bundle(self, study: optuna.Study, final_results: dict[str, Any]):
         """Save complete reproducibility bundle."""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Save Optuna study
-        study_path = self.output_dir / f"optuna_study_{timestamp}.db"
+        study_path = self.run_dir / f"optuna_study_{self.run_timestamp}.db"
         study.study_name = str(study_path)
         
         # Save configuration
-        config_path = self.output_dir / f"config_{timestamp}.json"
+        config_path = self.run_dir / f"config_{self.run_timestamp}.json"
         with open(config_path, "w") as f:
             json.dump(self.config.to_dict(), f, indent=2)
         
         # Save final results
-        results_path = self.output_dir / f"final_results_{timestamp}.json"
+        results_path = self.run_dir / f"final_results_{self.run_timestamp}.json"
         with open(results_path, "w") as f:
             json.dump(final_results, f, indent=2, default=str)
         
@@ -1023,19 +1098,19 @@ class OptimizationPipeline:
             "model_name": self.config.model_name,
             "random_seed": self.config.seed,
             "commit_hash": self._get_git_commit_hash(),
-            "timestamp": timestamp
+            "timestamp": self.run_timestamp
         }
         
-        best_config_path = self.output_dir / f"best_configuration_{timestamp}.json"
+        best_config_path = self.run_dir / f"best_configuration_{self.run_timestamp}.json"
         with open(best_config_path, "w") as f:
             json.dump(best_config, f, indent=2)
         
         # Save study trials summary
         trials_df = study.trials_dataframe()
-        trials_path = self.output_dir / f"study_trials_{timestamp}.csv"
+        trials_path = self.run_dir / f"study_trials_{self.run_timestamp}.csv"
         trials_df.to_csv(trials_path, index=False)
         
-        self.logger.info(f"💾 Reproducibility bundle saved to: {self.output_dir}")
+        self.logger.info(f"💾 Reproducibility bundle saved to: {self.run_dir}")
         self.logger.info(f"📊 Study database: {study_path}")
         self.logger.info(f"⚙️ Configuration: {config_path}")
         self.logger.info(f"🏆 Results: {results_path}")
