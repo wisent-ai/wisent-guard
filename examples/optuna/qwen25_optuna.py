@@ -73,13 +73,13 @@ def get_recommended_config_for_qwen7b() -> Dict[str, Any]:
         "model_name": "Qwen/Qwen2.5-7B",
         "batch_size": 8,  # Recommended: ~20GB VRAM, good balance
         "max_new_tokens": 256,
-        "layer_search_range": (14, 19),  # Layers 14-19 typically good for 7B models
-        "train_limit": 100,
-        "contrastive_pairs_limit": 50,  # Bounded by train_limit
+        "layer_search_range": (14, 25),  # Layers 14-19 typically good for 7B models
+        "train_limit": 200,
+        "contrastive_pairs_limit": 25,  # Bounded by train_limit
         "val_limit": 100,
         "test_limit": 200,
-        "n_trials": 50,
-        "n_startup_trials": 10,  # Random warmup before TPE
+        "n_trials": 100,
+        "n_startup_trials": 20,  # Random warmup before TPE
     }
 
 
@@ -119,7 +119,7 @@ def create_qwen_config(args) -> OptimizationConfig:
         
         # Dataset configuration - Mathematical reasoning focus
         train_dataset="hendrycks_math",  # Diverse math training data
-        val_dataset="gsm8k",            # GSM8K for optimization target
+        val_dataset="math500",            # GSM8K for optimization target
         test_dataset="gsm8k",           # GSM8K for final evaluation
         
         # Training configuration
