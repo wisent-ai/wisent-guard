@@ -1,16 +1,16 @@
 """
-Comprehensive Evaluation Framework for Wisent Guard
+Optuna-based Optimization Framework for Wisent Guard
 
-This module provides a comprehensive evaluation framework that properly separates:
-1. Benchmark Performance: Model's ability to solve problems  
-2. Probe Performance: Probe's ability to detect correctness from activations
-3. Steering Optimization: Grid search based on benchmark results
+This module provides Optuna-based hyperparameter optimization for steering methods:
+1. Hyperparameter Optimization: Optuna-driven search for best parameters
+2. Evaluation Pipeline: Comprehensive evaluation on multiple datasets
+3. Reproducibility: Complete experiment tracking and reproduction
 
 Key components:
-- ComprehensiveEvaluationPipeline: Main evaluation pipeline
-- ComprehensiveEvaluationConfig: Configuration management
-- Visualization utilities for human-readable results
-- Modular design for easy extension and testing
+- OptimizationPipeline: Main Optuna optimization pipeline
+- OptimizationConfig: Configuration management
+- Evaluation utilities for parameter assessment
+- Data loading and metrics calculation
 """
 
 from .optuna_pipeline import OptimizationConfig, OptimizationPipeline

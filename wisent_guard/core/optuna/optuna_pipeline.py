@@ -14,19 +14,19 @@ Key features:
 - Reproducibility bundle generation
 """
 
-import json
-import pickle
 import hashlib
+import json
 import logging
 import os
+import pickle
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict, field
-import numpy as np
+from typing import Any, Optional
 
-import torch
+import numpy as np
 import optuna
+import torch
 from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
 from optuna.samplers import TPESampler
 
@@ -36,15 +36,12 @@ try:
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
-from wisent_guard.core.optuna import (
-    data_utils,
-    metrics
-)
-from wisent_guard.core.task_interface import get_task
-from wisent_guard.core.steering_methods.dac import DAC
-from wisent_guard.core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
 from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
+from wisent_guard.core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
+from wisent_guard.core.optuna import data_utils, metrics
 from wisent_guard.core.response import Response
+from wisent_guard.core.steering_methods.dac import DAC
+from wisent_guard.core.task_interface import get_task
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +63,9 @@ class OptimizationConfig:
     val_limit: int = 50                      # How many validation samples to load
     test_limit: int = 100                    # How many test samples to load
     
-    layer_search_range: Tuple[int, int] = (15, 20)
+    layer_search_range: tuple[int, int] = (15, 20)
     probe_type: str = "logistic_regression"  # Fixed probe type
-    steering_methods: List[str] = field(default_factory=lambda: ["dac", "caa"]) # TODO add more
+    steering_methods: list[str] = field(default_factory=lambda: ["dac", "caa"]) # TODO add more
     
     # Optuna study configuration
     study_name: str = "optimization_pipeline"
@@ -96,7 +93,7 @@ class OptimizationConfig:
     max_layers_to_search: int = 6
     early_stopping_patience: int = 10
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return asdict(self)
 
@@ -110,7 +107,7 @@ class ActivationCache:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         
     def _generate_cache_key(self, split: str, layer_id: int, 
-                          tokenization_config: Dict[str, Any], 
+                          tokenization_config: dict[str, Any], 
                           prompt_variant: str = "default") -> str:
         """Generate unique cache key for activations."""
         config_str = json.dumps(tokenization_config, sort_keys=True)
@@ -122,7 +119,7 @@ class ActivationCache:
         return self.cache_dir / f"activations_{cache_key}.pkl"
     
     def has_cached_activations(self, split: str, layer_id: int, 
-                             tokenization_config: Dict[str, Any],
+                             tokenization_config: dict[str, Any],
                              prompt_variant: str = "default") -> bool:
         """Check if activations are cached."""
         cache_key = self._generate_cache_key(split, layer_id, tokenization_config, prompt_variant)
@@ -130,33 +127,33 @@ class ActivationCache:
     
     def save_activations(self, activations: np.ndarray, labels: np.ndarray,
                         split: str, layer_id: int, 
-                        tokenization_config: Dict[str, Any],
+                        tokenization_config: dict[str, Any],
                         prompt_variant: str = "default"):
         """Save activations to cache."""
         cache_key = self._generate_cache_key(split, layer_id, tokenization_config, prompt_variant)
         cache_path = self._get_cache_path(cache_key)
         
         cache_data = {
-            'activations': activations,
-            'labels': labels,
-            'metadata': {
-                'split': split,
-                'layer_id': layer_id,
-                'tokenization_config': tokenization_config,
-                'prompt_variant': prompt_variant,
-                'timestamp': datetime.now().isoformat(),
-                'shape': activations.shape
+            "activations": activations,
+            "labels": labels,
+            "metadata": {
+                "split": split,
+                "layer_id": layer_id,
+                "tokenization_config": tokenization_config,
+                "prompt_variant": prompt_variant,
+                "timestamp": datetime.now().isoformat(),
+                "shape": activations.shape
             }
         }
         
-        with open(cache_path, 'wb') as f:
+        with open(cache_path, "wb") as f:
             pickle.dump(cache_data, f)
         
         self.logger.info(f"Cached activations for {split} layer {layer_id}: {activations.shape}")
     
     def load_activations(self, split: str, layer_id: int,
-                        tokenization_config: Dict[str, Any],
-                        prompt_variant: str = "default") -> Tuple[np.ndarray, np.ndarray]:
+                        tokenization_config: dict[str, Any],
+                        prompt_variant: str = "default") -> tuple[np.ndarray, np.ndarray]:
         """Load activations from cache."""
         cache_key = self._generate_cache_key(split, layer_id, tokenization_config, prompt_variant)
         cache_path = self._get_cache_path(cache_key)
@@ -164,11 +161,11 @@ class ActivationCache:
         if not cache_path.exists():
             raise FileNotFoundError(f"No cached activations found for key: {cache_key}")
         
-        with open(cache_path, 'rb') as f:
+        with open(cache_path, "rb") as f:
             cache_data = pickle.load(f)
         
         self.logger.info(f"Loaded cached activations for {split} layer {layer_id}: {cache_data['activations'].shape}")
-        return cache_data['activations'], cache_data['labels']
+        return cache_data["activations"], cache_data["labels"]
 
 
 class OptimizationPipeline:
@@ -202,13 +199,13 @@ class OptimizationPipeline:
         self.val_samples = None
         self.test_samples = None
         self.tokenization_config = {
-            'max_length': config.max_length,
-            'padding': True,
-            'truncation': True,
-            'return_tensors': 'pt'
+            "max_length": config.max_length,
+            "padding": True,
+            "truncation": True,
+            "return_tensors": "pt"
         }
         
-    def run_optimization(self) -> Dict[str, Any]:
+    def run_optimization(self) -> dict[str, Any]:
         """Run the complete optimization pipeline."""
         self.logger.info("="*80)
         self.logger.info("🚀 STARTING OPTIMIZATION PIPELINE WITH OPTUNA")
@@ -232,7 +229,7 @@ class OptimizationPipeline:
         self.logger.info("📊 Setting up experiment...")
         
         # Load model and tokenizer with memory optimizations
-        from transformers import AutoTokenizer, AutoModelForCausalLM
+        from transformers import AutoModelForCausalLM, AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
         
         # Load model with memory optimizations (same as comprehensive evaluation)
@@ -299,7 +296,7 @@ class OptimizationPipeline:
                 else:
                     self.logger.info(f"Activations already cached for {split_name} split, layer {layer_id}")
     
-    def _create_probe_data(self, samples: List[Dict], layer_id: int, dataset_name: str) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_probe_data(self, samples: list[dict], layer_id: int, dataset_name: str) -> tuple[np.ndarray, np.ndarray]:
         """Create contrastive probe training data for a specific layer."""
         # Get task for the specified dataset
         task = get_task(dataset_name)
@@ -312,9 +309,9 @@ class OptimizationPipeline:
             # Extract QA pair
             contrastive_pair = extractor.extract_contrastive_pair(sample, task)
                 
-            question = contrastive_pair['question']
-            correct_answer = contrastive_pair['correct_answer']
-            incorrect_answer = contrastive_pair['incorrect_answer']
+            question = contrastive_pair["question"]
+            correct_answer = contrastive_pair["correct_answer"]
+            incorrect_answer = contrastive_pair["incorrect_answer"]
             
             # Log contrastive pair details
             self.logger.debug(f"Contrastive pair - Question: ...{question[-50:]}")
@@ -446,15 +443,14 @@ class OptimizationPipeline:
         
         from sklearn.metrics import roc_auc_score
         y_pred_proba = probe.predict_proba(X_val)[:, 1]
-        auc_score = roc_auc_score(y_val, y_pred_proba) if len(np.unique(y_val)) > 1 else 0.5
+        return roc_auc_score(y_val, y_pred_proba) if len(np.unique(y_val)) > 1 else 0.5
         
         # Don't store the probe object - it can't be JSON serialized
         # The probe will be retrained in the final evaluation if needed
         
-        return auc_score
     
     def _train_steering_method(self, trial: optuna.Trial, method_name: str, 
-                              layer_id: int, hyperparams: Dict[str, Any]) -> Any:
+                              layer_id: int, hyperparams: dict[str, Any]) -> Any:
         """Train steering method on training data."""
         # Use contrastive_pairs_limit with bounds checking
         contrastive_limit = min(self.config.contrastive_pairs_limit, len(self.train_samples))
@@ -472,7 +468,7 @@ class OptimizationPipeline:
             dac.train(contrastive_pairs, layer_id)
             return dac
             
-        elif method_name == "caa":
+        if method_name == "caa":
             # Create CAA instance
             from wisent_guard.core.steering_methods.caa import CAA
             caa = CAA(device=self.device)
@@ -481,10 +477,9 @@ class OptimizationPipeline:
             caa.train(contrastive_pairs, layer_id)
             return caa
             
-        else:
-            raise ValueError(f"Unsupported steering method: {method_name}")
+        raise ValueError(f"Unsupported steering method: {method_name}")
     
-    def _create_contrastive_pairs(self, samples: List[Dict], layer_id: int, dataset_name: str, limit: int = None) -> ContrastivePairSet:
+    def _create_contrastive_pairs(self, samples: list[dict], layer_id: int, dataset_name: str, limit: Optional[int] = None) -> ContrastivePairSet:
         """Create contrastive pairs with activations for steering training."""
         contrastive_pairs = []
         task = get_task(dataset_name)
@@ -500,16 +495,16 @@ class OptimizationPipeline:
                 self.logger.debug(f"Creating contrastive pair - Correct: {contrastive_pair['correct_answer']}, Incorrect: {contrastive_pair['incorrect_answer']}")
                 
                 positive_response = Response(
-                    text=contrastive_pair['correct_answer'],
+                    text=contrastive_pair["correct_answer"],
                     label=1
                 )
                 negative_response = Response(
-                    text=contrastive_pair['incorrect_answer'],
+                    text=contrastive_pair["incorrect_answer"],
                     label=0
                 )
                 
                 pair = ContrastivePair(
-                    prompt=contrastive_pair['question'],
+                    prompt=contrastive_pair["question"],
                     positive_response=positive_response,
                     negative_response=negative_response
                 )
@@ -528,8 +523,8 @@ class OptimizationPipeline:
                 
                 all_texts.extend([pos_text, neg_text])
                 text_to_pair_mapping.extend([
-                    (pair_idx, 'positive'),
-                    (pair_idx, 'negative')
+                    (pair_idx, "positive"),
+                    (pair_idx, "negative")
                 ])
             
             all_activations = self._extract_batch_activations(all_texts, layer_id)
@@ -537,14 +532,14 @@ class OptimizationPipeline:
             for text_idx, (pair_idx, response_type) in enumerate(text_to_pair_mapping):
                 activation = all_activations[text_idx]
                 
-                if response_type == 'positive':
+                if response_type == "positive":
                     pair_set.pairs[pair_idx].positive_response.activations = activation
                 else:
                     pair_set.pairs[pair_idx].negative_response.activations = activation
         
         return pair_set
     
-    def _extract_batch_activations(self, texts: List[str], layer_id: int) -> List[torch.Tensor]:
+    def _extract_batch_activations(self, texts: list[str], layer_id: int) -> list[torch.Tensor]:
         """Extract activations for multiple texts in batches."""
         if not texts:
             return []
@@ -567,17 +562,14 @@ class OptimizationPipeline:
             
             def batch_hook_fn(module, input, output):
                 with torch.no_grad():
-                    if isinstance(output, tuple):
-                        hidden_states = output[0]
-                    else:
-                        hidden_states = output
+                    hidden_states = output[0] if isinstance(output, tuple) else output
                     
                     last_token_acts = hidden_states[:, -1, :].detach().clone()
                     batch_activations.append(last_token_acts)
             
-            if hasattr(self.model, 'transformer'):
+            if hasattr(self.model, "transformer"):
                 target_layer = self.model.transformer.h[layer_id]
-            elif hasattr(self.model, 'model'):
+            elif hasattr(self.model, "model"):
                 target_layer = self.model.model.layers[layer_id]
             else:
                 raise ValueError("Unknown model architecture")
@@ -605,7 +597,7 @@ class OptimizationPipeline:
         return activations[0] if activations else torch.zeros(1, self.model.config.hidden_size, device=self.device)
     
     def _evaluate_steering_on_validation(self, steering_instance: Any, method_name: str,
-                                       layer_id: int, hyperparams: Dict[str, Any]) -> float:
+                                       layer_id: int, hyperparams: dict[str, Any]) -> float:
         """Evaluate steering method on validation data by re-running forward passes."""
         if steering_instance is None:
             return 0.0
@@ -626,8 +618,8 @@ class OptimizationPipeline:
             if not qa_pair:
                 continue
                 
-            question = qa_pair['formatted_question']
-            ground_truth = qa_pair['correct_answer']
+            question = qa_pair["formatted_question"]
+            ground_truth = qa_pair["correct_answer"]
             questions.append(question)
             ground_truths.append(ground_truth)
         
@@ -672,7 +664,7 @@ class OptimizationPipeline:
     
     def _generate_with_caa_steering(self, caa, question: str, alpha: float, layer_id: int) -> str:
         """Generate response with CAA steering applied."""
-        if not hasattr(caa, 'steering_vector') or caa.steering_vector is None:
+        if not hasattr(caa, "steering_vector") or caa.steering_vector is None:
             return self._generate_baseline(question)
         
         return self._generate_with_steering_hook(question, caa.steering_vector, layer_id, alpha)
@@ -688,16 +680,15 @@ class OptimizationPipeline:
                 hidden_states = output[0]
                 # Apply steering to the last token
                 hidden_states[:, -1, :] += alpha * steering_vector.to(hidden_states.device)
-                return (hidden_states,) + output[1:]
-            else:
-                hidden_states = output
-                hidden_states[:, -1, :] += alpha * steering_vector.to(hidden_states.device)
-                return hidden_states
+                return (hidden_states, *output[1:])
+            hidden_states = output
+            hidden_states[:, -1, :] += alpha * steering_vector.to(hidden_states.device)
+            return hidden_states
         
         # Register hook on target layer
-        if hasattr(self.model, 'transformer'):
+        if hasattr(self.model, "transformer"):
             target_layer = self.model.transformer.h[layer_id]
-        elif hasattr(self.model, 'model'):
+        elif hasattr(self.model, "model"):
             target_layer = self.model.model.layers[layer_id]
         else:
             raise ValueError("Unknown model architecture")
@@ -737,7 +728,7 @@ class OptimizationPipeline:
         response = self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
         return response.strip()
     
-    def _generate_baseline_batched(self, questions: List[str]) -> List[str]:  # TODO
+    def _generate_baseline_batched(self, questions: list[str]) -> list[str]:  # TODO
         """Generate baseline responses in batches without steering."""
         if not questions:
             return []
@@ -779,8 +770,8 @@ class OptimizationPipeline:
         
         return all_responses
     
-    def _generate_with_steering_batched(self, steering_instance: Any, questions: List[str], 
-                                       alpha: float, layer_id: int) -> List[str]:
+    def _generate_with_steering_batched(self, steering_instance: Any, questions: list[str], 
+                                       alpha: float, layer_id: int) -> list[str]:
         """Generate responses with steering applied in batches using apply_steering()."""
         if not questions:
             return []
@@ -803,10 +794,7 @@ class OptimizationPipeline:
             
             def steering_hook(module, input, output):
                 """Hook that applies steering using the steering method's apply_steering()."""
-                if isinstance(output, tuple):
-                    hidden_states = output[0]
-                else:
-                    hidden_states = output
+                hidden_states = output[0] if isinstance(output, tuple) else output
                 
                 # Apply steering using the method's apply_steering() function
                 steered = steering_instance.apply_steering(
@@ -815,21 +803,20 @@ class OptimizationPipeline:
                 )
                 
                 if isinstance(output, tuple):
-                    return (steered,) + output[1:]
-                else:
-                    return steered
+                    return (steered, *output[1:])
+                return steered
             
             # Register hook on target layer
-            if hasattr(self.model, 'transformer'):
+            if hasattr(self.model, "transformer"):
                 if layer_id >= len(self.model.transformer.h):
                     raise ValueError(f"layer_id {layer_id} exceeds model layers")
                 target_layer = self.model.transformer.h[layer_id]
-            elif hasattr(self.model, 'model'):
+            elif hasattr(self.model, "model"):
                 if layer_id >= len(self.model.model.layers):
                     raise ValueError(f"layer_id {layer_id} exceeds model layers")
                 target_layer = self.model.model.layers[layer_id]
             else:
-                raise ValueError(f"Unknown model architecture")
+                raise ValueError("Unknown model architecture")
             
             handle = target_layer.register_forward_hook(steering_hook)
             
@@ -859,12 +846,19 @@ class OptimizationPipeline:
         
         return all_responses
     
-    def _final_evaluation(self, best_trial: optuna.Trial) -> Dict[str, Any]:
+    def _final_evaluation(self, best_trial: optuna.Trial) -> dict[str, Any]:
         """Run final evaluation on test split with best configuration."""
         self.logger.info("🏆 Running final evaluation with best configuration...")
         
         # Extract best hyperparameters
-        best_params = best_trial.params
+        # Handle both real trials and FixedTrial objects
+        if hasattr(best_trial, "params") and best_trial.params:
+            best_params = best_trial.params
+        elif hasattr(best_trial, "_params"):
+            best_params = best_trial._params
+        else:
+            # Fallback - this shouldn't happen
+            raise ValueError("Cannot access trial parameters")
         layer_id = best_params["layer_id"]
         
         self.logger.info(f"Best configuration: {best_params}")
@@ -922,7 +916,7 @@ class OptimizationPipeline:
         
         final_results = {
             "best_trial_params": best_params,
-            "best_validation_score": best_trial.value,
+            "best_validation_score": getattr(best_trial, "value", None),
             "baseline_benchmark_metrics": baseline_benchmark_metrics,
             "steered_benchmark_metrics": steered_benchmark_metrics,
             "accuracy_improvement": accuracy_improvement,
@@ -945,7 +939,7 @@ class OptimizationPipeline:
         return final_results
     
     def _generate_test_predictions(self, steering_instance: Any, method_name: str, 
-                                 layer_id: int, alpha: float) -> Tuple[List[str], List[str]]:
+                                 layer_id: int, alpha: float) -> tuple[list[str], list[str]]:
         """Generate predictions on test data using batched generation."""
         # Collect all questions and ground truths for batching
         questions = []
@@ -959,8 +953,8 @@ class OptimizationPipeline:
             if not qa_pair:
                 continue
                 
-            question = qa_pair['formatted_question']
-            ground_truth = qa_pair['correct_answer']
+            question = qa_pair["formatted_question"]
+            ground_truth = qa_pair["correct_answer"]
             questions.append(question)
             ground_truths.append(ground_truth)
         
@@ -989,22 +983,22 @@ class OptimizationPipeline:
         
         return predictions, ground_truths
     
-    def _evaluate_probe_metrics(self, probe, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, float]:
+    def _evaluate_probe_metrics(self, probe, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """Evaluate probe metrics."""
-        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+        from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
         
         y_pred = probe.predict(X_test)
         y_pred_proba = probe.predict_proba(X_test)[:, 1]
         
         return {
-            'accuracy': accuracy_score(y_test, y_pred),
-            'precision': precision_score(y_test, y_pred, zero_division=0),
-            'recall': recall_score(y_test, y_pred, zero_division=0),
-            'f1': f1_score(y_test, y_pred, zero_division=0),
-            'auc': roc_auc_score(y_test, y_pred_proba) if len(np.unique(y_test)) > 1 else 0.5
+            "accuracy": accuracy_score(y_test, y_pred),
+            "precision": precision_score(y_test, y_pred, zero_division=0),
+            "recall": recall_score(y_test, y_pred, zero_division=0),
+            "f1": f1_score(y_test, y_pred, zero_division=0),
+            "auc": roc_auc_score(y_test, y_pred_proba) if len(np.unique(y_test)) > 1 else 0.5
         }
     
-    def _save_reproducibility_bundle(self, study: optuna.Study, final_results: Dict[str, Any]):
+    def _save_reproducibility_bundle(self, study: optuna.Study, final_results: dict[str, Any]):
         """Save complete reproducibility bundle."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
@@ -1014,12 +1008,12 @@ class OptimizationPipeline:
         
         # Save configuration
         config_path = self.output_dir / f"config_{timestamp}.json"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump(self.config.to_dict(), f, indent=2)
         
         # Save final results
         results_path = self.output_dir / f"final_results_{timestamp}.json"
-        with open(results_path, 'w') as f:
+        with open(results_path, "w") as f:
             json.dump(final_results, f, indent=2, default=str)
         
         # Save best configuration
@@ -1033,7 +1027,7 @@ class OptimizationPipeline:
         }
         
         best_config_path = self.output_dir / f"best_configuration_{timestamp}.json"
-        with open(best_config_path, 'w') as f:
+        with open(best_config_path, "w") as f:
             json.dump(best_config, f, indent=2)
         
         # Save study trials summary
@@ -1051,7 +1045,7 @@ class OptimizationPipeline:
         """Get current git commit hash for reproducibility."""
         try:
             import subprocess
-            result = subprocess.run(['git', 'rev-parse', 'HEAD'], 
+            result = subprocess.run(["git", "rev-parse", "HEAD"], 
                                   capture_output=True, text=True)
             if result.returncode == 0:
                 return result.stdout.strip()
@@ -1059,12 +1053,129 @@ class OptimizationPipeline:
             pass
         return None
     
+    def evaluate_only(self, best_params: dict[str, Any]) -> dict[str, Any]:
+        """Run evaluation only with provided parameters.
+        
+        Args:
+            best_params: Dictionary of hyperparameters to use for evaluation
+            
+        Returns:
+            Dictionary containing evaluation results
+        """
+        self.logger.info("🔬 Running evaluation-only mode with provided parameters")
+        self.logger.info(f"Parameters: {best_params}")
+        
+        # Setup experiment if not already done
+        if self.model is None:
+            self._setup_experiment()
+        
+        # Create a complete mock trial with all expected parameters
+        from optuna.trial import FixedTrial
+        
+        # Ensure we have all required parameters for _final_evaluation
+        complete_params = {
+            "layer_id": best_params.get("layer_id", 15),
+            "probe_type": best_params.get("probe_type", "logistic_regression"),
+            "probe_c": best_params.get("probe_c", 1.0),
+            "steering_method": best_params.get("steering_method", "caa"),
+            "steering_alpha": best_params.get("steering_alpha", 0.5),
+        }
+        
+        # Add method-specific parameters if needed
+        if complete_params["steering_method"] == "dac":
+            complete_params.update({
+                "entropy_threshold": best_params.get("entropy_threshold", 1.5),
+                "ptop": best_params.get("ptop", 0.5),
+                "max_alpha": best_params.get("max_alpha", 2.0),
+            })
+        
+        fixed_trial = FixedTrial(complete_params)
+        
+        # Fix FixedTrial params access issue
+        if not hasattr(fixed_trial, "params"):
+            fixed_trial.params = complete_params
+        
+        # Run final evaluation
+        return self._final_evaluation(fixed_trial)
+    
+    @classmethod
+    def from_saved_study(cls, study_path: str, config_path: Optional[str] = None,
+                        override_config: Optional[dict[str, Any]] = None):
+        """Create pipeline from saved study and optionally saved config.
+        
+        Args:
+            study_path: Path to the SQLite study database
+            config_path: Optional path to saved configuration JSON
+            override_config: Optional dict of config values to override
+            
+        Returns:
+            Tuple of (pipeline, study) ready for evaluation
+        """
+        # Load config if provided
+        if config_path:
+            with open(config_path) as f:
+                config_dict = json.load(f)
+                # Apply any overrides
+                if override_config:
+                    config_dict.update(override_config)
+                config = OptimizationConfig(**config_dict)
+        else:
+            # Create minimal config with overrides
+            config = OptimizationConfig(**(override_config or {}))
+        
+        # Load study
+        from pathlib import Path
+        study_name = Path(study_path).stem
+        study = optuna.load_study(
+            study_name=study_name,
+            storage=f"sqlite:///{study_path}"
+        )
+        
+        pipeline = cls(config)
+        return pipeline, study
+    
+    def evaluate_on_dataset(self, best_params: dict[str, Any], 
+                          dataset_name: str, dataset_limit: Optional[int] = None) -> dict[str, Any]:
+        """Evaluate best parameters on a different dataset.
+        
+        Args:
+            best_params: Dictionary of hyperparameters to use
+            dataset_name: Name of dataset to evaluate on
+            dataset_limit: Optional limit on number of samples
+            
+        Returns:
+            Dictionary containing evaluation results on the new dataset
+        """
+        # Temporarily override dataset configuration
+        original_test_dataset = self.config.test_dataset
+        original_test_limit = self.config.test_limit
+        
+        self.config.test_dataset = dataset_name
+        self.config.test_limit = dataset_limit or self.config.test_limit
+        
+        self.logger.info(f"📊 Evaluating on {dataset_name} with {self.config.test_limit} samples")
+        
+        # Reload test samples for new dataset
+        from . import data_utils
+        self.test_samples = data_utils.load_dataset_samples(
+            self.config.test_dataset, self.config.test_limit
+        )
+        
+        # Run evaluation
+        results = self.evaluate_only(best_params)
+        
+        # Restore original config
+        self.config.test_dataset = original_test_dataset
+        self.config.test_limit = original_test_limit
+        
+        return results
+    
     def cleanup_memory(self):
         """Clean up GPU/MPS memory."""
-        if hasattr(self, 'model') and self.model is not None:
+        if hasattr(self, "model") and self.model is not None:
             del self.model
             self.model = None
-        if hasattr(self, 'tokenizer') and self.tokenizer is not None:
+        if hasattr(self, "tokenizer") and self.tokenizer is not None:
             del self.tokenizer
             self.tokenizer = None
         
@@ -1104,7 +1215,7 @@ class OptimizationPipeline:
                 f"4. Set use_wandb=False to disable WandB"
             ) from e
     
-    def _log_trial_to_wandb(self, trial: optuna.Trial, metrics: Dict[str, float]):
+    def _log_trial_to_wandb(self, trial: optuna.Trial, metrics: dict[str, float]):
         """Log trial results to WandB."""
         if not self.config.use_wandb or self.wandb_run is None:
             return
@@ -1123,7 +1234,7 @@ class OptimizationPipeline:
         except Exception as e:
             self.logger.warning(f"Failed to log trial to WandB: {e}")
     
-    def _log_final_results_to_wandb(self, study: optuna.Study, final_results: Dict[str, Any]):
+    def _log_final_results_to_wandb(self, study: optuna.Study, final_results: dict[str, Any]):
         """Log final optimization results to WandB."""
         if not self.config.use_wandb or self.wandb_run is None:
             return
@@ -1133,9 +1244,9 @@ class OptimizationPipeline:
             best_params = {f"best/{k}": v for k, v in study.best_params.items()}
             best_metrics = {
                 "best/validation_accuracy": study.best_value,
-                "best/baseline_accuracy": final_results['baseline_benchmark_metrics']['accuracy'],
-                "best/steered_accuracy": final_results['steered_benchmark_metrics']['accuracy'],
-                "best/accuracy_improvement": final_results['accuracy_improvement'],
+                "best/baseline_accuracy": final_results["baseline_benchmark_metrics"]["accuracy"],
+                "best/steered_accuracy": final_results["steered_benchmark_metrics"]["accuracy"],
+                "best/accuracy_improvement": final_results["accuracy_improvement"],
                 "study/n_trials": len(study.trials),
                 "study/n_complete_trials": len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
             }
@@ -1160,7 +1271,7 @@ def main():
     # Setup logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     
     # Create configuration
