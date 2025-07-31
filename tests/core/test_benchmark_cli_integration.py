@@ -12,7 +12,7 @@ Commands tested:
 2. Steering: `python -m wisent_guard tasks gsm8k --model TEST_MODEL --steering-mode --steering-method CAA`
 
 This validates the complete pipeline from CLI parsing to model execution.
-Important note: the timeout 60s for the test is considered as passed.
+Important note: the timeout 120s for the test is considered as passed.
 """
 
 import contextlib
@@ -32,6 +32,9 @@ TEST_MODEL = "hf-internal-testing/tiny-random-gpt2"
 
 # Test with limited samples for speed (minimum 5 to ensure 80/20 split gives >0 training samples)
 TEST_LIMIT = 5
+
+# Global timeout configuration for CLI tests (in seconds)
+TIMEOUT_SECONDS = 120
 
 
 class TestBenchmarkCLIIntegration:
@@ -68,7 +71,7 @@ class TestBenchmarkCLIIntegration:
             if env_var in os.environ:
                 del os.environ[env_var]
 
-    def run_cli_command(self, cmd_args: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
+    def run_cli_command(self, cmd_args: list[str], timeout: int = TIMEOUT_SECONDS) -> subprocess.CompletedProcess:
         """Run wisent-guard CLI command and return result.
 
         Args:
@@ -154,7 +157,7 @@ class TestBenchmarkCLIIntegration:
         ]
 
         try:
-            result = self.run_cli_command(cmd_args, timeout=60)  # 60s timeout
+            result = self.run_cli_command(cmd_args, timeout=TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             # Timeout means the CLI started successfully and began processing
             print(f"⏱️ {task_name} basic classifier test TIMED OUT (treated as PASS)")
@@ -212,7 +215,7 @@ class TestBenchmarkCLIIntegration:
         ]
 
         try:
-            result = self.run_cli_command(cmd_args, timeout=60)  # 60s timeout
+            result = self.run_cli_command(cmd_args, timeout=TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             # Timeout means the CLI started successfully and began processing
             print(f"⏱️ {task_name} steering functionality test TIMED OUT (treated as PASS)")
