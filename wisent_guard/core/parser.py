@@ -73,6 +73,11 @@ def setup_parser() -> argparse.ArgumentParser:
                                                    help="Generate steering vectors from contrastive pairs (file or description)")
     setup_generate_vector_parser(generate_vector_parser)
     
+    # Multi-vector steering command for combining multiple vectors at inference time
+    multi_steer_parser = subparsers.add_parser("multi-steer",
+                                              help="Combine multiple steering vectors dynamically at inference time")
+    setup_multi_steer_parser(multi_steer_parser)
+    
     return parser
 
 
@@ -502,6 +507,10 @@ def setup_generate_pairs_parser(parser):
                         help="Enable verbose output")
     parser.add_argument("--similarity-threshold", type=float, default=0.8,
                         help="Similarity threshold for deduplication (0-1, higher = more strict)")
+    parser.add_argument("--timing", action="store_true",
+                        help="Show detailed timing for each generation step")
+    parser.add_argument("--max-workers", type=int, default=4,
+                        help="Number of parallel workers for generation (default: 4)")
 
 
 def setup_synthetic_parser(parser):
@@ -1065,3 +1074,37 @@ def setup_generate_vector_parser(parser):
     # General options
     parser.add_argument("--verbose", action="store_true",
                        help="Enable verbose output")
+
+
+def setup_multi_steer_parser(parser):
+    """Set up the multi-steer subcommand parser for dynamic vector combination."""
+    # Vector inputs - can specify multiple vector-weight pairs
+    parser.add_argument("--vector", type=str, action="append", required=True,
+                       metavar="PATH:WEIGHT",
+                       help="Path to steering vector and its weight (format: path/to/vector.pt:0.5). Can be specified multiple times.")
+    
+    # Model configuration
+    parser.add_argument("--model", type=str, required=True,
+                       help="Model name or path")
+    parser.add_argument("--layer", type=int, required=True,
+                       help="Layer index to apply combined steering")
+    parser.add_argument("--device", type=str, default=None,
+                       help="Device to run on (default: auto-detect)")
+    
+    # Generation configuration
+    parser.add_argument("--prompt", type=str, required=True,
+                       help="Prompt to generate with combined steering")
+    parser.add_argument("--max-new-tokens", type=int, default=100,
+                       help="Maximum new tokens to generate (default: 100)")
+    
+    # Weight normalization
+    parser.add_argument("--normalize-weights", action="store_true",
+                       help="Normalize weights to sum to 1.0")
+    parser.add_argument("--allow-unnormalized", action="store_true",
+                       help="Allow weights that don't sum to 1.0 (for stronger effects)")
+    
+    # Output options
+    parser.add_argument("--save-combined", type=str, default=None,
+                       help="Save the combined steering vector to this path")
+    parser.add_argument("--verbose", action="store_true",
+                       help="Enable verbose output showing weight calculations")

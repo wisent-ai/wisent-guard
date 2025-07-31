@@ -103,6 +103,8 @@ wisent_guard/core/contrastive_pairs/contrastive_pair.py
 wisent_guard/core/contrastive_pairs/contrastive_pair_set.py
 wisent_guard/core/contrastive_pairs/generate_synthetically.py
 wisent_guard/core/contrastive_pairs/quality_check.py
+wisent_guard/core/contrastive_pairs/question_bank.py
+wisent_guard/core/contrastive_pairs/question_bank_cli.py
 wisent_guard/core/data_loaders/__init__.py
 wisent_guard/core/data_loaders/livecodebench_loader.py
 wisent_guard/core/data_loaders/livecodebench_model_outputs.py

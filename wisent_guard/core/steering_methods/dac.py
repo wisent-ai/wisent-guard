@@ -632,6 +632,111 @@ class DAC(SteeringMethod):
         except Exception:
             return False
     
+    @staticmethod
+    def combine_steering_vectors(
+        vectors: List[torch.Tensor],
+        weights: List[float],
+        normalize_weights: bool = True
+    ) -> torch.Tensor:
+        """
+        Combine multiple steering vectors using weighted arithmetic.
+        
+        This implements the DAC reference approach: comp_vector = alpha_1 * diff1 + alpha_2 * diff2
+        
+        Args:
+            vectors: List of steering vectors to combine
+            weights: List of weights for each vector
+            normalize_weights: Whether to normalize weights to sum to 1.0
+            
+        Returns:
+            Combined steering vector
+        """
+        if len(vectors) != len(weights):
+            raise ValueError(f"Number of vectors ({len(vectors)}) must match number of weights ({len(weights)})")
+        
+        if len(vectors) == 0:
+            raise ValueError("Must provide at least one vector")
+        
+        # Normalize weights if requested
+        if normalize_weights:
+            weight_sum = sum(weights)
+            if weight_sum == 0:
+                raise ValueError("Weights sum to zero")
+            weights = [w / weight_sum for w in weights]
+        
+        # Ensure all vectors are on the same device
+        device = vectors[0].device
+        vectors = [v.to(device) for v in vectors]
+        
+        # Combine vectors using weighted sum
+        combined = torch.zeros_like(vectors[0])
+        for vector, weight in zip(vectors, weights):
+            combined = combined + weight * vector
+        
+        return combined
+    
+    def combine_property_vectors(
+        self,
+        property_weights: Dict[str, float],
+        normalize_weights: bool = True
+    ) -> torch.Tensor:
+        """
+        Combine loaded property vectors with specified weights.
+        
+        Args:
+            property_weights: Dictionary mapping property names to weights
+            normalize_weights: Whether to normalize weights to sum to 1.0
+            
+        Returns:
+            Combined steering vector
+        """
+        if not self.property_vectors:
+            raise ValueError("No property vectors loaded")
+        
+        vectors = []
+        weights = []
+        
+        for prop_name, weight in property_weights.items():
+            if prop_name not in self.property_vectors:
+                raise ValueError(f"Property '{prop_name}' not found in loaded vectors")
+            vectors.append(self.property_vectors[prop_name].vector)
+            weights.append(weight)
+        
+        return self.combine_steering_vectors(vectors, weights, normalize_weights)
+    
+    def create_combined_property(
+        self,
+        name: str,
+        property_weights: Dict[str, float],
+        normalize_weights: bool = True
+    ) -> None:
+        """
+        Create a new property by combining existing properties.
+        
+        Args:
+            name: Name for the new combined property
+            property_weights: Dictionary mapping property names to weights
+            normalize_weights: Whether to normalize weights to sum to 1.0
+        """
+        combined_vector = self.combine_property_vectors(property_weights, normalize_weights)
+        
+        # Use the layer index from the first property (they should all be the same)
+        layer_idx = list(self.property_vectors.values())[0].layer_index
+        
+        # Create new property vector
+        self.property_vectors[name] = PropertyVector(
+            name=name,
+            vector=combined_vector,
+            layer_index=layer_idx,
+            training_stats={
+                'method': 'combined',
+                'source_properties': list(property_weights.keys()),
+                'weights': property_weights,
+                'normalized': normalize_weights
+            },
+            aggregation_method=self.aggregation_method
+        )
+    
     def generate_with_dynamic_steering(
         self,
         model,
