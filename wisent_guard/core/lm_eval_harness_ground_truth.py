@@ -4,8 +4,8 @@ LM-Eval-Harness Ground Truth Evaluation
 This module provides ground truth evaluation using the lm-eval-harness framework.
 """
 
-from typing import Dict, Any, Optional, List
 import logging
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -66,27 +66,26 @@ class LMEvalHarnessGroundTruth:
             return self._evaluate_log_likelihoods(
                 classifier, task_name, num_samples, evaluation_model, layer, token_aggregation
             )
-        elif self.evaluation_method == "text-generation":
+        if self.evaluation_method == "text-generation":
             return self._evaluate_text_generation(
                 classifier, task_name, num_samples, evaluation_model, layer, token_aggregation
             )
-        elif self.evaluation_method == "perplexity":
+        if self.evaluation_method == "perplexity":
             return self._evaluate_perplexity(
                 classifier, task_name, num_samples, evaluation_model, layer, token_aggregation
             )
-        elif self.evaluation_method == "code-execution":
+        if self.evaluation_method == "code-execution":
             return self._evaluate_code_execution(
                 classifier, task_name, num_samples, evaluation_model, layer, token_aggregation
             )
-        else:
-            return {
-                "ground_truth": "UNKNOWN",
-                "method_used": "lm-eval-harness-unsupported",
-                "confidence": 0.0,
-                "details": f"Unsupported evaluation method: {self.evaluation_method}",
-                "task_name": task_name,
-                "evaluation_method": self.evaluation_method,
-            }
+        return {
+            "ground_truth": "UNKNOWN",
+            "method_used": "lm-eval-harness-unsupported",
+            "confidence": 0.0,
+            "details": f"Unsupported evaluation method: {self.evaluation_method}",
+            "task_name": task_name,
+            "evaluation_method": self.evaluation_method,
+        }
 
     def _evaluate_log_likelihoods(
         self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average"
@@ -116,7 +115,7 @@ class LMEvalHarnessGroundTruth:
                 "ground_truth": "UNKNOWN",
                 "method_used": "lm-eval-harness-error",
                 "confidence": 0.0,
-                "details": f"Log-likelihoods evaluation failed: {str(e)}",
+                "details": f"Log-likelihoods evaluation failed: {e!s}",
                 "task_name": task_name,
                 "evaluation_method": "log-likelihoods",
             }
@@ -162,10 +161,7 @@ class LMEvalHarnessGroundTruth:
 
                     # Extract ground truth answer
                     # HLE task handling
-                    if task_name.startswith("hle"):
-                        ground_truth = doc.get("answer", "")
-                    # MATH-500 task handling
-                    elif task_name in ["math500", "math", "hendrycks_math"]:
+                    if task_name.startswith("hle") or task_name in ["math500", "math", "hendrycks_math"]:
                         ground_truth = doc.get("answer", "")
                     # AIME task handling
                     elif task_name.startswith("aime"):
@@ -208,7 +204,7 @@ class LMEvalHarnessGroundTruth:
             for response_data in generated_responses:
                 try:
                     # Create layer object first
-                    from .activations import Activations, ActivationAggregationMethod
+                    from .activations import Activations
                     from .layer import Layer
 
                     layer_obj = Layer(index=layer, type="transformer")
@@ -279,7 +275,7 @@ class LMEvalHarnessGroundTruth:
                         }
                     )
 
-                    logger.info(f"📋 Generated Response Classification:")
+                    logger.info("📋 Generated Response Classification:")
                     logger.info(f"   🔸 Question: {response_data['question'][:100]}...")
                     logger.info(f"   🧠 Generated: {response_data['generated_response'][:100]}...")
                     logger.info(f"   🎯 Classifier score: {prediction:.3f} (lower = more truthful)")
@@ -315,7 +311,7 @@ class LMEvalHarnessGroundTruth:
 
         except Exception as e:
             logger.error(f"Error in text generation evaluation: {e}")
-            return self._error_result(f"Text generation evaluation error: {str(e)}")
+            return self._error_result(f"Text generation evaluation error: {e!s}")
 
     def _evaluate_perplexity(
         self, classifier, task_name: str, num_samples: int, model, layer: int, token_aggregation: str = "average"
@@ -353,7 +349,7 @@ class LMEvalHarnessGroundTruth:
 
                         # Extract activations from the text for classifier
                         try:
-                            from .activations import Activations, ActivationAggregationMethod
+                            from .activations import Activations
                             from .layer import Layer
 
                             layer_obj = Layer(index=layer, type="transformer")
@@ -411,7 +407,7 @@ class LMEvalHarnessGroundTruth:
 
                         perplexity_results.append(result)
 
-                        logger.info(f"📋 WikiText Perplexity Analysis:")
+                        logger.info("📋 WikiText Perplexity Analysis:")
                         logger.info(f"   📊 Document {i}: {len(text)} chars")
                         logger.info(f"   🎯 Perplexity: {perplexity:.3f}")
                         if classification_score is not None:
@@ -480,7 +476,7 @@ class LMEvalHarnessGroundTruth:
                         classification_score = None
                         try:
                             # Create layer object first
-                            from .activations import Activations, ActivationAggregationMethod
+                            from .activations import Activations
                             from .layer import Layer
 
                             layer_obj = Layer(index=layer, type="transformer")
@@ -555,7 +551,7 @@ class LMEvalHarnessGroundTruth:
 
                         perplexity_results.append(result)
 
-                        logger.info(f"📋 Perplexity Analysis:")
+                        logger.info("📋 Perplexity Analysis:")
                         logger.info(f"   🔸 Question: {prompt[:100]}...")
                         logger.info(f"   📊 Best choice (lowest perplexity): {best_choice['choice_text'][:100]}...")
                         logger.info(f"   🎯 Perplexity: {best_choice['perplexity']:.3f}")
@@ -596,7 +592,7 @@ class LMEvalHarnessGroundTruth:
                 ]
                 avg_classifier_score = sum(classifier_scores) / len(classifier_scores) if classifier_scores else None
 
-            logger.info(f"📊 PERPLEXITY EVALUATION RESULTS:")
+            logger.info("📊 PERPLEXITY EVALUATION RESULTS:")
             logger.info(f"   • Total samples: {total_samples}")
             if task_name == "wikitext":
                 logger.info(f"   • Average perplexity: {avg_perplexity:.3f}")
@@ -637,7 +633,7 @@ class LMEvalHarnessGroundTruth:
 
         except Exception as e:
             logger.error(f"Error in perplexity evaluation: {e}")
-            return self._error_result(f"Perplexity evaluation error: {str(e)}")
+            return self._error_result(f"Perplexity evaluation error: {e!s}")
 
     def _get_evaluation_method_for_task(self, task_name: str) -> str:
         """Get the evaluation method for a task from the benchmark configuration."""
@@ -645,7 +641,7 @@ class LMEvalHarnessGroundTruth:
             import json
 
             eval_methods_path = "wisent_guard/parameters/benchmarks/benchmark_evaluation_methods.json"
-            with open(eval_methods_path, "r") as f:
+            with open(eval_methods_path) as f:
                 benchmark_methods = json.load(f)
                 return benchmark_methods.get(task_name, "text-generation")
         except Exception as e:
@@ -723,8 +719,8 @@ class LMEvalHarnessGroundTruth:
     def _calculate_perplexity(self, model, text: str) -> float:
         """Calculate perplexity of text using the model."""
         try:
-            import torch
             import numpy as np
+            import torch
 
             # Use the model's prepare_activations method to get outputs
             prepared = model.prepare_activations(text)
@@ -866,7 +862,7 @@ class LMEvalHarnessGroundTruth:
             import traceback
 
             logger.error(f"Traceback: {traceback.format_exc()}")
-            return self._error_result(f"Generic code execution evaluation error: {str(e)}")
+            return self._error_result(f"Generic code execution evaluation error: {e!s}")
 
     def _evaluate_with_lm_eval_metrics(self, task_name: str, response_data: list, task_data) -> Dict[str, Any]:
         """Evaluate responses using task-specific evaluation metrics."""
@@ -942,8 +938,6 @@ class LMEvalHarnessGroundTruth:
     def _evaluate_gsm8k_response(self, generated: str, ground_truth) -> bool:
         """Evaluate GSM8K response using numerical answer extraction."""
         try:
-            import re
-
             # Extract numerical answer from generated response
             # GSM8K answers are typically in format "#### 42" or just the number
             generated_answer = self._extract_numerical_answer(generated)
@@ -1067,8 +1061,8 @@ class LMEvalHarnessGroundTruth:
     def _evaluate_drop_response(self, generated: str, ground_truth) -> bool:
         """Evaluate DROP response using structured answer format."""
         try:
-            import re
             import json
+            import re
 
             # Parse ground truth if it's a string representation of a dict
             if isinstance(ground_truth, str):
@@ -1089,7 +1083,7 @@ class LMEvalHarnessGroundTruth:
             gen_clean = generated.strip().lower()
 
             # Check number field
-            if "number" in gt_dict and gt_dict["number"]:
+            if gt_dict.get("number"):
                 number_str = str(gt_dict["number"]).strip()
                 if number_str:
                     # Direct number match
@@ -1121,7 +1115,7 @@ class LMEvalHarnessGroundTruth:
                                 return True
 
             # Check spans field
-            if "spans" in gt_dict and gt_dict["spans"]:
+            if gt_dict.get("spans"):
                 spans = gt_dict["spans"]
                 if isinstance(spans, list):
                     for span in spans:
@@ -1134,12 +1128,12 @@ class LMEvalHarnessGroundTruth:
                         return True
 
             # Check date field (less common but possible)
-            if "date" in gt_dict and gt_dict["date"]:
+            if gt_dict.get("date"):
                 date_obj = gt_dict["date"]
                 if isinstance(date_obj, dict):
                     # Check individual date components
                     for component in ["day", "month", "year"]:
-                        if component in date_obj and date_obj[component]:
+                        if date_obj.get(component):
                             date_val = str(date_obj[component]).strip().lower()
                             if date_val and date_val in gen_clean:
                                 return True
@@ -1170,19 +1164,18 @@ class LMEvalHarnessGroundTruth:
                         return True
 
                 return False
-            else:
-                # Handle string ground truth
-                gt_clean = str(ground_truth).strip().lower()
+            # Handle string ground truth
+            gt_clean = str(ground_truth).strip().lower()
 
-                # Exact match
-                if gen_clean == gt_clean:
-                    return True
+            # Exact match
+            if gen_clean == gt_clean:
+                return True
 
-                # Contains match
-                if gt_clean in gen_clean or gen_clean in gt_clean:
-                    return True
+            # Contains match
+            if gt_clean in gen_clean or gen_clean in gt_clean:
+                return True
 
-                return False
+            return False
 
         except Exception as e:
             logger.error(f"Error in default evaluation: {e}")
@@ -1244,7 +1237,7 @@ class LMEvalHarnessGroundTruth:
             logger.info(f"🎯 CODE EXECUTION EVALUATION: {task_name}")
 
             # Check if it's a BigCode task
-            from .bigcode_integration import is_bigcode_task, load_bigcode_task, get_bigcode_evaluator
+            from .bigcode_integration import get_bigcode_evaluator, is_bigcode_task, load_bigcode_task
             from .secure_code_evaluator import SecureCodeEvaluator
 
             if not is_bigcode_task(task_name):
@@ -1254,11 +1247,10 @@ class LMEvalHarnessGroundTruth:
                     return self._evaluate_generic_code_execution(
                         classifier, task_name, num_samples, model, layer, token_aggregation
                     )
-                else:
-                    logger.warning(f"Task {task_name} is not a code execution task, falling back to text generation")
-                    return self._evaluate_text_generation(
-                        classifier, task_name, num_samples, model, layer, token_aggregation
-                    )
+                logger.warning(f"Task {task_name} is not a code execution task, falling back to text generation")
+                return self._evaluate_text_generation(
+                    classifier, task_name, num_samples, model, layer, token_aggregation
+                )
 
             # Load BigCode task
             bigcode_task = load_bigcode_task(task_name, limit=num_samples)
@@ -1325,7 +1317,7 @@ class LMEvalHarnessGroundTruth:
             for i, code in enumerate(generated_codes):
                 try:
                     # Create layer object
-                    from .activations import Activations, ActivationAggregationMethod
+                    from .activations import Activations
                     from .layer import Layer
 
                     layer_obj = Layer(index=layer, type="transformer")
@@ -1406,7 +1398,7 @@ class LMEvalHarnessGroundTruth:
                 "ground_truth": "ERROR",
                 "method_used": "code-execution-error",
                 "confidence": 0.0,
-                "details": f"Code execution evaluation failed: {str(e)}",
+                "details": f"Code execution evaluation failed: {e!s}",
                 "task_name": task_name,
                 "evaluation_method": "code-execution",
             }

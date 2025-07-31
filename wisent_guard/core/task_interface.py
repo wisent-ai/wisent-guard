@@ -6,56 +6,52 @@ without depending on lm-evaluation-harness.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
+
 from .benchmark_extractors import BenchmarkExtractor
 
 
 class TaskInterface(ABC):
     """Abstract interface for benchmark tasks."""
-    
+
     @abstractmethod
     def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Load task data."""
-        pass
-    
+
     @abstractmethod
     def get_extractor(self) -> BenchmarkExtractor:
         """Get the benchmark extractor for this task."""
-        pass
-    
+
     @abstractmethod
     def get_name(self) -> str:
         """Get the task name."""
-        pass
-    
+
     @abstractmethod
     def get_description(self) -> str:
         """Get the task description."""
-        pass
-    
+
     @abstractmethod
     def get_categories(self) -> List[str]:
         """Get the task categories (e.g., ['coding', 'reasoning'])."""
-        pass
 
 
 class TaskRegistry:
     """Registry for managing available tasks."""
-    
+
     def __init__(self):
         self._tasks: Dict[str, Type[TaskInterface]] = {}
-    
+
     def register_task(self, name: str, task_class: Type[TaskInterface]):
         """Register a new task."""
         self._tasks[name] = task_class
-    
+
     def get_task(self, name: str, limit: Optional[int] = None) -> TaskInterface:
         """Get a task instance by name."""
         if name not in self._tasks:
             raise ValueError(f"Task '{name}' not found. Available tasks: {list(self._tasks.keys())}")
-        
+
         task_factory = self._tasks[name]
-        
+
         # Handle different task factory types
         if callable(task_factory):
             # Try calling with limit parameter
@@ -67,20 +63,16 @@ class TaskRegistry:
         else:
             # Direct class instantiation
             return task_factory()
-    
+
     def list_tasks(self) -> List[str]:
         """List all available task names."""
         return list(self._tasks.keys())
-    
+
     def get_task_info(self, name: str) -> Dict[str, Any]:
         """Get information about a specific task."""
         task = self.get_task(name)
-        return {
-            "name": task.get_name(),
-            "description": task.get_description(),
-            "categories": task.get_categories()
-        }
-    
+        return {"name": task.get_name(), "description": task.get_description(), "categories": task.get_categories()}
+
     def list_task_info(self) -> List[Dict[str, Any]]:
         """List information about all available tasks."""
         return [self.get_task_info(name) for name in self.list_tasks()]
@@ -121,4 +113,4 @@ def list_task_info() -> List[Dict[str, Any]]:
 def _ensure_tasks_registered():
     """Ensure all tasks are registered in the global registry."""
     if len(_task_registry._tasks) == 0:  # Only register if not already done
-        from . import tasks  # This triggers the registration
+        pass  # This triggers the registration
