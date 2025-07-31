@@ -15,7 +15,62 @@ env:                             # ← visible to *all* jobs
   HF_HUB_TOKEN: ${{ secrets.HUGGING_FACE }}
 
 jobs:
+# ─── 1. LINT ─────────────────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Detect changed Python files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+
+      - name: Ruff check (no fix)
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
+          ruff check --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
+
+      - name: Ruff auto‑fix (PRs only)
+        if: >
+          github.event_name == 'pull_request' &&
+          steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          ruff check --fix --exit-zero ${{ steps.changed-files.outputs.all_changed_files }}
+          ruff format ${{ steps.changed-files.outputs.all_changed_files }}
+
+      - name: Commit Ruff fixes
+        if: >
+          github.event_name == 'pull_request' &&
+          steps.changed-files.outputs.any_changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🎨 ci: Ruff auto‑fixes"
+          commit_user_name: "wisent‑style‑bot"
+          commit_user_email: "style-bot@users.noreply.github.com"
+
+# ─── 2. TEST ────────────────────────────────────────────────────────
   test:
+    needs: lint
     runs-on: ubuntu-latest
 
     steps:
