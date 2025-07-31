@@ -2,10 +2,12 @@
 LiveMathBench CNMO 2024 mathematical reasoning task implementation for task-agnostic architecture.
 """
 
-from typing import Dict, Any, List, Optional
-from ..task_interface import TaskInterface
-from ..benchmark_extractors import GSM8KExtractor
+from typing import Any, Dict, List, Optional
+
 import datasets
+
+from ..benchmark_extractors import GSM8KExtractor
+from ..task_interface import TaskInterface
 
 
 class LiveMathBenchTask(TaskInterface):
@@ -57,8 +59,9 @@ class LiveMathBenchTask(TaskInterface):
         except ValueError as e:
             if "Feature type 'List' not found" in str(e):
                 # Clear cache and retry due to deprecated feature type
-                import shutil
                 import os
+                import shutil
+
                 from datasets.utils.logging import get_logger
 
                 logger = get_logger(__name__)
