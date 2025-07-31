@@ -90,6 +90,7 @@ Thumbs.db
 !/wisent-guard-logo.png
 !/.DS_Store
 !/.github/
+!/.pre-commit-config.yaml
 
 
 # HuggingFace model files (too large for GitHub)
