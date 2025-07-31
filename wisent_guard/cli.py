@@ -7174,6 +7174,7 @@ def handle_generate_vector_command(args):
             
             # Convert to ContrastivePairSet
             from .core.response import PositiveResponse, NegativeResponse
+            from .core.contrastive_pairs import ContrastivePairSet, ContrastivePair
             pairs = ContrastivePairSet(name="loaded_from_file")
             for pair_data in pairs_data:
                 pair = ContrastivePair(
