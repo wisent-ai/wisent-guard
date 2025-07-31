@@ -85,10 +85,10 @@ def get_task_samples_for_analysis(task_name: str, num_samples: int = 5, trust_re
                 
                 task_dict = evaluator.get_task_dict([task_name])
                 if task_name in task_dict:
-                            task = task_dict[task_name]
-                            return get_task_samples_direct(task, num_samples=num_samples)
-                        else:
-                            return {"error": f"Task {task_name} not found even with trust_remote_code handling"}
+                    task = task_dict[task_name]
+                    return get_task_samples_direct(task, num_samples=num_samples)
+                else:
+                    return {"error": f"Task {task_name} not found even with trust_remote_code handling"}
             except Exception as e:
                 print(f"Trust remote code handling failed: {e}")
                 return {"error": f"Failed to load task with trust_remote_code handling: {e}"}

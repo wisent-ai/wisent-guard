@@ -2,7 +2,12 @@ import json
 import random
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict, Tuple
+import concurrent.futures
+from functools import lru_cache
+import threading
+import time
+from datetime import datetime
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -18,6 +23,28 @@ from .quality_check import quality_check_synthetic_pairs
 from .question_bank import QuestionBank
 
 
+class TimingContext:
+    """Context manager for timing operations."""
+    def __init__(self, name: str, verbose: bool = True):
+        self.name = name
+        self.verbose = verbose
+        self.start_time = None
+        self.end_time = None
+        self.duration = None
+    
+    def __enter__(self):
+        self.start_time = time.time()
+        if self.verbose:
+            print(f"⏱️  [{datetime.now().strftime('%H:%M:%S')}] Starting: {self.name}")
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_time = time.time()
+        self.duration = self.end_time - self.start_time
+        if self.verbose:
+            print(f"⏱️  [{datetime.now().strftime('%H:%M:%S')}] Completed: {self.name} (took {self.duration:.2f}s)")
+
+
 class SyntheticContrastivePairGenerator:
     """Generate contrastive pairs synthetically from natural language trait descriptions."""
 
@@ -28,6 +55,8 @@ class SyntheticContrastivePairGenerator:
         db_path: Optional[str] = None,
         db_similarity_threshold: float = 0.95,
         question_bank_path: Optional[str] = None,
+        max_workers: int = 4,
+        cache_size: int = 1000,
     ):
         """
         Initialize the synthetic pair generator.
@@ -38,10 +67,13 @@ class SyntheticContrastivePairGenerator:
             db_path: Optional path to the contrastive pair database. If None, caching is disabled.
             db_similarity_threshold: Threshold for retrieving a set from the database (0-1, higher = more strict).
             question_bank_path: Optional path to the question bank. If None, uses default location.
+            max_workers: Maximum number of parallel workers for generation
+            cache_size: Size of the LRU cache for model responses
         """
         self.model: Model = model
         self.similarity_threshold: float = similarity_threshold
         self.db_similarity_threshold: float = db_similarity_threshold
+        self.max_workers: int = max_workers
 
         self.similarity_model: Optional[SentenceTransformer] = (
             self._initialize_similarity_model()
@@ -50,6 +82,18 @@ class SyntheticContrastivePairGenerator:
             db_path
         )
         self.question_bank: QuestionBank = QuestionBank(question_bank_path)
+        
+        # Thread-safe cache for model responses
+        self._cache_lock = threading.Lock()
+        self._response_cache: Dict[str, str] = {}
+        self._cache_size = cache_size
+        
+        # Initialize thread pool executor
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        
+        # Timing statistics
+        self.timing_stats: Dict[str, List[float]] = {}
+        self.enable_timing = True  # Can be disabled if needed
 
     def _initialize_similarity_model(self) -> Optional[SentenceTransformer]:
         """Loads the SentenceTransformer model for similarity calculations."""
@@ -102,6 +146,9 @@ class SyntheticContrastivePairGenerator:
         Returns:
             list of question descriptions
         """
+        if self.model is None and force_new:
+            raise ValueError("No model loaded. Cannot generate new questions.")
+            
         print(f"📚 Checking question bank for trait: '{trait_description}'")
         
         # Check how many questions are available in the bank
@@ -136,7 +183,7 @@ class SyntheticContrastivePairGenerator:
                 gap = max(num_questions - available_count, 50)  # At least 50 new questions
                 target_new = gap * 2  # Generate 2x what we need
             
-            generated_questions = self._generate_new_questions(target_new)
+            generated_questions = self._generate_new_questions_parallel(target_new)
             
             # Add to bank
             added_count = self.question_bank.add_questions(generated_questions)
@@ -150,7 +197,7 @@ class SyntheticContrastivePairGenerator:
             
             return questions
     
-    def _generate_new_questions(self, target_count: int) -> list[str]:
+    def _generate_new_questions_parallel(self, target_count: int) -> list[str]:
         """
         Generate new questions using the LLM.
         
@@ -160,32 +207,46 @@ class SyntheticContrastivePairGenerator:
         Returns:
             List of generated questions
         """
+        if self.model is None:
+            raise ValueError("No model loaded. Cannot generate questions.")
+            
         all_questions: list[str] = []
         
         num_prompts_per_template: int = max(1, target_count // len(QUESTION_GEN.PROMPT_TEMPLATES))
         
-        for i, template in enumerate(QUESTION_GEN.PROMPT_TEMPLATES):
-            prompt: str = template.format(num_prompts=num_prompts_per_template)
-            print(f"   Using template {i+1}/{len(QUESTION_GEN.PROMPT_TEMPLATES)}")
+        with TimingContext(f"Parallel question generation ({len(QUESTION_GEN.PROMPT_TEMPLATES)} templates)", self.enable_timing):
+            # Create futures for parallel generation
+            futures = []
+            for i, template in enumerate(QUESTION_GEN.PROMPT_TEMPLATES):
+                prompt: str = template.format(num_prompts=num_prompts_per_template)
+                print(f"   Submitting template {i+1}/{len(QUESTION_GEN.PROMPT_TEMPLATES)} for parallel generation")
+                
+                future = self.executor.submit(
+                    self._cached_generate_response, 
+                    prompt, 
+                    QUESTION_GEN.CONFIG
+                )
+                futures.append((i, future))
             
-            try:
-                response: str
-                response, _ = self.model.generate(prompt, **QUESTION_GEN.CONFIG)
-                
-                # Parse questions from response
-                questions: list[str] = self._parse_questions_from_response(response)
-                all_questions.extend(questions)
-                
-            except Exception as e:
-                print(f"   ⚠️ Error with template {i+1}: {e}")
-                continue
+            # Collect results
+            for i, future in futures:
+                try:
+                    response = future.result(timeout=30)  # 30 second timeout
+                    questions = self._parse_questions_from_response(response)
+                    all_questions.extend(questions)
+                    print(f"   ✅ Template {i+1} generated {len(questions)} questions")
+                except Exception as e:
+                    print(f"   ⚠️ Error with template {i+1}: {e}")
+                    continue
         
         # Deduplicate
-        unique_questions: list[str] = self._deduplicate_questions(all_questions)
+        with TimingContext(f"Deduplicating {len(all_questions)} questions", self.enable_timing):
+            unique_questions: list[str] = self._deduplicate_questions(all_questions)
         
         # Select diverse questions up to target count
         if len(unique_questions) > target_count:
-            selected_questions = self._select_diverse_questions(unique_questions, target_count)
+            with TimingContext(f"Selecting {target_count} diverse questions from {len(unique_questions)}", self.enable_timing):
+                selected_questions = self._select_diverse_questions(unique_questions, target_count)
         else:
             selected_questions = unique_questions
         
@@ -244,7 +305,7 @@ class SyntheticContrastivePairGenerator:
         return questions[: QUESTION_PARSE.CANDIDATE_LIMIT]
 
     def _deduplicate_questions(self, questions: list[str]) -> list[str]:
-        """Remove duplicate or very similar questions.
+        """Remove duplicate or very similar questions using batch processing.
         Args:
             questions: The list of question strings to deduplicate
         Returns:
@@ -254,37 +315,26 @@ class SyntheticContrastivePairGenerator:
             # Fallback to simple text-based deduplication
             return list(set(questions))
 
-        unique_questions: list[str] = []
+        # Batch encode all questions at once
+        all_embeddings = self.similarity_model.encode(questions, batch_size=32)
+        
+        unique_indices = [0]  # Start with first question
+        unique_embeddings = [all_embeddings[0]]
 
-        for question in questions:
-            is_duplicate: bool = False
+        for i in range(1, len(questions)):
+            # Calculate similarities with all unique questions so far
+            similarities = np.dot(all_embeddings[i], np.array(unique_embeddings).T)
+            
+            if np.max(similarities) <= self.similarity_threshold:
+                unique_indices.append(i)
+                unique_embeddings.append(all_embeddings[i])
 
-            if unique_questions:
-                # Check similarity with existing questions
-                question_embedding: np.ndarray = self.similarity_model.encode(
-                    [question]
-                )
-                existing_embeddings: np.ndarray = self.similarity_model.encode(
-                    unique_questions
-                )
-
-                # Calculate cosine similarities
-                similarities: np.ndarray = np.dot(
-                    question_embedding, existing_embeddings.T
-                )[0]
-
-                if np.max(similarities) > self.similarity_threshold:
-                    is_duplicate = True
-
-            if not is_duplicate:
-                unique_questions.append(question)
-
-        return unique_questions
+        return [questions[i] for i in unique_indices]
 
     def _select_diverse_questions(
         self, questions: list[str], target_count: int
     ) -> list[str]:
-        """Select the most diverse questions up to target count.
+        """Select the most diverse questions using optimized computation.
         Args:
             questions: The list of question strings to select from
             target_count: The number of diverse questions to select
@@ -298,64 +348,122 @@ class SyntheticContrastivePairGenerator:
             # Random selection fallback
             return random.sample(questions, target_count)
 
-        # Use embeddings to select diverse questions
-        embeddings: np.ndarray = self.similarity_model.encode(questions)
-
-        selected_indices: list[int] = [0]  # Start with first question
+        # Batch encode all questions
+        embeddings = self.similarity_model.encode(questions, batch_size=32)
+        
+        # Use greedy selection with vectorized operations
+        selected_indices = [0]
+        selected_embeddings = embeddings[0:1]  # Start with first embedding
 
         for _ in range(target_count - 1):
-            remaining_indices: list[int] = [
-                i for i in range(len(questions)) if i not in selected_indices
-            ]
-
-            if not remaining_indices:
+            # Calculate distances from all remaining to all selected
+            remaining_mask = np.ones(len(questions), dtype=bool)
+            remaining_mask[selected_indices] = False
+            remaining_indices = np.where(remaining_mask)[0]
+            
+            if len(remaining_indices) == 0:
                 break
-
-            # Find question most different from already selected ones
-            max_min_distance: float = -1.0
-            best_idx: int = remaining_indices[0]
-
-            for idx in remaining_indices:
-                # Calculate minimum distance to any selected question
-                distances: list[float] = []
-                for selected_idx in selected_indices:
-                    distance: float = 1 - np.dot(
-                        embeddings[idx], embeddings[selected_idx]
-                    )
-                    distances.append(distance)
-
-                min_distance: float = min(distances)
-                if min_distance > max_min_distance:
-                    max_min_distance = min_distance
-                    best_idx = idx
-
+            
+            # Vectorized distance calculation
+            remaining_embeddings = embeddings[remaining_indices]
+            similarities = np.dot(remaining_embeddings, selected_embeddings.T)
+            min_similarities = np.min(similarities, axis=1)
+            
+            # Select the one with maximum minimum distance (least similar to any selected)
+            best_idx_in_remaining = np.argmin(min_similarities)
+            best_idx = remaining_indices[best_idx_in_remaining]
+            
             selected_indices.append(best_idx)
+            selected_embeddings = np.vstack([selected_embeddings, embeddings[best_idx]])
 
         return [questions[i] for i in selected_indices]
 
-    def _get_pair_embedding(self, pair: ContrastivePair) -> np.ndarray:
-        """Computes a single embedding for a contrastive pair.
-        Args:
-            pair: The ContrastivePair object to compute embedding for
-        Returns:
-            A numpy array representing the embedding of the contrastive pair
-        """
+    def _generate_contrastive_pairs_parallel(
+        self, questions: List[str], trait_description: str, current_count: int, target_count: int
+    ) -> List[ContrastivePair]:
+        """Generate multiple contrastive pairs in parallel."""
+        print(f"🔄 Generating contrastive pairs from {len(questions)} questions...")
+        
+        # Limit questions to what we need
+        remaining_needed = target_count - current_count
+        questions_to_process = questions[:remaining_needed + 5]  # Small buffer
+        
+        with TimingContext(f"Parallel pair generation ({len(questions_to_process)} pairs)", self.enable_timing):
+            # Create futures for parallel generation
+            futures = []
+            for i, question in enumerate(questions_to_process):
+                future = self.executor.submit(
+                    self._generate_single_contrastive_pair,
+                    question,
+                    trait_description,
+                    i + 1,
+                    len(questions_to_process)
+                )
+                futures.append((question, future))
+            
+            # Collect results
+            successful_pairs = []
+            for question, future in futures:
+                try:
+                    pair = future.result(timeout=60)  # 60 second timeout per pair
+                    if pair is not None:
+                        successful_pairs.append(pair)
+                        if current_count + len(successful_pairs) >= target_count:
+                            print(f"✅ Reached target of {target_count} pairs for selection")
+                            break
+                except Exception as e:
+                    print(f"   ⚠️ Failed to generate pair for question '{question[:50]}...': {e}")
+                    continue
+        
+        return successful_pairs
+    
+    def _generate_single_contrastive_pair(
+        self, question: str, trait_description: str, index: int, total: int
+    ) -> Optional[ContrastivePair]:
+        """Generate a single contrastive pair with error handling."""
+        try:
+            print(f"   Generating pair {index}/{total}: {question[:50]}...")
+            pair = self.generate_contrastive_pair(question, trait_description)
+            return pair
+        except Exception as e:
+            print(f"   ⚠️ Error generating pair: {str(e)[:100]}")
+            return None
+    
+    def _batch_compute_pair_embeddings(self, pairs: List[ContrastivePair]) -> np.ndarray:
+        """Compute embeddings for all pairs in batch."""
         if not self.similarity_model:
             return np.array([])
-
-        # Embed all components of the pair
-        prompt_emb: np.ndarray = self.similarity_model.encode([pair.prompt])[0]
-        pos_emb: np.ndarray = self.similarity_model.encode(
-            [pair.positive_response.text]
-        )[0]
-        neg_emb: np.ndarray = self.similarity_model.encode(
-            [pair.negative_response.text]
-        )[0]
-
-        # Concatenate and normalize to get a single representative vector
-        combined_emb: np.ndarray = np.concatenate([prompt_emb, pos_emb, neg_emb])
-        norm = np.linalg.norm(combined_emb)
-        return combined_emb / norm if norm != 0 else combined_emb
+        
+        with TimingContext(f"Batch embedding computation for {len(pairs)} pairs", self.enable_timing):
+            # Prepare all texts for batch encoding
+            all_texts = []
+            for pair in pairs:
+                all_texts.extend([
+                    pair.prompt,
+                    pair.positive_response.text,
+                    pair.negative_response.text
+                ])
+            
+            # Batch encode
+            all_embeddings = self.similarity_model.encode(all_texts, batch_size=32)
+            
+            # Reshape and combine embeddings for each pair
+            pair_embeddings = []
+            for i in range(0, len(all_embeddings), 3):
+                combined = np.concatenate([
+                    all_embeddings[i],      # prompt
+                    all_embeddings[i+1],    # positive
+                    all_embeddings[i+2]     # negative
+                ])
+                norm = np.linalg.norm(combined)
+                pair_embeddings.append(combined / norm if norm != 0 else combined)
+        
+        return np.array(pair_embeddings)
+    
+    def _get_pair_embedding(self, pair: ContrastivePair) -> np.ndarray:
+        """Computes a single embedding for a contrastive pair (for backward compatibility)."""
+        embeddings = self._batch_compute_pair_embeddings([pair])
+        return embeddings[0] if len(embeddings) > 0 else np.array([])
 
     def _select_diverse_pairs(
         self, pairs: list[ContrastivePair], target_count: int
@@ -378,7 +486,8 @@ class SyntheticContrastivePairGenerator:
             f"🔎 Selecting {target_count} diverse pairs from {len(pairs)} candidates..."
         )
 
-        embeddings: np.ndarray = np.array([self._get_pair_embedding(p) for p in pairs])
+        # Batch compute embeddings
+        embeddings = self._batch_compute_pair_embeddings(pairs)
 
         selected_indices: list[int] = [0]
         for _ in range(target_count - 1):
@@ -388,36 +497,58 @@ class SyntheticContrastivePairGenerator:
             if not remaining_indices:
                 break
 
-            # Use vectorized operations for faster distance calculation
-            selected_embeddings: np.ndarray = embeddings[selected_indices]
-            remaining_embeddings: np.ndarray = embeddings[remaining_indices]
-
-            # Calculate cosine similarity, then convert to distance
-            dist_matrix: np.ndarray = 1 - np.dot(
-                remaining_embeddings, selected_embeddings.T
-            )
-
-            # Find the minimum distance from each remaining point to any selected point
-            min_distances: np.ndarray = np.min(dist_matrix, axis=1)
-
-            # Find the point that has the maximum minimum-distance
-            max_dist_idx: int = np.argmax(min_distances)
-
-            selected_indices.append(remaining_indices[max_dist_idx])
+            # Use greedy selection with vectorized operations
+            selected_embeddings = embeddings[selected_indices]
+            
+            # Vectorized distance calculation
+            remaining_embeddings = embeddings[remaining_indices]
+            similarities = np.dot(remaining_embeddings, selected_embeddings.T)
+            min_similarities = np.min(similarities, axis=1)
+            
+            # Select the one with maximum minimum distance (least similar to any selected)
+            best_idx_in_remaining = np.argmin(min_similarities)
+            best_idx = remaining_indices[best_idx_in_remaining]
+            
+            selected_indices.append(best_idx)
 
         return [pairs[i] for i in selected_indices]
 
-    def _generate_response(self, prompt: str, config: dict[str, Any]) -> str:
-        """Generates a response from the model using the provided configuration.
+    def _cached_generate_response(self, prompt: str, config: dict[str, Any]) -> str:
+        """Generate response with caching.
         Args:
             prompt: The input prompt for the model
             config: Configuration parameters for the model generation
         Returns
             response: The generated response text
         """
-        response: str
+        # Create cache key from prompt and config
+        cache_key = f"{prompt}:{json.dumps(config, sort_keys=True)}"
+        
+        # Check cache
+        with self._cache_lock:
+            if cache_key in self._response_cache:
+                return self._response_cache[cache_key]
+        
+        # Generate response
         response, _ = self.model.generate(prompt, **config)
-        return response.strip()
+        response = response.strip()
+        
+        # Update cache
+        with self._cache_lock:
+            # Implement simple LRU by removing oldest entries if cache is full
+            if len(self._response_cache) >= self._cache_size:
+                # Remove ~10% of oldest entries
+                num_to_remove = max(1, self._cache_size // 10)
+                for _ in range(num_to_remove):
+                    self._response_cache.pop(next(iter(self._response_cache)))
+            
+            self._response_cache[cache_key] = response
+        
+        return response
+    
+    def _generate_response(self, prompt: str, config: dict[str, Any]) -> str:
+        """Wrapper for backward compatibility."""
+        return self._cached_generate_response(prompt, config)
 
     def generate_contrastive_pair(
         self, question: str, trait_description: str
@@ -555,7 +686,10 @@ class SyntheticContrastivePairGenerator:
             print(f"⚠️ Warning: Only created {len(successful_pairs)}/{target_pairs} pairs after {attempts} attempts")
         else:
             print(f"\n✅ Successfully created all {target_pairs} pairs using {questions_used} questions")
-            print(f"📊 Overall success rate: {len(successful_pairs)/questions_used*100:.1f}%")
+            if questions_used > 0:
+                print(f"📊 Overall success rate: {len(successful_pairs)/questions_used*100:.1f}%")
+            else:
+                print(f"📊 No questions were used (this shouldn't happen)")
         
         return successful_pairs
 
@@ -565,6 +699,7 @@ class SyntheticContrastivePairGenerator:
         num_pairs: int = 30,
         pair_overgeneration_factor: float = 1.5,
         force_regenerate: bool = False,
+        verbose_timing: bool = False,
     ) -> ContrastivePairSet:
         """
         Generate a complete contrastive pair set from a trait description.
@@ -575,10 +710,17 @@ class SyntheticContrastivePairGenerator:
             num_pairs: Number of contrastive pairs to generate
             pair_overgeneration_factor: Factor to overgenerate pairs for diversity selection
             force_regenerate: If True, bypasses the cache and generates a new set.
+            verbose_timing: If True, shows detailed timing for each step
 
         Returns:
             ContrastivePairSet with generated pairs
         """
+        # Override instance timing setting if verbose_timing is specified
+        original_timing = self.enable_timing
+        if verbose_timing:
+            self.enable_timing = True
+        
+        overall_start = time.time()
         use_database: bool = self.database is not None and not force_regenerate
 
         if not self.similarity_model and use_database:
@@ -657,6 +799,12 @@ class SyntheticContrastivePairGenerator:
             self.database.add_set(new_pair_set, trait_embedding)
             print(f"✅ Cached new set.")
 
+        overall_end = time.time()
+        print(f"\n📊 Total generation time: {overall_end - overall_start:.2f}s")
+        
+        # Restore original timing setting
+        self.enable_timing = original_timing
+        
         return new_pair_set
 
     def _generate_new_pairs(
@@ -696,29 +844,25 @@ class SyntheticContrastivePairGenerator:
             print(f"\n📝 Generating batch of {batch_size} questions (attempt {attempts + 1})...")
             questions: list[str] = self.generate_questions(trait_description, batch_size)
             questions_generated += len(questions)
+            
+            if not questions:
+                print(f"⚠️ No questions generated in attempt {attempts + 1}")
+                attempts += 1
+                continue
+                
             print(f"✅ Generated {len(questions)} unique questions")
             
-            # Try to create pairs from the questions
-            print("🔄 Generating contrastive pairs from questions...")
-            batch_pairs = []
-            for i, question in enumerate(questions):
-                try:
-                    print(f"   Generating pair {i+1}/{len(questions)}: {question[:50]}...")
-                    pair: ContrastivePair = self.generate_contrastive_pair(
-                        question, trait_description
-                    )
-                    batch_pairs.append(pair)
-                    all_pairs.append(pair)
-                    
-                    # Check if we have enough pairs
-                    if len(all_pairs) >= int(num_pairs * pair_overgeneration_factor):
-                        print(f"✅ Reached target of {int(num_pairs * pair_overgeneration_factor)} pairs for selection")
-                        break
-                except Exception as e:
-                    print(f"   ⚠️ Error generating pair for question '{question[:50]}': {e}")
-                    continue
+            # Generate pairs in parallel
+            batch_pairs = self._generate_contrastive_pairs_parallel(
+                questions, trait_description, len(all_pairs), int(num_pairs * pair_overgeneration_factor)
+            )
+            all_pairs.extend(batch_pairs)
             
-            print(f"📊 Batch results: {len(batch_pairs)}/{len(questions)} successful ({len(batch_pairs)/len(questions)*100:.1f}% success rate)")
+            if len(questions) > 0:
+                success_rate_pct = (len(batch_pairs)/len(questions)*100) if len(questions) > 0 else 0
+                print(f"📊 Batch results: {len(batch_pairs)}/{len(questions)} successful ({success_rate_pct:.1f}% success rate)")
+            else:
+                print(f"📊 Batch results: No questions to process")
             print(f"📊 Total progress: {len(all_pairs)}/{int(num_pairs * pair_overgeneration_factor)} pairs")
             
             attempts += 1
@@ -727,7 +871,10 @@ class SyntheticContrastivePairGenerator:
             print(f"⚠️ Warning: Only generated {len(all_pairs)} pairs, target was {num_pairs}")
         
         print(f"\n✅ Successfully generated {len(all_pairs)} raw contrastive pairs from {questions_generated} questions")
-        print(f"📊 Overall success rate: {len(all_pairs)/questions_generated*100:.1f}%")
+        if questions_generated > 0:
+            print(f"📊 Overall success rate: {len(all_pairs)/questions_generated*100:.1f}%")
+        else:
+            print(f"📊 Overall success rate: No questions were generated")
         
         # Select diverse pairs
         diverse_pairs: list[ContrastivePair] = self._select_diverse_pairs(
@@ -851,6 +998,11 @@ class SyntheticContrastivePairGenerator:
 
         return pair_set
 
+    def __del__(self):
+        """Cleanup thread pool executor."""
+        if hasattr(self, 'executor'):
+            self.executor.shutdown(wait=False)
+
 
 def generate_synthetic_pairs_cli(
     trait_description: str,
@@ -858,6 +1010,8 @@ def generate_synthetic_pairs_cli(
     output_file: Optional[str] = None,
     model=None,
     force_regenerate: bool = False,
+    verbose_timing: bool = False,
+    max_workers: int = 4,
 ) -> ContrastivePairSet:
     """
     CLI function to generate synthetic contrastive pairs.
@@ -868,22 +1022,28 @@ def generate_synthetic_pairs_cli(
         output_file: Optional file to save pairs to
         model: Model instance to use
         force_regenerate: If True, bypasses the cache and generates a new set.
+        verbose_timing: If True, shows detailed timing for each step
+        max_workers: Number of parallel workers for generation
 
     Returns:
         Generated ContrastivePairSet
     """
+    print("DEBUG: In generate_synthetic_pairs_cli")
+    print(f"  trait_description: {trait_description}")
+    print(f"  num_pairs: {num_pairs}")
+    
     if model is None:
         raise ValueError("Model must be provided")
 
     generator: SyntheticContrastivePairGenerator = SyntheticContrastivePairGenerator(
-        model
+        model, max_workers=max_workers
     )
-
+    
     pair_set: ContrastivePairSet = generator.generate_contrastive_pair_set(
         trait_description=trait_description,
         num_pairs=num_pairs,
-        name=f"synthetic_{trait_description.replace(' ', '_')[:20]}",
         force_regenerate=force_regenerate,
+        verbose_timing=verbose_timing,
     )
 
     if output_file:
