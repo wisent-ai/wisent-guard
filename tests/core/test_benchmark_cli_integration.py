@@ -116,6 +116,21 @@ class TestBenchmarkCLIIntegration:
         except Exception as e:
             pytest.fail(f"Failed to run CLI command: {e}")
     
+    def test_invalid_task_name(self):
+        """FAST TEST: Verify proper error handling for invalid task names."""
+        invalid_task = "invalid_task_name_xyz"
+        cmd_args = ["tasks", invalid_task, "--model", TEST_MODEL, "--layer", "4", "--limit", "5"]
+        result = self.run_cli_command(cmd_args, timeout=30)
+        
+        # Should fail with invalid task name
+        assert result.returncode != 0, f"Should fail with invalid task name: {result.stdout}"
+        
+        # Check error message mentions task validation
+        full_output = (result.stdout + result.stderr).lower()
+        task_error_indicators = ["invalid", "task", "not found", "available"]
+        found_task_error = any(indicator in full_output for indicator in task_error_indicators)
+        assert found_task_error, f"Should mention invalid task in error: {full_output[:300]}"
+    
     @pytest.mark.slow
     @pytest.mark.parametrize("task_name", ALLOWED_TASKS)
     def test_basic_classifier_full_execution(self, task_name):
