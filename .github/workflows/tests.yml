@@ -41,5 +41,4 @@ jobs:
       - name: Slow integration test (PRs only)
         if: github.event_name == 'pull_request'
         run: |
-          pytest wisent_guard/tests/core/test_benchmark_cli_integration.py \
-                -m "not heavy and not model_download and not docker" -v
+          pytest -m "not heavy and not model_download and not docker" -v
