@@ -1144,6 +1144,13 @@ class OptimizationPipeline:
         if self.model is None:
             self._setup_experiment()
         
+        # Create timestamped run directory for evaluation-only mode
+        if not hasattr(self, 'run_dir'):
+            self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.run_dir = self.output_dir / f"evaluate_only_{self.run_timestamp}"
+            self.run_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"📁 Evaluation directory: {self.run_dir}")
+        
         # Create a complete mock trial with all expected parameters
         from optuna.trial import FixedTrial
         

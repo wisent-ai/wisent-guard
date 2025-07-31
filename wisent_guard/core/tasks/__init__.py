@@ -14,6 +14,7 @@ from .hmmt_task import HMMTTask
 from .polymath_task import PolyMathTask
 from .livemathbench_task import LiveMathBenchTask
 from .supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
+from .file_task import FileTask, create_file_task, register_file_task, load_tasks_from_directory
 
 
 def register_all_tasks():
@@ -87,5 +88,9 @@ __all__ = [
     "SuperGPQAPhysicsTask",
     "SuperGPQAChemistryTask", 
     "SuperGPQABiologyTask",
+    "FileTask",
+    "create_file_task",
+    "register_file_task", 
+    "load_tasks_from_directory",
     "register_all_tasks"
 ]

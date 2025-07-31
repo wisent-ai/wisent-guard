@@ -122,6 +122,38 @@ class TruthfulQATask(LMEvalTask):
             description="TruthfulQA: Truthfulness evaluation benchmark",
             categories=["hallucination", "general-knowledge", "reasoning"]
         )
+    
+    def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Load TruthfulQA data, which only has validation split."""
+        try:
+            import lm_eval
+            from lm_eval.tasks import get_task_dict
+            
+            # Get task directly from lm-eval
+            task_dict = get_task_dict([self.task_name])
+            if self.task_name not in task_dict:
+                print(f"Warning: Task '{self.task_name}' not found in lm-eval")
+                return []
+            
+            task = task_dict[self.task_name]
+            
+            # TruthfulQA only has validation split, access it directly
+            docs = []
+            if hasattr(task, 'dataset') and 'validation' in task.dataset:
+                validation_data = task.dataset['validation']
+                docs = list(validation_data)
+            
+            # Apply limit if specified
+            if limit and len(docs) > limit:
+                docs = docs[:limit]
+                
+            return docs
+            
+        except Exception as e:
+            print(f"Warning: Could not load TruthfulQA task '{self.task_name}': {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
 
 class MMLUTask(LMEvalTask):
