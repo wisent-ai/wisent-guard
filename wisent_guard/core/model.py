@@ -503,7 +503,6 @@ class Model:
             "do_sample": True,
             "temperature": 0.7,
             "pad_token_id": self.tokenizer.pad_token_id,
-            "output_hidden_states": True,
             "return_dict_in_generate": True,
             **generation_kwargs
         }
