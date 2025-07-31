@@ -112,7 +112,7 @@ class TestBenchmarkCLIIntegration:
             return result
 
         except subprocess.TimeoutExpired:
-            pytest.fail(f"CLI command timed out after {timeout}s: {' '.join(full_cmd)}")
+            raise  # Re-raise to be caught by test methods
         except Exception as e:
             pytest.fail(f"Failed to run CLI command: {e}")
 
