@@ -653,7 +653,7 @@ def run_task_pipeline(
                 executor_info = secure_evaluator.get_executor_info()
                 print(f"   • Docker executor ready: {executor_info['image_name']}")
         except Exception as e:
-            # FAIL HARD - No mock execution allowed
+            # FAIL HARD - No fallback execution allowed
             print("\n❌ FATAL ERROR: Docker is required for code execution tasks")
             print(f"   • Task '{task_name}' requires secure Docker execution")
             print(f"   • Docker error: {e}")
@@ -2208,9 +2208,9 @@ def run_task_pipeline(
                     target_norm=target_norm,
                 )
             elif steering_method == "HPR":
-                steering_obj = HPR(device=device, beta=hpr_beta)
+                steering_obj = HPR(device=device)
                 if verbose:
-                    print(f"   • HPR beta: {hpr_beta}")
+                    print(f"   • Using HPR steering")
             elif steering_method == "DAC":
                 steering_obj = DAC(
                     device=device,
@@ -3570,7 +3570,7 @@ The task will be skipped in optimization."""
                         ]  # Single score for cached
                         aggregated_score = classification_result.get("score", 0.5)
 
-                    # Create a mock qa_pair for ground truth evaluation
+                    # Create a qa_pair for ground truth evaluation
                     qa_pair = {
                         "question": cached_item["question"],
                         "correct_answer": "N/A",
@@ -4493,6 +4493,8 @@ def main():
         handle_full_optimization_command(args)
     elif args.command == "generate-vector":
         handle_generate_vector_command(args)
+    elif args.command == "multi-steer":
+        handle_multi_steer_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -4504,6 +4506,7 @@ def handle_generate_pairs_command(args):
     print(f"   • Trait: {args.trait}")
     print(f"   • Number of pairs: {args.num_pairs}")
     print(f"   • Output file: {args.output}")
+    print("DEBUG: In handle_generate_pairs_command")
 
     try:
         # Load model
@@ -4512,12 +4515,25 @@ def handle_generate_pairs_command(args):
         model = Model(name=args.model, device=args.device)
 
         # Generate pairs
-        pair_set = generate_synthetic_pairs_cli(
-            trait_description=args.trait,
-            num_pairs=args.num_pairs,
-            output_file=args.output,
-            model=model,
-        )
+        print("DEBUG: About to import generate_synthetic_pairs_cli")
+        from .core.contrastive_pairs import generate_synthetic_pairs_cli
+        print(f"DEBUG: Imported function: {generate_synthetic_pairs_cli}")
+        
+        try:
+            print("DEBUG: Calling generate_synthetic_pairs_cli")
+            pair_set = generate_synthetic_pairs_cli(
+                trait_description=args.trait,
+                num_pairs=args.num_pairs,
+                output_file=args.output,
+                model=model,
+                verbose_timing=getattr(args, 'timing', False),
+                max_workers=getattr(args, 'max_workers', 4),
+            )
+        except TypeError as te:
+            print(f"TypeError details: {te}")
+            import traceback
+            traceback.print_exc()
+            raise
 
         print(
             f"✅ Successfully generated and saved {len(pair_set.pairs)} contrastive pairs!"
@@ -4525,6 +4541,8 @@ def handle_generate_pairs_command(args):
 
     except Exception as e:
         print(f"❌ Error generating pairs: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
@@ -4562,12 +4580,12 @@ def handle_synthetic_command(args):
         sys.exit(1)
 
 
-def _generate_test_scenarios(
-    trait_description: str, num_scenarios: int, model
+def _generate_test_questions(
+    trait_description: str, num_questions: int, model
 ) -> List[str]:
-    """Generate test scenarios for evaluating the steering method."""
+    """Generate test questions for evaluating the steering method."""
     return [
-        f"Test scenario {i+1} for {trait_description}" for i in range(num_scenarios)
+        f"Test question {i+1} for {trait_description}" for i in range(num_questions)
     ]
 
 
@@ -4875,8 +4893,7 @@ def handle_tasks_command(args):
                 # Generate pairs
                 synthetic_pair_set = generator.generate_contrastive_pair_set(
                     trait_description=args.trait,
-                    num_pairs=args.num_synthetic_pairs,
-                    name=f"synthetic_{args.trait.replace(' ', '_')[:20]}"
+                    num_pairs=args.num_synthetic_pairs
                 )
                 
                 print(f"✅ Generated {len(synthetic_pair_set.pairs)} synthetic pairs")
@@ -7040,6 +7057,7 @@ def handle_generate_vector_command(args):
             
             # Convert to ContrastivePairSet
             from .core.response import PositiveResponse, NegativeResponse
+            from .core.contrastive_pairs import ContrastivePairSet, ContrastivePair
             pairs = ContrastivePairSet(name="loaded_from_file")
             for pair_data in pairs_data:
                 pair = ContrastivePair(
@@ -7177,6 +7195,201 @@ def handle_generate_vector_command(args):
         
     except Exception as e:
         print(f"\n❌ Error generating steering vector: {e}")
+        import traceback
+        if args.verbose:
+            traceback.print_exc()
+        sys.exit(1)
+
+
+def handle_multi_steer_command(args):
+    """Handle the multi-steer command for dynamic vector combination."""
+    try:
+        print("🎯 Multi-Vector Steering")
+        print("=" * 60)
+        
+        # Parse vector-weight pairs
+        vectors_info = []
+        total_weight = 0.0
+        
+        print("\n📊 Loading steering vectors:")
+        for vector_spec in args.vector:
+            parts = vector_spec.split(':')
+            if len(parts) != 2:
+                print(f"❌ Invalid vector specification: {vector_spec}")
+                print("   Expected format: path/to/vector.pt:weight")
+                sys.exit(1)
+            
+            path, weight_str = parts
+            try:
+                weight = float(weight_str)
+            except ValueError:
+                print(f"❌ Invalid weight: {weight_str}")
+                sys.exit(1)
+            
+            vectors_info.append((path, weight))
+            total_weight += weight
+            print(f"   • {path}: weight={weight}")
+        
+        # Check weight normalization
+        if args.normalize_weights:
+            print(f"\n📏 Normalizing weights (sum={total_weight:.2f} → 1.0)")
+        elif not args.allow_unnormalized and abs(total_weight - 1.0) > 0.01:
+            print(f"\n⚠️  Warning: Weights sum to {total_weight:.2f} (not 1.0)")
+            print("   Use --normalize-weights to normalize or --allow-unnormalized to proceed")
+            sys.exit(1)
+        
+        # Load model
+        print(f"\n📦 Loading model: {args.model}")
+        from .core.model import Model
+        model = Model(name=args.model, device=args.device)
+        
+        # Load and combine vectors
+        print("\n🔄 Loading and combining vectors...")
+        from .core.steering_methods.dac import DAC
+        from .core.layer import Layer
+        
+        # Create DAC instance for vector combination
+        dac = DAC(device=args.device)
+        
+        # Load all vectors
+        loaded_vectors = []
+        weights = []
+        
+        for path, weight in vectors_info:
+            print(f"   Loading {path}...")
+            data = torch.load(path, map_location=args.device)
+            
+            # Extract vector based on format
+            if 'steering_vector' in data:
+                vector = data['steering_vector']
+            elif 'vector' in data:
+                vector = data['vector']
+            elif 'property_vectors' in data:
+                # Handle multi-property files
+                if 'default' in data['property_vectors']:
+                    vector = data['property_vectors']['default']['vector']
+                else:
+                    # Use first property
+                    first_prop = list(data['property_vectors'].values())[0]
+                    vector = first_prop['vector']
+            else:
+                print(f"❌ Could not find steering vector in {path}")
+                sys.exit(1)
+            
+            loaded_vectors.append(vector)
+            weights.append(weight)
+        
+        # Combine vectors
+        combined_vector = DAC.combine_steering_vectors(
+            loaded_vectors, 
+            weights, 
+            normalize_weights=args.normalize_weights
+        )
+        
+        print(f"\n✅ Combined {len(loaded_vectors)} vectors")
+        print(f"   📏 Combined vector shape: {combined_vector.shape}")
+        print(f"   📊 Combined vector norm: {torch.norm(combined_vector).item():.4f}")
+        
+        # Save combined vector if requested
+        if args.save_combined:
+            print(f"\n💾 Saving combined vector to: {args.save_combined}")
+            save_data = {
+                'method': 'DAC',
+                'steering_vector': combined_vector,
+                'layer_index': args.layer,
+                'combination_info': {
+                    'source_vectors': [path for path, _ in vectors_info],
+                    'weights': weights,
+                    'normalized': args.normalize_weights
+                }
+            }
+            torch.save(save_data, args.save_combined)
+        
+        # Apply combined steering and generate
+        print(f"\n🚀 Generating with combined steering...")
+        print(f"   📝 Prompt: {args.prompt}")
+        print(f"   📍 Layer: {args.layer}")
+        print(f"   🔢 Max tokens: {args.max_new_tokens}")
+        
+        # Create a temporary DAC instance with the combined vector
+        layer = Layer(args.layer)
+        dac.steering_vector = combined_vector
+        dac.layer_index = args.layer
+        dac.is_trained = True
+        
+        # Add property vector for compatibility
+        from .core.steering_methods.dac import PropertyVector
+        from .core.aggregation import ControlVectorAggregationMethod
+        dac.property_vectors['combined'] = PropertyVector(
+            name='combined',
+            vector=combined_vector,
+            layer_index=args.layer,
+            training_stats={'method': 'combined', 'weights': weights},
+            aggregation_method=ControlVectorAggregationMethod.CAA
+        )
+        
+        # Generate with combined steering
+        hooks = []
+        def steering_hook(module, input, output):
+            if isinstance(output, tuple):
+                hidden_states = output[0]
+            else:
+                hidden_states = output
+            
+            # Apply combined steering
+            steered = dac.apply_steering(
+                hidden_states,
+                strength=1.0,
+                active_properties=['combined']
+            )
+            
+            if isinstance(output, tuple):
+                return (steered,) + output[1:]
+            else:
+                return steered
+        
+        # Apply hook to the specified layer
+        if hasattr(model.hf_model, 'model') and hasattr(model.hf_model.model, 'layers'):
+            layer_module = model.hf_model.model.layers[args.layer]
+        elif hasattr(model.hf_model, 'transformer') and hasattr(model.hf_model.transformer, 'h'):
+            layer_module = model.hf_model.transformer.h[args.layer]
+        else:
+            print("❌ Could not find model layers")
+            sys.exit(1)
+        
+        handle = layer_module.register_forward_hook(steering_hook)
+        hooks.append(handle)
+        
+        try:
+            # Generate
+            response, _ = model.generate(
+                args.prompt,
+                layer_index=args.layer,
+                max_new_tokens=args.max_new_tokens
+            )
+            
+            print("\n" + "=" * 60)
+            print("📝 Generated Response:")
+            print("=" * 60)
+            print(response)
+            
+            if args.verbose:
+                print("\n📊 Combination Details:")
+                for i, (path, weight) in enumerate(vectors_info):
+                    norm_weight = weights[i] if args.normalize_weights else weight
+                    print(f"   • Vector {i+1}: {path}")
+                    print(f"     Weight: {weight} → {norm_weight:.4f}")
+                    print(f"     Contribution: {norm_weight * torch.norm(loaded_vectors[i]).item():.4f}")
+            
+        finally:
+            # Remove hooks
+            for hook in hooks:
+                hook.remove()
+        
+        print("\n✅ Multi-vector steering completed successfully!")
+        
+    except Exception as e:
+        print(f"\n❌ Error in multi-vector steering: {e}")
         import traceback
         if args.verbose:
             traceback.print_exc()

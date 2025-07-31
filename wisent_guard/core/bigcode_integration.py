@@ -194,8 +194,8 @@ class BigCodeTask:
                 self._load_from_path(expanded_path)
                 return
                 
-        # If no data found, create mock data for testing
-        self._create_mock_data()
+        # If no data found, raise error
+        raise ValueError(f"No data found for task {self.task_name}. Please provide valid benchmark data.")
         
     def _load_from_path(self, path: str):
         """Load data from a specific path."""
@@ -218,59 +218,6 @@ class BigCodeTask:
             data = data[:self.limit]
             
         self._data = data
-        
-    def _create_mock_data(self):
-        """Create mock data for testing when real data unavailable."""
-        logger.warning(f"Creating mock data for {self.task_name}")
-        
-        mock_templates = {
-            'humaneval': {
-                'task_id': 'HumanEval/0',
-                'prompt': 'def has_close_elements(numbers: List[float], threshold: float) -> bool:\n    """ Check if in given list of numbers, are any two numbers closer to each other than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    """\n',
-                'canonical_solution': '    for idx, elem in enumerate(numbers):\n        for idx2, elem2 in enumerate(numbers):\n            if idx != idx2:\n                distance = abs(elem - elem2)\n                if distance < threshold:\n                    return True\n\n    return False\n',
-                'test': 'def check(candidate):\n    assert candidate([1.0, 2.0, 3.0], 0.5) == False\n    assert candidate([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3) == True\n',
-                'entry_point': 'has_close_elements'
-            },
-            'apps': {
-                'problem_id': 0,
-                'question': 'Given a list of integers, return the sum of all even numbers.',
-                'starter_code': 'def sum_even(numbers):\n    # Your code here\n    pass',
-                'solutions': '["def sum_even(numbers):\\n    return sum(n for n in numbers if n % 2 == 0)"]',
-                'input_output': '{"inputs": ["[1, 2, 3, 4, 5]", "[10, 15, 20, 25]"], "outputs": ["6", "30"]}'
-            },
-            'mbpp_plus': {
-                'task_id': 'Mbpp/1',
-                'text': 'Write a function to find the minimum cost path to reach (m, n) from (0, 0) for the given cost matrix cost[][] and a position (m, n) in cost[][].',
-                'code': 'def min_cost(cost, m, n):\n    tc = [[0 for x in range(n+1)] for x in range(m+1)]\n    tc[0][0] = cost[0][0]\n    for i in range(1, m+1):\n        tc[i][0] = tc[i-1][0] + cost[i][0]\n    for j in range(1, n+1):\n        tc[0][j] = tc[0][j-1] + cost[0][j]\n    for i in range(1, m+1):\n        for j in range(1, n+1):\n            tc[i][j] = min(tc[i-1][j-1], tc[i-1][j], tc[i][j-1]) + cost[i][j]\n    return tc[m][n]',
-                'test_imports': [],
-                'test_list': ['assert min_cost([[1, 2, 3], [4, 8, 2], [1, 5, 3]], 2, 2) == 8']
-            }
-        }
-        
-        # Use appropriate template
-        base_name = self.task_name.replace('_plus', '').replace('multiple_', '')
-        if 'humaneval' in self.task_name or 'multiple' in self.task_name:
-            template = mock_templates['humaneval']
-        elif 'apps' in self.task_name:
-            template = mock_templates['apps']
-        elif 'mbpp' in self.task_name:
-            template = mock_templates['mbpp_plus']
-        else:
-            template = mock_templates['humaneval']  # Default
-            
-        # Create mock instances
-        self._data = []
-        num_samples = self.limit if self.limit else 5
-        
-        for i in range(num_samples):
-            sample = template.copy()
-            # Modify IDs
-            if 'task_id' in sample:
-                sample['task_id'] = sample['task_id'].replace('/0', f'/{i}')
-            if 'problem_id' in sample:
-                sample['problem_id'] = i
-                
-            self._data.append(sample)
             
     def get_samples(self) -> List[Dict[str, Any]]:
         """Get all samples from the task."""

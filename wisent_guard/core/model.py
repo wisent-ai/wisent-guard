@@ -122,16 +122,14 @@ class Model:
     def _detect_format(self) -> PromptFormat:
         """
         Detect the appropriate format to use based on the model.
+        Since we now use the tokenizer's chat template, this is mainly for backwards compatibility.
         
         Returns:
             PromptFormat enum indicating the format
-            
-        Raises:
-            ValueError: If model is not recognized and no user config exists
         """
         model_name = self.name.lower()
         
-        # Check for specific model types
+        # Check for specific model types (for backwards compatibility)
         if re.search(r"llama-?3", model_name, re.IGNORECASE):
             return PromptFormat.LLAMA31
         elif "mistral" in model_name:
@@ -141,24 +139,9 @@ class Model:
         elif "gpt2" in model_name or "distilgpt2" in model_name:
             return PromptFormat.LEGACY
         else:
-            # Check if we have a user-defined config
-            if user_model_configs.has_config(self.name):
-                # User has configured this model
-                return PromptFormat.LEGACY  # We'll handle tokens separately
-            else:
-                # Unknown model with no config - prompt user to configure it
-                print(f"\n⚠️  Model '{self.name}' is not recognized.")
-                response = input("Would you like to configure it now? (y/n): ").strip().lower()
-                
-                if response == 'y':
-                    # Configure the model interactively
-                    config = user_model_configs.prompt_and_save_config(self.name)
-                    return PromptFormat.LEGACY  # User-configured models use legacy format
-                else:
-                    raise ValueError(
-                        f"Model '{self.name}' requires configuration.\n"
-                        f"Run 'wisent-guard configure-model {self.name}' to set it up."
-                    )
+            # For all other models, default to LEGACY format
+            # The actual formatting will be handled by the tokenizer's chat template
+            return PromptFormat.LEGACY
 
     def _initialize_tokens(self):
         """Initialize user and assistant tokens based on format type or user config."""
@@ -197,7 +180,8 @@ class Model:
 
     def format_prompt(self, prompt: str, response: str = None) -> str:
         """
-        Format a prompt using the appropriate format (Llama 3.1, Mistral, or legacy).
+        Format a prompt using the tokenizer's chat template if available,
+        otherwise fall back to legacy format detection.
         
         Args:
             prompt: Input prompt text
@@ -206,6 +190,26 @@ class Model:
         Returns:
             Formatted prompt string
         """
+        # Try to use the tokenizer's chat template if available
+        if hasattr(self.tokenizer, 'chat_template') and self.tokenizer.chat_template is not None:
+            try:
+                # Create messages for the chat template
+                messages = [{"role": "user", "content": prompt}]
+                if response is not None:
+                    messages.append({"role": "assistant", "content": response})
+                
+                # Apply the chat template
+                formatted = self.tokenizer.apply_chat_template(
+                    messages, 
+                    tokenize=False, 
+                    add_generation_prompt=(response is None)  # Add generation prompt only if no response
+                )
+                return formatted
+            except Exception as e:
+                # Fall back to legacy format if chat template fails
+                print(f"Warning: Failed to apply chat template: {e}. Using legacy format.")
+        
+        # Legacy format detection (for backwards compatibility)
         if self.format_type == PromptFormat.LLAMA31:
             # Llama 3.1 special tokens
             BEGIN_TEXT = "<|begin_of_text|>"
@@ -515,7 +519,6 @@ class Model:
             "do_sample": True,
             "temperature": 0.7,
             "pad_token_id": self.tokenizer.pad_token_id,
-            "output_hidden_states": True,
             "return_dict_in_generate": True,
             **generation_kwargs
         }

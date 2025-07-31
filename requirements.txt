@@ -19,3 +19,6 @@ dotenv==0.9.9
 notebook==7.4.4
 optuna==4.4.0
 optuna-dashboard==0.19.0
+sentence-transformers>=2.0.0
+faiss-cpu==1.11.0.post1
+pre-commit==4.2.0

@@ -25,6 +25,7 @@ def main():
         print("  optimize-sample-size  - Find optimal training sample size for classifiers")
         print("  full-optimize         - Run full optimization: classification, steering, and sample size")
         print("  generate-vector       - Generate steering vectors from contrastive pairs (file or description)")
+        print("  multi-steer           - Combine multiple steering vectors dynamically at inference time")
         print("\nExamples:")
         print("  python -m wisent_guard tasks truthfulqa --layer 15 --model meta-llama/Llama-3.1-8B-Instruct")
         print("  python -m wisent_guard generate-pairs --trait 'refuse harmful requests' --output pairs.json")
@@ -36,7 +37,7 @@ def main():
     
     subcommand = sys.argv[1]
     
-    if subcommand in ["tasks", "generate-pairs", "synthetic", "test-nonsense", "agent", "model-config", "optimize-classification", "optimize-steering", "optimize-sample-size", "full-optimize", "generate-vector"]:
+    if subcommand in ["tasks", "generate-pairs", "synthetic", "test-nonsense", "agent", "model-config", "optimize-classification", "optimize-steering", "optimize-sample-size", "full-optimize", "generate-vector", "multi-steer"]:
         # Import and run the integrated CLI
         from .cli import main as cli_main
         # Remove the subcommand from sys.argv so the CLI parser works correctly
@@ -44,7 +45,7 @@ def main():
         cli_main()
     else:
         print(f"Unknown subcommand: {subcommand}")
-        print("Available subcommands: tasks, generate-pairs, synthetic, test-nonsense, agent, model-config, optimize-classification, optimize-steering, optimize-sample-size, full-optimize, generate-vector")
+        print("Available subcommands: tasks, generate-pairs, synthetic, test-nonsense, agent, model-config, optimize-classification, optimize-steering, optimize-sample-size, full-optimize, generate-vector, multi-steer")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -77,25 +77,18 @@ def get_task_samples_for_analysis(task_name: str, num_samples: int = 5, trust_re
         # If we get a trust_remote_code error, try direct approach with automatic confirmation
         if trust_remote_code:
             try:
-                import io
-                import sys
-                from unittest.mock import patch
+                import os
                 from lm_eval import evaluator
                 
-                # Mock all possible user inputs to automatically confirm
-                def mock_input(prompt):
-                    print(f"Auto-confirming prompt: {prompt}")
-                    return 'y'
+                # Set environment variable to trust remote code
+                os.environ['HF_DATASETS_TRUST_REMOTE_CODE'] = '1'
                 
-                # Mock stdin and input to automatically answer 'y' to trust remote code prompts
-                with patch('builtins.input', side_effect=mock_input):
-                    with patch('sys.stdin', io.StringIO('y\n')):
-                        task_dict = evaluator.get_task_dict([task_name])
-                        if task_name in task_dict:
-                            task = task_dict[task_name]
-                            return get_task_samples_direct(task, num_samples=num_samples)
-                        else:
-                            return {"error": f"Task {task_name} not found even with trust_remote_code handling"}
+                task_dict = evaluator.get_task_dict([task_name])
+                if task_name in task_dict:
+                    task = task_dict[task_name]
+                    return get_task_samples_direct(task, num_samples=num_samples)
+                else:
+                    return {"error": f"Task {task_name} not found even with trust_remote_code handling"}
             except Exception as e:
                 print(f"Trust remote code handling failed: {e}")
                 return {"error": f"Failed to load task with trust_remote_code handling: {e}"}
@@ -1421,13 +1414,11 @@ def get_task_samples_with_subtasks(task_name: str, num_samples: int = 5,
             
             # Import here to avoid circular imports
             from lm_eval import evaluator
-            from unittest.mock import patch
-            import io
+            import os
             
-            # Get task with automatic confirmation for trust_remote_code
-            with patch('builtins.input', return_value='y'):
-                with patch('sys.stdin', io.StringIO('y\n')):
-                    task_dict = evaluator.get_task_dict([task_name])
+            # Set environment variable to trust remote code
+            os.environ['HF_DATASETS_TRUST_REMOTE_CODE'] = '1'
+            task_dict = evaluator.get_task_dict([task_name])
                     
             if task_name in task_dict:
                 task = task_dict[task_name]
@@ -1696,12 +1687,10 @@ def try_datasets_direct_load(task_name: str, num_samples: int = 5, trust_remote_
     """
     try:
         import datasets
-        from unittest.mock import patch
+        import os
         
-        # Mock input for trust_remote_code prompts
-        def mock_input(prompt):
-            print(f"Auto-confirming datasets prompt: {prompt}")
-            return 'y'
+        # Set environment variable to trust remote code
+        os.environ['HF_DATASETS_TRUST_REMOTE_CODE'] = '1'
         
         # Try common dataset loading patterns
         dataset_patterns = [
@@ -1714,11 +1703,10 @@ def try_datasets_direct_load(task_name: str, num_samples: int = 5, trust_remote_
         
         for pattern in dataset_patterns:
             try:
-                with patch('builtins.input', side_effect=mock_input):
-                    if trust_remote_code:
-                        dataset = datasets.load_dataset(pattern, trust_remote_code=True)
-                    else:
-                        dataset = datasets.load_dataset(pattern)
+                if trust_remote_code:
+                    dataset = datasets.load_dataset(pattern, trust_remote_code=True)
+                else:
+                    dataset = datasets.load_dataset(pattern)
                     
                     # Extract samples
                     samples = []

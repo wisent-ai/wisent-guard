@@ -39,6 +39,8 @@ setup(
         "pandas>=1.2.0",
         "numpy>=1.21.0",
         "datasets>=2.0.0",
+        "sentence-transformers>=2.0.0",
+        "faiss-cpu>=1.7.0",
     ],
     extras_require={
         "harness": [

@@ -79,6 +79,7 @@ Thumbs.db
 !/dist/
 !/wisent_guard.egg-info/
 !/scripts/
+!/tests/
 
 # Don't ignore these files in the root directory
 !/.gitignore
@@ -90,6 +91,7 @@ Thumbs.db
 !/wisent-guard-logo.png
 !/.DS_Store
 !/.github/
+!/.pre-commit-config.yaml
 
 
 # HuggingFace model files (too large for GitHub)
