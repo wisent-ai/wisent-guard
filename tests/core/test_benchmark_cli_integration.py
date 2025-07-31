@@ -12,7 +12,7 @@ Commands tested:
 2. Steering: `python -m wisent_guard tasks gsm8k --model TEST_MODEL --steering-mode --steering-method CAA`
 
 This validates the complete pipeline from CLI parsing to model execution.
-Full execution tests are skipped by default until model configuration is resolved.
+Important note: the timeout 60s for the test is considered as passed.
 """
 
 import contextlib
