@@ -17,7 +17,6 @@ class PromptFormat(Enum):
     QWEN = "qwen"
 
 
-
 class TokenScore:
     """Stores information about a token and its similarity to harmful content."""
 

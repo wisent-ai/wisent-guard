@@ -281,7 +281,6 @@ class LMEvalHarnessGroundTruth:
                     logger.debug(f"   🎯 Classifier score: {prediction:.3f} (lower = more truthful)")
                     logger.debug(f"   ✅ Classifier judgment: {'TRUTHFUL' if prediction < 0.5 else 'UNTRUTHFUL'}")
 
-
                 except Exception as e:
                     import traceback
 
