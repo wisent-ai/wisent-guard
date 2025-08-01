@@ -74,10 +74,12 @@ Thumbs.db
 !/models/
 !/examples/
 !/evaluation/
+!/comprehensive_evaluation/
 !/classifier_evaluation/
 !/dist/
 !/wisent_guard.egg-info/
 !/scripts/
+!/tests/
 
 # Don't ignore these files in the root directory
 !/.gitignore
@@ -88,6 +90,8 @@ Thumbs.db
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
 !/.DS_Store
+!/.github/
+!/.pre-commit-config.yaml
 
 
 # HuggingFace model files (too large for GitHub)
@@ -120,7 +124,15 @@ opt_param/
 smoke_test_results/
 references/
 
+# Generated outputs (notebooks, comprehensive evaluation, wandb outputs)
+outputs/
+wandb/
+*/wandb/
+
 # Cache directories for our tools
+wisent_guard/benchmark_cache/
+comprehensive_evaluation/cache
+examples/**/cache
 
 # Keys and secrets
 keys/
