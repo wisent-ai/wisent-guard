@@ -363,35 +363,39 @@ class LMEvalHarnessGroundTruth:
                                 tensor=activation_tensor, layer=layer_obj, aggregation_method=activation_method
                             )
 
-                            # Get classifier prediction
-                            features = activation_obj.extract_features_for_classifier()
+                            # Get classifier prediction (only if classifier is provided)
+                            if classifier is not None:
+                                features = activation_obj.extract_features_for_classifier()
 
-                            # Handle different classifier return formats
-                            try:
-                                prediction_proba = classifier.predict_proba([features.cpu().numpy()])
-
-                                if isinstance(prediction_proba, (list, tuple)) and len(prediction_proba) > 0:
-                                    classification_score = float(prediction_proba[0])
-                                else:
-                                    classification_score = float(prediction_proba)
-
-                                if hasattr(classification_score, "__len__") and not isinstance(
-                                    classification_score, str
-                                ):
-                                    classification_score = float(classification_score[0])
-
-                            except Exception as proba_error:
-                                logger.warning(f"predict_proba failed: {proba_error}, trying predict...")
+                                # Handle different classifier return formats
                                 try:
-                                    predictions = classifier.predict([features.cpu().numpy()])
-                                    if len(predictions) > 0:
-                                        classification_score = float(predictions[0])
+                                    prediction_proba = classifier.predict_proba([features.cpu().numpy()])
+
+                                    if isinstance(prediction_proba, (list, tuple)) and len(prediction_proba) > 0:
+                                        classification_score = float(prediction_proba[0])
                                     else:
-                                        logger.warning("Classifier predict returned empty array")
+                                        classification_score = float(prediction_proba)
+
+                                    if hasattr(classification_score, "__len__") and not isinstance(
+                                        classification_score, str
+                                    ):
+                                        classification_score = float(classification_score[0])
+
+                                except Exception as proba_error:
+                                    logger.warning(f"predict_proba failed: {proba_error}, trying predict...")
+                                    try:
+                                        predictions = classifier.predict([features.cpu().numpy()])
+                                        if len(predictions) > 0:
+                                            classification_score = float(predictions[0])
+                                        else:
+                                            logger.warning("Classifier predict returned empty array")
+                                            classification_score = 0.5
+                                    except Exception as predict_error:
+                                        logger.error(f"Both predict_proba and predict failed: {predict_error}")
                                         classification_score = 0.5
-                                except Exception as predict_error:
-                                    logger.error(f"Both predict_proba and predict failed: {predict_error}")
-                                    classification_score = 0.5
+                            else:
+                                # No classifier provided - use default neutral score for perplexity-only evaluation
+                                classification_score = 0.5
 
                         except Exception as e:
                             logger.error(f"Error classifying WikiText document: {e}")
