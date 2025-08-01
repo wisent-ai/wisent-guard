@@ -311,7 +311,7 @@ class FullBenchmarkDownloader:
             return self._convert_mmmlu_format(sample)
 
         # Multiple Choice with explicit choices and numeric label (HellaSwag, SWAG, etc.)
-        elif "endings" in sample and "label" in sample:
+        elif ("endings" in sample and "label" in sample) or ("ending0" in sample and "label" in sample):
             return self._convert_multiple_choice_numeric(sample)
 
         # Multiple Choice with choices dict and answerKey (ARC, OpenBookQA, etc.)
@@ -351,6 +351,14 @@ class FullBenchmarkDownloader:
         # WebQS format (question, answers list)
         elif "question" in sample and "answers" in sample and isinstance(sample.get("answers"), list):
             return self._convert_webqs_format(sample)
+
+        # NaturalQS format (question, answer as list)
+        elif "question" in sample and "answer" in sample and isinstance(sample.get("answer"), list):
+            return self._convert_naturalqs_format(sample)
+
+        # TriviaQA format (question, answer as dict with aliases)
+        elif "question" in sample and "answer" in sample and isinstance(sample.get("answer"), dict):
+            return self._convert_triviaqa_format(sample)
 
         # Text generation with question/answer (GSM8K, math problems)
         elif "question" in sample and "answer" in sample:
@@ -437,7 +445,25 @@ class FullBenchmarkDownloader:
     def _convert_multiple_choice_numeric(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert multiple choice with numeric label (HellaSwag, SWAG)."""
         context = sample.get("ctx", sample.get("query", ""))
-        choices = sample.get("endings", sample.get("choices", []))
+        
+        # Handle different choice formats
+        if "endings" in sample:
+            # HellaSwag format: choices in "endings" list
+            choices = sample.get("endings", [])
+        elif "ending0" in sample:
+            # SWAG format: choices in separate ending0, ending1, etc. fields
+            choices = []
+            for i in range(4):  # SWAG typically has 4 choices
+                ending_key = f"ending{i}"
+                if ending_key in sample:
+                    choices.append(sample[ending_key])
+            # Build context from sent1, sent2, etc.
+            sent1 = sample.get("sent1", "")
+            sent2 = sample.get("sent2", "")
+            context = f"{sent1} {sent2}".strip()
+        else:
+            choices = sample.get("choices", [])
+        
         correct_idx = int(sample["label"])
 
         if not choices or correct_idx >= len(choices):
@@ -1074,6 +1100,98 @@ class FullBenchmarkDownloader:
                 }
             )
 
+        return pairs
+
+    def _convert_naturalqs_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert NaturalQS format (question, answer as list)."""
+        question = sample.get("question", "")
+        answer_list = sample.get("answer", [])
+        
+        if not question or not answer_list:
+            return []
+        
+        # Take the first answer as the correct one (shortest/most direct)
+        correct_answer = answer_list[0] if answer_list else ""
+        
+        if not correct_answer:
+            return []
+        
+        # Generate incorrect answers
+        incorrect_answers = []
+        
+        # Strategy 1: Use other answers from the list as distractors if available
+        if len(answer_list) > 1:
+            incorrect_answers.extend(answer_list[1:3])  # Take up to 2 more answers
+        
+        # Strategy 2: Generate generic incorrect answers
+        if len(incorrect_answers) < 2:
+            incorrect_answers.append("I don't know the answer to this question.")
+            incorrect_answers.append("This information is not available.")
+        
+        # Create contrastive pairs
+        pairs = []
+        for incorrect in incorrect_answers[:2]:  # Limit to 2 pairs
+            pairs.append({
+                "context": question,
+                "good_response": correct_answer,
+                "bad_response": incorrect,
+                "metadata": {
+                    "benchmark_type": "naturalqs",
+                    "task_type": "factual_qa",
+                    "total_answers": len(answer_list)
+                }
+            })
+        
+        return pairs
+
+    def _convert_triviaqa_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert TriviaQA format (question, answer as dict with aliases)."""
+        question = sample.get("question", "")
+        answer_dict = sample.get("answer", {})
+        
+        if not question or not answer_dict:
+            return []
+        
+        # Extract the correct answer from aliases
+        aliases = answer_dict.get("aliases", [])
+        if not aliases:
+            # Fallback to other fields
+            correct_answer = (answer_dict.get("value", "") or 
+                            answer_dict.get("normalized_value", "") or
+                            str(answer_dict))[:100]  # Truncate if too long
+        else:
+            correct_answer = aliases[0]  # Use first alias as primary answer
+        
+        if not correct_answer:
+            return []
+        
+        # Generate incorrect answers
+        incorrect_answers = []
+        
+        # Strategy 1: Use other aliases as distractors if available
+        if len(aliases) > 1:
+            incorrect_answers.extend(aliases[1:3])  # Take up to 2 more aliases
+        
+        # Strategy 2: Generate generic incorrect answers for trivia
+        if len(incorrect_answers) < 2:
+            incorrect_answers.append("Unknown")
+            incorrect_answers.append("I don't know")
+        
+        # Create contrastive pairs  
+        pairs = []
+        for incorrect in incorrect_answers[:2]:  # Limit to 2 pairs
+            pairs.append({
+                "context": question,
+                "good_response": correct_answer,
+                "bad_response": incorrect,
+                "metadata": {
+                    "benchmark_type": "triviaqa", 
+                    "task_type": "trivia_qa",
+                    "total_aliases": len(aliases),
+                    "entity_name": answer_dict.get("matched_wiki_entity_name", "")
+                }
+            })
+        
         return pairs
 
 

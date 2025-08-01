@@ -172,6 +172,7 @@ TEST_ALLOWED_TASKS = list(
     {
         *ORIGINAL_TASKS,  # Only verified working original tasks (drop, record)
         *MULTIPLE_CHOICE_TASKS,  # All multiple choice tasks work
+        *QA_TASKS,  # All QA tasks work
         *GPQA_TASKS,  # All GPQA tasks work
         *MATH_TASKS,  # All math tasks work
         *HLE_TASKS,  # All HLE tasks work
