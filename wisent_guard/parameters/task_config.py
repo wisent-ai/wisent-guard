@@ -5,10 +5,10 @@ This module defines the allowed tasks and task-related configurations
 that are used throughout the application.
 """
 
-# Define the whitelist of allowed tasks
-# This combines both lm-eval tasks and TaskInterface tasks
-ALLOWED_TASKS = {
-    # === Original tested tasks ===
+# === Task Groups ===
+
+# Original tested tasks
+ORIGINAL_TASKS = {
     "math_qa",
     "webqs",
     "truthfulqa_gen",
@@ -17,7 +17,10 @@ ALLOWED_TASKS = {
     "squad2",
     "wikitext",
     "winogrande",
-    # === Multiple choice benchmarks ===
+}
+
+# Multiple choice benchmarks
+MULTIPLE_CHOICE_TASKS = {
     "arc_challenge",
     "arc_easy",
     "hellaswag",
@@ -29,7 +32,11 @@ ALLOWED_TASKS = {
     "copa",
     "openbookqa",
     "race",
-    # === GPQA benchmarks ===
+    "boolq",
+}
+
+# GPQA scientific reasoning benchmarks
+GPQA_TASKS = {
     "gpqa",
     "gpqa_diamond",
     "gpqa_extended",
@@ -41,56 +48,51 @@ ALLOWED_TASKS = {
     "gpqa_main_cot_zeroshot",
     "gpqa_diamond_cot_zeroshot",
     "gpqa_extended_cot_zeroshot",
-    # === Boolean benchmarks ===
-    "boolq",
-    # === Math benchmarks ===
+    # SuperGPQA scientific reasoning benchmarks
+    "supergpqa",
+    "supergpqa_physics",
+    "supergpqa_chemistry",
+    "supergpqa_biology",
+}
+
+# Mathematical reasoning benchmarks
+MATH_TASKS = {
+    # Basic math benchmarks
     "gsm8k",
-    "asdiv",
-    "arithmetic",
-    # === MATH-500 mathematical reasoning benchmarks ===
+    # MATH-500 mathematical reasoning benchmarks
     "math",
     "math500",
     "hendrycks_math",
-    # === AIME contest math problems (general + year-specific) ===
+    # AIME contest math problems (general + year-specific)
     "aime",  # Latest AIME (2025)
     "aime2025",  # AIME 2025
     "aime2024",  # AIME 2024
-    # === HMMT contest math problems (general + competition-specific) ===
+    # HMMT contest math problems (general + competition-specific)
     "hmmt",  # Latest HMMT (February 2025)
     "hmmt_feb_2025",  # HMMT February 2025
-    # === PolyMath multilingual mathematical reasoning ===
     "polymath",  # Default: English medium
     "polymath_en_medium",  # English medium
     "polymath_zh_medium",  # Chinese medium
     "polymath_en_high",  # English high
     "polymath_zh_high",  # Chinese high
-    # === LiveMathBench CNMO 2024 (Chinese and English) ===
+    # LiveMathBench CNMO 2024 (Chinese and English)
     "livemathbench",  # Default: English
     "livemathbench_cnmo_en",  # CNMO 2024 English
     "livemathbench_cnmo_zh",  # CNMO 2024 Chinese
-    # === QA benchmarks ===
+}
+
+# QA benchmarks
+QA_TASKS = {
     "coqa",
     "naturalqs",
     "triviaqa",
-    # === Coding benchmarks ===
+}
+
+# Coding benchmarks
+CODING_TASKS = {
     "mbpp",
     "livecodebench",
-    # === Additional benchmarks ===
-    "cb",
-    "logiqa",
-    "multirc",
-    "mutual",
-    "prost",
-    "pubmedqa",
-    "sciq",
-    "swag",
-    "toxigen",
-    "wic",
-    "wsc",
-    "wsc273",
-    # === Adversarial benchmarks ===
-    "anli",
-    # === BigCode benchmarks ===
+    # BigCode benchmarks
     "humaneval",
     "humaneval_plus",
     "instructhumaneval",
@@ -115,19 +117,46 @@ ALLOWED_TASKS = {
     "codexglue_code_to_text_javascript",
     "codexglue_code_to_text_php",
     "mercury",
-    # === HLE (Human-Level Evaluation) benchmarks ===
+}
+
+# HLE (Human-Level Evaluation) benchmarks
+HLE_TASKS = {
     "hle",
     "hle_exact_match",
     "hle_multiple_choice",
-    # === SuperGPQA scientific reasoning benchmarks ===
-    "supergpqa",
-    "supergpqa_physics",
-    "supergpqa_chemistry",
-    "supergpqa_biology",
 }
 
-# Tasks for CLI integration testing
-# This is a subset of ALLOWED_TASKS that are known to work with our test infrastructure
+# Additional miscellaneous benchmarks
+MISC_TASKS = {
+    "cb",
+    "logiqa",
+    "multirc",
+    "mutual",
+    "prost",
+    "pubmedqa",
+    "sciq",
+    "swag",
+    "toxigen",
+    "wic",
+    "wsc",
+    "wsc273",
+    "anli",  # Adversarial benchmarks
+}
+
+# Combine all task groups into the final allowed tasks set
+# This uses Python's unpacking operator (*) to merge sets - equivalent to [...array] in JavaScript
+ALLOWED_TASKS = {
+    *ORIGINAL_TASKS,
+    *MULTIPLE_CHOICE_TASKS,
+    *GPQA_TASKS,
+    *MATH_TASKS,
+    *QA_TASKS,
+    *CODING_TASKS,
+    *HLE_TASKS,
+    *MISC_TASKS,
+}
+
+# TODO All tasks should pass the tests. This will be fixed.
 TEST_ALLOWED_TASKS = [
     # GPQA benchmarks
     "gpqa",

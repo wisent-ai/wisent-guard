@@ -14,6 +14,8 @@ class PromptFormat(Enum):
     LEGACY = "legacy"
     LLAMA31 = "llama31"
     MISTRAL = "mistral"
+    QWEN = "qwen"
+
 
 
 class TokenScore:
@@ -149,6 +151,8 @@ class Model:
             return PromptFormat.LLAMA31
         if "mistral" in model_name:
             return PromptFormat.MISTRAL
+        if "qwen" in model_name:
+            return PromptFormat.QWEN
         if "gpt2" in model_name or "distilgpt2" in model_name:
             return PromptFormat.LEGACY
         # For all other models, default to LEGACY format
@@ -165,6 +169,10 @@ class Model:
             # Mistral uses instruction format
             self.user_token = "[INST]"
             self.assistant_token = "[/INST]"
+        elif self.format_type == PromptFormat.QWEN:
+            # Qwen uses system/user/assistant roles with special tokens
+            self.user_token = "user"
+            self.assistant_token = "assistant"
         elif self.format_type == PromptFormat.LEGACY:
             # Check for user-defined tokens
             if user_model_configs.has_config(self.name):
@@ -236,6 +244,16 @@ class Model:
             if response is not None:
                 return f"{INST_START} {prompt} {INST_END} {response}"
             return f"{INST_START} {prompt} {INST_END}"
+
+        if self.format_type == PromptFormat.QWEN:
+            # Qwen format using special tokens
+            IM_START = "<|im_start|>"
+            IM_END = "<|im_end|>"
+
+            if response is not None:
+                return f"{IM_START}user\n{prompt}{IM_END}\n{IM_START}assistant\n{response}{IM_END}"
+            return f"{IM_START}user\n{prompt}{IM_END}\n{IM_START}assistant\n"
+
         # Legacy format
         if response is not None:
             return f"{self.user_token}\n{prompt}\n{self.assistant_token}\n{response}"
@@ -1119,6 +1137,8 @@ class ActivationHooks:
                 return "llama"
             if "mistral" in model_name:
                 return "mistral"
+            if "qwen" in model_name:
+                return "qwen"
             if "mpt" in model_name:
                 return "mpt"
 
@@ -1126,7 +1146,8 @@ class ActivationHooks:
 
     def _get_layer_name(self, model_type: str, layer_idx: int) -> str:
         """Get the layer name for a given model type and layer index."""
-        if model_type == "llama" or model_type == "mistral":
+
+        if model_type == "llama" or model_type == "mistral" or model_type == "qwen":
             return f"model.layers.{layer_idx}"
         if model_type == "mpt":
             return f"transformer.blocks.{layer_idx}"
