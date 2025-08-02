@@ -7,12 +7,18 @@ numpy>=1.21.0
 lm-eval==0.4.8
 nltk>=3.8.0
 datasets>=2.0.0
-bigcode-evaluation-harness @ git+https://github.com/bigcode-project/bigcode-evaluation-harness.git
 matplotlib>=3.3.0
 seaborn>=0.11.0
 docker>=5.0.0
 pytest>=6.0.0
 pyyaml>=5.4.0
 requests>=2.25.0
+sentence-transformers>=2.0.0 
+wandb==0.21.0
+dotenv==0.9.9
+notebook==7.4.4
+optuna==4.4.0
+optuna-dashboard==0.19.0
 sentence-transformers>=2.0.0
 faiss-cpu==1.11.0.post1
+pre-commit==4.2.0
