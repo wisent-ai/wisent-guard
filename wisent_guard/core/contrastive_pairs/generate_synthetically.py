@@ -568,8 +568,8 @@ class SyntheticContrastivePairGenerator:
         response = response.strip()
         
         # Post-process to remove any thinking tags that might have slipped through
+        import re
         if self.suppress_thinking_tokens and '<think>' in response:
-            import re
             # Remove everything between <think> and </think> tags
             response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
             response = response.strip()
