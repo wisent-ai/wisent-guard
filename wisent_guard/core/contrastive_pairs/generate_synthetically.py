@@ -250,7 +250,9 @@ class SyntheticContrastivePairGenerator:
                     all_questions.extend(questions)
                     print(f"   ✅ Template {i+1} generated {len(questions)} questions")
                 except Exception as e:
+                    import traceback
                     print(f"   ⚠️ Error with template {i+1}: {e}")
+                    print(f"   Traceback: {traceback.format_exc()}")
                     continue
         
         # Deduplicate
