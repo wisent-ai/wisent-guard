@@ -136,21 +136,25 @@ HLE_TASKS = {
     "hle_multiple_choice",
 }
 
-# Additional miscellaneous benchmarks
+# Additional miscellaneous benchmarks - ALL WORKING ✅
 MISC_TASKS = {
-    "cb",
-    "logiqa",
-    "multirc",
-    "mutual",
-    "prost",
-    "pubmedqa",
-    "sciq",
-    "swag",
-    "toxigen",
-    "wic",
-    "wsc",
-    "wsc273",
-    "anli",  # Adversarial benchmarks
+    "cb",  # ✅ Working - uses _convert_textual_entailment()
+    "swag",  # ✅ FIXED - now uses updated _convert_multiple_choice_numeric()
+}
+
+# Tasks that were in original MISC list but are NOT AVAILABLE in current system:
+MISC_TASKS_NOT_AVAILABLE = {
+    "anli",  # ❌ Not available in current wisent-guard system
+    "logiqa",  # ❌ Not available in current wisent-guard system
+    "multirc",  # ❌ Not available in current wisent-guard system
+    "mutual",  # ❌ Not available in current wisent-guard system
+    "prost",  # ❌ Not available in current wisent-guard system
+    "pubmedqa",  # ❌ Not available in current wisent-guard system
+    "sciq",  # ❌ Not available in current wisent-guard system
+    "toxigen",  # ❌ Not available in current wisent-guard system
+    "wic",  # ❌ Not available in current wisent-guard system
+    "wsc",  # ❌ Not available in current wisent-guard system
+    "wsc273",  # ❌ Not available in current wisent-guard system
 }
 
 # Combine all task groups into the final allowed tasks set
@@ -170,9 +174,10 @@ ALLOWED_TASKS = {
 # Including working ORIGINAL_TASKS + previously tested task groups
 TEST_ALLOWED_TASKS = list(
     {
-        *ORIGINAL_TASKS,  # Only verified working original tasks (drop, record)
+        *ORIGINAL_TASKS,  # All verified working original tasks (drop, record, squad2, wikitext, winogrande, webqs)
         *MULTIPLE_CHOICE_TASKS,  # All multiple choice tasks work
         *QA_TASKS,  # All QA tasks work
+        *MISC_TASKS,  # All working MISC tasks (cb, swag)
         *GPQA_TASKS,  # All GPQA tasks work
         *MATH_TASKS,  # All math tasks work
         *HLE_TASKS,  # All HLE tasks work
