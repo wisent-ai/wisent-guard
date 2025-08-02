@@ -77,6 +77,14 @@ class DAC(SteeringMethod):
         # Get positive and negative activations
         pos_activations, neg_activations = contrastive_pair_set.get_activation_pairs()
         
+        # Check if activations were actually extracted
+        if len(pos_activations) == 0 or len(neg_activations) == 0:
+            raise ValueError(
+                f"No activations found in contrastive pair set '{contrastive_pair_set.name}'. "
+                f"Activations must be extracted before training. "
+                f"Call pair_set.extract_activations_with_model(model, layer) first."
+            )
+        
         # Create control vector
         steering_vector, training_stats = create_control_vector_from_contrastive_pairs(
             pos_activations, 

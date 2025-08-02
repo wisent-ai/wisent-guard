@@ -196,7 +196,10 @@ class ContrastivePairSet:
 
     def extract_activations_with_model(self, model, layer):
         """Extract activations for all responses using the model."""
-        for pair in self.pairs:
+        extraction_errors = []
+        successful_extractions = 0
+        
+        for i, pair in enumerate(self.pairs):
             # Extract activations for positive response
             if pair.positive_response.text:
                 try:
@@ -205,8 +208,11 @@ class ContrastivePairSet:
                         pair.positive_response.text, layer
                     )
                     pair.positive_response.activations = activations_tensor
+                    successful_extractions += 1
                 except Exception as e:
-                    print(f"Error extracting positive activations: {e}")
+                    error_msg = f"Pair {i} positive response: {str(e)}"
+                    extraction_errors.append(error_msg)
+                    logger.error(f"Error extracting positive activations: {e}")
 
             # Extract activations for negative response
             if pair.negative_response.text:
@@ -216,8 +222,24 @@ class ContrastivePairSet:
                         pair.negative_response.text, layer
                     )
                     pair.negative_response.activations = activations_tensor
+                    successful_extractions += 1
                 except Exception as e:
-                    print(f"Error extracting negative activations: {e}")
+                    error_msg = f"Pair {i} negative response: {str(e)}"
+                    extraction_errors.append(error_msg)
+                    logger.error(f"Error extracting negative activations: {e}")
+        
+        # Log summary
+        total_expected = len(self.pairs) * 2  # positive and negative for each pair
+        logger.info(f"Activation extraction completed: {successful_extractions}/{total_expected} successful")
+        
+        if extraction_errors:
+            logger.warning(f"Encountered {len(extraction_errors)} extraction errors")
+            if len(extraction_errors) == total_expected:
+                # All extractions failed - this is likely a systematic issue
+                raise RuntimeError(
+                    f"All activation extractions failed. First error: {extraction_errors[0]}. "
+                    f"Check that the model and layer are correctly configured."
+                )
 
     def get_activation_pairs(self) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         """Get positive and negative activations for training."""
