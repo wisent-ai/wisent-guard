@@ -77,6 +77,15 @@ class SyntheticContrastivePairGenerator:
         self.db_similarity_threshold: float = db_similarity_threshold
         self.max_workers: int = max_workers
         self.generation_kwargs: Dict[str, Any] = generation_kwargs or {}
+        
+        # Handle enable_thinking parameter
+        if 'enable_thinking' in self.generation_kwargs and self.generation_kwargs['enable_thinking'] is False:
+            # Set enable_thinking=False on the model if it has the attribute
+            if hasattr(self.model, 'hf_model') and self.model.hf_model is not None:
+                if hasattr(self.model.hf_model, 'generation_config'):
+                    self.model.hf_model.generation_config.enable_thinking = False
+                if hasattr(self.model.hf_model, 'config'):
+                    self.model.hf_model.config.enable_thinking = False
 
         self.similarity_model: Optional[SentenceTransformer] = (
             self._initialize_similarity_model()
@@ -538,6 +547,9 @@ class SyntheticContrastivePairGenerator:
         
         # Extract layer_index from config (required parameter for Model.generate)
         layer_index = merged_config.pop('layer_index', 15)  # Default to layer 15
+        
+        # Remove enable_thinking as it should be set on model config, not passed to generate
+        merged_config.pop('enable_thinking', None)
         
         # Call model.generate with proper parameters
         response, _ = self.model.generate(prompt, layer_index, **merged_config)
