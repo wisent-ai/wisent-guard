@@ -119,6 +119,13 @@ wisent_guard/core/evaluation/benchmarks.py
 wisent_guard/core/evaluation/exporters.py
 wisent_guard/core/models/__init__.py
 wisent_guard/core/models/steering_compatible_model.py
+wisent_guard/core/optuna/__init__.py
+wisent_guard/core/optuna/data_utils.py
+wisent_guard/core/optuna/metrics.py
+wisent_guard/core/optuna/optuna_pipeline.py
+wisent_guard/core/optuna/pipeline.py
+wisent_guard/core/optuna/probe_optimization.py
+wisent_guard/core/optuna/steering_optimization.py
 wisent_guard/core/pipelines/__init__.py
 wisent_guard/core/pipelines/activation_collector.py
 wisent_guard/core/pipelines/experiment_runner.py

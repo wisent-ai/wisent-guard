@@ -79,7 +79,9 @@ class SyntheticContrastivePairGenerator:
         self.generation_kwargs: Dict[str, Any] = generation_kwargs or {}
         
         # Handle enable_thinking parameter
+        self.suppress_thinking_tokens = False
         if 'enable_thinking' in self.generation_kwargs and self.generation_kwargs['enable_thinking'] is False:
+            self.suppress_thinking_tokens = True
             # Set enable_thinking=False on the model if it has the attribute
             if hasattr(self.model, 'hf_model') and self.model.hf_model is not None:
                 if hasattr(self.model.hf_model, 'generation_config'):
@@ -551,9 +553,26 @@ class SyntheticContrastivePairGenerator:
         # Remove enable_thinking as it should be set on model config, not passed to generate
         merged_config.pop('enable_thinking', None)
         
+        # Add thinking tokens to suppress_tokens if needed
+        if self.suppress_thinking_tokens:
+            # Token IDs for <think> and </think> in Qwen models
+            think_tokens = [151667, 151668]  # <think> and </think>
+            existing_suppress = merged_config.get('suppress_tokens', [])
+            if isinstance(existing_suppress, list):
+                merged_config['suppress_tokens'] = existing_suppress + think_tokens
+            else:
+                merged_config['suppress_tokens'] = think_tokens
+        
         # Call model.generate with proper parameters
         response, _ = self.model.generate(prompt, layer_index, **merged_config)
         response = response.strip()
+        
+        # Post-process to remove any thinking tags that might have slipped through
+        if self.suppress_thinking_tokens and '<think>' in response:
+            import re
+            # Remove everything between <think> and </think> tags
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = response.strip()
         
         # Update cache
         with self._cache_lock:
