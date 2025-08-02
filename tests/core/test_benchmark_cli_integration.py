@@ -176,10 +176,10 @@ class TestBenchmarkCLIIntegration:
         ]
         error_lines = []
         for line in result.stderr.split("\n"):
-            if any(pattern in line for pattern in error_log_patterns):
-                # Skip lines that match ignore patterns
-                if not any(ignore_pattern in line for ignore_pattern in ignore_patterns):
-                    error_lines.append(line.strip())
+            if any(pattern in line for pattern in error_log_patterns) and not any(
+                ignore_pattern in line for ignore_pattern in ignore_patterns
+            ):
+                error_lines.append(line.strip())
 
         assert len(error_lines) == 0, f"Found ERROR/FATAL log messages in stderr: {error_lines}"
 
@@ -191,6 +191,14 @@ class TestBenchmarkCLIIntegration:
         processing_indicators = ["model", "loading", "processing", "samples", "questions", "results", "pipeline"]
         found_processing = any(indicator in full_output for indicator in processing_indicators)
         assert found_processing, f"Should contain processing indicators: {full_output[:300]}"
+
+        # Test should fail if we have 0 contrastive pairs
+        # This validates that the task is actually working properly
+        zero_pairs_indicators = ["contrastive pairs: 0", "⚠️ contrastive pairs: 0"]
+        has_zero_pairs = any(indicator in full_output for indicator in zero_pairs_indicators)
+        assert not has_zero_pairs, (
+            f"Task {task_name} produced 0 contrastive pairs - this indicates the task is not working properly: {full_output[:500]}"
+        )
 
         print(f"✅ {task_name} basic classifier FULL EXECUTION test passed!")
 
@@ -242,10 +250,10 @@ class TestBenchmarkCLIIntegration:
         ]
         error_lines = []
         for line in result.stderr.split("\n"):
-            if any(pattern in line for pattern in error_log_patterns):
-                # Skip lines that match ignore patterns
-                if not any(ignore_pattern in line for ignore_pattern in ignore_patterns):
-                    error_lines.append(line.strip())
+            if any(pattern in line for pattern in error_log_patterns) and not any(
+                ignore_pattern in line for ignore_pattern in ignore_patterns
+            ):
+                error_lines.append(line.strip())
 
         assert len(error_lines) == 0, f"Found ERROR/FATAL log messages in stderr: {error_lines}"
 
@@ -259,6 +267,14 @@ class TestBenchmarkCLIIntegration:
         processing_indicators = ["results", "pipeline", "processing", "samples"]
         found_processing = any(indicator in full_output for indicator in processing_indicators)
         assert found_processing, f"Should contain processing indicators: {full_output[:300]}"
+
+        # CRITICAL: Test should fail if we have 0 contrastive pairs
+        # This validates that the task is actually working properly
+        zero_pairs_indicators = ["contrastive pairs: 0", "⚠️ contrastive pairs: 0"]
+        has_zero_pairs = any(indicator in full_output for indicator in zero_pairs_indicators)
+        assert not has_zero_pairs, (
+            f"Task {task_name} produced 0 contrastive pairs - this indicates the task is not working properly: {full_output[:500]}"
+        )
 
         print(f"✅ {task_name} steering functionality FULL EXECUTION test passed!")
 
