@@ -574,6 +574,23 @@ class SyntheticContrastivePairGenerator:
             response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
             response = response.strip()
         
+        # Clean up any artifacts from suppressed tokens
+        if self.suppress_thinking_tokens:
+            # Remove strange characters that might appear at the start
+            response = re.sub(r'^[\.\$\s]+', '', response)
+            # Fix numbering that might be broken (e.g., ".$. 2." -> "1.")
+            lines = response.split('\n')
+            cleaned_lines = []
+            question_num = 1
+            for line in lines:
+                line = line.strip()
+                if line and re.match(r'^[\.\$\s]*\d+\.', line):
+                    # Replace the malformed number with correct numbering
+                    line = re.sub(r'^[\.\$\s]*\d+\.', f'{question_num}.', line)
+                    question_num += 1
+                cleaned_lines.append(line)
+            response = '\n'.join(cleaned_lines)
+        
         # Update cache
         with self._cache_lock:
             # Implement simple LRU by removing oldest entries if cache is full
