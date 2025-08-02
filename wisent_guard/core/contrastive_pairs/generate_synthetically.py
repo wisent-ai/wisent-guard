@@ -57,6 +57,7 @@ class SyntheticContrastivePairGenerator:
         question_bank_path: Optional[str] = None,
         max_workers: int = 4,
         cache_size: int = 1000,
+        generation_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the synthetic pair generator.
@@ -69,11 +70,13 @@ class SyntheticContrastivePairGenerator:
             question_bank_path: Optional path to the question bank. If None, uses default location.
             max_workers: Maximum number of parallel workers for generation
             cache_size: Size of the LRU cache for model responses
+            generation_kwargs: Optional dict of generation parameters to pass to the model (e.g., enable_thinking=False)
         """
         self.model: Model = model
         self.similarity_threshold: float = similarity_threshold
         self.db_similarity_threshold: float = db_similarity_threshold
         self.max_workers: int = max_workers
+        self.generation_kwargs: Dict[str, Any] = generation_kwargs or {}
 
         self.similarity_model: Optional[SentenceTransformer] = (
             self._initialize_similarity_model()
@@ -530,7 +533,14 @@ class SyntheticContrastivePairGenerator:
                 return self._response_cache[cache_key]
         
         # Generate response
-        response, _ = self.model.generate(prompt, **config)
+        # Merge generation_kwargs with config, giving precedence to generation_kwargs
+        merged_config = {**config, **self.generation_kwargs}
+        
+        # Extract layer_index from config (required parameter for Model.generate)
+        layer_index = merged_config.pop('layer_index', 15)  # Default to layer 15
+        
+        # Call model.generate with proper parameters
+        response, _ = self.model.generate(prompt, layer_index, **merged_config)
         response = response.strip()
         
         # Update cache
@@ -1012,6 +1022,7 @@ def generate_synthetic_pairs_cli(
     force_regenerate: bool = False,
     verbose_timing: bool = False,
     max_workers: int = 4,
+    generation_kwargs: Optional[Dict[str, Any]] = None,
 ) -> ContrastivePairSet:
     """
     CLI function to generate synthetic contrastive pairs.
@@ -1024,6 +1035,7 @@ def generate_synthetic_pairs_cli(
         force_regenerate: If True, bypasses the cache and generates a new set.
         verbose_timing: If True, shows detailed timing for each step
         max_workers: Number of parallel workers for generation
+        generation_kwargs: Optional dict of generation parameters to pass to the model (e.g., enable_thinking=False)
 
     Returns:
         Generated ContrastivePairSet
@@ -1036,7 +1048,7 @@ def generate_synthetic_pairs_cli(
         raise ValueError("Model must be provided")
 
     generator: SyntheticContrastivePairGenerator = SyntheticContrastivePairGenerator(
-        model, max_workers=max_workers
+        model, max_workers=max_workers, generation_kwargs=generation_kwargs
     )
     
     pair_set: ContrastivePairSet = generator.generate_contrastive_pair_set(
