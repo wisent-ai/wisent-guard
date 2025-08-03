@@ -31,13 +31,14 @@ def evaluate_response_correctness(response: str, expected_answer: str, task_name
     try:
         from ..task_interface import get_task
         from ..tasks.file_task import FileTask
+
         task = get_task(task_name, limit=1)
         if isinstance(task, FileTask):
             logger.debug(f"Using exact match for file-based task '{task_name}'")
             return response.strip().lower() == expected_answer.strip().lower()
     except:
         pass  # Continue with normal evaluation if task lookup fails
-    
+
     try:
         # Use the same evaluation approach as the CLI
         evaluator = LMEvalHarnessGroundTruth(task_name)

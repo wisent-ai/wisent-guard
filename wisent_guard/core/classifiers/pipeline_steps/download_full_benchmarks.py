@@ -323,7 +323,7 @@ class FullBenchmarkDownloader:
         # TruthfulQA MC2 format
         if "mc2_targets" in sample:
             return self._convert_truthfulqa_mc2(sample)
-        
+
         # SQuAD2 format (id, title, context, question, answers)
         if "context" in sample and "question" in sample and "answers" in sample:
             return self._convert_squad2_format(sample)
@@ -772,13 +772,13 @@ class FullBenchmarkDownloader:
                     )
 
         return pairs
-    
+
     def _convert_squad2_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert SQuAD2 format (id, title, context, question, answers)."""
         context = sample.get("context", "")
         question = sample.get("question", "")
         answers_data = sample.get("answers", {})
-        
+
         # Extract answer texts from answers dict
         answer_texts = answers_data.get("text", [])
         if not answer_texts:
@@ -787,33 +787,35 @@ class FullBenchmarkDownloader:
         else:
             # Use the first answer as the correct one
             correct_answer = answer_texts[0]
-        
+
         # Generate plausible incorrect answers for reading comprehension
         incorrect_answers = [
             "I cannot find this information in the passage.",
             "The question cannot be answered based on the given context.",
-            "This information is not provided in the text."
+            "This information is not provided in the text.",
         ]
-        
+
         # Format the context for the contrastive pair
         full_context = f"Context: {context}\n\nQuestion: {question}"
-        
+
         pairs = []
         for incorrect in incorrect_answers:
-            pairs.append({
-                "context": full_context,
-                "good_response": correct_answer,
-                "bad_response": incorrect,
-                "metadata": {
-                    "sample_id": sample.get("id", ""),
-                    "title": sample.get("title", ""),
-                    "benchmark_type": "squad2",
-                    "has_answer": bool(answer_texts)  # Track if this question has an answer
+            pairs.append(
+                {
+                    "context": full_context,
+                    "good_response": correct_answer,
+                    "bad_response": incorrect,
+                    "metadata": {
+                        "sample_id": sample.get("id", ""),
+                        "title": sample.get("title", ""),
+                        "benchmark_type": "squad2",
+                        "has_answer": bool(answer_texts),  # Track if this question has an answer
+                    },
                 }
-            })
-        
+            )
+
         return pairs
-    
+
     def _convert_generic_multiple_choice(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generic fallback for multiple choice formats."""
         question = sample.get("question", sample.get("query", ""))

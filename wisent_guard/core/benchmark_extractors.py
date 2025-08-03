@@ -812,9 +812,9 @@ class SQuAD2Extractor(BenchmarkExtractor):
             qa_pair = self.extract_qa_pair(doc, task_data)
             if not qa_pair:
                 return None
-                
-            correct_answer = qa_pair['correct_answer']
-            
+
+            correct_answer = qa_pair["correct_answer"]
+
             # Generate meaningful incorrect answers for reading comprehension
             if correct_answer == "No answer":
                 incorrect_answer = "The answer is clearly stated in the passage."
@@ -823,15 +823,16 @@ class SQuAD2Extractor(BenchmarkExtractor):
                 incorrect_answers = [
                     "The information is not provided in the text.",
                     "This cannot be determined from the passage.",
-                    "The passage does not contain this information."
+                    "The passage does not contain this information.",
                 ]
                 import random
+
                 incorrect_answer = random.choice(incorrect_answers)
-            
+
             return {
-                'question': qa_pair['formatted_question'],
-                'correct_answer': correct_answer,
-                'incorrect_answer': incorrect_answer
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
             }
 
         except Exception as e:
@@ -3059,25 +3060,25 @@ EXTRACTORS = {
     "polymath_en_high": GSM8KExtractor,
     "polymath_zh_high": GSM8KExtractor,
     # LiveMathBench CNMO 2024 (Chinese and English)
-    'livemathbench': GSM8KExtractor,
-    'livemathbench_cnmo_en': GSM8KExtractor,
-    'livemathbench_cnmo_zh': GSM8KExtractor,
-    'mmlu': MMLUExtractor,
-    'mmmlu': MMLUExtractor,
-    'm_mmlu_en': MMLUExtractor,  # Support the actual task name used by lm-eval
-    'piqa': PIQAExtractor,
-    'copa': COPAExtractor,
-    'openbookqa': OpenBookQAExtractor,
-    'squad2': SQuAD2Extractor,
-    'squadv2': SQuAD2Extractor,  # lm-eval uses squadv2 as the task name
-    'race': RACEExtractor,
-    'wikitext': WikiTextExtractor,
-    'mrpc': MRPCExtractor,  # GLUE MRPC paraphrase detection
-    'qnli': QNLIExtractor,  # GLUE QNLI question-answering NLI
-    'qqp': QQPExtractor,  # GLUE QQP question pairs
-    'rte': RTEExtractor,  # GLUE RTE textual entailment
-    'sst2': SST2Extractor,  # GLUE SST2 sentiment analysis
-    'wnli': WNLIExtractor,  # GLUE WNLI Winograd NLI
+    "livemathbench": GSM8KExtractor,
+    "livemathbench_cnmo_en": GSM8KExtractor,
+    "livemathbench_cnmo_zh": GSM8KExtractor,
+    "mmlu": MMLUExtractor,
+    "mmmlu": MMLUExtractor,
+    "m_mmlu_en": MMLUExtractor,  # Support the actual task name used by lm-eval
+    "piqa": PIQAExtractor,
+    "copa": COPAExtractor,
+    "openbookqa": OpenBookQAExtractor,
+    "squad2": SQuAD2Extractor,
+    "squadv2": SQuAD2Extractor,  # lm-eval uses squadv2 as the task name
+    "race": RACEExtractor,
+    "wikitext": WikiTextExtractor,
+    "mrpc": MRPCExtractor,  # GLUE MRPC paraphrase detection
+    "qnli": QNLIExtractor,  # GLUE QNLI question-answering NLI
+    "qqp": QQPExtractor,  # GLUE QQP question pairs
+    "rte": RTEExtractor,  # GLUE RTE textual entailment
+    "sst2": SST2Extractor,  # GLUE SST2 sentiment analysis
+    "wnli": WNLIExtractor,  # GLUE WNLI Winograd NLI
     # Add more specific extractors for other benchmarks
     "cb": COPAExtractor,  # Similar format to COPA
     "coqa": CoQAExtractor,  # Conversational QA format

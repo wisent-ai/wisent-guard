@@ -5,17 +5,15 @@ This package contains task-agnostic implementations for various benchmarks.
 """
 
 from ..task_interface import register_task
-from .livecodebench_task import LiveCodeBenchTask
-from .lm_eval_task import MBPPTask, GSM8KTask, TruthfulQATask, MMLUTask, Squad2Task
-from .hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
-from .math500_task import Math500Task
 from .aime_task import AIMETask
+from .hle_task import HLEExactMatchTask, HLEMultipleChoiceTask, HLETask
 from .hmmt_task import HMMTTask
 from .livecodebench_task import LiveCodeBenchTask
 from .livemathbench_task import LiveMathBenchTask
-from .supergpqa_task import SuperGPQATask, SuperGPQAPhysicsTask, SuperGPQAChemistryTask, SuperGPQABiologyTask
+from .lm_eval_task import GSM8KTask, MBPPTask, MMLUTask, Squad2Task, TruthfulQATask
 from .math500_task import Math500Task
 from .polymath_task import PolyMathTask
+from .supergpqa_task import SuperGPQABiologyTask, SuperGPQAChemistryTask, SuperGPQAPhysicsTask, SuperGPQATask
 
 
 def register_all_tasks():
@@ -29,7 +27,7 @@ def register_all_tasks():
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
     register_task("squad2", Squad2Task)
-    
+
     # Register HLE tasks
     register_task("hle", lambda limit=None: HLETask(limit=limit))
     register_task("hle_exact_match", lambda limit=None: HLEExactMatchTask(limit=limit))
@@ -81,32 +79,32 @@ register_all_tasks()
 
 
 __all__ = [
-    "LiveCodeBenchTask",
-    "MBPPTask", 
-    "GSM8KTask",
-    "TruthfulQATask",
-    "MMLUTask",
-    "Squad2Task",
-    "HLETask",
-    "HLEExactMatchTask", 
-    "HLEMultipleChoiceTask",
-    "Math500Task",
     "AIMETask",
     "GSM8KTask",
+    "GSM8KTask",
+    "HLEExactMatchTask",
     "HLEExactMatchTask",
     "HLEMultipleChoiceTask",
+    "HLEMultipleChoiceTask",
+    "HLETask",
     "HLETask",
     "HMMTTask",
     "LiveCodeBenchTask",
+    "LiveCodeBenchTask",
     "LiveMathBenchTask",
     "MBPPTask",
+    "MBPPTask",
+    "MMLUTask",
     "MMLUTask",
     "Math500Task",
+    "Math500Task",
     "PolyMathTask",
+    "Squad2Task",
     "SuperGPQABiologyTask",
     "SuperGPQAChemistryTask",
     "SuperGPQAPhysicsTask",
     "SuperGPQATask",
+    "TruthfulQATask",
     "TruthfulQATask",
     "register_all_tasks",
 ]

@@ -306,36 +306,36 @@ class OptimizationPipeline:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Create contrastive probe training data for a specific layer."""
         self.logger.info(f"Creating probe data from {len(samples)} samples for {dataset_name} on layer {layer_id}")
-        
+
         # Get task for the specified dataset
         task = get_task(dataset_name)
         extractor = task.get_extractor()
         self.logger.debug(f"Using task: {task.__class__.__name__}, extractor: {extractor.__class__.__name__}")
-        
+
         texts = []
         labels = []
         success_count = 0
         fail_count = 0
-        
+
         for i, sample in enumerate(samples):
             try:
                 # Extract QA pair
                 contrastive_pair = extractor.extract_contrastive_pair(sample, task)
-                
+
                 # Skip samples where contrastive pair extraction failed
                 if not contrastive_pair:
-                    self.logger.debug(f"Sample {i+1}: No contrastive pair extracted from keys: {list(sample.keys())}")
+                    self.logger.debug(f"Sample {i + 1}: No contrastive pair extracted from keys: {list(sample.keys())}")
                     fail_count += 1
                     continue
-                
+
                 success_count += 1
-                self.logger.debug(f"Sample {i+1}: Successfully extracted contrastive pair")
-                
+                self.logger.debug(f"Sample {i + 1}: Successfully extracted contrastive pair")
+
             except Exception as e:
-                self.logger.error(f"Sample {i+1}: Exception during contrastive pair extraction: {e}")
+                self.logger.error(f"Sample {i + 1}: Exception during contrastive pair extraction: {e}")
                 fail_count += 1
                 continue
-                
+
             question = contrastive_pair["question"]
             correct_answer = contrastive_pair["correct_answer"]
             incorrect_answer = contrastive_pair["incorrect_answer"]
@@ -351,13 +351,15 @@ class OptimizationPipeline:
             incorrect_text = f"{question} {incorrect_answer}"
             texts.append(incorrect_text)
             labels.append(0)
-        
-        self.logger.info(f"Probe data creation: {success_count} successful, {fail_count} failed. Generated {len(texts)} texts.")
-        
+
+        self.logger.info(
+            f"Probe data creation: {success_count} successful, {fail_count} failed. Generated {len(texts)} texts."
+        )
+
         if len(texts) == 0:
             self.logger.error("No texts generated for activation extraction! All contrastive pair extractions failed.")
             return np.array([]), np.array([])
-        
+
         activations = data_utils.extract_activations_with_hook(
             self.model, self.tokenizer, texts, layer_id, self.config.batch_size, self.config.max_length, self.device
         )
@@ -910,8 +912,10 @@ class OptimizationPipeline:
 
         # Save detailed test results to JSON
         if test_questions and test_ground_truths and baseline_predictions and steered_predictions:
-            self._save_detailed_test_results(test_questions, test_ground_truths, baseline_predictions, steered_predictions)
-        
+            self._save_detailed_test_results(
+                test_questions, test_ground_truths, baseline_predictions, steered_predictions
+            )
+
         # Calculate benchmark metrics using appropriate evaluation method
         if self._should_use_multiple_choice_evaluation():
             # Use LMEvalHarnessGroundTruth for proper multiple choice evaluation
@@ -922,11 +926,11 @@ class OptimizationPipeline:
             baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
                 baseline_predictions, test_ground_truths, self.config.test_dataset
             )
-            
+
             steered_benchmark_metrics = metrics.evaluate_benchmark_performance(
                 steered_predictions, test_ground_truths, self.config.test_dataset
             )
-        
+
         # Evaluate probe on test data
         X_test, y_test = self.cache.load_activations("test", layer_id, self.tokenization_config)
         test_probe_metrics = self._evaluate_probe_metrics(probe, X_test, y_test)
@@ -1163,14 +1167,14 @@ class OptimizationPipeline:
         # Setup experiment if not already done
         if self.model is None:
             self._setup_experiment()
-        
+
         # Create timestamped run directory for evaluation-only mode
-        if not hasattr(self, 'run_dir'):
+        if not hasattr(self, "run_dir"):
             self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.run_dir = self.output_dir / f"evaluate_only_{self.run_timestamp}"
             self.run_dir.mkdir(parents=True, exist_ok=True)
             self.logger.info(f"📁 Evaluation directory: {self.run_dir}")
-        
+
         # Create a complete mock trial with all expected parameters
         from optuna.trial import FixedTrial
 
@@ -1368,37 +1372,35 @@ class OptimizationPipeline:
 
         except Exception as e:
             self.logger.warning(f"Failed to log final results to WandB: {e}")
-    
+
     def _should_use_multiple_choice_evaluation(self) -> bool:
         """Determine if we should use multiple choice evaluation for this dataset."""
         # Use multiple choice evaluation for TruthfulQA and other MC tasks
         return self.config.test_dataset.lower() in ["truthfulqa_mc1", "truthfulqa", "mmlu"]
-    
+
     def _evaluate_with_lm_eval_harness(self, predictions: list[str], ground_truths: list[str]) -> dict[str, float]:
         """Evaluate predictions using LMEvalHarnessGroundTruth for proper multiple choice handling."""
         from ..lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
-        
+
         self.logger.info("🎯 Using LMEvalHarnessGroundTruth for multiple choice evaluation")
-        
+
         # Create evaluator
         evaluator = LMEvalHarnessGroundTruth(self.config.test_dataset, evaluation_method="text-generation")
-        
+
         # Format response data as expected by _evaluate_with_lm_eval_metrics
         response_data = []
         for pred, gt in zip(predictions, ground_truths):
-            response_data.append({
-                'generated_response': pred,
-                'ground_truth': gt,
-                'question': 'evaluation_question'  # Required field
-            })
-        
+            response_data.append(
+                {
+                    "generated_response": pred,
+                    "ground_truth": gt,
+                    "question": "evaluation_question",  # Required field
+                }
+            )
+
         # Use the internal evaluation method
-        results = evaluator._evaluate_with_lm_eval_metrics(
-            self.config.test_dataset, 
-            response_data, 
-            task_data=None
-        )
-        
+        results = evaluator._evaluate_with_lm_eval_metrics(self.config.test_dataset, response_data, task_data=None)
+
         return {"accuracy": results.get("accuracy", 0.0)}
 
 
