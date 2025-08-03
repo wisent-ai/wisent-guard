@@ -857,13 +857,24 @@ class SQuAD2Extractor(BenchmarkExtractor):
                 return None
                 
             correct_answer = qa_pair['correct_answer']
-            incorrect_answer = "Wrong answer" if correct_answer != "No answer" else "Some made-up answer"
+            
+            # Generate meaningful incorrect answers for reading comprehension
+            if correct_answer == "No answer":
+                incorrect_answer = "The answer is clearly stated in the passage."
+            else:
+                # Create plausible but incorrect answers
+                incorrect_answers = [
+                    "The information is not provided in the text.",
+                    "This cannot be determined from the passage.",
+                    "The passage does not contain this information."
+                ]
+                import random
+                incorrect_answer = random.choice(incorrect_answers)
             
             return {
                 'question': qa_pair['formatted_question'],
                 'correct_answer': correct_answer,
                 'incorrect_answer': incorrect_answer
-            
             }
             
         except Exception as e:
@@ -3125,6 +3136,7 @@ EXTRACTORS = {
     'copa': COPAExtractor,
     'openbookqa': OpenBookQAExtractor,
     'squad2': SQuAD2Extractor,
+    'squadv2': SQuAD2Extractor,  # lm-eval uses squadv2 as the task name
     'race': RACEExtractor,
     'wikitext': WikiTextExtractor,
     'mrpc': MRPCExtractor,  # GLUE MRPC paraphrase detection

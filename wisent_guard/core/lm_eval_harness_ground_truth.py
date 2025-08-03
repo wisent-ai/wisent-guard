@@ -843,6 +843,9 @@ class LMEvalHarnessGroundTruth:
                 elif task_name.startswith("hle") and "multiple_choice" in task_name:
                     # HLE multiple choice uses letter extraction (A, B, C, D, E)
                     is_correct = self._evaluate_multiple_choice_response(generated, ground_truth)
+                elif task_name.startswith("truthfulqa") or task_name == "truthfulqa_mc1":
+                    # TruthfulQA uses multiple-choice answer extraction (A, B, C, D)
+                    is_correct = self._evaluate_multiple_choice_response(generated, ground_truth)
                 else:
                     # Default: string matching with some flexibility
                     is_correct = self._evaluate_default_response(generated, ground_truth)

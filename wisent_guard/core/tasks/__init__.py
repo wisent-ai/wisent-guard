@@ -6,7 +6,7 @@ This package contains task-agnostic implementations for various benchmarks.
 
 from ..task_interface import register_task
 from .livecodebench_task import LiveCodeBenchTask
-from .lm_eval_task import MBPPTask, GSM8KTask, TruthfulQATask, MMLUTask
+from .lm_eval_task import MBPPTask, GSM8KTask, TruthfulQATask, MMLUTask, Squad2Task
 from .hle_task import HLETask, HLEExactMatchTask, HLEMultipleChoiceTask
 from .math500_task import Math500Task
 from .aime_task import AIMETask
@@ -27,6 +27,7 @@ def register_all_tasks():
     register_task("gsm8k", GSM8KTask)
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
+    register_task("squad2", Squad2Task)
     
     # Register HLE tasks
     register_task("hle", lambda limit=None: HLETask(limit=limit))
@@ -76,6 +77,7 @@ __all__ = [
     "GSM8KTask",
     "TruthfulQATask",
     "MMLUTask",
+    "Squad2Task",
     "HLETask",
     "HLEExactMatchTask", 
     "HLEMultipleChoiceTask",
