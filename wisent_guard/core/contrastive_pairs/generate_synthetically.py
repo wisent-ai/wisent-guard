@@ -244,16 +244,10 @@ class SyntheticContrastivePairGenerator:
             
             # Collect results
             for i, future in futures:
-                try:
-                    response = future.result(timeout=30)  # 30 second timeout
-                    questions = self._parse_questions_from_response(response)
-                    all_questions.extend(questions)
-                    print(f"   ✅ Template {i+1} generated {len(questions)} questions")
-                except Exception as e:
-                    import traceback
-                    print(f"   ⚠️ Error with template {i+1}: {e}")
-                    print(f"   Traceback: {traceback.format_exc()}")
-                    continue
+                response = future.result()
+                questions = self._parse_questions_from_response(response)
+                all_questions.extend(questions)
+                print(f"   ✅ Template {i+1} generated {len(questions)} questions")
         
         # Deduplicate
         with TimingContext(f"Deduplicating {len(all_questions)} questions", self.enable_timing):
@@ -420,16 +414,12 @@ class SyntheticContrastivePairGenerator:
             # Collect results
             successful_pairs = []
             for question, future in futures:
-                try:
-                    pair = future.result(timeout=60)  # 60 second timeout per pair
-                    if pair is not None:
-                        successful_pairs.append(pair)
-                        if current_count + len(successful_pairs) >= target_count:
-                            print(f"✅ Reached target of {target_count} pairs for selection")
-                            break
-                except Exception as e:
-                    print(f"   ⚠️ Failed to generate pair for question '{question[:50]}...': {e}")
-                    continue
+                pair = future.result()
+                if pair is not None:
+                    successful_pairs.append(pair)
+                    if current_count + len(successful_pairs) >= target_count:
+                        print(f"✅ Reached target of {target_count} pairs for selection")
+                        break
         
         return successful_pairs
     
@@ -571,26 +561,49 @@ class SyntheticContrastivePairGenerator:
         
         # Post-process to remove any thinking tags that might have slipped through
         import re
-        if self.suppress_thinking_tokens and '<think>' in response:
-            # Remove everything between <think> and </think> tags
-            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-            response = response.strip()
+        if self.suppress_thinking_tokens:
+            # First check if response still contains explicit think tags
+            if '<think>' in response:
+                # Remove everything between <think> and </think> tags
+                response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+                response = response.strip()
+            
+            # Handle case where tokens were suppressed but content remains
+            # Look for thinking-like content at the start
+            if response.startswith(('_jwt', 'Okay,', 'Let me', 'I need', 'I\'ll', 'First,', 'Alright,')):
+                # Find where the actual list starts (look for "1.")
+                match = re.search(r'^1\.', response, re.MULTILINE)
+                if match:
+                    # Extract from where the list actually starts
+                    response = response[match.start():]
+                else:
+                    # If no numbered list found, try to extract questions
+                    # Look for question marks to identify actual questions
+                    lines = response.split('\n')
+                    question_lines = []
+                    for line in lines:
+                        if '?' in line and not any(phrase in line.lower() for phrase in ['let me', 'i need', 'i\'ll', 'okay']):
+                            question_lines.append(line)
+                    if question_lines:
+                        response = '\n'.join(f"{i+1}. {q.strip()}" for i, q in enumerate(question_lines[:50]))
         
-        # Clean up any artifacts from suppressed tokens
+        # Clean up any remaining artifacts
         if self.suppress_thinking_tokens:
             # Remove strange characters that might appear at the start
-            response = re.sub(r'^[\.\$\s]+', '', response)
-            # Fix numbering that might be broken (e.g., ".$. 2." -> "1.")
+            response = re.sub(r'^[\.\$\s_]+', '', response)
+            # Fix any broken numbering
             lines = response.split('\n')
             cleaned_lines = []
             question_num = 1
             for line in lines:
                 line = line.strip()
-                if line and re.match(r'^[\.\$\s]*\d+\.', line):
-                    # Replace the malformed number with correct numbering
-                    line = re.sub(r'^[\.\$\s]*\d+\.', f'{question_num}.', line)
+                if line and re.match(r'^\d+\.', line):
+                    # Ensure proper numbering
+                    line = re.sub(r'^\d+\.', f'{question_num}.', line)
                     question_num += 1
-                cleaned_lines.append(line)
+                    cleaned_lines.append(line)
+                elif line and not any(phrase in line.lower() for phrase in ['let me', 'i need', 'okay', 'wait']):
+                    cleaned_lines.append(line)
             response = '\n'.join(cleaned_lines)
         
         # Update cache

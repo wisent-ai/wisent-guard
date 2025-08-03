@@ -130,6 +130,11 @@ class Model:
             self.name, torch_dtype=torch_dtype, device_map=self.device, output_hidden_states=True
         )
         self.hf_model.config.output_hidden_states = True
+        
+        # Disable thinking for models that support it
+        if hasattr(self.hf_model.config, 'enable_thinking'):
+            self.hf_model.config.enable_thinking = False
+            
         self.hf_model.eval()
 
         # Keep backward compatibility
