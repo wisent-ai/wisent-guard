@@ -718,7 +718,7 @@ class Model:
 
         # Run through model to get outputs
         with torch.no_grad():
-            outputs = self.hf_model(inputs.input_ids, output_hidden_states=True)
+            outputs = self.hf_model(inputs["input_ids"], output_hidden_states=True)
 
         return {"outputs": outputs, "inputs": inputs, "formatted_text": formatted_text}
 

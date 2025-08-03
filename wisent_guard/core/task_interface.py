@@ -113,4 +113,6 @@ def list_task_info() -> List[Dict[str, Any]]:
 def _ensure_tasks_registered():
     """Ensure all tasks are registered in the global registry."""
     if len(_task_registry._tasks) == 0:  # Only register if not already done
-        pass  # This triggers the registration
+        # Import tasks module to trigger registration
+        # This is crucial for CLI usage where tasks module isn't imported elsewhere
+        from . import tasks  # noqa: F401 # This imports __init__.py which calls register_all_tasks()

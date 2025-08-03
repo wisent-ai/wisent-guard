@@ -176,10 +176,10 @@ class TestBenchmarkCLIIntegration:
         ]
         error_lines = []
         for line in result.stderr.split("\n"):
-            if any(pattern in line for pattern in error_log_patterns):
-                # Skip lines that match ignore patterns
-                if not any(ignore_pattern in line for ignore_pattern in ignore_patterns):
-                    error_lines.append(line.strip())
+            if any(pattern in line for pattern in error_log_patterns) and not any(
+                ignore_pattern in line for ignore_pattern in ignore_patterns
+            ):
+                error_lines.append(line.strip())
 
         assert len(error_lines) == 0, f"Found ERROR/FATAL log messages in stderr: {error_lines}"
 
@@ -191,6 +191,29 @@ class TestBenchmarkCLIIntegration:
         processing_indicators = ["model", "loading", "processing", "samples", "questions", "results", "pipeline"]
         found_processing = any(indicator in full_output for indicator in processing_indicators)
         assert found_processing, f"Should contain processing indicators: {full_output[:300]}"
+
+        # Test should fail if we have 0 contrastive pairs in the final result
+        # This validates that the task is actually working properly
+        # Note: Ignore cached "contrastive pairs: 0" from initial download, only check final processing
+        lines = full_output.split("\n")
+        processing_started = False
+        final_zero_pairs = False
+
+        for line in lines:
+            # Look for the processing phase (after cache download)
+            if "processing" in line and ("contrastive pairs" in line or "samples" in line):
+                processing_started = True
+            # Check for zero pairs only after processing has started
+            if (
+                processing_started
+                and ("contrastive pairs: 0" in line or "⚠️ contrastive pairs: 0" in line)
+                and "saved benchmark:" not in line
+            ):
+                final_zero_pairs = True
+
+        assert not final_zero_pairs, (
+            f"Task {task_name} produced 0 contrastive pairs during processing - this indicates the task is not working properly: {full_output[:800]}"
+        )
 
         print(f"✅ {task_name} basic classifier FULL EXECUTION test passed!")
 
@@ -242,10 +265,10 @@ class TestBenchmarkCLIIntegration:
         ]
         error_lines = []
         for line in result.stderr.split("\n"):
-            if any(pattern in line for pattern in error_log_patterns):
-                # Skip lines that match ignore patterns
-                if not any(ignore_pattern in line for ignore_pattern in ignore_patterns):
-                    error_lines.append(line.strip())
+            if any(pattern in line for pattern in error_log_patterns) and not any(
+                ignore_pattern in line for ignore_pattern in ignore_patterns
+            ):
+                error_lines.append(line.strip())
 
         assert len(error_lines) == 0, f"Found ERROR/FATAL log messages in stderr: {error_lines}"
 
@@ -259,6 +282,29 @@ class TestBenchmarkCLIIntegration:
         processing_indicators = ["results", "pipeline", "processing", "samples"]
         found_processing = any(indicator in full_output for indicator in processing_indicators)
         assert found_processing, f"Should contain processing indicators: {full_output[:300]}"
+
+        # Test should fail if we have 0 contrastive pairs in the final result
+        # This validates that the task is actually working properly
+        # Note: Ignore cached "contrastive pairs: 0" from initial download, only check final processing
+        lines = full_output.split("\n")
+        processing_started = False
+        final_zero_pairs = False
+
+        for line in lines:
+            # Look for the processing phase (after cache download)
+            if "processing" in line and ("contrastive pairs" in line or "samples" in line):
+                processing_started = True
+            # Check for zero pairs only after processing has started
+            if (
+                processing_started
+                and ("contrastive pairs: 0" in line or "⚠️ contrastive pairs: 0" in line)
+                and "saved benchmark:" not in line
+            ):
+                final_zero_pairs = True
+
+        assert not final_zero_pairs, (
+            f"Task {task_name} produced 0 contrastive pairs during processing - this indicates the task is not working properly: {full_output[:800]}"
+        )
 
         print(f"✅ {task_name} steering functionality FULL EXECUTION test passed!")
 
