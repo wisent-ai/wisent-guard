@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from .contrastive_pairs import ContrastivePairSet
 from .user_model_config import user_model_configs
@@ -543,7 +543,7 @@ class Model:
         input_length = inputs["input_ids"].shape[1]
 
         # Prepare generation config - handle both old and new transformers versions
-        generation_config = {
+        gen_config_dict = {
             "max_new_tokens": max_new_tokens,
             "do_sample": True,
             "temperature": 0.7,
@@ -553,20 +553,40 @@ class Model:
         }
         
         # Remove None values to avoid issues
-        generation_config = {k: v for k, v in generation_config.items() if v is not None}
+        gen_config_dict = {k: v for k, v in gen_config_dict.items() if v is not None}
+        
+        # For newer transformers, we need to create a GenerationConfig object
+        try:
+            generation_config = GenerationConfig(**gen_config_dict)
+        except:
+            # Fallback for older transformers versions
+            generation_config = gen_config_dict
 
         # For TTFT tracking, we need to implement streaming-like generation
         if gen_state:
             # Use a simple approach: measure time to generate just the first token, then the rest
-            first_token_config = generation_config.copy()
-            first_token_config["max_new_tokens"] = 1
+            if isinstance(generation_config, GenerationConfig):
+                # Copy GenerationConfig and modify
+                first_token_config = GenerationConfig(**generation_config.to_dict())
+                first_token_config.max_new_tokens = 1
+            else:
+                # Copy dict
+                first_token_config = generation_config.copy()
+                first_token_config["max_new_tokens"] = 1
 
             # Generate first token
-            if enable_gradients:
-                first_outputs = self.hf_model.generate(**inputs, **first_token_config)
+            if isinstance(generation_config, GenerationConfig):
+                if enable_gradients:
+                    first_outputs = self.hf_model.generate(**inputs, generation_config=first_token_config)
+                else:
+                    with torch.inference_mode():
+                        first_outputs = self.hf_model.generate(**inputs, generation_config=first_token_config)
             else:
-                with torch.inference_mode():
+                if enable_gradients:
                     first_outputs = self.hf_model.generate(**inputs, **first_token_config)
+                else:
+                    with torch.inference_mode():
+                        first_outputs = self.hf_model.generate(**inputs, **first_token_config)
 
             # Mark first token time
             gen_state["mark_first_token"]()
@@ -578,14 +598,26 @@ class Model:
                     "input_ids": first_outputs.sequences,
                     "attention_mask": torch.ones_like(first_outputs.sequences),
                 }
-                remaining_config = generation_config.copy()
-                remaining_config["max_new_tokens"] = max_new_tokens - 1
-
-                if enable_gradients:
-                    outputs = self.hf_model.generate(**new_inputs, **remaining_config)
+                
+                if isinstance(generation_config, GenerationConfig):
+                    remaining_config = GenerationConfig(**generation_config.to_dict())
+                    remaining_config.max_new_tokens = max_new_tokens - 1
                 else:
-                    with torch.inference_mode():
+                    remaining_config = generation_config.copy()
+                    remaining_config["max_new_tokens"] = max_new_tokens - 1
+
+                if isinstance(generation_config, GenerationConfig):
+                    if enable_gradients:
+                        outputs = self.hf_model.generate(**new_inputs, generation_config=remaining_config)
+                    else:
+                        with torch.inference_mode():
+                            outputs = self.hf_model.generate(**new_inputs, generation_config=remaining_config)
+                else:
+                    if enable_gradients:
                         outputs = self.hf_model.generate(**new_inputs, **remaining_config)
+                    else:
+                        with torch.inference_mode():
+                            outputs = self.hf_model.generate(**new_inputs, **remaining_config)
 
                 # Combine sequences
                 generated_tokens = outputs.sequences[0][input_length:]
@@ -594,11 +626,20 @@ class Model:
                 generated_tokens = first_outputs.sequences[0][input_length:]
         else:
             # Standard generation without TTFT tracking
-            if enable_gradients:
-                outputs = self.hf_model.generate(**inputs, **generation_config)
+            if isinstance(generation_config, GenerationConfig):
+                # New transformers API - pass generation_config as argument
+                if enable_gradients:
+                    outputs = self.hf_model.generate(**inputs, generation_config=generation_config)
+                else:
+                    with torch.inference_mode():
+                        outputs = self.hf_model.generate(**inputs, generation_config=generation_config)
             else:
-                with torch.inference_mode():
+                # Old transformers API - unpack dict as kwargs
+                if enable_gradients:
                     outputs = self.hf_model.generate(**inputs, **generation_config)
+                else:
+                    with torch.inference_mode():
+                        outputs = self.hf_model.generate(**inputs, **generation_config)
 
             generated_tokens = outputs.sequences[0][input_length:]
 
