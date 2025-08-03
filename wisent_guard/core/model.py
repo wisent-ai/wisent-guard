@@ -542,6 +542,7 @@ class Model:
         inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
         input_length = inputs["input_ids"].shape[1]
 
+        # Prepare generation config - handle both old and new transformers versions
         generation_config = {
             "max_new_tokens": max_new_tokens,
             "do_sample": True,
@@ -550,6 +551,9 @@ class Model:
             "return_dict_in_generate": True,
             **generation_kwargs,
         }
+        
+        # Remove None values to avoid issues
+        generation_config = {k: v for k, v in generation_config.items() if v is not None}
 
         # For TTFT tracking, we need to implement streaming-like generation
         if gen_state:
