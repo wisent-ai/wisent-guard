@@ -4,41 +4,41 @@ Clean implementation using enhanced core primitives.
 """
 
 import logging
-import sys
 import os
-import torch
-import numpy as np
+import sys
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from .core import Model, ContrastivePairSet, SteeringMethod, SteeringType, Layer
-from .core.ground_truth_evaluator import GroundTruthEvaluator
+import torch
+
+from .core import ContrastivePairSet, Layer, Model, SteeringMethod, SteeringType
 from .core.activations import TestActivationCache
-from .optimize import (
-    run_smart_optimization,
-    run_interactive_optimization,
-)
-from .core.save_results import (
-    save_results_json,
-    save_results_csv,
-    create_evaluation_report,
-)
-from .core.parser import (
-    setup_parser,
-    aggregate_token_scores,
-    parse_layers_from_arg,
-)
-from .inference import (
-    generate_with_classification_and_handling,
-    generate_with_multi_layer_classification_and_handling,
-)
 from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
 )
 from .core.contrastive_pairs.contrastive_pair import ContrastivePair
+from .core.ground_truth_evaluator import GroundTruthEvaluator
 from .core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 from .core.model_config_manager import ModelConfigManager
+from .core.parser import (
+    aggregate_token_scores,
+    parse_layers_from_arg,
+    setup_parser,
+)
+from .core.save_results import (
+    create_evaluation_report,
+    save_results_csv,
+    save_results_json,
+)
+from .inference import (
+    generate_with_classification_and_handling,
+    generate_with_multi_layer_classification_and_handling,
+)
+from .optimize import (
+    run_interactive_optimization,
+    run_smart_optimization,
+)
 
 # Import caching infrastructure
 try:
@@ -64,8 +64,8 @@ try:
 except ImportError:
     try:
         # Alternative import path for development/testing
-        import sys
         import os
+        import sys
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
         sys.path.insert(0, os.path.join(current_dir, "core", "lm-harness-integration"))
@@ -73,9 +73,7 @@ except ImportError:
 
         # Try to import UNAVAILABLE_BENCHMARKS
         try:
-            sys.path.insert(
-                0, os.path.join(current_dir, "core", "classifiers", "pipeline_steps")
-            )
+            sys.path.insert(0, os.path.join(current_dir, "core", "classifiers", "pipeline_steps"))
             from download_full_benchmarks import FullBenchmarkDownloader
 
             UNAVAILABLE_BENCHMARKS = FullBenchmarkDownloader.UNAVAILABLE_BENCHMARKS
@@ -97,12 +95,10 @@ except ImportError:
             "mmlu": {"task": "mmlu", "tags": ["knowledge"], "priority": "high"},
         }
         UNAVAILABLE_BENCHMARKS = set()
-        print(
-            "⚠️  Warning: Could not import CORE_BENCHMARKS, using minimal fallback list"
-        )
+        print("⚠️  Warning: Could not import CORE_BENCHMARKS, using minimal fallback list")
 
 # Import allowed tasks from centralized configuration
-from .parameters.task_config import ALLOWED_TASKS, get_all_available_tasks
+from .parameters.task_config import ALLOWED_TASKS
 
 # Filter to only available (working) benchmarks - this gives us the validated benchmarks
 AVAILABLE_BENCHMARKS = {
@@ -111,9 +107,7 @@ AVAILABLE_BENCHMARKS = {
     if name not in UNAVAILABLE_BENCHMARKS and name in ALLOWED_TASKS
 }
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -149,22 +143,16 @@ def suggest_similar_tasks(invalid_task: str, max_suggestions: int = 5) -> List[s
     from difflib import get_close_matches
 
     valid_tasks = get_valid_task_names()
-    suggestions = get_close_matches(
-        invalid_task, valid_tasks, n=max_suggestions, cutoff=0.6
-    )
+    suggestions = get_close_matches(invalid_task, valid_tasks, n=max_suggestions, cutoff=0.6)
     return suggestions
 
 
 def print_valid_tasks_by_category():
     """Print all valid (available) tasks organized by categories/tags."""
     excluded_count = len(UNAVAILABLE_BENCHMARKS)
-    print(
-        f"\n📋 VALID TASKS ({len(AVAILABLE_BENCHMARKS)} available out of {len(CORE_BENCHMARKS)} total):"
-    )
+    print(f"\n📋 VALID TASKS ({len(AVAILABLE_BENCHMARKS)} available out of {len(CORE_BENCHMARKS)} total):")
     if excluded_count > 0:
-        print(
-            f"    🚫 {excluded_count} benchmarks excluded (known unavailable/problematic)"
-        )
+        print(f"    🚫 {excluded_count} benchmarks excluded (known unavailable/problematic)")
     print("=" * 60)
 
     # Group by priority for better organization
@@ -177,17 +165,9 @@ def print_valid_tasks_by_category():
     for priority in ["high", "medium", "low", "unknown"]:
         if by_priority[priority]:
             emoji = (
-                "🚀"
-                if priority == "high"
-                else (
-                    "⚡"
-                    if priority == "medium"
-                    else "🐌" if priority == "low" else "❓"
-                )
+                "🚀" if priority == "high" else ("⚡" if priority == "medium" else "🐌" if priority == "low" else "❓")
             )
-            print(
-                f"\n{emoji} {priority.upper()} PRIORITY ({len(by_priority[priority])} tasks):"
-            )
+            print(f"\n{emoji} {priority.upper()} PRIORITY ({len(by_priority[priority])} tasks):")
 
             for name, config in sorted(by_priority[priority]):
                 tags = ", ".join(config.get("tags", []))
@@ -209,9 +189,7 @@ def print_task_info(task_name: str):
     if task_name not in AVAILABLE_BENCHMARKS:
         if task_name in UNAVAILABLE_BENCHMARKS:
             print(f"❌ Task '{task_name}' is known to be unavailable/problematic")
-            print(
-                f"🚫 This benchmark is excluded from the {len(AVAILABLE_BENCHMARKS)} available benchmarks"
-            )
+            print(f"🚫 This benchmark is excluded from the {len(AVAILABLE_BENCHMARKS)} available benchmarks")
         else:
             print(f"❌ Task '{task_name}' not found in available benchmarks")
         return
@@ -250,12 +228,10 @@ def is_benchmark_cached(task_name: str, cache_dir: str) -> bool:
     return os.path.exists(cache_path)
 
 
-def load_cached_benchmark(
-    task_name: str, cache_dir: str
-) -> Optional[List[Dict[str, Any]]]:
+def load_cached_benchmark(task_name: str, cache_dir: str) -> Optional[List[Dict[str, Any]]]:
     """Load cached benchmark data."""
-    import pickle
     import os
+    import pickle
 
     cache_path = get_cache_path(task_name, cache_dir)
     if not os.path.exists(cache_path):
@@ -270,9 +246,7 @@ def load_cached_benchmark(
         return None
 
 
-def save_benchmark_to_cache(
-    task_name: str, cache_dir: str, limit: Optional[int] = None, verbose: bool = False
-) -> bool:
+def save_benchmark_to_cache(task_name: str, cache_dir: str, limit: Optional[int] = None, verbose: bool = False) -> bool:
     """Save benchmark data to cache using the download infrastructure."""
     import os
 
@@ -308,10 +282,9 @@ def save_benchmark_to_cache(
             if verbose:
                 print(f"✅ Successfully cached {task_name}")
             return True
-        else:
-            if verbose:
-                print(f"❌ Failed to cache {task_name}")
-            return False
+        if verbose:
+            print(f"❌ Failed to cache {task_name}")
+        return False
 
     except Exception as e:
         if verbose:
@@ -342,9 +315,7 @@ def convert_cached_data_to_qa_pairs(
     return qa_pairs
 
 
-def _run_lm_harness_evaluation(
-    task_data, test_qa_pairs, model, steering_methods, layers, verbose=False
-):
+def _run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, verbose=False):
     """
     Run proper lm-harness evaluation with steering integration.
 
@@ -374,10 +345,7 @@ def _run_lm_harness_evaluation(
             print(f"   • Test samples: {len(test_qa_pairs)}")
             try:
                 steering_method_names = (
-                    [
-                        m.method_type.value if hasattr(m, "method_type") else str(m)
-                        for m in steering_methods
-                    ]
+                    [m.method_type.value if hasattr(m, "method_type") else str(m) for m in steering_methods]
                     if steering_methods
                     else "None"
                 )
@@ -402,11 +370,7 @@ def _run_lm_harness_evaluation(
                 for req in requests:
                     # Extract the prompt from the request
                     if hasattr(req, "args") and req.args:
-                        prompt = (
-                            req.args[0]
-                            if isinstance(req.args[0], str)
-                            else str(req.args[0])
-                        )
+                        prompt = req.args[0] if isinstance(req.args[0], str) else str(req.args[0])
                     else:
                         prompt = str(req)
 
@@ -414,22 +378,16 @@ def _run_lm_harness_evaluation(
                         # Generate with steering using the wisent model
                         if self.steering_methods and self.layers:
                             # Apply steering during generation
-                            response, _, _, _ = (
-                                generate_with_classification_and_handling(
-                                    self.wisent_model,
-                                    prompt,
-                                    self.layers[0],  # Use first layer
-                                    max_new_tokens=300,
-                                    steering_method=(
-                                        self.steering_methods[0]
-                                        if self.steering_methods
-                                        else None
-                                    ),
-                                    token_aggregation="average",
-                                    detection_threshold=0.6,
-                                    verbose=False,
-                                    detection_handler=None,
-                                )
+                            response, _, _, _ = generate_with_classification_and_handling(
+                                self.wisent_model,
+                                prompt,
+                                self.layers[0],  # Use first layer
+                                max_new_tokens=300,
+                                steering_method=(self.steering_methods[0] if self.steering_methods else None),
+                                token_aggregation="average",
+                                detection_threshold=0.6,
+                                verbose=False,
+                                detection_handler=None,
                             )
                         else:
                             # Generate without steering
@@ -487,9 +445,7 @@ def _run_lm_harness_evaluation(
             "accuracy": accuracy,
             "method": "lm_harness_with_steering",
             "task_name": task_name,
-            "steering_applied": (
-                len(steering_methods) > 0 if steering_methods else False
-            ),
+            "steering_applied": (len(steering_methods) > 0 if steering_methods else False),
             "full_results": task_results,
         }
 
@@ -637,7 +593,7 @@ def run_task_pipeline(
     """
 
     # SECURITY: Enforce Docker for code execution tasks
-    from .core import enforce_secure_execution, SecureCodeEvaluator
+    from .core import SecureCodeEvaluator, enforce_secure_execution
 
     if enforce_secure_execution(task_name):
         if verbose:
@@ -702,7 +658,6 @@ def run_task_pipeline(
         # Additional benchmarks that map to existing extractors
         "cb",  # COPAExtractor (similar format)
         "logiqa",
-        "math_qa",
         "multirc",
         "mutual",
         "prost",
@@ -716,20 +671,14 @@ def run_task_pipeline(
     }
 
     # Inform user about ground truth method for tested tasks
-    if (
-        ground_truth_method == "lm-eval-harness"
-        and task_name.lower() in LM_EVAL_HARNESS_TASKS
-        and verbose
-    ):
+    if ground_truth_method == "lm-eval-harness" and task_name.lower() in LM_EVAL_HARNESS_TASKS and verbose:
         print(f"✅ Using 'lm-eval-harness' ground truth method for task '{task_name}'")
-        print(
-            "   • This task has been tested and validated to work with lm-eval-harness"
-        )
+        print("   • This task has been tested and validated to work with lm-eval-harness")
         print("   • To use a different method, specify --ground-truth-method <method>")
 
     # AUTO-LOAD MODEL CONFIGURATION (if available)
     # Load saved optimal parameters for this model if they exist
-    from .core.model_config_manager import get_optimal_parameters, ModelConfigManager
+    from .core.model_config_manager import ModelConfigManager, get_optimal_parameters
 
     # Load model config for control vectors and other settings
     config_manager = ModelConfigManager()
@@ -767,15 +716,11 @@ def run_task_pipeline(
 
             if "token_aggregation" in optimal_params:
                 token_aggregation = optimal_params["token_aggregation"]
-                config_overrides["token_aggregation"] = (
-                    f"{original_aggregation} → {token_aggregation}"
-                )
+                config_overrides["token_aggregation"] = f"{original_aggregation} → {token_aggregation}"
 
             if "detection_threshold" in optimal_params:
                 detection_threshold = optimal_params["detection_threshold"]
-                config_overrides["detection_threshold"] = (
-                    f"{original_threshold} → {detection_threshold}"
-                )
+                config_overrides["detection_threshold"] = f"{original_threshold} → {detection_threshold}"
 
             if verbose or config_overrides:
                 print(f"\n🔧 Auto-loaded saved configuration for model: {model_name}")
@@ -896,10 +841,10 @@ def run_task_pipeline(
             )
 
         from .core.tracking import (
-            get_global_memory_tracker,
-            get_global_latency_tracker,
-            get_memory_info,
             format_memory_usage,
+            get_global_latency_tracker,
+            get_global_memory_tracker,
+            get_memory_info,
         )
 
         if enable_memory_tracking:
@@ -908,9 +853,7 @@ def run_task_pipeline(
             memory_tracker.sampling_interval = memory_sampling_interval
             memory_tracker.start_monitoring()
             if verbose:
-                print(
-                    f"   • Memory tracking started with {memory_sampling_interval}s interval"
-                )
+                print(f"   • Memory tracking started with {memory_sampling_interval}s interval")
 
         if enable_latency_tracking:
             latency_tracker = get_global_latency_tracker()
@@ -920,7 +863,7 @@ def run_task_pipeline(
 
     # Show current memory usage if requested
     if show_memory_usage:
-        from .core.tracking import get_memory_info, format_memory_usage
+        from .core.tracking import format_memory_usage, get_memory_info
 
         current_memory = get_memory_info()
         print(f"\n💾 Current Memory Usage: {format_memory_usage(current_memory)}")
@@ -937,9 +880,7 @@ def run_task_pipeline(
             if steering_method == "CAA" and optimal_steering.get("method") != "CAA":
                 steering_method = optimal_steering["method"]
                 if verbose:
-                    print(
-                        f"\n🔧 Auto-loaded optimal steering method: {steering_method}"
-                    )
+                    print(f"\n🔧 Auto-loaded optimal steering method: {steering_method}")
 
             # Auto-load optimal steering layer if available and not explicitly overridden
             if optimal_steering.get("layer") is not None and steering_mode:
@@ -947,18 +888,12 @@ def run_task_pipeline(
                 original_layer = layer
                 layer = str(optimal_steering["layer"])
                 if verbose and original_layer != layer:
-                    print(
-                        f"🔧 Auto-loaded optimal steering layer: {layer} (was {original_layer})"
-                    )
+                    print(f"🔧 Auto-loaded optimal steering layer: {layer} (was {original_layer})")
 
-            if steering_strength == 1.0 and optimal_steering.get(
-                "strength"
-            ):  # Default strength
+            if steering_strength == 1.0 and optimal_steering.get("strength"):  # Default strength
                 steering_strength = optimal_steering["strength"]
                 if verbose:
-                    print(
-                        f"🔧 Auto-loaded optimal steering strength: {steering_strength}"
-                    )
+                    print(f"🔧 Auto-loaded optimal steering strength: {steering_strength}")
         elif verbose:
             print(
                 f"\n💡 No optimized steering config found. Run 'wisent-guard optimize-steering auto {model_name}' to optimize."
@@ -967,9 +902,9 @@ def run_task_pipeline(
     display_name = task_name if not (from_csv or from_json) else f"file:{task_name}"
 
     if verbose:
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"🚀 STARTING PIPELINE FOR TASK: {display_name.upper()}")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         print("📋 Configuration:")
         print(f"   • Model: {model_name}")
         print(f"   • Layer: {layer}")
@@ -1029,7 +964,7 @@ def run_task_pipeline(
 
         detection_handler = None
         if detection_action != "pass_through":
-            from .core.detection_handling import DetectionHandler, DetectionAction
+            from .core.detection_handling import DetectionAction, DetectionHandler
 
             # Map string to enum
             action_mapping = {
@@ -1048,40 +983,40 @@ def run_task_pipeline(
         if from_synthetic and synthetic_contrastive_pairs:
             # Synthetic pair mode
             if verbose:
-                print(f"\n🧬 Synthetic pair mode:")
+                print("\n🧬 Synthetic pair mode:")
                 print(f"   • Training pairs: {len(synthetic_contrastive_pairs.pairs)}")
                 print(f"   • Task name: {synthetic_contrastive_pairs.name}")
-            
+
             # Skip normal data loading - we'll use the synthetic pair set
             group_task_processed = True
             group_task_qa_format = True
-            
+
         elif cross_benchmark_mode and train_contrastive_pairs and eval_contrastive_pairs:
             # Cross-benchmark evaluation mode
             if verbose:
-                print(f"\n🔄 Cross-benchmark evaluation mode:")
+                print("\n🔄 Cross-benchmark evaluation mode:")
                 print(f"   • Training pairs: {len(train_contrastive_pairs.pairs)}")
                 print(f"   • Evaluation pairs: {len(eval_contrastive_pairs.pairs)}")
-            
+
             # Skip normal data loading - we'll use the pre-loaded pair sets
             group_task_processed = True
             group_task_qa_format = True
-            
+
             # We'll handle training and evaluation separately below
             contrastive_pairs = train_contrastive_pairs.pairs
-            
+
         elif preloaded_qa_pairs:
             # Use pre-loaded QA pairs (e.g., from mixed sampling)
             if verbose:
                 print(f"\n📊 Using pre-loaded mixed dataset with {len(preloaded_qa_pairs)} QA pairs...")
-            
+
             all_qa_pairs = preloaded_qa_pairs
             qa_pairs = all_qa_pairs
-            
+
             # Set group task format flag
             group_task_qa_format = True
             group_task_processed = True
-            
+
         elif from_csv or from_json:
             # Load data from CSV/JSON file using ContrastivePairSet
             if verbose:
@@ -1099,9 +1034,7 @@ def run_task_pipeline(
                     limit=limit,
                 )
             else:  # from_json
-                pair_set = ContrastivePairSet.from_json_file(
-                    name="json_data", json_path=task_name, limit=limit
-                )
+                pair_set = ContrastivePairSet.from_json_file(name="json_data", json_path=task_name, limit=limit)
 
             # Convert ContrastivePairSet to qa_pairs format for existing pipeline
             all_qa_pairs = []
@@ -1140,9 +1073,7 @@ def run_task_pipeline(
                     print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples")
 
             if verbose:
-                print(
-                    f"📊 Data split: {len(qa_pairs)} training pairs, {len(test_qa_pairs_source)} test pairs"
-                )
+                print(f"📊 Data split: {len(qa_pairs)} training pairs, {len(test_qa_pairs_source)} test pairs")
 
         else:
             # Traditional lm-harness task loading with caching support
@@ -1153,11 +1084,7 @@ def run_task_pipeline(
             cached_data = None
             used_cache = False
 
-            if (
-                use_cached
-                and not force_download
-                and is_benchmark_cached(task_name, cache_dir)
-            ):
+            if use_cached and not force_download and is_benchmark_cached(task_name, cache_dir):
                 if verbose:
                     print(f"💾 Found cached benchmark data for {task_name}")
 
@@ -1176,9 +1103,7 @@ def run_task_pipeline(
                             print(f"   📏 Limited to {limit} pairs as requested")
                 else:
                     if verbose:
-                        print(
-                            "⚠️  Failed to load cached data, falling back to fresh download"
-                        )
+                        print("⚠️  Failed to load cached data, falling back to fresh download")
 
             if not used_cache:
                 # Load fresh data from lm-eval
@@ -1189,15 +1114,14 @@ def run_task_pipeline(
                 # Skip group task check for MBPP and LiveCodeBench as they're known to be slow
                 if task_name in ["mbpp", "livecodebench"]:
                     if verbose:
-                        print(
-                            f"🔍 Skipping group task check for {task_name} (known to be slow)"
-                        )
+                        print(f"🔍 Skipping group task check for {task_name} (known to be slow)")
                     group_task_processed = False
                     group_task_qa_format = False
                 else:
                     try:
-                        from lm_eval import evaluator
                         import threading
+
+                        from lm_eval import evaluator
 
                         if verbose:
                             print(f"🔍 Checking if '{task_name}' is a group task...")
@@ -1223,9 +1147,7 @@ def run_task_pipeline(
 
                         if thread.is_alive():
                             # Thread is still running, task loading timed out
-                            raise TimeoutError(
-                                f"Task loading timed out for {task_name}"
-                            )
+                            raise TimeoutError(f"Task loading timed out for {task_name}")
 
                         if exception_occurred:
                             raise exception_occurred
@@ -1251,9 +1173,7 @@ def run_task_pipeline(
                                         print(f"   🔍 Loading subtask: {subtask_name}")
 
                                     # Load each subtask individually
-                                    subtask_data = model.load_lm_eval_task(
-                                        subtask_name, shots=shots, limit=limit
-                                    )
+                                    subtask_data = model.load_lm_eval_task(subtask_name, shots=shots, limit=limit)
                                     subtask_train_docs, _ = model.split_task_data(
                                         subtask_data,
                                         split_ratio=split_ratio,
@@ -1266,9 +1186,7 @@ def run_task_pipeline(
                                     )
 
                                     if verbose:
-                                        print(
-                                            f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}"
-                                        )
+                                        print(f"   ✅ Extracted {len(subtask_qa_pairs)} pairs from {subtask_name}")
 
                                     # Add subtask identifier to each pair for tracking
                                     for pair in subtask_qa_pairs:
@@ -1278,9 +1196,7 @@ def run_task_pipeline(
 
                                 except Exception as e:
                                     if verbose:
-                                        print(
-                                            f"   ⚠️ Failed to load subtask {subtask_name}: {e}"
-                                        )
+                                        print(f"   ⚠️ Failed to load subtask {subtask_name}: {e}")
                                     continue
 
                             if not all_qa_pairs:
@@ -1303,26 +1219,18 @@ def run_task_pipeline(
 
                             split_point = int(len(all_qa_pairs) * split_ratio)
                             qa_pairs = all_qa_pairs[:split_point]  # Training data
-                            test_qa_pairs_source = all_qa_pairs[
-                                split_point:
-                            ]  # Test data
+                            test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
 
                             # Apply limits
                             if len(qa_pairs) > MAX_TRAIN_SAMPLES:
                                 qa_pairs = qa_pairs[:MAX_TRAIN_SAMPLES]
                                 if verbose:
-                                    print(
-                                        f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples"
-                                    )
+                                    print(f"   ⚠️  Training data limited to {MAX_TRAIN_SAMPLES} samples")
 
                             if len(test_qa_pairs_source) > MAX_TEST_SAMPLES:
-                                test_qa_pairs_source = test_qa_pairs_source[
-                                    :MAX_TEST_SAMPLES
-                                ]
+                                test_qa_pairs_source = test_qa_pairs_source[:MAX_TEST_SAMPLES]
                                 if verbose:
-                                    print(
-                                        f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples"
-                                    )
+                                    print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples")
 
                             if verbose:
                                 print(
@@ -1332,25 +1240,18 @@ def run_task_pipeline(
                                 # Show breakdown by subtask
                                 from collections import Counter
 
-                                subtask_counts = Counter(
-                                    pair.get("source_subtask", "unknown")
-                                    for pair in qa_pairs
-                                )
+                                subtask_counts = Counter(pair.get("source_subtask", "unknown") for pair in qa_pairs)
                                 print("📋 Breakdown by subtask:")
                                 for subtask, count in subtask_counts.most_common():
                                     print(f"   • {subtask}: {count} pairs")
 
                             # Set a flag to indicate we've already processed the group task
                             group_task_processed = True
-                            group_task_qa_format = (
-                                True  # Test data is already in QA format
-                            )
+                            group_task_qa_format = True  # Test data is already in QA format
 
                         else:
                             if verbose:
-                                print(
-                                    f"✅ '{task_name}' is an individual task, proceeding..."
-                                )
+                                print(f"✅ '{task_name}' is an individual task, proceeding...")
                             group_task_processed = False
                             group_task_qa_format = False
 
@@ -1363,10 +1264,8 @@ def run_task_pipeline(
                     except Exception as e:
                         if "Group task" in str(e):
                             raise e  # Re-raise group task errors
-                        elif verbose:
-                            print(
-                                f"⚠️  Could not check if '{task_name}' is a group task: {e}"
-                            )
+                        if verbose:
+                            print(f"⚠️  Could not check if '{task_name}' is a group task: {e}")
                             print("🔄 Proceeding with standard task loading...")
                         group_task_processed = False
                         group_task_qa_format = False
@@ -1376,9 +1275,7 @@ def run_task_pipeline(
                     # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
                     actual_task_name = get_actual_task_name(task_name)
                     if verbose and actual_task_name != task_name:
-                        print(
-                            f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'"
-                        )
+                        print(f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'")
 
                     # Determine the total limit to load
                     # If training_limit or testing_limit are specified, we need to load enough data
@@ -1397,47 +1294,43 @@ def run_task_pipeline(
                             # Only testing limit specified, calculate total based on split ratio
                             # Add 20% buffer to account for rounding
                             total_limit = int(testing_limit / (1 - split_ratio) * 1.2) + 1
-                    
-                    task_data = model.load_lm_eval_task(
-                        actual_task_name, shots=shots, limit=total_limit
-                    )
-                    #TODO Code below should be refactored. Originally It had been built to support Lm-eval-harness, but it was rebuilt to be suitable for benchamarks outside lm-eval-harness
+
+                    task_data = model.load_lm_eval_task(actual_task_name, shots=shots, limit=total_limit)
+                    # TODO Code below should be refactored. Originally It had been built to support Lm-eval-harness, but it was rebuilt to be suitable for benchamarks outside lm-eval-harness
                     # Check if this is a TaskInterface task (skip split_task_data for these)
-                    if hasattr(task_data, 'get_name') and hasattr(task_data, 'load_data'):
+                    if hasattr(task_data, "get_name") and hasattr(task_data, "load_data"):
                         # TaskInterface task - data loading handled internally
                         train_docs = task_data.load_data(limit=training_limit)
                         test_docs = task_data.load_data(limit=testing_limit)
                     else:
-                        # Standard lm-eval task  
+                        # Standard lm-eval task
                         train_docs, test_docs = model.split_task_data(
                             task_data, split_ratio=split_ratio, random_seed=seed
                         )
-                    
+
                     # Apply training and testing limits if specified
                     original_train_size = len(train_docs)
                     original_test_size = len(test_docs)
-                    
+
                     if training_limit is not None and len(train_docs) > training_limit:
                         train_docs = train_docs[:training_limit]
                         if verbose:
-                            print(f"   ⚠️  Training data limited to {training_limit} samples (from {original_train_size})")
-                    
+                            print(
+                                f"   ⚠️  Training data limited to {training_limit} samples (from {original_train_size})"
+                            )
+
                     if testing_limit is not None and len(test_docs) > testing_limit:
                         test_docs = test_docs[:testing_limit]
                         if verbose:
                             print(f"   ⚠️  Test data limited to {testing_limit} samples (from {original_test_size})")
 
                     if verbose:
-                        print(
-                            f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs"
-                        )
+                        print(f"📊 Data split: {len(train_docs)} training docs, {len(test_docs)} test docs")
 
                     # Extract QA pairs from training documents
                     if verbose:
                         print("\n📝 TRAINING DATA PREPARATION:")
-                        print(
-                            f"   • Loading {task_name} data with correct/incorrect answers..."
-                        )
+                        print(f"   • Loading {task_name} data with correct/incorrect answers...")
 
                     # NEW: Use ManagedCachedBenchmarks for intelligent downloading
                     if cache_benchmark:
@@ -1460,7 +1353,7 @@ def run_task_pipeline(
                                 elif testing_limit is not None:
                                     # Add 20% buffer to account for rounding
                                     cache_limit = int(testing_limit / (1 - split_ratio) * 1.2) + 1
-                            
+
                             cached_samples = managed_cache.get_task_samples(
                                 task_name=task_name,
                                 limit=cache_limit or 1000,  # Default to 1000 if no limit
@@ -1468,45 +1361,31 @@ def run_task_pipeline(
                             )
 
                             # Convert cached samples to QA pairs format
-                            qa_pairs = [
-                                sample["normalized"] for sample in cached_samples
-                            ]
+                            qa_pairs = [sample["normalized"] for sample in cached_samples]
 
                             if verbose:
-                                print(
-                                    f"✅ Using managed cache: {len(qa_pairs)} samples loaded efficiently"
-                                )
+                                print(f"✅ Using managed cache: {len(qa_pairs)} samples loaded efficiently")
 
                         except Exception as e:
                             if verbose:
-                                print(
-                                    f"⚠️  Managed cache failed, falling back to traditional method: {e}"
-                                )
+                                print(f"⚠️  Managed cache failed, falling back to traditional method: {e}")
 
                             # Fallback to traditional method
-                            qa_pairs = (
-                                ContrastivePairSet.extract_qa_pairs_from_task_docs(
-                                    task_name, task_data, train_docs
-                                )
+                            qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
+                                task_name, task_data, train_docs
                             )
                     else:
                         # Traditional method when caching is disabled
-                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
-                            task_name, task_data, train_docs
-                        )
+                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
 
-                    test_qa_pairs_source = (
-                        test_docs  # Keep original format for test docs
-                    )
+                    test_qa_pairs_source = test_docs  # Keep original format for test docs
 
                 # CACHE SAVING: Save to cache if requested and we loaded fresh data
                 if cache_benchmark and not used_cache:
                     if verbose:
                         print("💾 Caching benchmark data for future use...")
 
-                    success = save_benchmark_to_cache(
-                        task_name, cache_dir, limit, verbose
-                    )
+                    success = save_benchmark_to_cache(task_name, cache_dir, limit, verbose)
                     if success and verbose:
                         print("✅ Benchmark cached successfully!")
                     elif verbose:
@@ -1521,14 +1400,14 @@ def run_task_pipeline(
                 split_point = int(len(all_qa_pairs) * split_ratio)
                 qa_pairs = all_qa_pairs[:split_point]  # Training data
                 test_qa_pairs_source = all_qa_pairs[split_point:]  # Test data
-                
+
                 if verbose:
                     print(f"📊 Initial split: {len(qa_pairs)} training, {len(test_qa_pairs_source)} test samples")
 
                 # Apply limits
                 original_train_size = len(qa_pairs)
                 original_test_size = len(test_qa_pairs_source)
-                
+
                 if len(qa_pairs) > MAX_TRAIN_SAMPLES:
                     qa_pairs = qa_pairs[:MAX_TRAIN_SAMPLES]
                     if verbose:
@@ -1540,7 +1419,7 @@ def run_task_pipeline(
                     test_qa_pairs_source = test_qa_pairs_source[:MAX_TEST_SAMPLES]
                     if verbose:
                         print(f"   ⚠️  Test data limited to {MAX_TEST_SAMPLES} samples (from {original_test_size})")
-                        
+
                 if verbose:
                     print(f"📊 Final data split: {len(qa_pairs)} training, {len(test_qa_pairs_source)} test samples")
                 group_task_processed = False
@@ -1551,38 +1430,36 @@ def run_task_pipeline(
             # In synthetic mode, skip normal QA pair extraction
             qa_pairs = []  # Empty, we're using synthetic pairs
             test_qa_pairs_source = []  # No test data for synthetic
-            
+
         # Set up qa_pairs and test_qa_pairs_source for cross-benchmark evaluation
         elif cross_benchmark_mode and eval_contrastive_pairs:
             # In cross-benchmark mode, we need to recreate qa_pairs for display purposes
             # Note: The actual training will use train_contrastive_pairs which already has activations
-            
+
             # For cross-benchmark, we skip showing training examples and QA pair extraction
             # since the data is already processed
             qa_pairs = []  # Empty list to avoid errors
             test_qa_pairs_source = []  # Will be populated from eval pairs later
-            
+
             if verbose:
-                print(f"\n🔄 Cross-benchmark evaluation setup:")
+                print("\n🔄 Cross-benchmark evaluation setup:")
                 print(f"   • Training pairs from: {train_contrastive_pairs.name}")
                 print(f"   • Evaluation pairs from: {eval_contrastive_pairs.name}")
                 print(f"   • Training samples: {len(train_contrastive_pairs.pairs)}")
                 print(f"   • Evaluation samples: {len(eval_contrastive_pairs.pairs)}")
-            
+
             # Skip the normal QA pair display
             skip_qa_display = True
         else:
             skip_qa_display = False
-        
+
         if verbose and not skip_qa_display:
             print(f"   • Successfully extracted {len(qa_pairs)} QA pairs")
             print("\n🔍 Training Examples:")
             for i, qa_pair in enumerate(qa_pairs[:4]):  # Show first 4
-                print(f"\n   📋 Example {i+1}:")
+                print(f"\n   📋 Example {i + 1}:")
                 question_preview = (
-                    qa_pair["question"][:100] + "..."
-                    if len(qa_pair["question"]) > 100
-                    else qa_pair["question"]
+                    qa_pair["question"][:100] + "..." if len(qa_pair["question"]) > 100 else qa_pair["question"]
                 )
                 print(f"      🔸 Question: {question_preview}")
                 print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
@@ -1612,7 +1489,7 @@ def run_task_pipeline(
                         os.path.dirname(__file__),
                         "parameters/benchmarks/benchmark_evaluation_methods.json",
                     )
-                    with open(eval_methods_path, "r") as f:
+                    with open(eval_methods_path) as f:
                         benchmark_methods = json.load(f)
                         return benchmark_methods.get(task_name, "text-generation")
                 except Exception as e:
@@ -1624,9 +1501,7 @@ def run_task_pipeline(
 
             if evaluation_method == "perplexity":
                 if verbose:
-                    print(
-                        "\n🎯 PERPLEXITY TASK DETECTED: Skipping contrastive training"
-                    )
+                    print("\n🎯 PERPLEXITY TASK DETECTED: Skipping contrastive training")
                     print(f"   • Task: {task_name}")
                     print(f"   • Evaluation method: {evaluation_method}")
                     print("   • Going directly to perplexity evaluation")
@@ -1639,9 +1514,7 @@ def run_task_pipeline(
 
                 # Use actual task name for evaluation
                 actual_eval_task_name = get_actual_task_name(task_name)
-                lm_eval_ground_truth = LMEvalHarnessGroundTruth(
-                    actual_eval_task_name, evaluation_method, model=model
-                )
+                lm_eval_ground_truth = LMEvalHarnessGroundTruth(actual_eval_task_name, evaluation_method, model=model)
 
                 # Run perplexity evaluation without classifier
                 lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
@@ -1654,10 +1527,8 @@ def run_task_pipeline(
                 )
 
                 if verbose:
-                    print(
-                        f"\n🎉 PERPLEXITY EVALUATION COMPLETED FOR {task_name.upper()}!"
-                    )
-                    print(f"{'='*80}")
+                    print(f"\n🎉 PERPLEXITY EVALUATION COMPLETED FOR {task_name.upper()}!")
+                    print(f"{'=' * 80}")
                     print("📊 FINAL RESULTS:")
                     print(f"   • Test samples: {len(test_qa_pairs_source)}")
                     print(f"   • Evaluation method: {evaluation_method}")
@@ -1670,7 +1541,7 @@ def run_task_pipeline(
                         print(f"   • Average perplexity score: {avg_score:.3f}")
                     else:
                         print("   • Perplexity evaluation: Completed")
-                    print(f"{'='*80}")
+                    print(f"{'=' * 80}")
 
                 return {
                     "task_name": task_name,
@@ -1691,22 +1562,18 @@ def run_task_pipeline(
             training_sample_count = len(train_contrastive_pairs.pairs) if train_contrastive_pairs else 0
         else:
             training_sample_count = len(qa_pairs)
-        
+
         if training_sample_count < min_training_samples:
             error_msg = f"Insufficient training data: {training_sample_count} pairs found, minimum {min_training_samples} required"
             if verbose:
                 print(f"\n❌ ERROR: {error_msg}")
                 print("   • Consider increasing --limit or using a larger dataset")
-                print(
-                    f"   • CSV/JSON files should have at least {min_training_samples} rows"
-                )
+                print(f"   • CSV/JSON files should have at least {min_training_samples} rows")
                 print("   • lm-harness tasks may need higher --limit values")
 
             if not allow_small_dataset:
                 if verbose:
-                    print(
-                        "   • Use --allow-small-dataset flag to bypass this check (may cause training issues)"
-                    )
+                    print("   • Use --allow-small-dataset flag to bypass this check (may cause training issues)")
 
                 return {
                     "task_name": task_name,
@@ -1716,22 +1583,17 @@ def run_task_pipeline(
                     "minimum_required": min_training_samples,
                     "suggestion": "Increase dataset size, --limit parameter, or use --allow-small-dataset flag",
                 }
-            else:
-                if verbose:
-                    print(
-                        "   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag"
-                    )
-                    print(
-                        f"   • Training may be unstable with only {len(qa_pairs)} samples"
-                    )
+            if verbose:
+                print("   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag")
+                print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
 
         # Create contrastive pairs using proper activation collection logic
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
-            TokenTargetingStrategy,
             PromptConstructionStrategy,
+            TokenTargetingStrategy,
         )
-        from .core.activations import Activations, ActivationAggregationMethod
+        from .core.activations import ActivationAggregationMethod, Activations
 
         # Convert strings to enums
         prompt_strategy_mapping = {
@@ -1762,23 +1624,21 @@ def run_task_pipeline(
 
         # Create collector (needed for activation extraction regardless of mode)
         collector = ActivationCollectionLogic(model=model)
-        
+
         # In synthetic mode, use pre-loaded synthetic pairs
         if from_synthetic and synthetic_contrastive_pairs:
             contrastive_pairs = synthetic_contrastive_pairs.pairs
             if verbose:
-                print(f"\n🧬 Using pre-loaded synthetic contrastive pairs")
+                print("\n🧬 Using pre-loaded synthetic contrastive pairs")
                 print(f"   • Pairs: {len(contrastive_pairs)}")
         # In cross-benchmark mode, use pre-loaded contrastive pairs
         elif cross_benchmark_mode and train_contrastive_pairs:
             contrastive_pairs = train_contrastive_pairs.pairs
             if verbose:
-                print(f"\n🔄 Using pre-loaded contrastive pairs from cross-benchmark training data")
+                print("\n🔄 Using pre-loaded contrastive pairs from cross-benchmark training data")
                 print(f"   • Pairs: {len(contrastive_pairs)}")
         else:
-            contrastive_pairs = collector.create_batch_contrastive_pairs(
-                qa_pairs, prompt_strategy
-            )
+            contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs, prompt_strategy)
 
             # 🚨 HARD ERROR CHECK: No training data created
             if len(contrastive_pairs) == 0:
@@ -1793,7 +1653,7 @@ def run_task_pipeline(
         if verbose:
             print(f"\n🔄 Created {len(contrastive_pairs)} contrastive pairs:")
             for i, pair in enumerate(contrastive_pairs[:3]):  # Show first 3
-                print(f"\n   🔄 Contrastive Pair {i+1}:")
+                print(f"\n   🔄 Contrastive Pair {i + 1}:")
                 print(f"      📝 Prompt: {pair.prompt}")
                 print(f"      🟢 Positive (B): {pair.positive_response}")
                 print(f"      🔴 Negative (A): {pair.negative_response}")
@@ -1810,9 +1670,7 @@ def run_task_pipeline(
             if verbose:
                 print(f"\n❌ ERROR: {error_msg}")
                 print("   • Use --load-classifier to load pre-trained classifiers")
-                print(
-                    "   • Use --load-steering-vector to load pre-trained steering vectors"
-                )
+                print("   • Use --load-steering-vector to load pre-trained steering vectors")
             return {"task_name": task_name, "error": error_msg}
 
         # Handle inference-only mode
@@ -1836,31 +1694,19 @@ def run_task_pipeline(
 
                 if len(layers) > 1:
                     # Multi-layer mode
-                    classifiers_data = ModelPersistence.load_multi_layer_classifiers(
-                        load_classifier, layers
-                    )
+                    classifiers_data = ModelPersistence.load_multi_layer_classifiers(load_classifier, layers)
                     for layer_idx, (classifier, metadata) in classifiers_data.items():
-                        steering_methods[layer_idx] = type(
-                            "SteeringMethod", (), {"classifier": classifier}
-                        )()
+                        steering_methods[layer_idx] = type("SteeringMethod", (), {"classifier": classifier})()
                         loaded_models[layer_idx] = metadata
                         if verbose:
-                            print(
-                                f"     ✅ Layer {layer_idx}: {metadata.get('classifier_type', 'unknown')} classifier"
-                            )
+                            print(f"     ✅ Layer {layer_idx}: {metadata.get('classifier_type', 'unknown')} classifier")
                 else:
                     # Single layer mode
-                    classifier, metadata = ModelPersistence.load_classifier(
-                        load_classifier, layers[0]
-                    )
-                    steering_methods[layers[0]] = type(
-                        "SteeringMethod", (), {"classifier": classifier}
-                    )()
+                    classifier, metadata = ModelPersistence.load_classifier(load_classifier, layers[0])
+                    steering_methods[layers[0]] = type("SteeringMethod", (), {"classifier": classifier})()
                     loaded_models[layers[0]] = metadata
                     if verbose:
-                        print(
-                            f"     ✅ Layer {layers[0]}: {metadata.get('classifier_type', 'unknown')} classifier"
-                        )
+                        print(f"     ✅ Layer {layers[0]}: {metadata.get('classifier_type', 'unknown')} classifier")
 
             if load_steering_vector:
                 if verbose:
@@ -1885,22 +1731,16 @@ def run_task_pipeline(
                                 "loaded_from": load_steering_vector,
                             }
                             if verbose:
-                                print(
-                                    f"     ✅ Loaded steering vector for layer {layer_index}"
-                                )
+                                print(f"     ✅ Loaded steering vector for layer {layer_index}")
                         else:
                             if verbose:
-                                print(
-                                    "     ⚠️  Warning: No layer information in loaded vector"
-                                )
+                                print("     ⚠️  Warning: No layer information in loaded vector")
                     else:
                         if verbose:
-                            print(
-                                f"     ❌ Failed to load steering vector from {load_steering_vector}"
-                            )
+                            print(f"     ❌ Failed to load steering vector from {load_steering_vector}")
                 except Exception as e:
                     if verbose:
-                        print(f"     ❌ Error loading steering vector: {str(e)}")
+                        print(f"     ❌ Error loading steering vector: {e!s}")
 
             if not steering_methods:
                 error_msg = "No models could be loaded for inference"
@@ -1920,13 +1760,10 @@ def run_task_pipeline(
         elif train_only:
             if verbose:
                 print("\n🎓 TRAINING-ONLY MODE:")
-                print(
-                    "   • Training classifiers/vectors and saving, skipping inference..."
-                )
+                print("   • Training classifiers/vectors and saving, skipping inference...")
 
             # Continue with training but return early before inference
             # (Training will happen in the normal flow, but we'll return after training)
-            pass
 
         # Check if optimization is needed
         original_layer = layer
@@ -1937,9 +1774,7 @@ def run_task_pipeline(
             # Special case: Interactive optimization - SKIP normal pipeline
             # Generate test questions for optimization
             test_questions = []
-            for doc in test_qa_pairs_source[
-                :2
-            ]:  # Use first 2 test questions for optimization
+            for doc in test_qa_pairs_source[:2]:  # Use first 2 test questions for optimization
                 try:
                     if from_csv or from_json:
                         # For CSV/JSON, doc is already a qa_pair dict
@@ -1972,9 +1807,7 @@ def run_task_pipeline(
                     if verbose:
                         print("✅ Interactive optimization completed!")
                         print(f"   • Optimized layer: {layer} (was {original_layer})")
-                        print(
-                            f"   • Optimized aggregation: {token_aggregation} (was {original_token_aggregation})"
-                        )
+                        print(f"   • Optimized aggregation: {token_aggregation} (was {original_token_aggregation})")
 
                     # Return results immediately - skip normal pipeline
                     return {
@@ -2012,18 +1845,12 @@ def run_task_pipeline(
                         # ContrastivePairSet is already imported at the top of the file
 
                         # Extract QA pairs using the comprehensive method that handles all benchmarks
-                        qa_pairs_batch = (
-                            ContrastivePairSet.extract_qa_pairs_from_task_docs(
-                                task_name, task_data, [doc]
-                            )
-                        )
+                        qa_pairs_batch = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, [doc])
 
                         if qa_pairs_batch:
                             test_qa_pairs.extend(qa_pairs_batch)
                         elif verbose:
-                            print(
-                                f"⚠️  Failed to extract test QA pair from benchmark {task_name}"
-                            )
+                            print(f"⚠️  Failed to extract test QA pair from benchmark {task_name}")
 
                 except Exception:
                     continue
@@ -2045,24 +1872,16 @@ def run_task_pipeline(
             )
 
             # Extract the best parameters from optimization
-        if optimization_result and optimization_result.get(
-            "optimization_performed", False
-        ):
+        if optimization_result and optimization_result.get("optimization_performed", False):
             layer = optimization_result.get("best_layer", layer)
-            token_aggregation = optimization_result.get(
-                "best_aggregation", token_aggregation
-            )
-            optimized_classifier_type = optimization_result.get(
-                "best_classifier_type", classifier_type
-            )
+            token_aggregation = optimization_result.get("best_aggregation", token_aggregation)
+            optimized_classifier_type = optimization_result.get("best_classifier_type", classifier_type)
             optimized_threshold = optimization_result.get("best_threshold", 0.6)
 
             # 🚨 FIX: Update layers array to use optimized layer for ground truth evaluation
             optimized_layer_int = int(layer) if isinstance(layer, str) else layer
             layers = [optimized_layer_int]  # Update layers array with optimized layer
-            layer_obj = Layer(
-                index=optimized_layer_int, type="transformer"
-            )  # Update layer object too
+            layer_obj = Layer(index=optimized_layer_int, type="transformer")  # Update layer object too
 
             if verbose:
                 print("✅ Hyperparameter optimization completed!")
@@ -2084,13 +1903,9 @@ def run_task_pipeline(
             }
 
         # Extract activations from the choice tokens using the (possibly optimized) layer
-        optimization_note = (
-            " (optimized)" if optimize and layer != original_layer else ""
-        )
+        optimization_note = " (optimized)" if optimize and layer != original_layer else ""
         if verbose:
-            print(
-                f"\n🔬 Extracting activations from layer {layer}{optimization_note} choice tokens..."
-            )
+            print(f"\n🔬 Extracting activations from layer {layer}{optimization_note} choice tokens...")
 
         if latency_tracker:
             with latency_tracker.time_operation("activation_extraction"):
@@ -2145,20 +1960,10 @@ def run_task_pipeline(
         for i, processed_pair in enumerate(processed_pairs):
             if i < len(pair_set.pairs):
                 # Assign activations to the response objects, not the pair directly
-                if (
-                    hasattr(pair_set.pairs[i], "positive_response")
-                    and pair_set.pairs[i].positive_response
-                ):
-                    pair_set.pairs[i].positive_response.activations = (
-                        processed_pair.positive_activations
-                    )
-                if (
-                    hasattr(pair_set.pairs[i], "negative_response")
-                    and pair_set.pairs[i].negative_response
-                ):
-                    pair_set.pairs[i].negative_response.activations = (
-                        processed_pair.negative_activations
-                    )
+                if hasattr(pair_set.pairs[i], "positive_response") and pair_set.pairs[i].positive_response:
+                    pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
+                if hasattr(pair_set.pairs[i], "negative_response") and pair_set.pairs[i].negative_response:
+                    pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
 
         # STEERING MODE vs CLASSIFICATION MODE
         if steering_mode:
@@ -2173,8 +1978,8 @@ def run_task_pipeline(
                     print(f"   • Target norm: {target_norm}")
 
             # Import steering methods
-            from .core.steering_method import CAA, HPR, DAC, BiPO, KSteering
             from .core.normalization import VectorNormalizationMethod
+            from .core.steering_method import CAA, DAC, HPR, BiPO, KSteering
 
             # Ensure task_data is available for steering evaluation
             # If not already loaded (e.g., from CSV/JSON), load it now
@@ -2182,13 +1987,9 @@ def run_task_pipeline(
                 # FIXED: Resolve benchmark name to actual task name for lm-eval-harness
                 actual_task_name = get_actual_task_name(task_name)
                 if verbose and actual_task_name != task_name:
-                    print(
-                        f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'"
-                    )
+                    print(f"🔄 Resolving benchmark '{task_name}' to task '{actual_task_name}'")
 
-                task_data = model.load_lm_eval_task(
-                    actual_task_name, shots=shots, limit=limit
-                )
+                task_data = model.load_lm_eval_task(actual_task_name, shots=shots, limit=limit)
 
             # Convert string to enum
             try:
@@ -2196,9 +1997,7 @@ def run_task_pipeline(
             except ValueError:
                 norm_method = VectorNormalizationMethod.NONE
                 if verbose:
-                    print(
-                        f"   • Warning: Unknown normalization method '{normalization_method}', using 'none'"
-                    )
+                    print(f"   • Warning: Unknown normalization method '{normalization_method}', using 'none'")
 
             # Create steering method based on selection
             if steering_method == "CAA":
@@ -2210,7 +2009,7 @@ def run_task_pipeline(
             elif steering_method == "HPR":
                 steering_obj = HPR(device=device)
                 if verbose:
-                    print(f"   • Using HPR steering")
+                    print("   • Using HPR steering")
             elif steering_method == "DAC":
                 steering_obj = DAC(
                     device=device,
@@ -2233,17 +2032,9 @@ def run_task_pipeline(
                     print(f"   • BiPO epochs: {bipo_epochs}")
             elif steering_method == "KSteering":
                 # Parse target and avoid labels
-                target_labels = [
-                    int(x.strip())
-                    for x in ksteering_target_labels.split(",")
-                    if x.strip()
-                ]
+                target_labels = [int(x.strip()) for x in ksteering_target_labels.split(",") if x.strip()]
                 avoid_labels = (
-                    [
-                        int(x.strip())
-                        for x in ksteering_avoid_labels.split(",")
-                        if x.strip()
-                    ]
+                    [int(x.strip()) for x in ksteering_avoid_labels.split(",") if x.strip()]
                     if ksteering_avoid_labels
                     else []
                 )
@@ -2262,9 +2053,7 @@ def run_task_pipeline(
                     print(f"   • K-Steering num labels: {ksteering_num_labels}")
                     print(f"   • K-Steering hidden dim: {ksteering_hidden_dim}")
                     print(f"   • K-Steering learning rate: {ksteering_learning_rate}")
-                    print(
-                        f"   • K-Steering classifier epochs: {ksteering_classifier_epochs}"
-                    )
+                    print(f"   • K-Steering classifier epochs: {ksteering_classifier_epochs}")
                     print(f"   • K-Steering target labels: {target_labels}")
                     print(f"   • K-Steering avoid labels: {avoid_labels}")
                     print(f"   • K-Steering alpha: {ksteering_alpha}")
@@ -2276,18 +2065,14 @@ def run_task_pipeline(
                 if verbose:
                     print(f"   • Token steering enabled: {token_steering_strategy}")
                     print(f"   • Token decay rate: {token_decay_rate}")
-                    print(
-                        f"   • Token strength range: {token_min_strength} - {token_max_strength}"
-                    )
+                    print(f"   • Token strength range: {token_min_strength} - {token_max_strength}")
                     print(f"   • Apply to prompt: {token_apply_to_prompt}")
                     if token_apply_to_prompt:
-                        print(
-                            f"   • Prompt strength multiplier: {token_prompt_strength_multiplier}"
-                        )
+                        print(f"   • Prompt strength multiplier: {token_prompt_strength_multiplier}")
 
                 from .core.steering_methods.token_steered import (
-                    TokenSteeringStrategy,
                     TokenSteeringConfig,
+                    TokenSteeringStrategy,
                     TokenSteeringWrapper,
                 )
 
@@ -2304,9 +2089,7 @@ def run_task_pipeline(
                     "custom": TokenSteeringStrategy.CUSTOM,
                 }
 
-                strategy = strategy_mapping.get(
-                    token_steering_strategy, TokenSteeringStrategy.SECOND_TO_LAST
-                )
+                strategy = strategy_mapping.get(token_steering_strategy, TokenSteeringStrategy.SECOND_TO_LAST)
 
                 # Create token steering configuration
                 token_config = TokenSteeringConfig(
@@ -2322,9 +2105,7 @@ def run_task_pipeline(
                 steering_obj = TokenSteeringWrapper(steering_obj, token_config)
 
                 if verbose:
-                    print(
-                        f"   • Wrapped {steering_method} with token steering: {steering_obj.name}"
-                    )
+                    print(f"   • Wrapped {steering_method} with token steering: {steering_obj.name}")
 
             # Train steering method to compute steering vector
             try:
@@ -2352,38 +2133,23 @@ def run_task_pipeline(
                         if "final_norm" in norm_info:
                             print(f"   • Final norm: {norm_info['final_norm']:.4f}")
                         if "scaling_factor" in norm_info:
-                            print(
-                                f"   • Scaling factor: {norm_info['scaling_factor']:.4f}"
-                            )
+                            print(f"   • Scaling factor: {norm_info['scaling_factor']:.4f}")
 
                     # Show method-specific stats
-                    if (
-                        steering_method == "HPR"
-                        and "householder_matrix_norm" in training_stats
-                    ):
-                        print(
-                            f"   • Householder matrix norm: {training_stats['householder_matrix_norm']:.4f}"
-                        )
+                    if steering_method == "HPR" and "householder_matrix_norm" in training_stats:
+                        print(f"   • Householder matrix norm: {training_stats['householder_matrix_norm']:.4f}")
                     elif steering_method == "BiPO" and "final_loss" in training_stats:
-                        print(
-                            f"   • Final training loss: {training_stats['final_loss']:.6f}"
-                        )
-                        print(
-                            f"   • Epochs trained: {training_stats['num_epochs_trained']}"
-                        )
+                        print(f"   • Final training loss: {training_stats['final_loss']:.6f}")
+                        print(f"   • Epochs trained: {training_stats['num_epochs_trained']}")
 
                 # Save steering vector if requested
                 if save_steering_vector:
                     success = steering_obj.save_steering_vector(save_steering_vector)
                     if verbose:
                         if success:
-                            print(
-                                f"   • Saved steering vector to: {save_steering_vector}"
-                            )
+                            print(f"   • Saved steering vector to: {save_steering_vector}")
                         else:
-                            print(
-                                f"   • Failed to save steering vector to: {save_steering_vector}"
-                            )
+                            print(f"   • Failed to save steering vector to: {save_steering_vector}")
 
                 # Initialize nonsense detector if needed
                 nonsense_detector = None
@@ -2397,9 +2163,7 @@ def run_task_pipeline(
                         enable_dictionary_check=not disable_dictionary_check,
                     )
                     if verbose:
-                        print(
-                            f"   • Nonsense detection enabled: action={nonsense_action}"
-                        )
+                        print(f"   • Nonsense detection enabled: action={nonsense_action}")
 
                 # TEST THE STEERING using lm-harness evaluation (same as baseline)
                 if verbose:
@@ -2431,12 +2195,8 @@ def run_task_pipeline(
                                 formatted_question = raw_question
 
                             # Extract correct answer
-                            correct_answers = doc.get("mc1_targets", {}).get(
-                                "choices", []
-                            )
-                            correct_labels = doc.get("mc1_targets", {}).get(
-                                "labels", []
-                            )
+                            correct_answers = doc.get("mc1_targets", {}).get("choices", [])
+                            correct_labels = doc.get("mc1_targets", {}).get("labels", [])
 
                             # Find the correct answer
                             correct_answer = None
@@ -2488,35 +2248,25 @@ def run_task_pipeline(
 
                 if verbose:
                     print(f"✅ {steering_method} steering evaluation completed")
-                    print(
-                        f"   📊 Accuracy: {steering_evaluation_results.get('accuracy', 'N/A')}"
-                    )
+                    print(f"   📊 Accuracy: {steering_evaluation_results.get('accuracy', 'N/A')}")
                     print(f"   📊 Test samples: {len(test_qa_pairs)}")
 
                 # No need to generate sample responses since we're using lm-harness evaluation
                 steered_responses = []
 
                 # Generate performance report before returning
-                if (
-                    enable_memory_tracking
-                    or enable_latency_tracking
-                    or show_timing_summary
-                ):
+                if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
                     if verbose:
                         print("\n🔍 Generating performance report...")
                     print("\n📊 PERFORMANCE REPORT:")
-                    print(f"{'='*50}")
+                    print(f"{'=' * 50}")
 
                     if memory_tracker:
                         if verbose:
                             print("   • Stopping memory monitoring...")
                         memory_stats = memory_tracker.stop_monitoring()
                         print("💾 Memory Usage:")
-                        print(
-                            memory_tracker.format_stats(
-                                memory_stats, detailed_performance_report
-                            )
-                        )
+                        print(memory_tracker.format_stats(memory_stats, detailed_performance_report))
 
                     if latency_tracker or show_timing_summary:
                         if verbose:
@@ -2535,11 +2285,9 @@ def run_task_pipeline(
                     if export_performance_csv:
                         if latency_tracker:
                             latency_tracker.export_csv(export_performance_csv)
-                            print(
-                                f"\n📄 Performance data exported to: {export_performance_csv}"
-                            )
+                            print(f"\n📄 Performance data exported to: {export_performance_csv}")
 
-                    print(f"{'='*50}")
+                    print(f"{'=' * 50}")
 
                 # Return steering mode results with proper evaluation data
                 return {
@@ -2558,9 +2306,7 @@ def run_task_pipeline(
                 }
 
             except Exception as e:
-                error_msg = (
-                    f"{steering_method} steering vector computation failed: {str(e)}"
-                )
+                error_msg = f"{steering_method} steering vector computation failed: {e!s}"
                 if verbose:
                     print(f"\n❌ STEERING ERROR: {error_msg}")
                     print(f"   • Training pairs: {len(pair_set)}")
@@ -2568,27 +2314,19 @@ def run_task_pipeline(
                     print(f"   • Method: {steering_method}")
 
                 # Generate performance report before error return
-                if (
-                    enable_memory_tracking
-                    or enable_latency_tracking
-                    or show_timing_summary
-                ):
+                if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
                     try:
                         if verbose:
                             print("\n🔍 Generating performance report (error case)...")
                         print("\n📊 PERFORMANCE REPORT:")
-                        print(f"{'='*50}")
+                        print(f"{'=' * 50}")
 
                         if memory_tracker:
                             if verbose:
                                 print("   • Stopping memory monitoring...")
                             memory_stats = memory_tracker.stop_monitoring()
                             print("💾 Memory Usage:")
-                            print(
-                                memory_tracker.format_stats(
-                                    memory_stats, detailed_performance_report
-                                )
-                            )
+                            print(memory_tracker.format_stats(memory_stats, detailed_performance_report))
 
                         if latency_tracker or show_timing_summary:
                             if verbose:
@@ -2602,23 +2340,17 @@ def run_task_pipeline(
                                 from .core.tracking import format_timing_summary
 
                                 print("\n⏱️ Timing Summary:")
-                                print(
-                                    format_timing_summary(detailed_performance_report)
-                                )
+                                print(format_timing_summary(detailed_performance_report))
 
                         if export_performance_csv:
                             if latency_tracker:
                                 latency_tracker.export_csv(export_performance_csv)
-                                print(
-                                    f"\n📄 Performance data exported to: {export_performance_csv}"
-                                )
+                                print(f"\n📄 Performance data exported to: {export_performance_csv}")
 
-                            print(f"{'='*50}")
+                            print(f"{'=' * 50}")
                     except Exception as perf_error:
                         if verbose:
-                            print(
-                                f"   • Performance report generation failed: {perf_error}"
-                            )
+                            print(f"   • Performance report generation failed: {perf_error}")
 
                 return {
                     "task_name": task_name,
@@ -2641,9 +2373,7 @@ def run_task_pipeline(
 
         # Check if we should try to load pre-trained classifiers automatically
         loaded_classifiers = False
-        if (
-            not load_classifier and not train_only
-        ):  # Only auto-load if not explicitly loading or training
+        if not load_classifier and not train_only:  # Only auto-load if not explicitly loading or training
             # Try to load classifiers from the standard optimization directory
             safe_model_name = model_name.replace("/", "_").replace(":", "_")
             auto_load_dir = f"./optimized_classifiers/{safe_model_name}"
@@ -2663,9 +2393,7 @@ def run_task_pipeline(
 
             if classifier_exists:
                 if verbose:
-                    print(
-                        "\n📦 Found pre-trained classifiers, loading automatically..."
-                    )
+                    print("\n📦 Found pre-trained classifiers, loading automatically...")
                     print(f"   • Loading from: {auto_load_path}")
 
                 load_classifier = auto_load_path
@@ -2682,9 +2410,7 @@ def run_task_pipeline(
             try:
                 if is_multi_layer:
                     # Load multiple classifiers
-                    classifiers_data = ModelPersistence.load_multi_layer_classifiers(
-                        load_classifier, layers
-                    )
+                    classifiers_data = ModelPersistence.load_multi_layer_classifiers(load_classifier, layers)
                     for layer_idx, (classifier, metadata) in classifiers_data.items():
                         steering_type = (
                             SteeringType.LOGISTIC
@@ -2712,9 +2438,7 @@ def run_task_pipeline(
                             )
                 else:
                     # Load single classifier
-                    classifier, metadata = ModelPersistence.load_classifier(
-                        load_classifier, layers[0]
-                    )
+                    classifier, metadata = ModelPersistence.load_classifier(load_classifier, layers[0])
                     steering_type = (
                         SteeringType.LOGISTIC
                         if metadata.get("classifier_type", "logistic") == "logistic"
@@ -2751,11 +2475,7 @@ def run_task_pipeline(
                 layer_training_results = {}
 
         # AUTO-USE CONTROL VECTOR: If we have a control vector and steering is not explicitly disabled, set it up
-        if (
-            control_vector_info
-            and control_vector_info.get("loaded")
-            and not (steering_mode and load_steering_vector)
-        ):
+        if control_vector_info and control_vector_info.get("loaded") and not (steering_mode and load_steering_vector):
             try:
                 from .core.steering_methods.control_vector_steering import (
                     ControlVectorSteering,
@@ -2780,9 +2500,7 @@ def run_task_pipeline(
                     }
 
                     if verbose:
-                        print(
-                            f"\n🎮 Using auto-loaded control vector for layer {cv_layer}"
-                        )
+                        print(f"\n🎮 Using auto-loaded control vector for layer {cv_layer}")
                         print("   • Vector will be applied during generation")
                         print("   • Use --skip-steering to disable")
 
@@ -2818,9 +2536,7 @@ def run_task_pipeline(
                     positive_full = f"{pair.prompt}{pair.positive_response}"
                     negative_full = f"{pair.prompt}{pair.negative_response}"
 
-                    layer_phrase_pairs.append(
-                        {"harmful": negative_full, "harmless": positive_full}
-                    )
+                    layer_phrase_pairs.append({"harmful": negative_full, "harmless": positive_full})
 
                 layer_pair_set = ContrastivePairSet.from_phrase_pairs(
                     name=f"{task_name}_layer_{layer_idx}",
@@ -2835,45 +2551,31 @@ def run_task_pipeline(
                             hasattr(layer_pair_set.pairs[i], "positive_response")
                             and layer_pair_set.pairs[i].positive_response
                         ):
-                            layer_pair_set.pairs[i].positive_response.activations = (
-                                processed_pair.positive_activations
-                            )
+                            layer_pair_set.pairs[i].positive_response.activations = processed_pair.positive_activations
                         if (
                             hasattr(layer_pair_set.pairs[i], "negative_response")
                             and layer_pair_set.pairs[i].negative_response
                         ):
-                            layer_pair_set.pairs[i].negative_response.activations = (
-                                processed_pair.negative_activations
-                            )
+                            layer_pair_set.pairs[i].negative_response.activations = processed_pair.negative_activations
 
                 # Train classifier for this layer
-                steering_type = (
-                    SteeringType.LOGISTIC
-                    if final_classifier_type == "logistic"
-                    else SteeringType.MLP
-                )
+                steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
                 layer_steering_method = SteeringMethod(
                     method_type=steering_type, threshold=final_threshold, device=device
                 )
 
                 try:
-                    layer_training_results[layer_idx] = layer_steering_method.train(
-                        layer_pair_set
-                    )
+                    layer_training_results[layer_idx] = layer_steering_method.train(layer_pair_set)
                     steering_methods[layer_idx] = layer_steering_method
 
                     if verbose:
-                        accuracy = layer_training_results[layer_idx].get(
-                            "accuracy", "N/A"
-                        )
+                        accuracy = layer_training_results[layer_idx].get("accuracy", "N/A")
                         f1_score = layer_training_results[layer_idx].get("f1", "N/A")
-                        print(
-                            f"      ✅ Layer {layer_idx}: Accuracy={accuracy:.2%}, F1={f1_score:.3f}"
-                        )
+                        print(f"      ✅ Layer {layer_idx}: Accuracy={accuracy:.2%}, F1={f1_score:.3f}")
 
                 except Exception as e:
                     if verbose:
-                        print(f"      ❌ Layer {layer_idx}: Training failed - {str(e)}")
+                        print(f"      ❌ Layer {layer_idx}: Training failed - {e!s}")
                     layer_training_results[layer_idx] = {"error": str(e)}
 
             # Use the first successfully trained layer as the primary one for compatibility
@@ -2883,9 +2585,7 @@ def run_task_pipeline(
                 training_results = layer_training_results[primary_layer]
             else:
                 # If primary layer failed, try to find any successful layer
-                successful_layers = [
-                    layer for layer in layers if layer in steering_methods
-                ]
+                successful_layers = [layer for layer in layers if layer in steering_methods]
                 if successful_layers:
                     primary_layer = successful_layers[0]
                     steering_method = steering_methods[primary_layer]
@@ -2912,14 +2612,8 @@ def run_task_pipeline(
                 print(f"   • Threshold: {final_threshold}")
                 print(f"   • Training pairs: {len(pair_set)}")
 
-            steering_type = (
-                SteeringType.LOGISTIC
-                if final_classifier_type == "logistic"
-                else SteeringType.MLP
-            )
-            steering_method = SteeringMethod(
-                method_type=steering_type, threshold=final_threshold, device=device
-            )
+            steering_type = SteeringType.LOGISTIC if final_classifier_type == "logistic" else SteeringType.MLP
+            steering_method = SteeringMethod(method_type=steering_type, threshold=final_threshold, device=device)
 
             try:
                 training_results = steering_method.train(pair_set)
@@ -2928,19 +2622,15 @@ def run_task_pipeline(
 
                 if verbose:
                     print("✅ Training completed!")
-                    print(
-                        f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}"
-                    )
+                    print(f"   • Accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
                     print(f"   • F1 Score: {training_results.get('f1', 'N/A'):.3f}")
 
             except ZeroDivisionError as e:
-                error_msg = f"Classifier training failed due to insufficient or imbalanced data: {str(e)}"
+                error_msg = f"Classifier training failed due to insufficient or imbalanced data: {e!s}"
                 if verbose:
                     print(f"\n❌ TRAINING ERROR: {error_msg}")
                     print("   • This often happens with very small datasets")
-                    print(
-                        "   • Try increasing the dataset size or using --limit with a higher value"
-                    )
+                    print("   • Try increasing the dataset size or using --limit with a higher value")
                     print(f"   • Current training samples: {len(pair_set)}")
 
                 return {
@@ -2953,7 +2643,7 @@ def run_task_pipeline(
                 }
 
             except Exception as e:
-                error_msg = f"Classifier training failed: {str(e)}"
+                error_msg = f"Classifier training failed: {e!s}"
                 if verbose:
                     print(f"\n❌ TRAINING ERROR: {error_msg}")
                     print(f"   • Training samples: {len(pair_set)}")
@@ -2972,10 +2662,9 @@ def run_task_pipeline(
             if verbose:
                 print("\n✅ Using pre-loaded classifiers (skipped training)")
             # Ensure we have the primary steering method and training results set
-            if is_multi_layer and layers[0] in steering_methods:
-                steering_method = steering_methods[layers[0]]
-                training_results = layer_training_results[layers[0]]
-            elif not is_multi_layer and layers[0] in steering_methods:
+            if (is_multi_layer and layers[0] in steering_methods) or (
+                not is_multi_layer and layers[0] in steering_methods
+            ):
                 steering_method = steering_methods[layers[0]]
                 training_results = layer_training_results[layers[0]]
 
@@ -2993,9 +2682,7 @@ def run_task_pipeline(
             else:
                 # Default path for train-only mode
                 safe_model_name = model_name.replace("/", "_").replace("-", "_")
-                save_path = os.path.join(
-                    classifier_dir, f"{task_name}_{safe_model_name}_classifier"
-                )
+                save_path = os.path.join(classifier_dir, f"{task_name}_{safe_model_name}_classifier")
 
             if verbose:
                 print("\n💾 SAVING TRAINED CLASSIFIERS:")
@@ -3021,9 +2708,7 @@ def run_task_pipeline(
                                 detection_threshold=final_threshold,
                             )
 
-                            path = ModelPersistence.save_classifier(
-                                classifier, layer_idx, save_path, metadata
-                            )
+                            path = ModelPersistence.save_classifier(classifier, layer_idx, save_path, metadata)
                             saved_classifier_paths.append(path)
 
                             if verbose:
@@ -3042,9 +2727,7 @@ def run_task_pipeline(
                         detection_threshold=final_threshold,
                     )
 
-                    path = ModelPersistence.save_classifier(
-                        classifier, layers[0], save_path, metadata
-                    )
+                    path = ModelPersistence.save_classifier(classifier, layers[0], save_path, metadata)
                     saved_classifier_paths.append(path)
 
                     if verbose:
@@ -3058,9 +2741,7 @@ def run_task_pipeline(
         if train_only:
             if verbose:
                 print("\n🎓 TRAINING-ONLY MODE COMPLETED!")
-                print(
-                    f"   • Trained classifiers for layers: {list(steering_methods.keys())}"
-                )
+                print(f"   • Trained classifiers for layers: {list(steering_methods.keys())}")
                 if saved_classifier_paths:
                     print(f"   • Saved {len(saved_classifier_paths)} classifier files")
                 print("   • Skipping inference phase")
@@ -3071,11 +2752,7 @@ def run_task_pipeline(
                 "mode": "train_only",
                 "layers": layers,
                 "trained_layers": list(steering_methods.keys()),
-                "training_results": (
-                    layer_training_results
-                    if is_multi_layer
-                    else {layers[0]: training_results}
-                ),
+                "training_results": (layer_training_results if is_multi_layer else {layers[0]: training_results}),
                 "saved_classifier_paths": saved_classifier_paths,
                 "classifier_type": final_classifier_type,
                 "training_samples": len(contrastive_pairs),
@@ -3096,7 +2773,7 @@ def run_task_pipeline(
                         os.path.dirname(__file__),
                         "parameters/benchmarks/benchmark_evaluation_methods.json",
                     )
-                    with open(eval_methods_path, "r") as f:
+                    with open(eval_methods_path) as f:
                         benchmark_methods = json.load(f)
                         return benchmark_methods.get(task_name, "text-generation")
                 except Exception as e:
@@ -3108,9 +2785,7 @@ def run_task_pipeline(
 
             if verbose:
                 print("\n🔍 LM-EVAL-HARNESS GROUND TRUTH EVALUATION:")
-                print(
-                    "   • Using lm-eval-harness tasks for direct classifier evaluation"
-                )
+                print("   • Using lm-eval-harness tasks for direct classifier evaluation")
                 print(f"   • Task: {task_name}")
                 print(f"   • Evaluation method: {evaluation_method}")
                 print(f"   • Samples: {len(test_qa_pairs_source)}")
@@ -3118,18 +2793,10 @@ def run_task_pipeline(
             # Get the trained classifier for evaluation
             if len(layers) > 1:
                 # Multi-layer mode - use first layer's classifier
-                classifier = (
-                    steering_methods[layers[0]].classifier
-                    if layers[0] in steering_methods
-                    else None
-                )
+                classifier = steering_methods[layers[0]].classifier if layers[0] in steering_methods else None
             else:
                 # Single-layer mode
-                classifier = (
-                    steering_method.classifier
-                    if hasattr(steering_method, "classifier")
-                    else None
-                )
+                classifier = steering_method.classifier if hasattr(steering_method, "classifier") else None
 
             if classifier is None:
                 if verbose:
@@ -3146,9 +2813,7 @@ def run_task_pipeline(
                 # Use LMEvalHarnessGroundTruth for proper evaluation - pass token_aggregation
                 # FIXED: Use actual task name for both constructor and evaluation
                 actual_eval_task_name = get_actual_task_name(task_name)
-                lm_eval_ground_truth = LMEvalHarnessGroundTruth(
-                    actual_eval_task_name, evaluation_method, model=model
-                )
+                lm_eval_ground_truth = LMEvalHarnessGroundTruth(actual_eval_task_name, evaluation_method, model=model)
                 lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
                     classifier,
                     actual_eval_task_name,
@@ -3178,9 +2843,7 @@ def run_task_pipeline(
 This indicates the {evaluation_method} evaluation method is not working properly for {task_name}.
 The task will be skipped in optimization."""
                         print(error_msg)
-                        logger.warning(
-                            f"Evaluation failed for {task_name}: {error_msg}"
-                        )
+                        logger.warning(f"Evaluation failed for {task_name}: {error_msg}")
 
                         # Return error result that will be caught by optimizer
                         return {
@@ -3215,10 +2878,8 @@ The task will be skipped in optimization."""
             total_classifications = lm_eval_metrics.get("total_samples", 0)
 
             if verbose:
-                print(
-                    f"\n🎉 LM-EVAL-HARNESS EVALUATION COMPLETED FOR {task_name.upper()}!"
-                )
-                print(f"{'='*80}")
+                print(f"\n🎉 LM-EVAL-HARNESS EVALUATION COMPLETED FOR {task_name.upper()}!")
+                print(f"{'=' * 80}")
                 print("📊 FINAL RESULTS:")
                 print(f"   • Training samples: {len(contrastive_pairs)}")
                 print(f"   • Test samples: {len(test_qa_pairs_source)}")
@@ -3234,15 +2895,13 @@ The task will be skipped in optimization."""
                 lm_eval_metrics = lm_eval_results.get("lm_eval_metrics", {})
                 classifier_accuracy = lm_eval_metrics.get("accuracy", "N/A")
                 if isinstance(classifier_accuracy, (int, float)):
-                    print(
-                        f"   • Classifier evaluation accuracy: {classifier_accuracy:.2%}"
-                    )
+                    print(f"   • Classifier evaluation accuracy: {classifier_accuracy:.2%}")
                 else:
                     print(f"   • Classifier evaluation accuracy: {classifier_accuracy}")
 
                 print(f"   • Correct predictions: {correct_classifications}")
                 print(f"   • Total evaluated: {total_classifications}")
-                print(f"{'='*80}")
+                print(f"{'=' * 80}")
 
             results = {
                 "task_name": task_name,
@@ -3273,7 +2932,7 @@ The task will be skipped in optimization."""
                 print("\n🧬 SYNTHETIC MODE - SKIPPING EVALUATION")
                 print("   • Synthetic pairs are for training only")
                 print("   • Use the trained classifier for steering or detection")
-            
+
             # Return training results only
             return {
                 "task_name": task_name,
@@ -3282,17 +2941,17 @@ The task will be skipped in optimization."""
                 "mode": "synthetic",
                 "training_results": training_results,
                 "num_synthetic_pairs": len(synthetic_contrastive_pairs.pairs) if synthetic_contrastive_pairs else 0,
-                "synthetic_trait": getattr(synthetic_contrastive_pairs, 'trait_description', 'unknown'),
+                "synthetic_trait": getattr(synthetic_contrastive_pairs, "trait_description", "unknown"),
             }
-        
+
         # Special handling for cross-benchmark evaluation
-        elif cross_benchmark_mode and eval_contrastive_pairs:
+        if cross_benchmark_mode and eval_contrastive_pairs:
             if verbose:
                 print("\n🔄 CROSS-BENCHMARK EVALUATION:")
                 print(f"   • Evaluating classifier trained on {train_contrastive_pairs.name}")
                 print(f"   • Testing on {eval_contrastive_pairs.name}")
                 print(f"   • Evaluation samples: {len(eval_contrastive_pairs.pairs)}")
-            
+
             # Extract activations for evaluation data
             eval_pairs_with_activations = []
             for pair in eval_contrastive_pairs.pairs:
@@ -3300,34 +2959,34 @@ The task will be skipped in optimization."""
                 eval_pair = ContrastivePair(
                     prompt=pair.prompt,
                     positive_response=pair.positive_response,
-                    negative_response=pair.negative_response
+                    negative_response=pair.negative_response,
                 )
                 eval_pairs_with_activations.append(eval_pair)
-            
+
             # Extract activations for evaluation pairs
             if verbose:
                 print("\n🔬 Extracting activations for evaluation data...")
-            
+
             eval_processed_pairs = collector.collect_activations_batch(
                 pairs=eval_pairs_with_activations,
                 layer_index=layers[0],
                 device=device,
                 token_targeting_strategy=targeting_strategy,
             )
-            
+
             # Evaluate the classifier on the evaluation data
             correct_predictions = 0
             total_predictions = 0
-            
+
             for i, eval_pair in enumerate(eval_processed_pairs):
                 try:
                     # Get positive and negative activations
                     pos_activation = eval_pair.positive_activations
                     neg_activation = eval_pair.negative_activations
-                    
+
                     if pos_activation is not None and neg_activation is not None:
                         # Handle different types of steering methods
-                        if hasattr(steering_method, 'is_vector_based') and steering_method.is_vector_based:
+                        if hasattr(steering_method, "is_vector_based") and steering_method.is_vector_based:
                             # Vector-based steering (CAA, etc.)
                             # For vector-based methods, we compare the dot product with the steering vector
                             steering_vector = steering_method.get_steering_vector()
@@ -3337,73 +2996,73 @@ The task will be skipped in optimization."""
                                     pos_activation = torch.tensor(pos_activation)
                                 if not isinstance(neg_activation, torch.Tensor):
                                     neg_activation = torch.tensor(neg_activation)
-                                
+
                                 # Compute dot products with steering vector
                                 pos_score = torch.dot(pos_activation.flatten(), steering_vector.flatten()).item()
                                 neg_score = torch.dot(neg_activation.flatten(), steering_vector.flatten()).item()
-                                
+
                                 # For CAA, negative scores indicate harmful content
                                 # So we want positive to have lower (more negative) score than negative
                                 if pos_score < neg_score:
                                     correct_predictions += 1
                                 total_predictions += 1
-                                
+
                                 if verbose and i < 3:  # Show first 3 examples
-                                    print(f"\n   Example {i+1}:")
+                                    print(f"\n   Example {i + 1}:")
                                     print(f"   • Positive score: {pos_score:.3f}")
                                     print(f"   • Negative score: {neg_score:.3f}")
                                     print(f"   • Prediction: {'✅ Correct' if pos_score < neg_score else '❌ Wrong'}")
-                        
-                        elif hasattr(steering_method, 'classifier') and steering_method.classifier is not None:
+
+                        elif hasattr(steering_method, "classifier") and steering_method.classifier is not None:
                             # Classifier-based steering (logistic, MLP)
                             # Ensure activations are in the right format
-                            if hasattr(pos_activation, 'cpu'):
+                            if hasattr(pos_activation, "cpu"):
                                 pos_feat = pos_activation.cpu().numpy()
                                 neg_feat = neg_activation.cpu().numpy()
                             else:
                                 pos_feat = pos_activation
                                 neg_feat = neg_activation
-                            
+
                             # Reshape if needed - ensure 2D array for sklearn
-                            if hasattr(pos_feat, 'ndim'):
+                            if hasattr(pos_feat, "ndim"):
                                 if pos_feat.ndim == 1:
                                     pos_feat = pos_feat.reshape(1, -1)
-                            elif hasattr(pos_feat, 'shape'):
+                            elif hasattr(pos_feat, "shape"):
                                 if len(pos_feat.shape) == 1:
                                     pos_feat = pos_feat.reshape(1, -1)
-                            
-                            if hasattr(neg_feat, 'ndim'):
+
+                            if hasattr(neg_feat, "ndim"):
                                 if neg_feat.ndim == 1:
                                     neg_feat = neg_feat.reshape(1, -1)
-                            elif hasattr(neg_feat, 'shape'):
+                            elif hasattr(neg_feat, "shape"):
                                 if len(neg_feat.shape) == 1:
                                     neg_feat = neg_feat.reshape(1, -1)
-                            
+
                             # Debug: print shapes before prediction
                             if verbose and i == 0:
                                 print(f"      Debug - pos_feat shape: {pos_feat.shape}")
                                 print(f"      Debug - neg_feat shape: {neg_feat.shape}")
                                 print(f"      Debug - pos_feat type: {type(pos_feat)}")
-                            
+
                             # Get predictions
                             pos_proba = steering_method.classifier.predict_proba(pos_feat)
                             neg_proba = steering_method.classifier.predict_proba(neg_feat)
-                            
+
                             if verbose and i == 0:
                                 print(f"      Debug - pos_proba: {pos_proba}")
                                 print(f"      Debug - neg_proba: {neg_proba}")
                                 print(f"      Debug - pos_proba shape: {pos_proba.shape}")
-                            
+
                             pos_score = pos_proba[0][1]
                             neg_score = neg_proba[0][1]
-                            
+
                             # Correct if positive has higher score than negative
                             if pos_score > neg_score:
                                 correct_predictions += 1
                             total_predictions += 1
-                            
+
                             if verbose and i < 3:  # Show first 3 examples
-                                print(f"\n   Example {i+1}:")
+                                print(f"\n   Example {i + 1}:")
                                 print(f"   • Positive score: {pos_score:.3f}")
                                 print(f"   • Negative score: {neg_score:.3f}")
                                 print(f"   • Prediction: {'✅ Correct' if pos_score > neg_score else '❌ Wrong'}")
@@ -3414,16 +3073,16 @@ The task will be skipped in optimization."""
                         print(f"      Neg activation type: {type(neg_activation)}")
                         if pos_activation is not None:
                             print(f"      Pos shape: {getattr(pos_activation, 'shape', 'no shape')}")
-            
+
             # Calculate accuracy
             accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0.0
-            
+
             if verbose:
-                print(f"\n📊 CROSS-BENCHMARK EVALUATION RESULTS:")
+                print("\n📊 CROSS-BENCHMARK EVALUATION RESULTS:")
                 print(f"   • Accuracy: {accuracy:.2%} ({correct_predictions}/{total_predictions})")
                 print(f"   • Training domain: {train_contrastive_pairs.name}")
                 print(f"   • Evaluation domain: {eval_contrastive_pairs.name}")
-            
+
             # Return results
             return {
                 "task_name": task_name,
@@ -3493,12 +3152,10 @@ The task will be skipped in optimization."""
                     continue
 
             if verbose:
-                print(
-                    f"   • Successfully extracted {len(test_qa_pairs)} test questions"
-                )
+                print(f"   • Successfully extracted {len(test_qa_pairs)} test questions")
                 print("\n🔍 Test Questions:")
                 for i, qa_pair in enumerate(test_qa_pairs):
-                    print(f"\n   📋 Question {i+1}:")
+                    print(f"\n   📋 Question {i + 1}:")
                     print(
                         f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}"
                     )
@@ -3517,15 +3174,11 @@ The task will be skipped in optimization."""
                 # Use cached activations instead of generating new responses
                 if verbose:
                     print("\n🔄 PROCESSING CACHED ACTIVATIONS:")
-                    print(
-                        f"   • Processing {len(locals().get('cached_layer_activations', []))} cached responses..."
-                    )
+                    print(f"   • Processing {len(locals().get('cached_layer_activations', []))} cached responses...")
 
-                for i, cached_item in enumerate(
-                    locals().get("cached_layer_activations", [])
-                ):
+                for i, cached_item in enumerate(locals().get("cached_layer_activations", [])):
                     if verbose and not optimize:
-                        print(f"\n   🎯 Processing cached response {i+1}:")
+                        print(f"\n   🎯 Processing cached response {i + 1}:")
                         print(
                             f"      📝 Question: {cached_item['question'][:100]}{'...' if len(cached_item['question']) > 100 else ''}"
                         )
@@ -3539,17 +3192,11 @@ The task will be skipped in optimization."""
                         # Multi-layer mode - get classification from the appropriate layer
                         if layers[0] in steering_methods:
                             current_steering_method = steering_methods[layers[0]]
-                            classification_result = (
-                                current_steering_method.classify_activation(activations)
-                            )
+                            classification_result = current_steering_method.classify_activation(activations)
                             classification = (
-                                "HALLUCINATION"
-                                if classification_result.get("is_harmful", False)
-                                else "TRUTHFUL"
+                                "HALLUCINATION" if classification_result.get("is_harmful", False) else "TRUTHFUL"
                             )
-                            token_scores = [
-                                classification_result.get("score", 0.5)
-                            ]  # Single score for cached
+                            token_scores = [classification_result.get("score", 0.5)]  # Single score for cached
                             aggregated_score = classification_result.get("score", 0.5)
                         else:
                             classification = "UNKNOWN"
@@ -3557,17 +3204,11 @@ The task will be skipped in optimization."""
                             aggregated_score = 0.5
                     else:
                         # Single-layer mode
-                        classification_result = steering_method.classify_activation(
-                            activations
-                        )
+                        classification_result = steering_method.classify_activation(activations)
                         classification = (
-                            "HALLUCINATION"
-                            if classification_result.get("is_harmful", False)
-                            else "TRUTHFUL"
+                            "HALLUCINATION" if classification_result.get("is_harmful", False) else "TRUTHFUL"
                         )
-                        token_scores = [
-                            classification_result.get("score", 0.5)
-                        ]  # Single score for cached
+                        token_scores = [classification_result.get("score", 0.5)]  # Single score for cached
                         aggregated_score = classification_result.get("score", 0.5)
 
                     # Create a qa_pair for ground truth evaluation
@@ -3579,9 +3220,7 @@ The task will be skipped in optimization."""
                     # Evaluate the cached response using the ground truth evaluator
                     try:
                         # Create ground truth evaluator
-                        evaluator = GroundTruthEvaluator.from_string(
-                            ground_truth_method
-                        )
+                        evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
 
                         # Get user label if available
                         user_label = None
@@ -3623,12 +3262,8 @@ The task will be skipped in optimization."""
 
                         if verbose and not optimize:
                             print(f"      🤖 Cached Response: {response}")
-                            print(
-                                f"      📊 Classification: {classification} (score: {aggregated_score:.3f})"
-                            )
-                            print(
-                                f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']})"
-                            )
+                            print(f"      📊 Classification: {classification} (score: {aggregated_score:.3f})")
+                            print(f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']})")
                             if classification_correct is not None:
                                 print(
                                     f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}"
@@ -3646,7 +3281,7 @@ The task will be skipped in optimization."""
                                 "ground_truth": "UNKNOWN",
                                 "ground_truth_method": "error",
                                 "ground_truth_confidence": 0.0,
-                                "ground_truth_details": f"Error during evaluation: {str(e)}",
+                                "ground_truth_details": f"Error during evaluation: {e!s}",
                                 "classification_correct": None,
                                 "was_handled": False,
                                 "source": "cached_activations",
@@ -3656,10 +3291,8 @@ The task will be skipped in optimization."""
             else:
                 # Generate new responses (original logic)
                 for i, qa_pair in enumerate(test_qa_pairs):
-                    if (
-                        verbose and not optimize
-                    ):  # Only show detailed progress when not optimizing
-                        print(f"\n   🎯 Generating response {i+1}:")
+                    if verbose and not optimize:  # Only show detailed progress when not optimizing
+                        print(f"\n   🎯 Generating response {i + 1}:")
                         print(
                             f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}"
                         )
@@ -3671,25 +3304,21 @@ The task will be skipped in optimization."""
                     # Generate response with token-level scoring and detection handling
                     if len(layers) > 1:
                         # Multi-layer mode: use multi-layer generation function
-                        response, layer_results, was_handled = (
-                            generate_with_multi_layer_classification_and_handling(
-                                model,
-                                simple_prompt,
-                                layers,
-                                max_new_tokens,
-                                steering_methods,
-                                token_aggregation,
-                                detection_threshold,
-                                verbose and not optimize,
-                                detection_handler,
-                            )
+                        response, layer_results, was_handled = generate_with_multi_layer_classification_and_handling(
+                            model,
+                            simple_prompt,
+                            layers,
+                            max_new_tokens,
+                            steering_methods,
+                            token_aggregation,
+                            detection_threshold,
+                            verbose and not optimize,
+                            detection_handler,
                         )
                         # For backward compatibility, use primary layer's results for main fields
                         primary_layer = layers[0]
                         token_scores = (
-                            layer_results[primary_layer]["token_scores"]
-                            if primary_layer in layer_results
-                            else []
+                            layer_results[primary_layer]["token_scores"] if primary_layer in layer_results else []
                         )
                         classification = (
                             layer_results[primary_layer]["classification"]
@@ -3697,75 +3326,54 @@ The task will be skipped in optimization."""
                             else "UNKNOWN"
                         )
                         aggregated_score = (
-                            layer_results[primary_layer]["aggregated_score"]
-                            if primary_layer in layer_results
-                            else 0.0
+                            layer_results[primary_layer]["aggregated_score"] if primary_layer in layer_results else 0.0
                         )
                     else:
                         # Single-layer mode: use original function
-                        response, token_scores, classification, was_handled = (
-                            generate_with_classification_and_handling(
-                                model,
-                                simple_prompt,
-                                layers[0],
-                                max_new_tokens,
-                                steering_method,
-                                token_aggregation,
-                                detection_threshold,
-                                verbose and not optimize,
-                                detection_handler,
-                            )
+                        response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                            model,
+                            simple_prompt,
+                            layers[0],
+                            max_new_tokens,
+                            steering_method,
+                            token_aggregation,
+                            detection_threshold,
+                            verbose and not optimize,
+                            detection_handler,
                         )
                         layer_results = None
                         aggregated_score = (
-                            aggregate_token_scores(token_scores, token_aggregation)
-                            if token_scores
-                            else 0.0
+                            aggregate_token_scores(token_scores, token_aggregation) if token_scores else 0.0
                         )
 
                         # Save activations if requested (extract from last generation)
-                        if (
-                            save_test_activations
-                            and locals().get("test_activation_cache") is not None
-                        ):
+                        if save_test_activations and locals().get("test_activation_cache") is not None:
                             try:
                                 # We need to extract activations from the last forward pass
                                 # This is a simplified version - ideally we'd modify the generation functions
                                 # to return activations as well
 
                                 # For now, we'll do a quick forward pass to extract activations
-                                model_inputs = model.tokenizer(
-                                    simple_prompt, return_tensors="pt", padding=True
-                                )
+                                model_inputs = model.tokenizer(simple_prompt, return_tensors="pt", padding=True)
                                 if hasattr(model, "device"):
-                                    model_inputs = {
-                                        k: v.to(model.device)
-                                        for k, v in model_inputs.items()
-                                    }
+                                    model_inputs = {k: v.to(model.device) for k, v in model_inputs.items()}
 
                                 with torch.no_grad():
-                                    outputs = model.model(
-                                        **model_inputs, output_hidden_states=True
-                                    )
+                                    outputs = model.model(**model_inputs, output_hidden_states=True)
 
                                     # Extract activations from the target layer
-                                    if (
-                                        outputs.hidden_states
-                                        and len(outputs.hidden_states) > layers[0]
-                                    ):
+                                    if outputs.hidden_states and len(outputs.hidden_states) > layers[0]:
                                         layer_activations = outputs.hidden_states[
                                             layers[0] + 1
                                         ]  # +1 because hidden_states[0] is embeddings
 
                                         # Create Activations object
                                         from .core.activations import (
-                                            Activations,
                                             ActivationAggregationMethod,
+                                            Activations,
                                         )
 
-                                        layer_obj = Layer(
-                                            index=layers[0], type="transformer"
-                                        )
+                                        layer_obj = Layer(index=layers[0], type="transformer")
                                         activations_obj = Activations(
                                             tensor=layer_activations,
                                             layer=layer_obj,
@@ -3773,9 +3381,7 @@ The task will be skipped in optimization."""
                                         )
 
                                         # Add to cache
-                                        locals().get(
-                                            "test_activation_cache"
-                                        ).add_activation(
+                                        locals().get("test_activation_cache").add_activation(
                                             question=qa_pair["question"],
                                             response=response,
                                             activations=activations_obj,
@@ -3789,9 +3395,7 @@ The task will be skipped in optimization."""
                     # Evaluate the generated response using the ground truth evaluator
                     try:
                         # Create ground truth evaluator
-                        evaluator = GroundTruthEvaluator.from_string(
-                            ground_truth_method
-                        )
+                        evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
 
                         # Get correct answer for comparison
                         correct_answers = qa_pair.get("correct_answer", "")
@@ -3802,23 +3406,15 @@ The task will be skipped in optimization."""
                             user_label = user_labels[i]
 
                         # Evaluate the response
-                        evaluation_result = evaluator.evaluate_response(
-                            response, correct_answers, user_label
-                        )
+                        evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
 
                         ground_truth = evaluation_result["ground_truth"]
 
                         # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
                         classification_correct = None
                         if ground_truth != "UNKNOWN":
-                            expected_classification = (
-                                "HALLUCINATION"
-                                if ground_truth == "HALLUCINATION"
-                                else "TRUTHFUL"
-                            )
-                            classification_correct = (
-                                classification == expected_classification
-                            )
+                            expected_classification = "HALLUCINATION" if ground_truth == "HALLUCINATION" else "TRUTHFUL"
+                            classification_correct = classification == expected_classification
 
                             if classification_correct:
                                 correct_classifications += 1
@@ -3845,16 +3441,10 @@ The task will be skipped in optimization."""
 
                         generated_responses.append(response_entry)
 
-                        if (
-                            verbose and not optimize
-                        ):  # Only show detailed output when not optimizing
+                        if verbose and not optimize:  # Only show detailed output when not optimizing
                             print(f"      🤖 Generated: {response}")
-                            print(
-                                f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores]}"
-                            )
-                            aggregated_score = aggregate_token_scores(
-                                token_scores, token_aggregation
-                            )
+                            print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores]}")
+                            aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
                             print(
                                 f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})"
                             )
@@ -3872,9 +3462,7 @@ The task will be skipped in optimization."""
                             print(f"      ✅ Expected: {qa_pair['correct_answer']}")
                             print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
                             if evaluation_result["details"]:
-                                print(
-                                    f"      📝 Details: {evaluation_result['details']}"
-                                )
+                                print(f"      📝 Details: {evaluation_result['details']}")
 
                     except Exception as e:
                         if verbose and not optimize:
@@ -3888,7 +3476,7 @@ The task will be skipped in optimization."""
                                 "ground_truth": "UNKNOWN",
                                 "ground_truth_method": "error",
                                 "ground_truth_confidence": 0.0,
-                                "ground_truth_details": f"Error during evaluation: {str(e)}",
+                                "ground_truth_details": f"Error during evaluation: {e!s}",
                                 "classification_correct": None,
                                 "was_handled": was_handled,
                             }
@@ -3935,9 +3523,7 @@ The task will be skipped in optimization."""
                 "num_test": len(test_qa_pairs),
                 "sample_responses": generated_responses,
                 "classification_accuracy": (
-                    correct_classifications / total_classifications
-                    if total_classifications > 0
-                    else None
+                    correct_classifications / total_classifications if total_classifications > 0 else None
                 ),
                 "correct_classifications": correct_classifications,
                 "total_classifications": total_classifications,
@@ -3945,13 +3531,11 @@ The task will be skipped in optimization."""
 
             if verbose:
                 print(f"\n🎉 OPTIMIZATION PIPELINE COMPLETED FOR {task_name.upper()}!")
-                print(f"{'='*80}")
+                print(f"{'=' * 80}")
                 print("📊 FINAL RESULTS:")
                 print(f"   • Training samples: {len(contrastive_pairs)}")
                 print(f"   • Test samples: {len(test_qa_pairs)}")
-                print(
-                    f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}"
-                )
+                print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
                 if total_classifications > 0:
                     print(
                         f"   • Test accuracy: {test_accuracy:.2%} ({correct_classifications}/{total_classifications})"
@@ -3966,477 +3550,412 @@ The task will be skipped in optimization."""
                     )
                 else:
                     print("   • Classification accuracy: Could not evaluate")
-                print(f"{'='*80}\n")
+                print(f"{'=' * 80}\n")
 
             logger.info(f"Optimization pipeline completed for {task_name}")
             return results
-        else:
-            # Only do pre-written validation when NOT optimizing
-            if verbose:
-                print("\n🧪 PREPARING TEST DATA:")
-                print(
-                    f"   • Loading {task_name} test data with correct/incorrect answers..."
-                )
+        # Only do pre-written validation when NOT optimizing
+        if verbose:
+            print("\n🧪 PREPARING TEST DATA:")
+            print(f"   • Loading {task_name} test data with correct/incorrect answers...")
 
-            # Get the actual test data with correct and incorrect answers
-            test_qa_pairs = []
-            for doc in test_qa_pairs_source:
-                try:
-                    if from_csv or from_json or group_task_qa_format:
-                        # For CSV/JSON/group tasks, doc is already a qa_pair dict
+        # Get the actual test data with correct and incorrect answers
+        test_qa_pairs = []
+        for doc in test_qa_pairs_source:
+            try:
+                if from_csv or from_json or group_task_qa_format:
+                    # For CSV/JSON/group tasks, doc is already a qa_pair dict
+                    test_qa_pairs.append(
+                        {
+                            "question": doc["question"],
+                            "formatted_question": doc["question"],
+                            "correct_answer": doc["correct_answer"],
+                            "incorrect_answer": doc["incorrect_answer"],
+                        }
+                    )
+                else:
+                    # For lm-harness tasks, extract from document
+                    raw_question = doc.get("question", str(doc))
+                    if hasattr(task_data, "doc_to_text"):
+                        formatted_question = task_data.doc_to_text(doc)
+                    else:
+                        formatted_question = raw_question
+
+                    # Extract correct answer
+                    correct_answers = doc.get("mc1_targets", {}).get("choices", [])
+                    correct_labels = doc.get("mc1_targets", {}).get("labels", [])
+
+                    # Find the correct answer
+                    correct_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 1 and i < len(correct_answers):
+                            correct_answer = correct_answers[i]
+                            break
+
+                    # Find an incorrect answer
+                    incorrect_answer = None
+                    for i, label in enumerate(correct_labels):
+                        if label == 0 and i < len(correct_answers):
+                            incorrect_answer = correct_answers[i]
+                            break
+
+                    if correct_answer and incorrect_answer:
                         test_qa_pairs.append(
                             {
-                                "question": doc["question"],
-                                "formatted_question": doc["question"],
-                                "correct_answer": doc["correct_answer"],
-                                "incorrect_answer": doc["incorrect_answer"],
+                                "question": raw_question,
+                                "formatted_question": formatted_question,
+                                "correct_answer": correct_answer,
+                                "incorrect_answer": incorrect_answer,
                             }
                         )
-                    else:
-                        # For lm-harness tasks, extract from document
-                        raw_question = doc.get("question", str(doc))
-                        if hasattr(task_data, "doc_to_text"):
-                            formatted_question = task_data.doc_to_text(doc)
-                        else:
-                            formatted_question = raw_question
 
-                        # Extract correct answer
-                        correct_answers = doc.get("mc1_targets", {}).get("choices", [])
-                        correct_labels = doc.get("mc1_targets", {}).get("labels", [])
+            except Exception:
+                # Skip problematic docs
+                continue
 
-                        # Find the correct answer
-                        correct_answer = None
-                        for i, label in enumerate(correct_labels):
-                            if label == 1 and i < len(correct_answers):
-                                correct_answer = correct_answers[i]
-                                break
+        if verbose:
+            print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
+            print("\n🔍 Test Examples:")
+            for i, qa_pair in enumerate(test_qa_pairs):
+                print(f"\n   📋 Test Example {i + 1}:")
+                print(
+                    f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}"
+                )
+                print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
+                if "incorrect_answer" in qa_pair:
+                    print(f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}")
 
-                        # Find an incorrect answer
-                        incorrect_answer = None
-                        for i, label in enumerate(correct_labels):
-                            if label == 0 and i < len(correct_answers):
-                                incorrect_answer = correct_answers[i]
-                                break
+        # Create test contrastive pairs using proper activation collection logic
+        test_contrastive_pairs = collector.create_batch_contrastive_pairs(test_qa_pairs)
 
-                        if correct_answer and incorrect_answer:
-                            test_qa_pairs.append(
-                                {
-                                    "question": raw_question,
-                                    "formatted_question": formatted_question,
-                                    "correct_answer": correct_answer,
-                                    "incorrect_answer": incorrect_answer,
-                                }
-                            )
+        test_processed_pairs = collector.collect_activations_batch(
+            pairs=test_contrastive_pairs,
+            layer_index=layers[0],
+            device=device,
+            token_targeting_strategy=targeting_strategy,
+        )
 
-                except Exception:
-                    # Skip problematic docs
-                    continue
+        # Convert to ContrastivePairSet format for evaluation
+        test_phrase_pairs = []
+        for pair in test_processed_pairs:
+            # Create the full prompts for the pair set
+            positive_full = f"{pair.prompt}{pair.positive_response}"
+            negative_full = f"{pair.prompt}{pair.negative_response}"
 
+            test_phrase_pairs.append(
+                {
+                    "harmful": negative_full,  # A choice (incorrect)
+                    "harmless": positive_full,  # B choice (correct)
+                }
+            )
+
+        # Run proper lm-harness evaluation on the test set with steering (only for individual tasks)
+        from .core.steering_methods.steering_evaluation import (
+            run_lm_harness_evaluation,
+        )
+
+        # Only run lm-harness evaluation for individual tasks, not group tasks
+        if not group_task_processed:
+            evaluation_results = run_lm_harness_evaluation(
+                task_data,
+                test_qa_pairs,
+                model,
+                steering_methods,
+                layers,
+                1.0,
+                True,
+                verbose,
+                "likelihoods",
+            )
+        else:
+            # For group tasks, we skip lm-harness evaluation since it doesn't apply to combined subtasks
+            evaluation_results = {
+                "baseline_accuracy": "N/A (group task)",
+                "steered_accuracy": "N/A (group task)",
+                "improvement": "N/A (group task)",
+                "note": "lm-harness evaluation skipped for group tasks (combined subtasks)",
+            }
+
+        # Handle test activation loading/saving
+        test_activation_cache = None
+        use_cached_activations = False
+
+        if load_test_activations:
+            # Load cached test activations instead of generating new responses
             if verbose:
-                print(f"   • Successfully extracted {len(test_qa_pairs)} test QA pairs")
-                print("\n🔍 Test Examples:")
-                for i, qa_pair in enumerate(test_qa_pairs):
-                    print(f"\n   📋 Test Example {i+1}:")
-                    print(
-                        f"      🔸 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}"
-                    )
-                    print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
-                    if "incorrect_answer" in qa_pair:
+                print("\n💾 LOADING CACHED TEST ACTIVATIONS:")
+                print(f"   • Loading from: {load_test_activations}")
+
+            try:
+                test_activation_cache = TestActivationCache.load_from_file(load_test_activations)
+
+                # Filter activations for the current layer
+                cached_layer_activations = test_activation_cache.get_activations_for_layer(layers[0])
+
+                if cached_layer_activations:
+                    use_cached_activations = True
+                    if verbose:
+                        print(f"   ✅ Found {len(cached_layer_activations)} cached activations for layer {layers[0]}")
+                else:
+                    if verbose:
+                        print(f"   ❌ No cached activations found for layer {layers[0]}")
                         print(
-                            f"      ❌ Incorrect Answer: {qa_pair['incorrect_answer']}"
+                            f"   • Available layers: {list(set(item['layer'] for item in test_activation_cache.activations))}"
                         )
 
-            # Create test contrastive pairs using proper activation collection logic
-            test_contrastive_pairs = collector.create_batch_contrastive_pairs(
-                test_qa_pairs
-            )
+            except Exception as e:
+                if verbose:
+                    print(f"   ❌ Failed to load cached activations: {e}")
+                    print("   • Will generate new responses instead")
 
-            test_processed_pairs = collector.collect_activations_batch(
-                pairs=test_contrastive_pairs,
-                layer_index=layers[0],
-                device=device,
-                token_targeting_strategy=targeting_strategy,
-            )
+        if save_test_activations and not use_cached_activations:
+            # Initialize cache for saving
+            test_activation_cache = TestActivationCache()
+            if verbose:
+                print(f"\n💾 WILL SAVE TEST ACTIVATIONS TO: {save_test_activations}")
 
-            # Convert to ContrastivePairSet format for evaluation
-            test_phrase_pairs = []
-            for pair in test_processed_pairs:
-                # Create the full prompts for the pair set
-                positive_full = f"{pair.prompt}{pair.positive_response}"
-                negative_full = f"{pair.prompt}{pair.negative_response}"
+        # Generate sample responses with token-level classification
+        if verbose:
+            if optimize:
+                print("\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
+                print(f"   • Generating {len(test_qa_pairs)} sample responses with optimized layer {layer}...")
+            else:
+                print("\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:")
+                print(f"   • Generating {len(test_qa_pairs)} sample responses...")
 
-                test_phrase_pairs.append(
-                    {
-                        "harmful": negative_full,  # A choice (incorrect)
-                        "harmless": positive_full,  # B choice (correct)
-                    }
+        generated_responses = []
+        correct_classifications = 0
+        total_classifications = 0
+
+        for i, qa_pair in enumerate(test_qa_pairs):
+            if verbose and not optimize:  # Only show detailed progress when not optimizing
+                print(f"\n   🎯 Generating response {i + 1}:")
+                print(
+                    f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}"
                 )
 
-            # Run proper lm-harness evaluation on the test set with steering (only for individual tasks)
-            from .core.steering_methods.steering_evaluation import (
-                run_lm_harness_evaluation,
-            )
+            # Use the raw question for natural generation
+            # The formatted_question contains few-shot examples which are for training, not generation
+            simple_prompt = qa_pair["question"]
 
-            # Only run lm-harness evaluation for individual tasks, not group tasks
-            if not group_task_processed:
-                evaluation_results = run_lm_harness_evaluation(
-                    task_data,
-                    test_qa_pairs,
+            # Generate response with token-level scoring and detection handling
+            if len(layers) > 1:
+                # Multi-layer mode: use multi-layer generation function
+                response, layer_results, was_handled = generate_with_multi_layer_classification_and_handling(
                     model,
-                    steering_methods,
+                    simple_prompt,
                     layers,
-                    1.0,
-                    True,
-                    verbose,
-                    "likelihoods",
+                    max_new_tokens,
+                    steering_methods,
+                    token_aggregation,
+                    detection_threshold,
+                    verbose and not optimize,
+                    detection_handler,
+                )
+                # For backward compatibility, use primary layer's results for main fields
+                primary_layer = layers[0]
+                token_scores = layer_results[primary_layer]["token_scores"] if primary_layer in layer_results else []
+                classification = (
+                    layer_results[primary_layer]["classification"] if primary_layer in layer_results else "UNKNOWN"
+                )
+                aggregated_score = (
+                    layer_results[primary_layer]["aggregated_score"] if primary_layer in layer_results else 0.0
                 )
             else:
-                # For group tasks, we skip lm-harness evaluation since it doesn't apply to combined subtasks
-                evaluation_results = {
-                    "baseline_accuracy": "N/A (group task)",
-                    "steered_accuracy": "N/A (group task)",
-                    "improvement": "N/A (group task)",
-                    "note": "lm-harness evaluation skipped for group tasks (combined subtasks)",
+                # Single-layer mode: use original function
+                response, token_scores, classification, was_handled = generate_with_classification_and_handling(
+                    model,
+                    simple_prompt,
+                    layers[0],
+                    max_new_tokens,
+                    steering_method,
+                    token_aggregation,
+                    detection_threshold,
+                    verbose and not optimize,
+                    detection_handler,
+                )
+                layer_results = None
+                aggregated_score = aggregate_token_scores(token_scores, token_aggregation) if token_scores else 0.0
+
+            # Evaluate the generated response using the ground truth evaluator
+            try:
+                # Create ground truth evaluator
+                evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
+
+                # Get correct answer for comparison
+                correct_answers = qa_pair.get("correct_answer", "")
+
+                # Get user label if available
+                user_label = None
+                if user_labels and i < len(user_labels):
+                    user_label = user_labels[i]
+
+                # Evaluate the response
+                evaluation_result = evaluator.evaluate_response(response, correct_answers, user_label)
+
+                ground_truth = evaluation_result["ground_truth"]
+
+                # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
+                classification_correct = None
+                if ground_truth != "UNKNOWN":
+                    classification_correct = classification == ground_truth
+                    if classification_correct:
+                        correct_classifications += 1
+                    total_classifications += 1
+
+                # Create response entry with layer results if available
+                response_entry = {
+                    "question": qa_pair["question"],  # Add the question
+                    "response": response,
+                    "token_scores": token_scores,
+                    "aggregated_score": aggregated_score,
+                    "classification": classification,
+                    "ground_truth": ground_truth,
+                    "ground_truth_method": evaluation_result["method_used"],
+                    "ground_truth_confidence": evaluation_result["confidence"],
+                    "ground_truth_details": evaluation_result["details"],
+                    "classification_correct": classification_correct,
+                    "was_handled": was_handled,
                 }
 
-            # Handle test activation loading/saving
-            test_activation_cache = None
-            use_cached_activations = False
+                # Add layer-specific results if multi-layer
+                if layer_results:
+                    response_entry["layer_results"] = layer_results
 
-            if load_test_activations:
-                # Load cached test activations instead of generating new responses
-                if verbose:
-                    print("\n💾 LOADING CACHED TEST ACTIVATIONS:")
-                    print(f"   • Loading from: {load_test_activations}")
+                generated_responses.append(response_entry)
 
-                try:
-                    test_activation_cache = TestActivationCache.load_from_file(
-                        load_test_activations
+                if verbose and not optimize:  # Only show detailed output when not optimizing
+                    print(f"      🤖 Generated: {response}")
+                    print(f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores]}")
+                    aggregated_score = aggregate_token_scores(token_scores, token_aggregation)
+                    print(
+                        f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})"
                     )
-
-                    # Filter activations for the current layer
-                    cached_layer_activations = (
-                        test_activation_cache.get_activations_for_layer(layers[0])
+                    print(
+                        f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})"
                     )
-
-                    if cached_layer_activations:
-                        use_cached_activations = True
-                        if verbose:
-                            print(
-                                f"   ✅ Found {len(cached_layer_activations)} cached activations for layer {layers[0]}"
-                            )
+                    if classification_correct is not None:
+                        print(
+                            f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}"
+                        )
                     else:
-                        if verbose:
-                            print(
-                                f"   ❌ No cached activations found for layer {layers[0]}"
-                            )
-                            print(
-                                f"   • Available layers: {list(set(item['layer'] for item in test_activation_cache.activations))}"
-                            )
-
-                except Exception as e:
-                    if verbose:
-                        print(f"   ❌ Failed to load cached activations: {e}")
-                        print("   • Will generate new responses instead")
-
-            if save_test_activations and not use_cached_activations:
-                # Initialize cache for saving
-                test_activation_cache = TestActivationCache()
-                if verbose:
-                    print(
-                        f"\n💾 WILL SAVE TEST ACTIVATIONS TO: {save_test_activations}"
-                    )
-
-            # Generate sample responses with token-level classification
-            if verbose:
-                if optimize:
-                    print("\n🎭 GENERATING SAMPLE RESPONSES WITH OPTIMIZED CLASSIFIER:")
-                    print(
-                        f"   • Generating {len(test_qa_pairs)} sample responses with optimized layer {layer}..."
-                    )
-                else:
-                    print(
-                        "\n🎭 GENERATING SAMPLE RESPONSES WITH HALLUCINATION DETECTION:"
-                    )
-                    print(f"   • Generating {len(test_qa_pairs)} sample responses...")
-
-            generated_responses = []
-            correct_classifications = 0
-            total_classifications = 0
-
-            for i, qa_pair in enumerate(test_qa_pairs):
-                if (
-                    verbose and not optimize
-                ):  # Only show detailed progress when not optimizing
-                    print(f"\n   🎯 Generating response {i+1}:")
-                    print(
-                        f"      📝 Question: {qa_pair['question'][:100]}{'...' if len(qa_pair['question']) > 100 else ''}"
-                    )
-
-                # Use the raw question for natural generation
-                # The formatted_question contains few-shot examples which are for training, not generation
-                simple_prompt = qa_pair["question"]
-
-                # Generate response with token-level scoring and detection handling
-                if len(layers) > 1:
-                    # Multi-layer mode: use multi-layer generation function
-                    response, layer_results, was_handled = (
-                        generate_with_multi_layer_classification_and_handling(
-                            model,
-                            simple_prompt,
-                            layers,
-                            max_new_tokens,
-                            steering_methods,
-                            token_aggregation,
-                            detection_threshold,
-                            verbose and not optimize,
-                            detection_handler,
+                        print(
+                            f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})"
                         )
-                    )
-                    # For backward compatibility, use primary layer's results for main fields
-                    primary_layer = layers[0]
-                    token_scores = (
-                        layer_results[primary_layer]["token_scores"]
-                        if primary_layer in layer_results
-                        else []
-                    )
-                    classification = (
-                        layer_results[primary_layer]["classification"]
-                        if primary_layer in layer_results
-                        else "UNKNOWN"
-                    )
-                    aggregated_score = (
-                        layer_results[primary_layer]["aggregated_score"]
-                        if primary_layer in layer_results
-                        else 0.0
-                    )
-                else:
-                    # Single-layer mode: use original function
-                    response, token_scores, classification, was_handled = (
-                        generate_with_classification_and_handling(
-                            model,
-                            simple_prompt,
-                            layers[0],
-                            max_new_tokens,
-                            steering_method,
-                            token_aggregation,
-                            detection_threshold,
-                            verbose and not optimize,
-                            detection_handler,
-                        )
-                    )
-                    layer_results = None
-                    aggregated_score = (
-                        aggregate_token_scores(token_scores, token_aggregation)
-                        if token_scores
-                        else 0.0
-                    )
+                    print(f"      ✅ Expected: {qa_pair['correct_answer']}")
+                    print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
+                    if evaluation_result["details"]:
+                        print(f"      📝 Details: {evaluation_result['details']}")
 
-                # Evaluate the generated response using the ground truth evaluator
-                try:
-                    # Create ground truth evaluator
-                    evaluator = GroundTruthEvaluator.from_string(ground_truth_method)
-
-                    # Get correct answer for comparison
-                    correct_answers = qa_pair.get("correct_answer", "")
-
-                    # Get user label if available
-                    user_label = None
-                    if user_labels and i < len(user_labels):
-                        user_label = user_labels[i]
-
-                    # Evaluate the response
-                    evaluation_result = evaluator.evaluate_response(
-                        response, correct_answers, user_label
-                    )
-
-                    ground_truth = evaluation_result["ground_truth"]
-
-                    # Check if our classification matches ground truth (only if ground truth is not UNKNOWN)
-                    classification_correct = None
-                    if ground_truth != "UNKNOWN":
-                        classification_correct = classification == ground_truth
-                        if classification_correct:
-                            correct_classifications += 1
-                        total_classifications += 1
-
-                    # Create response entry with layer results if available
-                    response_entry = {
+            except Exception as e:
+                if verbose and not optimize:
+                    print(f"      ⚠️  Could not evaluate response: {e}")
+                generated_responses.append(
+                    {
                         "question": qa_pair["question"],  # Add the question
                         "response": response,
                         "token_scores": token_scores,
-                        "aggregated_score": aggregated_score,
                         "classification": classification,
-                        "ground_truth": ground_truth,
-                        "ground_truth_method": evaluation_result["method_used"],
-                        "ground_truth_confidence": evaluation_result["confidence"],
-                        "ground_truth_details": evaluation_result["details"],
-                        "classification_correct": classification_correct,
+                        "ground_truth": "UNKNOWN",
+                        "ground_truth_method": "error",
+                        "ground_truth_confidence": 0.0,
+                        "ground_truth_details": f"Error during evaluation: {e!s}",
+                        "classification_correct": None,
                         "was_handled": was_handled,
                     }
-
-                    # Add layer-specific results if multi-layer
-                    if layer_results:
-                        response_entry["layer_results"] = layer_results
-
-                    generated_responses.append(response_entry)
-
-                    if (
-                        verbose and not optimize
-                    ):  # Only show detailed output when not optimizing
-                        print(f"      🤖 Generated: {response}")
-                        print(
-                            f"      🔍 Token Scores: {[f'{score:.3f}' for score in token_scores]}"
-                        )
-                        aggregated_score = aggregate_token_scores(
-                            token_scores, token_aggregation
-                        )
-                        print(
-                            f"      📊 Our Classification: {classification} ({token_aggregation} score: {aggregated_score:.3f})"
-                        )
-                        print(
-                            f"      🎯 Ground Truth: {ground_truth} (method: {evaluation_result['method_used']}, confidence: {evaluation_result['confidence']:.2f})"
-                        )
-                        if classification_correct is not None:
-                            print(
-                                f"      {'✅' if classification_correct else '❌'} Classification {'CORRECT' if classification_correct else 'WRONG'}"
-                            )
-                        else:
-                            print(
-                                f"      ❓ Classification accuracy not evaluated (ground truth method: {evaluation_result['method_used']})"
-                            )
-                        print(f"      ✅ Expected: {qa_pair['correct_answer']}")
-                        print(f"      ❌ Incorrect: {qa_pair['incorrect_answer']}")
-                        if evaluation_result["details"]:
-                            print(f"      📝 Details: {evaluation_result['details']}")
-
-                except Exception as e:
-                    if verbose and not optimize:
-                        print(f"      ⚠️  Could not evaluate response: {e}")
-                    generated_responses.append(
-                        {
-                            "question": qa_pair["question"],  # Add the question
-                            "response": response,
-                            "token_scores": token_scores,
-                            "classification": classification,
-                            "ground_truth": "UNKNOWN",
-                            "ground_truth_method": "error",
-                            "ground_truth_confidence": 0.0,
-                            "ground_truth_details": f"Error during evaluation: {str(e)}",
-                            "classification_correct": None,
-                            "was_handled": was_handled,
-                        }
-                    )
-
-            # Show summary for optimization
-            if verbose and optimize:
-                print(
-                    f"\n   ✅ Generated {len(generated_responses)} responses with optimized layer {layer}"
                 )
-                if total_classifications > 0:
-                    classification_acc = correct_classifications / total_classifications
-                    print(
-                        f"   📊 Classification accuracy: {classification_acc:.2%} ({correct_classifications}/{total_classifications})"
-                    )
 
-            results = {
-                "task_name": task_name,
-                "model_name": model_name,
-                "layer": layer,
-                "original_layer": original_layer,
-                "token_aggregation": token_aggregation,
-                "original_token_aggregation": original_token_aggregation,
-                "optimization_performed": optimize,
-                "optimization_result": optimization_result,
-                "training_results": training_results,
-                "evaluation_results": evaluation_results,
-                "num_train": len(contrastive_pairs),
-                "num_test": len(test_qa_pairs),
-                "sample_responses": generated_responses,
-                "classification_accuracy": (
-                    correct_classifications / total_classifications
-                    if total_classifications > 0
-                    else None
-                ),
-                "correct_classifications": correct_classifications,
-                "total_classifications": total_classifications,
-            }
+        # Show summary for optimization
+        if verbose and optimize:
+            print(f"\n   ✅ Generated {len(generated_responses)} responses with optimized layer {layer}")
+            if total_classifications > 0:
+                classification_acc = correct_classifications / total_classifications
+                print(
+                    f"   📊 Classification accuracy: {classification_acc:.2%} ({correct_classifications}/{total_classifications})"
+                )
 
+        results = {
+            "task_name": task_name,
+            "model_name": model_name,
+            "layer": layer,
+            "original_layer": original_layer,
+            "token_aggregation": token_aggregation,
+            "original_token_aggregation": original_token_aggregation,
+            "optimization_performed": optimize,
+            "optimization_result": optimization_result,
+            "training_results": training_results,
+            "evaluation_results": evaluation_results,
+            "num_train": len(contrastive_pairs),
+            "num_test": len(test_qa_pairs),
+            "sample_responses": generated_responses,
+            "classification_accuracy": (
+                correct_classifications / total_classifications if total_classifications > 0 else None
+            ),
+            "correct_classifications": correct_classifications,
+            "total_classifications": total_classifications,
+        }
+
+        if verbose:
+            print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
+            print(f"{'=' * 80}")
+            print("📊 FINAL RESULTS:")
+            print(f"   • Training samples: {len(contrastive_pairs)}")
+            print(f"   • Test samples: {len(test_qa_pairs)}")
+            print(f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}")
+            print(f"   • Generated responses: {len(generated_responses)}")
+            if total_classifications > 0:
+                classification_acc = correct_classifications / total_classifications
+                print(
+                    f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})"
+                )
+            else:
+                print("   • Classification accuracy: Could not evaluate")
+            print(f"{'=' * 80}\n")
+
+        # Generate performance report
+        if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
             if verbose:
-                print(f"\n🎉 PIPELINE COMPLETED FOR {task_name.upper()}!")
-                print(f"{'='*80}")
-                print("📊 FINAL RESULTS:")
-                print(f"   • Training samples: {len(contrastive_pairs)}")
-                print(f"   • Test samples: {len(test_qa_pairs)}")
-                print(
-                    f"   • Training accuracy: {training_results.get('accuracy', 'N/A'):.2%}"
-                )
-                print(f"   • Generated responses: {len(generated_responses)}")
-                if total_classifications > 0:
-                    classification_acc = correct_classifications / total_classifications
-                    print(
-                        f"   • Classification accuracy on generated responses: {classification_acc:.2%} ({correct_classifications}/{total_classifications})"
-                    )
-                else:
-                    print("   • Classification accuracy: Could not evaluate")
-                print(f"{'='*80}\n")
+                print("\n🔍 Generating performance report...")
+            print("\n📊 PERFORMANCE REPORT:")
+            print(f"{'=' * 50}")
 
-            # Generate performance report
-            if enable_memory_tracking or enable_latency_tracking or show_timing_summary:
+            if memory_tracker:
                 if verbose:
-                    print("\n🔍 Generating performance report...")
-                print("\n📊 PERFORMANCE REPORT:")
-                print(f"{'='*50}")
+                    print("   • Stopping memory monitoring...")
+                memory_stats = memory_tracker.stop_monitoring()
+                print("💾 Memory Usage:")
+                print(memory_tracker.format_stats(memory_stats, detailed_performance_report))
 
-                if memory_tracker:
-                    if verbose:
-                        print("   • Stopping memory monitoring...")
-                    memory_stats = memory_tracker.stop_monitoring()
-                    print("💾 Memory Usage:")
-                    print(
-                        memory_tracker.format_stats(
-                            memory_stats, detailed_performance_report
-                        )
-                    )
+            if latency_tracker or show_timing_summary:
+                if verbose:
+                    print("   • Collecting timing data...")
+                from .core.tracking import format_timing_summary
 
-                if latency_tracker or show_timing_summary:
-                    if verbose:
-                        print("   • Collecting timing data...")
-                    from .core.tracking import format_timing_summary
+                print("\n⏱️ Timing Summary:")
+                print(format_timing_summary(detailed_performance_report))
 
-                    print("\n⏱️ Timing Summary:")
-                    print(format_timing_summary(detailed_performance_report))
+            if export_performance_csv:
+                if latency_tracker:
+                    latency_tracker.export_csv(export_performance_csv)
+                    print(f"\n📄 Performance data exported to: {export_performance_csv}")
 
-                if export_performance_csv:
-                    if latency_tracker:
-                        latency_tracker.export_csv(export_performance_csv)
-                        print(
-                            f"\n📄 Performance data exported to: {export_performance_csv}"
-                        )
+            print(f"{'=' * 50}")
 
-                print(f"{'='*50}")
+        # Save test activations if requested
+        if save_test_activations and test_activation_cache is not None and len(test_activation_cache.activations) > 0:
+            try:
+                test_activation_cache.save_to_file(save_test_activations)
+                if verbose:
+                    print("\n💾 SAVED TEST ACTIVATIONS:")
+                    print(f"   • File: {save_test_activations}")
+                    print(f"   • Count: {len(test_activation_cache.activations)} activations")
+                    print(f"   • Layer: {layers[0]}")
+            except Exception as e:
+                if verbose:
+                    print(f"\n❌ Failed to save test activations: {e}")
 
-            # Save test activations if requested
-            if (
-                save_test_activations
-                and test_activation_cache is not None
-                and len(test_activation_cache.activations) > 0
-            ):
-                try:
-                    test_activation_cache.save_to_file(save_test_activations)
-                    if verbose:
-                        print("\n💾 SAVED TEST ACTIVATIONS:")
-                        print(f"   • File: {save_test_activations}")
-                        print(
-                            f"   • Count: {len(test_activation_cache.activations)} activations"
-                        )
-                        print(f"   • Layer: {layers[0]}")
-                except Exception as e:
-                    if verbose:
-                        print(f"\n❌ Failed to save test activations: {e}")
-
-            logger.info(f"Pipeline completed for {task_name}")
-            return results
+        logger.info(f"Pipeline completed for {task_name}")
+        return results
 
     except Exception as e:
         # 🚨 ALL ERRORS ARE CRITICAL - HARD STOP THE ENTIRE PROGRAM
@@ -4517,8 +4036,9 @@ def handle_generate_pairs_command(args):
         # Generate pairs
         print("DEBUG: About to import generate_synthetic_pairs_cli")
         from .core.contrastive_pairs import generate_synthetic_pairs_cli
+
         print(f"DEBUG: Imported function: {generate_synthetic_pairs_cli}")
-        
+
         try:
             print("DEBUG: Calling generate_synthetic_pairs_cli")
             pair_set = generate_synthetic_pairs_cli(
@@ -4526,22 +4046,22 @@ def handle_generate_pairs_command(args):
                 num_pairs=args.num_pairs,
                 output_file=args.output,
                 model=model,
-                verbose_timing=getattr(args, 'timing', False),
-                max_workers=getattr(args, 'max_workers', 4),
+                verbose_timing=getattr(args, "timing", False),
+                max_workers=getattr(args, "max_workers", 4),
             )
         except TypeError as te:
             print(f"TypeError details: {te}")
             import traceback
+
             traceback.print_exc()
             raise
 
-        print(
-            f"✅ Successfully generated and saved {len(pair_set.pairs)} contrastive pairs!"
-        )
+        print(f"✅ Successfully generated and saved {len(pair_set.pairs)} contrastive pairs!")
 
     except Exception as e:
         print(f"❌ Error generating pairs: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
@@ -4580,13 +4100,9 @@ def handle_synthetic_command(args):
         sys.exit(1)
 
 
-def _generate_test_questions(
-    trait_description: str, num_questions: int, model
-) -> List[str]:
+def _generate_test_questions(trait_description: str, num_questions: int, model) -> List[str]:
     """Generate test questions for evaluating the steering method."""
-    return [
-        f"Test question {i+1} for {trait_description}" for i in range(num_questions)
-    ]
+    return [f"Test question {i + 1} for {trait_description}" for i in range(num_questions)]
 
 
 def handle_tasks_command(args):
@@ -4602,7 +4118,7 @@ def handle_tasks_command(args):
         metadata_dir = cache_dir / "metadata"
 
         print("📊 CACHE STATUS")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print(f"Cache directory: {args.cache_dir}")
 
         if not cache_dir.exists():
@@ -4610,9 +4126,7 @@ def handle_tasks_command(args):
             return
 
         if not data_dir.exists() or not metadata_dir.exists():
-            print(
-                "❌ Cache structure incomplete (missing data or metadata directories)"
-            )
+            print("❌ Cache structure incomplete (missing data or metadata directories)")
             return
 
         # Read existing cache format
@@ -4622,12 +4136,10 @@ def handle_tasks_command(args):
 
         for metadata_file in metadata_dir.glob("*_metadata.json"):
             try:
-                with open(metadata_file, "r") as f:
+                with open(metadata_file) as f:
                     metadata = json.load(f)
 
-                task_name = metadata.get(
-                    "task_name", metadata_file.stem.replace("_metadata", "")
-                )
+                task_name = metadata.get("task_name", metadata_file.stem.replace("_metadata", ""))
                 data_file = data_dir / f"{task_name}.pkl"
 
                 if data_file.exists():
@@ -4639,9 +4151,7 @@ def handle_tasks_command(args):
                         "samples": metadata.get("total_samples", "unknown"),
                         "size_mb": file_size / (1024 * 1024),
                         "download_time": metadata.get("download_timestamp", "unknown"),
-                        "processing_time": metadata.get(
-                            "processing_time_seconds", "unknown"
-                        ),
+                        "processing_time": metadata.get("processing_time_seconds", "unknown"),
                     }
             except Exception as e:
                 print(f"⚠️  Warning: Could not read metadata for {metadata_file}: {e}")
@@ -4653,9 +4163,7 @@ def handle_tasks_command(args):
         if cached_tasks:
             print("📋 CACHED TASKS:")
             # Sort by size for better display
-            sorted_tasks = sorted(
-                cached_tasks.items(), key=lambda x: x[1]["size_mb"], reverse=True
-            )
+            sorted_tasks = sorted(cached_tasks.items(), key=lambda x: x[1]["size_mb"], reverse=True)
             for task_name, task_info in sorted_tasks:
                 samples = task_info["samples"]
                 size_mb = task_info["size_mb"]
@@ -4663,9 +4171,7 @@ def handle_tasks_command(args):
                 if isinstance(download_time, str) and download_time != "unknown":
                     # Extract just the date part
                     download_time = download_time.split("T")[0]
-                print(
-                    f"   📁 {task_name}: {samples} samples, {size_mb:.1f} MB (downloaded {download_time})"
-                )
+                print(f"   📁 {task_name}: {samples} samples, {size_mb:.1f} MB (downloaded {download_time})")
         else:
             print("📋 No cached tasks found")
         return
@@ -4675,9 +4181,7 @@ def handle_tasks_command(args):
 
         managed_cache = get_managed_cache(args.cache_dir)
         removed_count = managed_cache.cleanup_cache(args.cleanup_cache)
-        print(
-            f"🧹 Cleaned up {removed_count} cache entries older than {args.cleanup_cache} days"
-        )
+        print(f"🧹 Cleaned up {removed_count} cache entries older than {args.cleanup_cache} days")
         return
 
     # Handle special task listing commands
@@ -4701,95 +4205,93 @@ def handle_tasks_command(args):
                 print("❌ Synthetic generation mode requires --trait description")
                 print("   Example: --synthetic --trait 'hallucinates less'")
                 sys.exit(1)
-            
+
             print("🧬 Synthetic pair generation mode:")
             print(f"   • Trait: {args.trait}")
             print(f"   • Number of pairs: {args.num_synthetic_pairs}")
             if hasattr(args, "save_synthetic") and args.save_synthetic:
                 print(f"   • Will save to: {args.save_synthetic}")
-            
+
             # Set up for synthetic generation
             args.task_names = "SYNTHETIC_GENERATE"  # Special marker
-    
+
     # Handle cross-benchmark evaluation mode
     elif hasattr(args, "cross_benchmark") and args.cross_benchmark:
         if not (hasattr(args, "train_task") and hasattr(args, "eval_task")):
             print("❌ Cross-benchmark mode requires both --train-task and --eval-task")
             sys.exit(1)
-        
+
         print("🔄 Cross-benchmark evaluation mode:")
         print(f"   • Training on: {args.train_task}")
         print(f"   • Evaluating on: {args.eval_task}")
-        
+
         # Set up for cross-benchmark processing
         args.task_names = "CROSS_BENCHMARK"  # Special marker
-        
+
     # Handle --all flag: automatically use all available benchmarks
     elif hasattr(args, "all") and args.all:
         args.task_names = ",".join(sorted(AVAILABLE_BENCHMARKS.keys()))
         print(f"🚀 Running ALL {len(AVAILABLE_BENCHMARKS)} available benchmarks:")
         print(f"   {', '.join(sorted(AVAILABLE_BENCHMARKS.keys()))}")
         print(f"   Using --limit {args.limit or 'unlimited'} samples per benchmark\n")
-    
+
     # Handle --tag for mixed benchmark sampling
     elif hasattr(args, "tag") and args.tag:
         print(f"🎲 Mixed benchmark sampling with tags: {', '.join(args.tag)}")
         print(f"   • Total samples: {args.mixed_samples}")
         print(f"   • Tag mode: {args.tag_mode}")
         print(f"   • Split ratio: {args.split_ratio}")
-        
+
         # Set a special marker for mixed sampling mode
         args.mixed_sampling_mode = True
         args.task_names = "MIXED_SAMPLING"  # Special marker
-        
+
     # Handle --skills/--risks based task selection
     elif hasattr(args, "skills") and (args.skills or args.risks):
         from .core.task_selector import TaskSelector
+
         selector = TaskSelector()
-        
+
         # Validate and show selection criteria
         if args.skills:
             print(f"🎯 Selecting tasks by skills: {', '.join(args.skills)}")
         if args.risks:
             print(f"⚠️  Selecting tasks by risks: {', '.join(args.risks)}")
-        
+
         # Find matching tasks
         selected_tasks = selector.select_random_tasks(
             skills=args.skills,
             risks=args.risks,
             num_tasks=args.num_tasks,
             min_quality_score=args.min_quality_score,
-            seed=args.task_seed
+            seed=args.task_seed,
         )
-        
+
         if not selected_tasks:
             print("❌ No tasks found matching the specified skills/risks criteria")
             print("💡 Available skills:", ", ".join(selector.get_available_skills()))
             print("💡 Available risks:", ", ".join(selector.get_available_risks()))
             sys.exit(1)
-        
+
         # Filter to only include available benchmarks
         selected_tasks = [t for t in selected_tasks if t in AVAILABLE_BENCHMARKS]
-        
+
         if not selected_tasks:
             print("❌ No available benchmarks match the specified criteria")
             print("   (Some matching tasks may be in the unavailable/problematic list)")
             sys.exit(1)
-        
+
         args.task_names = ",".join(selected_tasks)
         print(f"📋 Selected {len(selected_tasks)} tasks from skills/risks criteria")
         if args.verbose:
-            print(f"   Tasks: {', '.join(selected_tasks[:10])}" + 
-                  (" ..." if len(selected_tasks) > 10 else ""))
+            print(f"   Tasks: {', '.join(selected_tasks[:10])}" + (" ..." if len(selected_tasks) > 10 else ""))
 
     task_sources = []
 
     # Build list of task sources
     if hasattr(args, "task_names") and args.task_names:
         # Parse comma-separated task names
-        task_names = [
-            name.strip() for name in args.task_names.split(",") if name.strip()
-        ]
+        task_names = [name.strip() for name in args.task_names.split(",") if name.strip()]
 
         # Validate each task name before processing
         invalid_tasks = []
@@ -4810,15 +4312,11 @@ def handle_tasks_command(args):
             for invalid_task in invalid_tasks:
                 # Check if it's an unavailable benchmark
                 if invalid_task in UNAVAILABLE_BENCHMARKS:
-                    print(
-                        f"🚫 '{invalid_task}' is known to be unavailable/problematic."
-                    )
+                    print(f"🚫 '{invalid_task}' is known to be unavailable/problematic.")
 
                 suggestions = suggest_similar_tasks(invalid_task)
                 if suggestions:
-                    print(
-                        f"\n💡 Did you mean one of these instead of '{invalid_task}'?"
-                    )
+                    print(f"\n💡 Did you mean one of these instead of '{invalid_task}'?")
                     for suggestion in suggestions[:3]:
                         config = AVAILABLE_BENCHMARKS[suggestion]
                         priority = config.get("priority", "unknown")
@@ -4837,12 +4335,8 @@ def handle_tasks_command(args):
         task_sources.append(args.from_json)
 
     if not task_sources:
-        print(
-            "❌ No task source specified. Use --task-name, --from-csv, --from-json, --list-tasks, or --task-info"
-        )
-        print(
-            f"\n📖 To see all {len(AVAILABLE_BENCHMARKS)} valid tasks: wisent-guard tasks --list-tasks"
-        )
+        print("❌ No task source specified. Use --task-name, --from-csv, --from-json, --list-tasks, or --task-info")
+        print(f"\n📖 To see all {len(AVAILABLE_BENCHMARKS)} valid tasks: wisent-guard tasks --list-tasks")
         sys.exit(1)
 
     logger.info(f"Starting wisent-guard harness for sources: {task_sources}")
@@ -4850,9 +4344,7 @@ def handle_tasks_command(args):
     # Load model once for efficiency when processing multiple tasks
     shared_model = None
     if len(task_sources) > 1:
-        print(
-            f"\n🚀 Loading model once for {len(task_sources)} tasks (efficiency optimization)..."
-        )
+        print(f"\n🚀 Loading model once for {len(task_sources)} tasks (efficiency optimization)...")
         try:
             shared_model = Model(name=args.model, device=args.device)
             print("✅ Model loaded successfully! Will reuse across all tasks.")
@@ -4867,83 +4359,82 @@ def handle_tasks_command(args):
         try:
             # Show progress when processing multiple tasks
             if len(task_sources) > 1:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"📊 TASK {i}/{len(task_sources)}: {source.upper()}")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
 
             # Initialize variables for special modes
             from_csv = False
             from_json = False
-            
+
             # Handle synthetic generation mode
             if source == "SYNTHETIC_GENERATE" and hasattr(args, "synthetic") and args.synthetic:
                 print("\n🧬 Generating synthetic contrastive pairs...")
-                
+
                 # Import the synthetic generator
                 from .core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
-                
+
                 # Initialize the model if not already done
                 if shared_model is None:
                     print("🔧 Initializing model for synthetic generation...")
                     shared_model = Model(args.model, device=args.device)
-                
+
                 # Create generator
                 generator = SyntheticContrastivePairGenerator(shared_model)
-                
+
                 # Generate pairs
                 synthetic_pair_set = generator.generate_contrastive_pair_set(
-                    trait_description=args.trait,
-                    num_pairs=args.num_synthetic_pairs
+                    trait_description=args.trait, num_pairs=args.num_synthetic_pairs
                 )
-                
+
                 print(f"✅ Generated {len(synthetic_pair_set.pairs)} synthetic pairs")
-                
+
                 # Save if requested
                 if hasattr(args, "save_synthetic") and args.save_synthetic:
                     generator.save_to_json(synthetic_pair_set, args.save_synthetic)
-                
+
                 # Set up for training
                 print("\n🎯 Proceeding to train classifier on synthetic pairs...")
-                
+
                 # Override some args for synthetic training
                 args.from_synthetic = True
                 synthetic_contrastive_pairs = synthetic_pair_set
-                
+
             # Handle synthetic loading mode
             elif source == "SYNTHETIC_LOAD" and hasattr(args, "load_synthetic") and args.load_synthetic:
                 print("\n📂 Loading synthetic pairs from file...")
-                
+
                 # Import the synthetic generator
                 from .core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
-                
+
                 # Initialize the model if not already done
                 if shared_model is None:
                     print("🔧 Initializing model...")
                     shared_model = Model(args.model, device=args.device)
-                
+
                 # Create generator and load pairs
                 generator = SyntheticContrastivePairGenerator(shared_model)
                 synthetic_pair_set = generator.load_from_json(args.load_synthetic)
-                
+
                 print(f"✅ Loaded {len(synthetic_pair_set.pairs)} synthetic pairs")
-                
+
                 # Set up for training
                 print("\n🎯 Proceeding to train classifier on loaded synthetic pairs...")
-                
+
                 # Override some args for synthetic training
                 args.from_synthetic = True
                 synthetic_contrastive_pairs = synthetic_pair_set
-            
+
             # Handle cross-benchmark evaluation mode
             elif source == "CROSS_BENCHMARK" and hasattr(args, "cross_benchmark") and args.cross_benchmark:
                 print("\n🔄 Setting up cross-benchmark evaluation...")
-                
+
                 # Load training and evaluation data separately
                 from .core.mixed_benchmark_sampler import MixedBenchmarkSampler
-                
-                cache_dir = getattr(args, 'cache_dir', './benchmark_cache')
+
+                cache_dir = getattr(args, "cache_dir", "./benchmark_cache")
                 sampler = MixedBenchmarkSampler(cache_dir=cache_dir)
-                
+
                 try:
                     # Load training data
                     print(f"\n📚 Loading training data from: {args.train_task}")
@@ -4955,42 +4446,42 @@ def handle_tasks_command(args):
                             split_ratio=1.0,  # Use all for training
                             random_seed=args.seed,
                             tag_mode=args.tag_mode,
-                            name=f"train_mixed_{'_'.join(args.train_tag)}"
+                            name=f"train_mixed_{'_'.join(args.train_tag)}",
                         )
                     else:
                         # Load single benchmark for training using managed cache
                         from .core.contrastive_pairs import ContrastivePairSet
                         from .core.managed_cached_benchmarks import get_managed_cache
-                        
+
                         # Get cached samples for training
                         managed_cache = get_managed_cache()
                         train_samples = managed_cache.get_task_samples(
-                            task_name=args.train_task,
-                            limit=args.limit,
-                            force_fresh=False
+                            task_name=args.train_task, limit=args.limit, force_fresh=False
                         )
-                        
+
                         # Extract QA pairs and convert to phrase pairs format
                         phrase_pairs = []
                         for sample in train_samples:
                             qa_pair = sample.get("normalized", {})
-                            if qa_pair and all(k in qa_pair for k in ["question", "correct_answer", "incorrect_answer"]):
+                            if qa_pair and all(
+                                k in qa_pair for k in ["question", "correct_answer", "incorrect_answer"]
+                            ):
                                 # Convert QA pair to phrase pair format
                                 # Format: question + correct answer as harmless, question + incorrect answer as harmful
-                                phrase_pairs.append({
-                                    "harmless": f"{qa_pair['question']} {qa_pair['correct_answer']}",
-                                    "harmful": f"{qa_pair['question']} {qa_pair['incorrect_answer']}"
-                                })
-                        
+                                phrase_pairs.append(
+                                    {
+                                        "harmless": f"{qa_pair['question']} {qa_pair['correct_answer']}",
+                                        "harmful": f"{qa_pair['question']} {qa_pair['incorrect_answer']}",
+                                    }
+                                )
+
                         # Create ContrastivePairSet from phrase pairs
                         train_pair_set = ContrastivePairSet.from_phrase_pairs(
-                            name=f"train_{args.train_task}",
-                            phrase_pairs=phrase_pairs,
-                            task_type="lm_evaluation"
+                            name=f"train_{args.train_task}", phrase_pairs=phrase_pairs, task_type="lm_evaluation"
                         )
-                    
+
                     print(f"✅ Loaded {len(train_pair_set.pairs)} training pairs")
-                    
+
                     # Load evaluation data
                     print(f"\n📊 Loading evaluation data from: {args.eval_task}")
                     if args.eval_tag:
@@ -5001,65 +4492,66 @@ def handle_tasks_command(args):
                             split_ratio=1.0,  # Use all for evaluation
                             random_seed=args.seed + 1 if args.seed else None,  # Different seed
                             tag_mode=args.tag_mode,
-                            name=f"eval_mixed_{'_'.join(args.eval_tag)}"
+                            name=f"eval_mixed_{'_'.join(args.eval_tag)}",
                         )
                     else:
                         # Load single benchmark for evaluation using managed cache
                         # Get cached samples for evaluation
                         eval_samples = managed_cache.get_task_samples(
-                            task_name=args.eval_task,
-                            limit=args.testing_limit or args.limit,
-                            force_fresh=False
+                            task_name=args.eval_task, limit=args.testing_limit or args.limit, force_fresh=False
                         )
-                        
+
                         # Extract QA pairs and convert to phrase pairs format
                         eval_phrase_pairs = []
                         for sample in eval_samples:
                             qa_pair = sample.get("normalized", {})
-                            if qa_pair and all(k in qa_pair for k in ["question", "correct_answer", "incorrect_answer"]):
+                            if qa_pair and all(
+                                k in qa_pair for k in ["question", "correct_answer", "incorrect_answer"]
+                            ):
                                 # Convert QA pair to phrase pair format
                                 # Format: question + correct answer as harmless, question + incorrect answer as harmful
-                                eval_phrase_pairs.append({
-                                    "harmless": f"{qa_pair['question']} {qa_pair['correct_answer']}",
-                                    "harmful": f"{qa_pair['question']} {qa_pair['incorrect_answer']}"
-                                })
-                        
+                                eval_phrase_pairs.append(
+                                    {
+                                        "harmless": f"{qa_pair['question']} {qa_pair['correct_answer']}",
+                                        "harmful": f"{qa_pair['question']} {qa_pair['incorrect_answer']}",
+                                    }
+                                )
+
                         # Create ContrastivePairSet from phrase pairs
                         eval_pair_set = ContrastivePairSet.from_phrase_pairs(
-                            name=f"eval_{args.eval_task}",
-                            phrase_pairs=eval_phrase_pairs,
-                            task_type="lm_evaluation"
+                            name=f"eval_{args.eval_task}", phrase_pairs=eval_phrase_pairs, task_type="lm_evaluation"
                         )
-                    
+
                     print(f"✅ Loaded {len(eval_pair_set.pairs)} evaluation pairs")
-                    
+
                     # Set up for cross-benchmark processing
                     task_name = f"cross_{args.train_task}_to_{args.eval_task}"
                     from_csv = False
                     from_json = False
                     cross_benchmark_mode = True
-                    
+
                     # Store the pair sets for later use
                     train_contrastive_pairs = train_pair_set
                     eval_contrastive_pairs = eval_pair_set
-                    
+
                 except Exception as e:
                     print(f"❌ Failed to load cross-benchmark data: {e}")
                     if args.verbose:
                         import traceback
+
                         traceback.print_exc()
                     continue
-                    
+
             # Handle mixed sampling mode
             elif source == "MIXED_SAMPLING" and hasattr(args, "mixed_sampling_mode") and args.mixed_sampling_mode:
                 # Use mixed benchmark sampler
                 from .core.mixed_benchmark_sampler import MixedBenchmarkSampler
-                
+
                 print("\n🎲 Using mixed benchmark sampling...")
-                
-                cache_dir = getattr(args, 'cache_dir', './benchmark_cache')
+
+                cache_dir = getattr(args, "cache_dir", "./benchmark_cache")
                 sampler = MixedBenchmarkSampler(cache_dir=cache_dir)
-                
+
                 # Create mixed contrastive pair set
                 try:
                     pair_set = sampler.create_mixed_contrastive_pair_set(
@@ -5068,31 +4560,34 @@ def handle_tasks_command(args):
                         split_ratio=args.split_ratio,
                         random_seed=args.seed,
                         tag_mode=args.tag_mode,
-                        name=f"mixed_{'_'.join(args.tag)}"
+                        name=f"mixed_{'_'.join(args.tag)}",
                     )
-                    
+
                     print(f"✅ Created mixed dataset with {len(pair_set.pairs)} contrastive pairs")
-                    
+
                     # Extract QA pairs for processing
                     qa_pairs = []
                     for pair in pair_set.pairs:
-                        qa_pairs.append({
-                            "question": pair.question,
-                            "correct_answer": pair.correct_answer,
-                            "incorrect_answer": pair.incorrect_answer,
-                            "source_benchmark": pair.metadata.get("source_benchmark", "unknown")
-                        })
-                    
+                        qa_pairs.append(
+                            {
+                                "question": pair.question,
+                                "correct_answer": pair.correct_answer,
+                                "incorrect_answer": pair.incorrect_answer,
+                                "source_benchmark": pair.metadata.get("source_benchmark", "unknown"),
+                            }
+                        )
+
                     # Set up parameters for mixed sampling
                     task_name = f"mixed_{'_'.join(args.tag)}"
                     from_csv = False
                     from_json = False
                     group_task_qa_format = True  # Use the same format as group tasks
-                    
+
                 except Exception as e:
                     print(f"❌ Failed to create mixed dataset: {e}")
                     if args.verbose:
                         import traceback
+
                         traceback.print_exc()
                     continue
             else:
@@ -5113,16 +4608,10 @@ def handle_tasks_command(args):
             if limit_to_use is None:
                 # First check if we're using saved config (which determines the layer)
                 optimal_layer = None
-                if not (
-                    args.layer != "15"
-                    or args.token_aggregation != "average"
-                    or args.detection_threshold != 0.6
-                ):
+                if not (args.layer != "15" or args.token_aggregation != "average" or args.detection_threshold != 0.6):
                     # We're using defaults, so check for saved config
                     config_manager = ModelConfigManager()
-                    optimal_params = config_manager.get_optimal_parameters(
-                        args.model, source
-                    )
+                    optimal_params = config_manager.get_optimal_parameters(args.model, source)
                     if optimal_params and "classification_layer" in optimal_params:
                         optimal_layer = optimal_params["classification_layer"]
                 else:
@@ -5132,15 +4621,11 @@ def handle_tasks_command(args):
                 # Now get optimal sample size for this task and layer
                 if optimal_layer is not None:
                     config_manager = ModelConfigManager()
-                    optimal_sample_size = config_manager.get_optimal_sample_size(
-                        args.model, source, optimal_layer
-                    )
+                    optimal_sample_size = config_manager.get_optimal_sample_size(args.model, source, optimal_layer)
                     if optimal_sample_size:
                         limit_to_use = optimal_sample_size
                         if args.verbose:
-                            print(
-                                f"   📊 Using optimal sample size: {optimal_sample_size} (from config)"
-                            )
+                            print(f"   📊 Using optimal sample size: {optimal_sample_size} (from config)")
 
             # Parse steering methods
             steering_methods = []
@@ -5187,15 +4672,9 @@ def handle_tasks_command(args):
                             learning_rate=args.ksteering_learning_rate,
                             classifier_epochs=args.ksteering_classifier_epochs,
                             target_labels=[
-                                int(x.strip())
-                                for x in args.ksteering_target_labels.split(",")
-                                if x.strip()
+                                int(x.strip()) for x in args.ksteering_target_labels.split(",") if x.strip()
                             ],
-                            avoid_labels=[
-                                int(x.strip())
-                                for x in args.ksteering_avoid_labels.split(",")
-                                if x.strip()
-                            ],
+                            avoid_labels=[int(x.strip()) for x in args.ksteering_avoid_labels.split(",") if x.strip()],
                             alpha=args.ksteering_alpha,
                         )
                     )
@@ -5299,12 +4778,14 @@ def handle_tasks_command(args):
                 # Pass pre-loaded QA pairs for mixed sampling
                 preloaded_qa_pairs=qa_pairs if (source == "MIXED_SAMPLING" and qa_pairs) else None,
                 # Pass cross-benchmark data
-                cross_benchmark_mode=cross_benchmark_mode if 'cross_benchmark_mode' in locals() else False,
-                train_contrastive_pairs=train_contrastive_pairs if 'train_contrastive_pairs' in locals() else None,
-                eval_contrastive_pairs=eval_contrastive_pairs if 'eval_contrastive_pairs' in locals() else None,
+                cross_benchmark_mode=cross_benchmark_mode if "cross_benchmark_mode" in locals() else False,
+                train_contrastive_pairs=train_contrastive_pairs if "train_contrastive_pairs" in locals() else None,
+                eval_contrastive_pairs=eval_contrastive_pairs if "eval_contrastive_pairs" in locals() else None,
                 # Pass synthetic data
-                from_synthetic=getattr(args, 'from_synthetic', False),
-                synthetic_contrastive_pairs=synthetic_contrastive_pairs if 'synthetic_contrastive_pairs' in locals() else None,
+                from_synthetic=getattr(args, "from_synthetic", False),
+                synthetic_contrastive_pairs=synthetic_contrastive_pairs
+                if "synthetic_contrastive_pairs" in locals()
+                else None,
                 # Model reuse parameter for efficiency
                 model_instance=shared_model,
             )
@@ -5341,8 +4822,10 @@ def handle_test_nonsense_command(args):
 def handle_monitor_command(args):
     """Handle the monitor command."""
     import platform
+
     import torch
-    from .core.tracking import get_memory_info, format_memory_usage
+
+    from .core.tracking import format_memory_usage, get_memory_info
 
     print("🔍 Wisent-Guard Performance Monitor")
     print("=" * 50)
@@ -5368,6 +4851,7 @@ def handle_monitor_command(args):
 def handle_agent_command(args):
     """Handle the agent command."""
     import asyncio
+
     from .core.autonomous_agent import AutonomousAgent
 
     async def run_agent():
@@ -5400,9 +4884,7 @@ def handle_agent_command(args):
                 ksteering_num_labels=getattr(args, "ksteering_num_labels", 6),
                 ksteering_hidden_dim=getattr(args, "ksteering_hidden_dim", 512),
                 ksteering_learning_rate=getattr(args, "ksteering_learning_rate", 1e-3),
-                ksteering_classifier_epochs=getattr(
-                    args, "ksteering_classifier_epochs", 100
-                ),
+                ksteering_classifier_epochs=getattr(args, "ksteering_classifier_epochs", 100),
                 ksteering_target_labels=getattr(args, "ksteering_target_labels", "0"),
                 ksteering_avoid_labels=getattr(args, "ksteering_avoid_labels", ""),
                 ksteering_alpha=getattr(args, "ksteering_alpha", 50.0),
@@ -5426,9 +4908,7 @@ def handle_agent_command(args):
                 # Process the prompt using new quality control system
                 result = await agent.respond_with_quality_control(
                     prompt=args.prompt,
-                    max_attempts=getattr(
-                        args, "max_quality_attempts", args.max_attempts
-                    ),
+                    max_attempts=getattr(args, "max_quality_attempts", args.max_attempts),
                     time_budget_minutes=args.time_budget,
                 )
 
@@ -5447,38 +4927,25 @@ def handle_agent_command(args):
                     print("\n🧠 CLASSIFIER PARAMETERS:")
                     if classifier_params is not None:
                         print(f"   Layer: {classifier_params.optimal_layer}")
-                        print(
-                            f"   Threshold: {classifier_params.classification_threshold}"
-                        )
-                        print(
-                            f"   Training samples: {classifier_params.training_samples}"
-                        )
-                        print(
-                            f"   Classifier type: {classifier_params.classifier_type}"
-                        )
+                        print(f"   Threshold: {classifier_params.classification_threshold}")
+                        print(f"   Training samples: {classifier_params.training_samples}")
+                        print(f"   Classifier type: {classifier_params.classifier_type}")
                         print(f"   Reasoning: {classifier_params.reasoning}")
                     else:
-                        print(
-                            "   ❌ No classifier parameters available (operation timed out)"
-                        )
+                        print("   ❌ No classifier parameters available (operation timed out)")
 
                     # Show steering parameters if used
                     if result.steering_params_used:
                         steering_params = result.steering_params_used
                         print("\n🎛️ STEERING PARAMETERS:")
                         print(f"   Method: {steering_params.steering_method}")
-                        print(
-                            f"   Initial strength: {steering_params.initial_strength}"
-                        )
+                        print(f"   Initial strength: {steering_params.initial_strength}")
                         print(f"   Increment: {steering_params.increment}")
                         print(f"   Maximum: {steering_params.maximum_strength}")
                         print(f"   Reasoning: {steering_params.reasoning}")
 
                     # Show quality progression
-                    if (
-                        result.quality_progression
-                        and len(result.quality_progression) > 1
-                    ):
+                    if result.quality_progression and len(result.quality_progression) > 1:
                         print("\n📈 QUALITY PROGRESSION:")
                         for i, score in enumerate(result.quality_progression, 1):
                             print(f"   Attempt {i}: {score:.3f}")
@@ -5489,13 +4956,9 @@ def handle_agent_command(args):
                         if classifier_params is not None:
                             print(f"   Classifier: {classifier_params.reasoning}")
                         else:
-                            print(
-                                "   Classifier: ❌ No parameters available (operation timed out)"
-                            )
+                            print("   Classifier: ❌ No parameters available (operation timed out)")
                         if result.steering_params_used:
-                            print(
-                                f"   Steering: {result.steering_params_used.reasoning}"
-                            )
+                            print(f"   Steering: {result.steering_params_used.reasoning}")
 
             else:
                 print("🔄 Using Legacy Autonomous Response System...")
@@ -5530,9 +4993,7 @@ def handle_agent_command(args):
                     summary = agent.get_performance_summary()
                     if not summary.get("tracking_disabled"):
                         print("\n📈 PERFORMANCE SUMMARY:")
-                        print(
-                            f"   Total improvements: {summary.get('total_improvements_attempted', 0)}"
-                        )
+                        print(f"   Total improvements: {summary.get('total_improvements_attempted', 0)}")
                         print(f"   Success rate: {summary.get('success_rate', 0):.2%}")
 
         except Exception as e:
@@ -5564,9 +5025,7 @@ def handle_model_config_command(args):
         elif args.config_action == "test":
             handle_model_config_test(args, config_manager)
         else:
-            print(
-                "❌ No action specified. Use 'save', 'list', 'show', 'remove', or 'test'"
-            )
+            print("❌ No action specified. Use 'save', 'list', 'show', 'remove', or 'test'")
             sys.exit(1)
 
     except Exception as e:
@@ -5622,9 +5081,7 @@ def handle_model_config_list(args, config_manager):
 
     for config in sorted(configs, key=lambda x: x.get("created_date", "")):
         model_name = config["model_name"]
-        created = (
-            config["created_date"][:10] if config.get("created_date") else "unknown"
-        )
+        created = config["created_date"][:10] if config.get("created_date") else "unknown"
         method = config["optimization_method"]
         cls_layer = config["classification_layer"]
         steer_layer = config["steering_layer"]
@@ -5690,11 +5147,7 @@ def handle_model_config_remove(args, config_manager):
         return
 
     if not args.confirm:
-        response = (
-            input(f"🗑️  Remove configuration for '{args.model}'? (y/N): ")
-            .strip()
-            .lower()
-        )
+        response = input(f"🗑️  Remove configuration for '{args.model}'? (y/N): ").strip().lower()
         if response not in ["y", "yes"]:
             print("❌ Removal cancelled")
             return
@@ -5761,10 +5214,7 @@ def handle_classification_optimization_command(args):
         if args.save_logs_json:
             print(f"   📄 Detailed logs will be saved to: {args.save_logs_json}")
         if args.save_classifiers:
-            classifiers_dir = (
-                args.classifiers_dir
-                or f"./optimized_classifiers/{args.model.replace('/', '_')}"
-            )
+            classifiers_dir = args.classifiers_dir or f"./optimized_classifiers/{args.model.replace('/', '_')}"
             print(f"   💾 Classifiers will be saved to: {classifiers_dir}")
         else:
             print("   🚫 Classifier saving disabled")
@@ -5775,12 +5225,11 @@ def handle_classification_optimization_command(args):
         # Skip timing estimation if requested
         if not args.skip_timing_estimation:
             # Time estimation with calibration
-            from .core.time_estimator import OptimizationTimeEstimator
             from pathlib import Path
 
-            calibration_file = (
-                Path(args.calibration_file) if args.calibration_file else None
-            )
+            from .core.time_estimator import OptimizationTimeEstimator
+
+            calibration_file = Path(args.calibration_file) if args.calibration_file else None
 
             estimator = OptimizationTimeEstimator(
                 model_name=args.model,
@@ -5838,9 +5287,7 @@ def handle_classification_optimization_command(args):
         )
 
         print("\n✅ Classification optimization completed successfully!")
-        print(
-            f"   📊 Optimized {summary.successful_optimizations}/{summary.total_tasks_tested} tasks"
-        )
+        print(f"   📊 Optimized {summary.successful_optimizations}/{summary.total_tasks_tested} tasks")
         print(f"   🎯 Best overall layer: {summary.overall_best_layer}")
         print(f"   🔧 Best aggregation: {summary.overall_best_aggregation}")
         print(f"   📈 Best threshold: {summary.overall_best_threshold}")
@@ -5991,9 +5438,7 @@ def handle_steering_optimization_command(args):
                 }
             )
 
-            result = run_steering_optimization(
-                model_name=args.model, optimization_type="comprehensive", **kwargs
-            )
+            result = run_steering_optimization(model_name=args.model, optimization_type="comprehensive", **kwargs)
 
         else:
             print(f"❌ Unknown steering action: {args.steering_action}")
@@ -6004,9 +5449,7 @@ def handle_steering_optimization_command(args):
 
     except NotImplementedError as e:
         print(f"⚠️  Steering optimization not yet implemented: {e}")
-        print(
-            "   📝 This is expected - steering optimization framework has been created"
-        )
+        print("   📝 This is expected - steering optimization framework has been created")
         print("   🔧 Implementation of actual optimization logic is needed")
         print("   📋 See wisent_guard/core/steering_optimizer.py for TODOs")
 
@@ -6024,7 +5467,7 @@ def handle_sample_size_optimization_command(args):
     try:
         # Determine if we're optimizing for classification or steering
         method_type = "steering" if args.steering_mode else "classification"
-        
+
         # Check if we should verify parameters match existing config (for classification)
         if method_type == "classification" and not args.force:
             from .core.model_config_manager import ModelConfigManager
@@ -6034,14 +5477,10 @@ def handle_sample_size_optimization_command(args):
 
             if model_config:
                 optimal_params = model_config.get("optimal_parameters", {})
-                task_overrides = model_config.get("task_specific_overrides", {}).get(
-                    args.task, {}
-                )
+                task_overrides = model_config.get("task_specific_overrides", {}).get(args.task, {})
 
                 # Check if parameters match
-                config_layer = task_overrides.get(
-                    "classification_layer", optimal_params.get("classification_layer")
-                )
+                config_layer = task_overrides.get("classification_layer", optimal_params.get("classification_layer"))
                 config_aggregation = task_overrides.get(
                     "token_aggregation",
                     optimal_params.get("token_aggregation", "average"),
@@ -6053,36 +5492,26 @@ def handle_sample_size_optimization_command(args):
 
                 mismatches = []
                 if config_layer is not None and config_layer != args.layer:
-                    mismatches.append(
-                        f"Layer: config has {config_layer}, you specified {args.layer}"
-                    )
+                    mismatches.append(f"Layer: config has {config_layer}, you specified {args.layer}")
                 if config_aggregation != args.token_aggregation:
                     mismatches.append(
                         f"Token aggregation: config has '{config_aggregation}', you specified '{args.token_aggregation}'"
                     )
                 if abs(config_threshold - args.threshold) > 0.01:
-                    mismatches.append(
-                        f"Threshold: config has {config_threshold}, you specified {args.threshold}"
-                    )
+                    mismatches.append(f"Threshold: config has {config_threshold}, you specified {args.threshold}")
 
                 if mismatches:
-                    print(
-                        "⚠️  Parameter mismatch with existing classifier configuration!"
-                    )
+                    print("⚠️  Parameter mismatch with existing classifier configuration!")
                     print(f"   Model config for {args.model} has different parameters:")
                     for mismatch in mismatches:
                         print(f"   • {mismatch}")
                     print("\n   Options:")
-                    print(
-                        f"   1. Run 'wisent-guard optimize-classification {args.model} --task {args.task}' first"
-                    )
+                    print(f"   1. Run 'wisent-guard optimize-classification {args.model} --task {args.task}' first")
                     print(
                         f"   2. Use parameters from config: --layer {config_layer} --token-aggregation {config_aggregation} --threshold {config_threshold}"
                     )
                     print("   3. Force optimization with your parameters using --force")
-                    print(
-                        "\n   Sample size optimization should use the same parameters as your actual classifier!"
-                    )
+                    print("\n   Sample size optimization should use the same parameters as your actual classifier!")
                     sys.exit(1)
 
         print(f"📏 Starting {method_type} sample size optimization...")
@@ -6090,15 +5519,15 @@ def handle_sample_size_optimization_command(args):
         print(f"   📋 Task: {args.task}")
         print(f"   📊 Layer: {args.layer}")
         print(f"   📊 Token aggregation: {args.token_aggregation}")
-        
+
         if method_type == "classification":
             print(f"   📊 Threshold: {args.threshold}")
         else:  # steering
             print(f"   🎯 Steering method: {args.steering_method}")
             print(f"   💪 Steering strength: {args.steering_strength}")
-            if hasattr(args, 'token_targeting_strategy'):
+            if hasattr(args, "token_targeting_strategy"):
                 print(f"   🎯 Token targeting: {args.token_targeting_strategy}")
-        
+
         print(f"   🔢 Sample sizes: {args.sample_sizes}")
         print(f"   📊 Test size: {args.test_size}")
         print(f"   🌱 Random seed: {args.seed}")
@@ -6112,18 +5541,19 @@ def handle_sample_size_optimization_command(args):
         method_kwargs = {
             "token_aggregation": args.token_aggregation,
         }
-        
+
         if method_type == "classification":
-            method_kwargs.update({
-                "threshold": args.threshold,
-                "classifier_type": getattr(args, 'classifier_type', 'logistic')
-            })
+            method_kwargs.update(
+                {"threshold": args.threshold, "classifier_type": getattr(args, "classifier_type", "logistic")}
+            )
         else:  # steering
-            method_kwargs.update({
-                "steering_method": args.steering_method,
-                "steering_strength": args.steering_strength,
-                "token_targeting_strategy": getattr(args, 'token_targeting_strategy', 'LAST_TOKEN')
-            })
+            method_kwargs.update(
+                {
+                    "steering_method": args.steering_method,
+                    "steering_strength": args.steering_strength,
+                    "token_targeting_strategy": getattr(args, "token_targeting_strategy", "LAST_TOKEN"),
+                }
+            )
 
         # Run optimization
         results = optimize_sample_size(
@@ -6138,17 +5568,17 @@ def handle_sample_size_optimization_command(args):
             verbose=args.verbose,
             save_plot=args.save_plot,
             save_to_config=not args.no_save_config,
-            **method_kwargs
+            **method_kwargs,
         )
 
         # Display results
         print(f"\n✅ Optimal sample size: {results['optimal_sample_size']}")
-        
+
         # Only show details if verbose
         if args.verbose:
-            if results.get('optimal_accuracy') is not None:
+            if results.get("optimal_accuracy") is not None:
                 print(f"   Accuracy at optimal size: {results['optimal_accuracy']:.3f}")
-            
+
             # Show all tested sizes
             all_results = results.get("all_results", {})
             if all_results.get("sample_sizes"):
@@ -6159,9 +5589,7 @@ def handle_sample_size_optimization_command(args):
 
         if not args.no_save_config and method_type == "classification":
             print("\n💾 Optimal sample size saved to model config")
-            print(
-                f"   • This will be used as default --limit for {args.task} on layer {args.layer}"
-            )
+            print(f"   • This will be used as default --limit for {args.task} on layer {args.layer}")
 
     except Exception as e:
         print(f"❌ Sample size optimization failed: {e}")
@@ -6185,31 +5613,31 @@ def handle_full_optimization_command(args):
         elif args.skills or args.risks:
             # Use task selector to find tasks by skills/risks
             from .core.task_selector import TaskSelector
+
             selector = TaskSelector()
-            
+
             # Validate skills and risks
             if args.skills:
                 print(f"   🎯 Skills: {', '.join(args.skills)}")
             if args.risks:
                 print(f"   ⚠️  Risks: {', '.join(args.risks)}")
-            
+
             # Find matching tasks
             tasks = selector.select_random_tasks(
                 skills=args.skills,
                 risks=args.risks,
                 num_tasks=args.num_tasks,
                 min_quality_score=args.min_quality_score,
-                seed=args.task_seed
+                seed=args.task_seed,
             )
-            
+
             if not tasks:
                 print("❌ No tasks found matching the specified skills/risks criteria")
                 sys.exit(1)
-                
+
             print(f"   📋 Tasks: {len(tasks)} tasks selected from skills/risks criteria")
             if args.verbose:
-                print(f"      Selected tasks: {', '.join(tasks[:5])}" + 
-                      (" ..." if len(tasks) > 5 else ""))
+                print(f"      Selected tasks: {', '.join(tasks[:5])}" + (" ..." if len(tasks) > 5 else ""))
         else:
             # Use all available tasks
             tasks = get_valid_task_names()
@@ -6218,12 +5646,11 @@ def handle_full_optimization_command(args):
         # Skip timing estimation if requested
         if not args.skip_timing_estimation:
             # Create time estimator with calibration options
-            from .core.time_estimator import OptimizationTimeEstimator
             from pathlib import Path
 
-            calibration_file = (
-                Path(args.calibration_file) if args.calibration_file else None
-            )
+            from .core.time_estimator import OptimizationTimeEstimator
+
+            calibration_file = Path(args.calibration_file) if args.calibration_file else None
 
             estimator = OptimizationTimeEstimator(
                 model_name=args.model,
@@ -6259,19 +5686,15 @@ def handle_full_optimization_command(args):
             # Check if estimated time is over 1 hour and prompt for confirmation
             if total_time > 3600:  # More than 1 hour
                 print("\n⚠️  WARNING: The estimated optimization time is over 1 hour!")
-                print(
-                    f"   This optimization will take approximately {estimator.format_time(total_time)}."
-                )
+                print(f"   This optimization will take approximately {estimator.format_time(total_time)}.")
 
                 # Prompt for confirmation
                 while True:
-                    response = (
-                        input("\n   Do you want to continue? (y/n): ").strip().lower()
-                    )
+                    response = input("\n   Do you want to continue? (y/n): ").strip().lower()
                     if response == "y" or response == "yes":
                         print("\n✅ Continuing with optimization...")
                         break
-                    elif response == "n" or response == "no":
+                    if response == "n" or response == "no":
                         print("\n❌ Optimization cancelled by user.")
                         sys.exit(0)
                     else:
@@ -6286,11 +5709,9 @@ def handle_full_optimization_command(args):
             def classification_progress_callback(task_idx, task_name, status):
                 """Callback to track classification progress."""
                 if status == "completed":
-                    print(f"   ✅ [{task_idx+1}/{len(tasks)}] {task_name} optimized")
+                    print(f"   ✅ [{task_idx + 1}/{len(tasks)}] {task_name} optimized")
                 elif status == "started":
-                    print(
-                        f"   🔄 [{task_idx+1}/{len(tasks)}] Optimizing {task_name}..."
-                    )
+                    print(f"   🔄 [{task_idx + 1}/{len(tasks)}] Optimizing {task_name}...")
 
             from .core.classification_optimizer import run_classification_optimization
 
@@ -6329,9 +5750,7 @@ def handle_full_optimization_command(args):
 
             if not model_config:
                 print("\n❌ Error: No model configuration found!")
-                print(
-                    "   • Run classification optimization first or use --skip-sample-size"
-                )
+                print("   • Run classification optimization first or use --skip-sample-size")
                 sys.exit(1)
 
             # Run sample size optimization for each task
@@ -6339,14 +5758,10 @@ def handle_full_optimization_command(args):
 
             sample_size_results = {}
             for idx, task in enumerate(tasks):
-                print(
-                    f"\n   📋 [{idx+1}/{len(tasks)}] Optimizing sample size for {task}..."
-                )
+                print(f"\n   📋 [{idx + 1}/{len(tasks)}] Optimizing sample size for {task}...")
 
                 # Get task-specific parameters
-                task_params = model_config.get("task_specific_overrides", {}).get(
-                    task, {}
-                )
+                task_params = model_config.get("task_specific_overrides", {}).get(task, {})
                 optimal_params = model_config.get("optimal_parameters", {})
 
                 layer = task_params.get(
@@ -6362,9 +5777,7 @@ def handle_full_optimization_command(args):
                     optimal_params.get("detection_threshold", 0.5),
                 )
 
-                print(
-                    f"      • Using layer {layer}, {aggregation} aggregation, threshold {threshold}"
-                )
+                print(f"      • Using layer {layer}, {aggregation} aggregation, threshold {threshold}")
 
                 try:
                     results = run_sample_size_optimization(
@@ -6382,18 +5795,14 @@ def handle_full_optimization_command(args):
                     )
 
                     sample_size_results[task] = results
-                    print(
-                        f"      ✅ Optimal sample size: {results['optimal_sample_size']}"
-                    )
+                    print(f"      ✅ Optimal sample size: {results['optimal_sample_size']}")
 
                 except Exception as e:
                     print(f"      ❌ Failed: {e}")
                     sample_size_results[task] = {"error": str(e)}
 
             # Summary
-            successful = sum(
-                1 for r in sample_size_results.values() if "error" not in r
-            )
+            successful = sum(1 for r in sample_size_results.values() if "error" not in r)
             print("\n✅ Sample size optimization completed!")
             print(f"   📊 Successfully optimized {successful}/{len(tasks)} tasks")
 
@@ -6417,14 +5826,10 @@ def handle_full_optimization_command(args):
                 classifiers_trained = 0
                 for idx, task in enumerate(tasks):
                     try:
-                        print(
-                            f"\n   🎯 [{idx+1}/{len(tasks)}] Training classifier for {task}..."
-                        )
+                        print(f"\n   🎯 [{idx + 1}/{len(tasks)}] Training classifier for {task}...")
 
                         # Get task-specific parameters
-                        task_params = model_config.get(
-                            "task_specific_overrides", {}
-                        ).get(task, {})
+                        task_params = model_config.get("task_specific_overrides", {}).get(task, {})
                         optimal_params = model_config.get("optimal_parameters", {})
 
                         layer = task_params.get(
@@ -6441,21 +5846,15 @@ def handle_full_optimization_command(args):
                         )
 
                         # Get optimal sample size
-                        optimal_sample_size = config_manager.get_optimal_sample_size(
-                            args.model, task, layer
-                        )
+                        optimal_sample_size = config_manager.get_optimal_sample_size(args.model, task, layer)
                         if not optimal_sample_size:
                             optimal_sample_size = 200  # Default fallback
 
-                        print(
-                            f"      • Layer {layer}, {aggregation} aggregation, threshold {threshold}"
-                        )
+                        print(f"      • Layer {layer}, {aggregation} aggregation, threshold {threshold}")
                         print(f"      • Using {optimal_sample_size} training samples")
 
                         # Build classifier save path
-                        classifier_path = os.path.join(
-                            classifier_dir, f"{task}_classifier"
-                        )
+                        classifier_path = os.path.join(classifier_dir, f"{task}_classifier")
 
                         # Run the pipeline in train-only mode with optimal parameters
                         result = run_task_pipeline(
@@ -6476,9 +5875,7 @@ def handle_full_optimization_command(args):
                             print("      ✅ Classifier saved successfully")
                             classifiers_trained += 1
                         else:
-                            print(
-                                f"      ❌ Failed: {result.get('error', 'Unknown error')}"
-                            )
+                            print(f"      ❌ Failed: {result.get('error', 'Unknown error')}")
 
                         # Update progress
 
@@ -6486,9 +5883,7 @@ def handle_full_optimization_command(args):
                         print(f"      ❌ Error training classifier: {e}")
 
                 print("\n✅ Classifier training completed!")
-                print(
-                    f"   📊 Trained and cached {classifiers_trained}/{len(tasks)} classifiers"
-                )
+                print(f"   📊 Trained and cached {classifiers_trained}/{len(tasks)} classifiers")
                 print(f"   📁 Saved to: {classifier_dir}")
 
                 # Update overall progress
@@ -6517,21 +5912,15 @@ def handle_full_optimization_command(args):
                 vectors_trained = 0
                 for idx, task in enumerate(tasks):
                     try:
-                        print(
-                            f"\n   🎯 [{idx+1}/{len(tasks)}] Training control vector for {task}..."
-                        )
+                        print(f"\n   🎯 [{idx + 1}/{len(tasks)}] Training control vector for {task}...")
 
                         # Get task-specific parameters
-                        task_params = model_config.get(
-                            "task_specific_overrides", {}
-                        ).get(task, {})
+                        task_params = model_config.get("task_specific_overrides", {}).get(task, {})
                         optimal_params = model_config.get("optimal_parameters", {})
 
                         # Use steering layer if available, otherwise use classification layer
                         steering_config = model_config.get("steering_optimization", {})
-                        task_steering = model_config.get(
-                            "task_specific_steering", {}
-                        ).get(task, {})
+                        task_steering = model_config.get("task_specific_steering", {}).get(task, {})
 
                         layer = task_steering.get(
                             "layer",
@@ -6545,9 +5934,7 @@ def handle_full_optimization_command(args):
                         )
 
                         # Get optimal sample size
-                        optimal_sample_size = config_manager.get_optimal_sample_size(
-                            args.model, task, layer
-                        )
+                        optimal_sample_size = config_manager.get_optimal_sample_size(args.model, task, layer)
                         if not optimal_sample_size:
                             optimal_sample_size = 200  # Default fallback
 
@@ -6556,9 +5943,7 @@ def handle_full_optimization_command(args):
 
                         # Load task data and create contrastive pairs
                         actual_task_name = get_actual_task_name(task)
-                        task_data = model.load_lm_eval_task(
-                            actual_task_name, shots=0, limit=optimal_sample_size
-                        )
+                        task_data = model.load_lm_eval_task(actual_task_name, shots=0, limit=optimal_sample_size)
 
                         from .core.agent.diagnose.tasks.task_manager import load_docs
 
@@ -6569,9 +5954,7 @@ def handle_full_optimization_command(args):
                             ContrastivePairSet,
                         )
 
-                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
-                            task, task_data, docs
-                        )
+                        qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task, task_data, docs)
 
                         if not qa_pairs:
                             print("      ❌ No QA pairs extracted")
@@ -6580,25 +5963,19 @@ def handle_full_optimization_command(args):
                         # Create contrastive pairs
                         from .core.activation_collection_method import (
                             ActivationCollectionLogic,
-                        )
-                        from .core.activation_collection_method import (
                             PromptConstructionStrategy,
                         )
 
                         collector = ActivationCollectionLogic(model=model)
                         prompt_strategy = PromptConstructionStrategy.MULTIPLE_CHOICE
-                        contrastive_pairs = collector.create_batch_contrastive_pairs(
-                            qa_pairs, prompt_strategy
-                        )
+                        contrastive_pairs = collector.create_batch_contrastive_pairs(qa_pairs, prompt_strategy)
 
                         # Extract activations
                         from .core import Layer
 
                         layer_obj = Layer(index=layer)
 
-                        print(
-                            f"      • Extracting activations from {len(contrastive_pairs)} pairs..."
-                        )
+                        print(f"      • Extracting activations from {len(contrastive_pairs)} pairs...")
 
                         # Create ContrastivePairSet from extracted pairs
                         pair_set = ContrastivePairSet(name=f"{task}_control_vector")
@@ -6608,16 +5985,12 @@ def handle_full_optimization_command(args):
                         for pair in pair_set.pairs:
                             # Extract positive activations
                             if pair.positive_response:
-                                pos_activations = model.extract_activations(
-                                    pair.positive_response, layer_obj
-                                )
+                                pos_activations = model.extract_activations(pair.positive_response, layer_obj)
                                 pair.positive_activations = pos_activations
 
                             # Extract negative activations
                             if pair.negative_response:
-                                neg_activations = model.extract_activations(
-                                    pair.negative_response, layer_obj
-                                )
+                                neg_activations = model.extract_activations(pair.negative_response, layer_obj)
                                 pair.negative_activations = neg_activations
 
                         # Compute control vector
@@ -6625,9 +5998,7 @@ def handle_full_optimization_command(args):
 
                         if control_vector is not None:
                             # Save control vector
-                            vector_path = os.path.join(
-                                vector_dir, f"{task}_control_vector.pt"
-                            )
+                            vector_path = os.path.join(vector_dir, f"{task}_control_vector.pt")
                             torch.save(
                                 {
                                     "vector": control_vector,
@@ -6669,9 +6040,7 @@ def handle_full_optimization_command(args):
                 config_manager.update_model_config(args.model, model_config)
 
                 print("\n✅ Control vector training completed!")
-                print(
-                    f"   📊 Trained and cached {vectors_trained}/{len(tasks)} control vectors"
-                )
+                print(f"   📊 Trained and cached {vectors_trained}/{len(tasks)} control vectors")
                 print(f"   📁 Saved to: {vector_dir}")
 
                 # Final overall progress
@@ -6685,14 +6054,14 @@ def handle_full_optimization_command(args):
             print(f"   🔧 Testing methods: {', '.join(args.steering_methods)}")
             print(f"   📊 Layer range: {args.steering_layer_range or 'auto'}")
             print(f"   💪 Strength range: {args.steering_strength_range}")
-            
+
             from .core.steering_optimizer import run_steering_optimization
-            
+
             steering_results = {}
             for idx, task in enumerate(tasks):
                 try:
-                    print(f"\n   🔄 [{idx+1}/{len(tasks)}] Optimizing steering for {task}...")
-                    
+                    print(f"\n   🔄 [{idx + 1}/{len(tasks)}] Optimizing steering for {task}...")
+
                     # Determine layer range
                     if args.steering_layer_range:
                         # Use the layer range string directly
@@ -6701,12 +6070,12 @@ def handle_full_optimization_command(args):
                         # Use optimal classification layer
                         optimal_layer = model_config.get("optimal_parameters", {}).get("classification_layer", 0)
                         layer_range_str = str(optimal_layer)
-                    
+
                     # Run steering optimization
                     print(f"      • Debug: Testing methods {args.steering_methods}")
                     print(f"      • Debug: Layer range: {layer_range_str}")
                     print(f"      • Debug: Strength range: {args.steering_strength_range}")
-                    
+
                     result = run_steering_optimization(
                         model_name=args.model,
                         optimization_type="method_comparison",
@@ -6718,34 +6087,36 @@ def handle_full_optimization_command(args):
                         layer_range=layer_range_str,
                         strength_range=args.steering_strength_range,
                     )
-                    
+
                     if result:
                         # Handle SteeringOptimizationSummary object
-                        if hasattr(result, 'best_overall_method'):
+                        if hasattr(result, "best_overall_method"):
                             # Extract best configuration from summary
                             best_method = result.best_overall_method
                             best_layer = result.best_overall_layer
                             best_strength = result.best_overall_strength
-                            
+
                             # Find accuracy from task results
                             best_accuracy = 0.0
                             if result.task_results:
                                 for task_result in result.task_results:
-                                    if (task_result.best_steering_method == best_method and 
-                                        task_result.best_steering_layer == best_layer):
+                                    if (
+                                        task_result.best_steering_method == best_method
+                                        and task_result.best_steering_layer == best_layer
+                                    ):
                                         best_accuracy = task_result.steering_effectiveness_score
                                         break
-                            
+
                             print(f"      ✅ Best method: {best_method} (layer {best_layer}, strength {best_strength})")
                             print(f"      📊 Effectiveness: {best_accuracy:.3f}")
-                            
+
                             steering_results[task] = {
                                 "method": best_method,
                                 "layer": best_layer,
                                 "strength": best_strength,
-                                "accuracy": best_accuracy
+                                "accuracy": best_accuracy,
                             }
-                            
+
                             # Save to model config
                             if "steering_optimization" not in model_config:
                                 model_config["steering_optimization"] = {}
@@ -6754,15 +6125,17 @@ def handle_full_optimization_command(args):
                                 "layer": best_layer,
                                 "strength": best_strength,
                                 "accuracy": best_accuracy,
-                                "optimized_date": datetime.now().isoformat()
+                                "optimized_date": datetime.now().isoformat(),
                             }
                         # Handle dictionary result (backward compatibility)
                         elif isinstance(result, dict) and result.get("overall_best"):
                             best = result["overall_best"]
-                            print(f"      ✅ Best method: {best['method']} (layer {best['layer']}, strength {best['strength']})")
+                            print(
+                                f"      ✅ Best method: {best['method']} (layer {best['layer']}, strength {best['strength']})"
+                            )
                             print(f"      📊 Accuracy: {best['accuracy']:.3f}")
                             steering_results[task] = best
-                            
+
                             # Save to model config
                             if "steering_optimization" not in model_config:
                                 model_config["steering_optimization"] = {}
@@ -6771,29 +6144,31 @@ def handle_full_optimization_command(args):
                                 "layer": best["layer"],
                                 "strength": best["strength"],
                                 "accuracy": best["accuracy"],
-                                "optimized_date": datetime.now().isoformat()
+                                "optimized_date": datetime.now().isoformat(),
                             }
                         else:
                             print("      ❌ Steering optimization failed - unexpected result format")
                     else:
                         print("      ❌ Steering optimization failed")
-                        
+
                 except Exception as e:
                     print(f"      ❌ Error: {e}")
                     if args.verbose:
                         import traceback
+
                         traceback.print_exc()
-            
+
             if steering_results:
                 print("\n✅ Steering method optimization completed!")
                 print(f"   📊 Optimized {len(steering_results)}/{len(tasks)} tasks")
-                
+
                 # Find most common method
                 from collections import Counter
+
                 methods = [r["method"] for r in steering_results.values()]
                 most_common = Counter(methods).most_common(1)[0] if methods else ("CAA", 0)
                 print(f"   🏆 Most common best method: {most_common[0]} ({most_common[1]}/{len(methods)} tasks)")
-                
+
                 # Save to config
                 config_manager.update_model_config(args.model, model_config)
         else:
@@ -6803,28 +6178,28 @@ def handle_full_optimization_command(args):
         if not args.skip_steering and not args.skip_sample_size:
             print("\n📏 Step 6: Steering Sample Size Optimization")
             print("   🎯 Finding optimal training size for steering methods")
-            
+
             steering_sample_results = {}
             for idx, task in enumerate(tasks):
                 try:
                     # Get best steering method for this task
                     best_steering = model_config.get("steering_optimization", {}).get(task)
-                    if not best_steering or best_steering.get('method') == 'none':
-                        print(f"\n   ⏭️  [{idx+1}/{len(tasks)}] Skipping {task} (no valid steering method found)")
+                    if not best_steering or best_steering.get("method") == "none":
+                        print(f"\n   ⏭️  [{idx + 1}/{len(tasks)}] Skipping {task} (no valid steering method found)")
                         continue
-                        
-                    print(f"\n   🔄 [{idx+1}/{len(tasks)}] Optimizing sample size for {task}...")
+
+                    print(f"\n   🔄 [{idx + 1}/{len(tasks)}] Optimizing sample size for {task}...")
                     print(f"      • Method: {best_steering['method']}")
                     print(f"      • Layer: {best_steering['layer']}")
                     print(f"      • Strength: {best_steering['strength']}")
-                    
+
                     # Run sample size optimization for steering
                     from .core.sample_size_optimizer_v2 import optimize_sample_size
-                    
+
                     sample_result = optimize_sample_size(
                         model_name=args.model,
                         task_name=task,
-                        layer=best_steering['layer'],
+                        layer=best_steering["layer"],
                         method_type="steering",
                         sample_sizes=args.sample_sizes,
                         test_size=min(200, args.steering_limit or 200),
@@ -6832,41 +6207,42 @@ def handle_full_optimization_command(args):
                         verbose=False,
                         save_plot=args.save_plots,
                         save_to_config=False,  # We'll save manually
-                        steering_method=best_steering['method'],
-                        steering_strength=best_steering['strength'],
+                        steering_method=best_steering["method"],
+                        steering_strength=best_steering["strength"],
                     )
-                    
+
                     if sample_result and sample_result.get("optimal_sample_size"):
                         optimal_size = sample_result["optimal_sample_size"]
                         print(f"      ✅ Optimal sample size: {optimal_size}")
                         print(f"      📊 Accuracy: {sample_result.get('optimal_accuracy', 'N/A')}")
                         steering_sample_results[task] = optimal_size
-                        
+
                         # Save to model config
                         if "steering_sample_sizes" not in model_config:
                             model_config["steering_sample_sizes"] = {}
                         model_config["steering_sample_sizes"][task] = {
-                            str(best_steering['layer']): optimal_size,
-                            "method": best_steering['method'],
-                            "strength": best_steering['strength']
+                            str(best_steering["layer"]): optimal_size,
+                            "method": best_steering["method"],
+                            "strength": best_steering["strength"],
                         }
                     else:
                         print("      ❌ Sample size optimization failed")
-                        
+
                 except Exception as e:
                     print(f"      ❌ Error: {e}")
                     if args.verbose:
                         import traceback
+
                         traceback.print_exc()
-            
+
             if steering_sample_results:
                 print("\n✅ Steering sample size optimization completed!")
                 print(f"   📊 Optimized {len(steering_sample_results)}/{len(tasks)} tasks")
-                
+
                 # Calculate average sample size
                 avg_size = sum(steering_sample_results.values()) / len(steering_sample_results)
                 print(f"   📏 Average optimal sample size: {avg_size:.0f}")
-                
+
                 # Save to config
                 config_manager.update_model_config(args.model, model_config)
         else:
@@ -6884,12 +6260,8 @@ def handle_full_optimization_command(args):
             print("   📏 Optimal steering sample sizes determined")
         print("   🚀 Ready to use optimized parameters with 'wisent-guard tasks'")
         print("\n   Example usage:")
-        print(
-            f"   $ wisent-guard tasks {tasks[0] if tasks else 'truthfulqa_mc1'} --model {args.model}"
-        )
-        print(
-            "   (Will automatically use optimal parameters, cached classifier, control vector, and steering)"
-        )
+        print(f"   $ wisent-guard tasks {tasks[0] if tasks else 'truthfulqa_mc1'} --model {args.model}")
+        print("   (Will automatically use optimal parameters, cached classifier, control vector, and steering)")
 
     except Exception as e:
         print(f"\n❌ Full optimization failed: {e}")
@@ -6917,93 +6289,89 @@ def handle_generate_vector_command(args):
                 print("❌ Single-property mode requires --from-pairs or --from-description")
                 sys.exit(1)
             print("🎯 Generating steering vector...")
-        
+
         print(f"   📊 Model: {args.model}")
         print(f"   🎯 Method: {args.method}")
         if not args.multi_property:
             print(f"   📍 Layer: {args.layer}")
         print(f"   💾 Output: {args.output}")
-        
+
         # Load model
         from .core.model import Model
+
         model = Model(name=args.model, device=args.device)
-        
+
         # Handle multi-property mode
         if args.multi_property:
-            from .core.steering_methods.dac import DAC
-            from .core.response import PositiveResponse, NegativeResponse
-            from .core.contrastive_pairs import ContrastivePairSet, ContrastivePair
-            from .core.layer import Layer
             import json
-            
-            method = DAC(
-                dynamic_control=args.dynamic_control,
-                entropy_threshold=args.entropy_threshold
-            )
-            
+
+            from .core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+            from .core.layer import Layer
+            from .core.response import NegativeResponse, PositiveResponse
+            from .core.steering_methods.dac import DAC
+
+            method = DAC(dynamic_control=args.dynamic_control, entropy_threshold=args.entropy_threshold)
+
             property_pairs = {}
-            
+
             # Process property files
             if args.property_files:
                 for prop_def in args.property_files:
-                    parts = prop_def.split(':')
+                    parts = prop_def.split(":")
                     if len(parts) != 3:
                         print(f"❌ Invalid property file format: {prop_def}")
                         print("   Expected format: property_name:pairs_file:layer")
                         sys.exit(1)
-                    
+
                     prop_name, pairs_file, layer_str = parts
                     try:
                         layer = int(layer_str)
                     except ValueError:
                         print(f"❌ Invalid layer number: {layer_str}")
                         sys.exit(1)
-                    
+
                     print(f"\n📄 Loading {prop_name} from: {pairs_file}")
-                    with open(pairs_file, 'r') as f:
+                    with open(pairs_file) as f:
                         pairs_data = json.load(f)
-                    
+
                     # Create ContrastivePairSet
                     pairs = ContrastivePairSet(name=prop_name)
                     for pair_data in pairs_data:
                         pair = ContrastivePair(
-                            prompt=pair_data.get('prompt', ''),
-                            positive_response=PositiveResponse(pair_data.get('positive_response', '')),
-                            negative_response=NegativeResponse(pair_data.get('negative_response', ''))
+                            prompt=pair_data.get("prompt", ""),
+                            positive_response=PositiveResponse(pair_data.get("positive_response", "")),
+                            negative_response=NegativeResponse(pair_data.get("negative_response", "")),
                         )
                         pairs.pairs.append(pair)
-                    
+
                     print(f"   ✅ Loaded {len(pairs.pairs)} pairs for {prop_name}")
                     property_pairs[prop_name] = (pairs, layer)
-            
+
             # Process property descriptions
             if args.property_descriptions:
                 from .core.contrastive_pairs import generate_synthetic_pairs_cli
-                
+
                 for prop_def in args.property_descriptions:
-                    parts = prop_def.split(':')
+                    parts = prop_def.split(":")
                     if len(parts) != 3:
                         print(f"❌ Invalid property description format: {prop_def}")
                         print("   Expected format: property_name:description:layer")
                         sys.exit(1)
-                    
+
                     prop_name, description, layer_str = parts
                     try:
                         layer = int(layer_str)
                     except ValueError:
                         print(f"❌ Invalid layer number: {layer_str}")
                         sys.exit(1)
-                    
+
                     print(f"\n🤖 Generating pairs for {prop_name}: {description}")
                     pairs = generate_synthetic_pairs_cli(
-                        trait_description=description,
-                        num_pairs=args.num_pairs,
-                        output_file=None,
-                        model=model
+                        trait_description=description, num_pairs=args.num_pairs, output_file=None, model=model
                     )
                     print(f"   ✅ Generated {len(pairs.pairs)} pairs for {prop_name}")
                     property_pairs[prop_name] = (pairs, layer)
-            
+
             # Extract activations for all properties
             print("\n🔍 Extracting activations for all properties...")
             for prop_name, (pairs, layer) in property_pairs.items():
@@ -7012,39 +6380,40 @@ def handle_generate_vector_command(args):
                 for pair in pairs.pairs:
                     # Extract positive activations
                     positive_activations = model.extract_activations(
-                        pair.prompt + " " + pair.positive_response.text,
-                        layer=layer_obj
+                        pair.prompt + " " + pair.positive_response.text, layer=layer_obj
                     )
                     pair.positive_response.activations = positive_activations
-                    
+
                     # Extract negative activations
                     negative_activations = model.extract_activations(
-                        pair.prompt + " " + pair.negative_response.text,
-                        layer=layer_obj
+                        pair.prompt + " " + pair.negative_response.text, layer=layer_obj
                     )
                     pair.negative_response.activations = negative_activations
-            
+
             # Train multi-property DAC
-            print(f"\n🎯 Training multi-property DAC...")
+            print("\n🎯 Training multi-property DAC...")
             all_stats = method.train_multi_property(property_pairs)
-            
+
             for prop_name, stats in all_stats.items():
-                print(f"   ✅ {prop_name} vector trained (layer {property_pairs[prop_name][1]}, norm: {stats['vector_norm']:.4f})")
-            
+                print(
+                    f"   ✅ {prop_name} vector trained (layer {property_pairs[prop_name][1]}, norm: {stats['vector_norm']:.4f})"
+                )
+
             # Save the multi-property vector
             print(f"\n💾 Saving multi-property steering vector to: {args.output}")
             import os
-            os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else '.', exist_ok=True)
-            
+
+            os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
+
             # Use DAC's built-in save method
             method.save_steering_vector(args.output)
-            
+
             print("\n✅ Multi-property steering vector generated successfully!")
             print(f"   Properties: {list(property_pairs.keys())}")
-            print(f"\n   You can now use this vector with multi-property steering!")
-            
+            print("\n   You can now use this vector with multi-property steering!")
+
             return
-        
+
         # Single-property mode (original code)
         # Get or generate contrastive pairs
         pairs = None
@@ -7052,150 +6421,150 @@ def handle_generate_vector_command(args):
             # Load pairs from file
             print(f"\n📄 Loading pairs from: {args.from_pairs}")
             import json
-            with open(args.from_pairs, 'r') as f:
+
+            with open(args.from_pairs) as f:
                 pairs_data = json.load(f)
-            
+
             # Convert to ContrastivePairSet
-            from .core.response import PositiveResponse, NegativeResponse
-            from .core.contrastive_pairs import ContrastivePairSet, ContrastivePair
+            from .core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+            from .core.response import NegativeResponse, PositiveResponse
+
             pairs = ContrastivePairSet(name="loaded_from_file")
             for pair_data in pairs_data:
                 pair = ContrastivePair(
-                    prompt=pair_data.get('prompt', ''),
-                    positive_response=PositiveResponse(pair_data.get('positive_response', '')),
-                    negative_response=NegativeResponse(pair_data.get('negative_response', ''))
+                    prompt=pair_data.get("prompt", ""),
+                    positive_response=PositiveResponse(pair_data.get("positive_response", "")),
+                    negative_response=NegativeResponse(pair_data.get("negative_response", "")),
                 )
                 pairs.pairs.append(pair)
             print(f"   ✅ Loaded {len(pairs.pairs)} pairs")
-            
+
         else:  # from_description
             print(f"\n🤖 Generating pairs for trait: {args.from_description}")
             print(f"   📊 Number of pairs: {args.num_pairs}")
-            
+
             # Generate pairs
             from .core.contrastive_pairs import generate_synthetic_pairs_cli
+
             pairs = generate_synthetic_pairs_cli(
                 trait_description=args.from_description,
                 num_pairs=args.num_pairs,
                 output_file=args.save_pairs,
-                model=model
+                model=model,
             )
             print(f"   ✅ Generated {len(pairs.pairs)} pairs")
-            
+
             if args.save_pairs:
                 print(f"   💾 Saved pairs to: {args.save_pairs}")
-        
+
         # Extract activations
         print("\n🔍 Extracting activations...")
         from .core.layer import Layer
+
         layer = Layer(args.layer)
         for pair in pairs.pairs:
             # Extract positive activations
             positive_activations = model.extract_activations(
-                pair.prompt + " " + pair.positive_response.text,
-                layer=layer
+                pair.prompt + " " + pair.positive_response.text, layer=layer
             )
             pair.positive_response.activations = positive_activations
-            
+
             # Extract negative activations
             negative_activations = model.extract_activations(
-                pair.prompt + " " + pair.negative_response.text,
-                layer=layer
+                pair.prompt + " " + pair.negative_response.text, layer=layer
             )
             pair.negative_response.activations = negative_activations
-        
+
         # Create and train steering method
         print(f"\n🎯 Training {args.method} steering vector...")
-        
+
         if args.method == "DAC":
             from .core.steering_methods.dac import DAC
-            method = DAC(
-                dynamic_control=args.dynamic_control,
-                entropy_threshold=args.entropy_threshold
-            )
+
+            method = DAC(dynamic_control=args.dynamic_control, entropy_threshold=args.entropy_threshold)
         elif args.method == "CAA":
             from .core.steering_methods.caa import CAA
+
             method = CAA()
         elif args.method == "HPR":
             from .core.steering_methods.hpr import HPR
+
             method = HPR(beta=args.beta)
         elif args.method == "BiPO":
             from .core.steering_methods.bipo import BiPO
+
             method = BiPO()
         elif args.method == "ControlVectorSteering":
             from .core.steering_methods.control_vector_steering import ControlVectorSteering
+
             # For ControlVectorSteering, we need to compute the vector first
             positive_acts = torch.cat([pair.positive_response.activations.unsqueeze(0) for pair in pairs.pairs])
             negative_acts = torch.cat([pair.negative_response.activations.unsqueeze(0) for pair in pairs.pairs])
             control_vector = (positive_acts - negative_acts).mean(dim=0)
-            method = ControlVectorSteering(
-                control_vector=control_vector,
-                layer=args.layer
-            )
-        
+            method = ControlVectorSteering(control_vector=control_vector, layer=args.layer)
+
         # Train the method
         if args.method != "ControlVectorSteering":
-            method.train(
-                contrastive_pair_set=pairs,
-                layer_index=args.layer
-            )
-        
+            method.train(contrastive_pair_set=pairs, layer_index=args.layer)
+
         # Save the steering vector
         print(f"\n💾 Saving steering vector to: {args.output}")
-        
+
         # Create output directory if needed
         import os
-        os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else '.', exist_ok=True)
-        
+
+        os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
+
         # Save in a format compatible with our demo script
         save_data = {
-            'method': args.method,
-            'steering_vector': method.steering_vector if hasattr(method, 'steering_vector') else None,
-            'layer_index': args.layer,
-            'trait_description': args.from_description if args.from_description else 'loaded from file',
-            'num_pairs': len(pairs.pairs),
-            'model_name': args.model
+            "method": args.method,
+            "steering_vector": method.steering_vector if hasattr(method, "steering_vector") else None,
+            "layer_index": args.layer,
+            "trait_description": args.from_description if args.from_description else "loaded from file",
+            "num_pairs": len(pairs.pairs),
+            "model_name": args.model,
         }
-        
+
         # Add method-specific data
         if args.method == "DAC":
-            save_data['dynamic_control'] = args.dynamic_control
-            save_data['entropy_threshold'] = args.entropy_threshold
-            save_data['aggregation_method'] = 'caa'  # Default for DAC
-            
+            save_data["dynamic_control"] = args.dynamic_control
+            save_data["entropy_threshold"] = args.entropy_threshold
+            save_data["aggregation_method"] = "caa"  # Default for DAC
+
             # Add training stats
-            if hasattr(method, 'steering_vector') and method.steering_vector is not None:
+            if hasattr(method, "steering_vector") and method.steering_vector is not None:
                 vector_norm = torch.norm(method.steering_vector).item()
                 vector_mean = method.steering_vector.mean().item()
                 vector_std = method.steering_vector.std().item()
-                save_data['training_stats'] = {
-                    'num_pairs': len(pairs.pairs),
-                    'vector_norm': vector_norm,
-                    'vector_mean': vector_mean,
-                    'vector_std': vector_std,
-                    'vector_shape': list(method.steering_vector.shape),
-                    'aggregation_method': 'caa'
+                save_data["training_stats"] = {
+                    "num_pairs": len(pairs.pairs),
+                    "vector_norm": vector_norm,
+                    "vector_mean": vector_mean,
+                    "vector_std": vector_std,
+                    "vector_shape": list(method.steering_vector.shape),
+                    "aggregation_method": "caa",
                 }
         elif args.method == "HPR":
-            save_data['beta'] = args.beta
-            if hasattr(method, 'householder_matrix'):
-                save_data['householder_matrix'] = method.householder_matrix
+            save_data["beta"] = args.beta
+            if hasattr(method, "householder_matrix"):
+                save_data["householder_matrix"] = method.householder_matrix
         elif args.method == "ControlVectorSteering":
-            save_data['vector'] = method.control_vector
-            save_data['layer'] = args.layer
-        
+            save_data["vector"] = method.control_vector
+            save_data["layer"] = args.layer
+
         torch.save(save_data, args.output)
-        
+
         print("\n✅ Steering vector generated successfully!")
         print(f"   📏 Vector shape: {method.steering_vector.shape if hasattr(method, 'steering_vector') else 'N/A'}")
-        if hasattr(method, 'steering_vector') and method.steering_vector is not None:
+        if hasattr(method, "steering_vector") and method.steering_vector is not None:
             print(f"   📊 Vector norm: {torch.norm(method.steering_vector).item():.4f}")
-        print(f"\n   You can now use this vector with:")
-        print(f"   $ python demo_steering_generation.py \"Your prompt\" --steering-vector {args.output}")
-        
+        print("\n   You can now use this vector with:")
+        print(f'   $ python demo_steering_generation.py "Your prompt" --steering-vector {args.output}')
+
     except Exception as e:
         print(f"\n❌ Error generating steering vector: {e}")
         import traceback
+
         if args.verbose:
             traceback.print_exc()
         sys.exit(1)
@@ -7206,30 +6575,30 @@ def handle_multi_steer_command(args):
     try:
         print("🎯 Multi-Vector Steering")
         print("=" * 60)
-        
+
         # Parse vector-weight pairs
         vectors_info = []
         total_weight = 0.0
-        
+
         print("\n📊 Loading steering vectors:")
         for vector_spec in args.vector:
-            parts = vector_spec.split(':')
+            parts = vector_spec.split(":")
             if len(parts) != 2:
                 print(f"❌ Invalid vector specification: {vector_spec}")
                 print("   Expected format: path/to/vector.pt:weight")
                 sys.exit(1)
-            
+
             path, weight_str = parts
             try:
                 weight = float(weight_str)
             except ValueError:
                 print(f"❌ Invalid weight: {weight_str}")
                 sys.exit(1)
-            
+
             vectors_info.append((path, weight))
             total_weight += weight
             print(f"   • {path}: weight={weight}")
-        
+
         # Check weight normalization
         if args.normalize_weights:
             print(f"\n📏 Normalizing weights (sum={total_weight:.2f} → 1.0)")
@@ -7237,160 +6606,153 @@ def handle_multi_steer_command(args):
             print(f"\n⚠️  Warning: Weights sum to {total_weight:.2f} (not 1.0)")
             print("   Use --normalize-weights to normalize or --allow-unnormalized to proceed")
             sys.exit(1)
-        
+
         # Load model
         print(f"\n📦 Loading model: {args.model}")
         from .core.model import Model
+
         model = Model(name=args.model, device=args.device)
-        
+
         # Load and combine vectors
         print("\n🔄 Loading and combining vectors...")
-        from .core.steering_methods.dac import DAC
         from .core.layer import Layer
-        
+        from .core.steering_methods.dac import DAC
+
         # Create DAC instance for vector combination
         dac = DAC(device=args.device)
-        
+
         # Load all vectors
         loaded_vectors = []
         weights = []
-        
+
         for path, weight in vectors_info:
             print(f"   Loading {path}...")
             data = torch.load(path, map_location=args.device)
-            
+
             # Extract vector based on format
-            if 'steering_vector' in data:
-                vector = data['steering_vector']
-            elif 'vector' in data:
-                vector = data['vector']
-            elif 'property_vectors' in data:
+            if "steering_vector" in data:
+                vector = data["steering_vector"]
+            elif "vector" in data:
+                vector = data["vector"]
+            elif "property_vectors" in data:
                 # Handle multi-property files
-                if 'default' in data['property_vectors']:
-                    vector = data['property_vectors']['default']['vector']
+                if "default" in data["property_vectors"]:
+                    vector = data["property_vectors"]["default"]["vector"]
                 else:
                     # Use first property
-                    first_prop = list(data['property_vectors'].values())[0]
-                    vector = first_prop['vector']
+                    first_prop = list(data["property_vectors"].values())[0]
+                    vector = first_prop["vector"]
             else:
                 print(f"❌ Could not find steering vector in {path}")
                 sys.exit(1)
-            
+
             loaded_vectors.append(vector)
             weights.append(weight)
-        
+
         # Combine vectors
         combined_vector = DAC.combine_steering_vectors(
-            loaded_vectors, 
-            weights, 
-            normalize_weights=args.normalize_weights
+            loaded_vectors, weights, normalize_weights=args.normalize_weights
         )
-        
+
         print(f"\n✅ Combined {len(loaded_vectors)} vectors")
         print(f"   📏 Combined vector shape: {combined_vector.shape}")
         print(f"   📊 Combined vector norm: {torch.norm(combined_vector).item():.4f}")
-        
+
         # Save combined vector if requested
         if args.save_combined:
             print(f"\n💾 Saving combined vector to: {args.save_combined}")
             save_data = {
-                'method': 'DAC',
-                'steering_vector': combined_vector,
-                'layer_index': args.layer,
-                'combination_info': {
-                    'source_vectors': [path for path, _ in vectors_info],
-                    'weights': weights,
-                    'normalized': args.normalize_weights
-                }
+                "method": "DAC",
+                "steering_vector": combined_vector,
+                "layer_index": args.layer,
+                "combination_info": {
+                    "source_vectors": [path for path, _ in vectors_info],
+                    "weights": weights,
+                    "normalized": args.normalize_weights,
+                },
             }
             torch.save(save_data, args.save_combined)
-        
+
         # Apply combined steering and generate
-        print(f"\n🚀 Generating with combined steering...")
+        print("\n🚀 Generating with combined steering...")
         print(f"   📝 Prompt: {args.prompt}")
         print(f"   📍 Layer: {args.layer}")
         print(f"   🔢 Max tokens: {args.max_new_tokens}")
-        
+
         # Create a temporary DAC instance with the combined vector
         layer = Layer(args.layer)
         dac.steering_vector = combined_vector
         dac.layer_index = args.layer
         dac.is_trained = True
-        
+
         # Add property vector for compatibility
-        from .core.steering_methods.dac import PropertyVector
         from .core.aggregation import ControlVectorAggregationMethod
-        dac.property_vectors['combined'] = PropertyVector(
-            name='combined',
+        from .core.steering_methods.dac import PropertyVector
+
+        dac.property_vectors["combined"] = PropertyVector(
+            name="combined",
             vector=combined_vector,
             layer_index=args.layer,
-            training_stats={'method': 'combined', 'weights': weights},
-            aggregation_method=ControlVectorAggregationMethod.CAA
+            training_stats={"method": "combined", "weights": weights},
+            aggregation_method=ControlVectorAggregationMethod.CAA,
         )
-        
+
         # Generate with combined steering
         hooks = []
+
         def steering_hook(module, input, output):
             if isinstance(output, tuple):
                 hidden_states = output[0]
             else:
                 hidden_states = output
-            
+
             # Apply combined steering
-            steered = dac.apply_steering(
-                hidden_states,
-                strength=1.0,
-                active_properties=['combined']
-            )
-            
+            steered = dac.apply_steering(hidden_states, strength=1.0, active_properties=["combined"])
+
             if isinstance(output, tuple):
                 return (steered,) + output[1:]
-            else:
-                return steered
-        
+            return steered
+
         # Apply hook to the specified layer
-        if hasattr(model.hf_model, 'model') and hasattr(model.hf_model.model, 'layers'):
+        if hasattr(model.hf_model, "model") and hasattr(model.hf_model.model, "layers"):
             layer_module = model.hf_model.model.layers[args.layer]
-        elif hasattr(model.hf_model, 'transformer') and hasattr(model.hf_model.transformer, 'h'):
+        elif hasattr(model.hf_model, "transformer") and hasattr(model.hf_model.transformer, "h"):
             layer_module = model.hf_model.transformer.h[args.layer]
         else:
             print("❌ Could not find model layers")
             sys.exit(1)
-        
+
         handle = layer_module.register_forward_hook(steering_hook)
         hooks.append(handle)
-        
+
         try:
             # Generate
-            response, _ = model.generate(
-                args.prompt,
-                layer_index=args.layer,
-                max_new_tokens=args.max_new_tokens
-            )
-            
+            response, _ = model.generate(args.prompt, layer_index=args.layer, max_new_tokens=args.max_new_tokens)
+
             print("\n" + "=" * 60)
             print("📝 Generated Response:")
             print("=" * 60)
             print(response)
-            
+
             if args.verbose:
                 print("\n📊 Combination Details:")
                 for i, (path, weight) in enumerate(vectors_info):
                     norm_weight = weights[i] if args.normalize_weights else weight
-                    print(f"   • Vector {i+1}: {path}")
+                    print(f"   • Vector {i + 1}: {path}")
                     print(f"     Weight: {weight} → {norm_weight:.4f}")
                     print(f"     Contribution: {norm_weight * torch.norm(loaded_vectors[i]).item():.4f}")
-            
+
         finally:
             # Remove hooks
             for hook in hooks:
                 hook.remove()
-        
+
         print("\n✅ Multi-vector steering completed successfully!")
-        
+
     except Exception as e:
         print(f"\n❌ Error in multi-vector steering: {e}")
         import traceback
+
         if args.verbose:
             traceback.print_exc()
         sys.exit(1)

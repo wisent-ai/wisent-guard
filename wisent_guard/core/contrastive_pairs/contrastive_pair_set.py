@@ -1,4 +1,3 @@
-import csv
 import json
 import logging
 import random
@@ -28,18 +27,14 @@ class ContrastivePairSet:
             negative_text, negative_activations = model.generate(
                 pair.prompt, layer.index, temperature=1.2, do_sample=True
             )
-            pair.negative_response = NegativeResponse(
-                text=negative_text, activations=negative_activations
-            )
+            pair.negative_response = NegativeResponse(text=negative_text, activations=negative_activations)
 
     def label_responses_by_task(self, task):
         """Label responses as positive/negative based on task-specific criteria."""
         for pair in self.pairs:
             # Evaluate if the positive response is actually correct
             if hasattr(pair, "document"):  # Store document for evaluation
-                evaluation = self.evaluate_response_with_task(
-                    task, pair.document, pair.positive_response.text
-                )
+                evaluation = self.evaluate_response_with_task(task, pair.document, pair.positive_response.text)
 
                 if not evaluation["correct"]:
                     # Swap positive and negative if the "positive" is actually bad
@@ -65,9 +60,7 @@ class ContrastivePairSet:
             neg_text = random.choice(false_responses)
             neg_resp = NegativeResponse(text=neg_text)
 
-            pair = ContrastivePair(
-                prompt=prompt, positive_response=pos_resp, negative_response=neg_resp
-            )
+            pair = ContrastivePair(prompt=prompt, positive_response=pos_resp, negative_response=neg_resp)
             pair.document = doc  # Store for later evaluation
             self.pairs.append(pair)
 
@@ -96,9 +89,7 @@ class ContrastivePairSet:
 
             neg_resp = NegativeResponse(text=neg_text)
 
-            pair = ContrastivePair(
-                prompt=prompt, positive_response=pos_resp, negative_response=neg_resp
-            )
+            pair = ContrastivePair(prompt=prompt, positive_response=pos_resp, negative_response=neg_resp)
             pair.document = doc  # Store for later evaluation
             self.pairs.append(pair)
 
@@ -123,14 +114,10 @@ class ContrastivePairSet:
             # Create a simple prompt
             prompt = f"Respond to this: {harmless_text[:50]}..."
 
-            pair = ContrastivePair(
-                prompt=prompt, positive_response=pos_resp, negative_response=neg_resp
-            )
+            pair = ContrastivePair(prompt=prompt, positive_response=pos_resp, negative_response=neg_resp)
             self.pairs.append(pair)
 
-    def create_multiple_choice_from_phrases(
-        self, phrase_pairs: List[Dict[str, str]], model
-    ) -> None:
+    def create_multiple_choice_from_phrases(self, phrase_pairs: List[Dict[str, str]], model) -> None:
         """
         Convert phrase pairs to multiple-choice format using the model's formatting.
 
@@ -146,9 +133,7 @@ class ContrastivePairSet:
                 continue
 
             # Use model's multiple choice conversion
-            harmful_mc, harmless_mc = model.convert_to_multiple_choice(
-                harmful_text, harmless_text
-            )
+            harmful_mc, harmless_mc = model.convert_to_multiple_choice(harmful_text, harmless_text)
 
             # Create responses
             pos_resp = PositiveResponse(text=harmless_mc)  # Harmless choice is positive
@@ -158,14 +143,10 @@ class ContrastivePairSet:
             question = "Which of the following statements is better?"
             prompt = f"{question}\nA. {harmless_text}\nB. {harmful_text}"
 
-            pair = ContrastivePair(
-                prompt=prompt, positive_response=pos_resp, negative_response=neg_resp
-            )
+            pair = ContrastivePair(prompt=prompt, positive_response=pos_resp, negative_response=neg_resp)
             self.pairs.append(pair)
 
-    def create_multiple_choice_questions(
-        self, questions: List[Dict[str, Any]], model
-    ) -> None:
+    def create_multiple_choice_questions(self, questions: List[Dict[str, Any]], model) -> None:
         """
         Create contrastive pairs from multiple-choice questions.
 
@@ -175,13 +156,9 @@ class ContrastivePairSet:
         """
         for q in questions:
             # Create A (correct) and B (incorrect) response phrases
-            a_phrase = model.format_multiple_choice(
-                q["question"], q["choice_a"], q["choice_b"], "A"
-            )
+            a_phrase = model.format_multiple_choice(q["question"], q["choice_a"], q["choice_b"], "A")
 
-            b_phrase = model.format_multiple_choice(
-                q["question"], q["choice_a"], q["choice_b"], "B"
-            )
+            b_phrase = model.format_multiple_choice(q["question"], q["choice_a"], q["choice_b"], "B")
 
             # Create ContrastivePair
             pos_resp = PositiveResponse(text=a_phrase)  # A is correct/harmless
@@ -196,28 +173,46 @@ class ContrastivePairSet:
 
     def extract_activations_with_model(self, model, layer):
         """Extract activations for all responses using the model."""
-        for pair in self.pairs:
+        extraction_errors = []
+        successful_extractions = 0
+        
+        for i, pair in enumerate(self.pairs):
             # Extract activations for positive response
             if pair.positive_response.text:
                 try:
                     # Use model's activation extraction
-                    activations_tensor = model.extract_activations(
-                        pair.positive_response.text, layer
-                    )
+                    activations_tensor = model.extract_activations(pair.positive_response.text, layer)
                     pair.positive_response.activations = activations_tensor
+                    successful_extractions += 1
                 except Exception as e:
-                    print(f"Error extracting positive activations: {e}")
+                    error_msg = f"Pair {i} positive response: {str(e)}"
+                    extraction_errors.append(error_msg)
+                    logger.error(f"Error extracting positive activations: {e}")
 
             # Extract activations for negative response
             if pair.negative_response.text:
                 try:
                     # Use model's activation extraction
-                    activations_tensor = model.extract_activations(
-                        pair.negative_response.text, layer
-                    )
+                    activations_tensor = model.extract_activations(pair.negative_response.text, layer)
                     pair.negative_response.activations = activations_tensor
+                    successful_extractions += 1
                 except Exception as e:
-                    print(f"Error extracting negative activations: {e}")
+                    error_msg = f"Pair {i} negative response: {str(e)}"
+                    extraction_errors.append(error_msg)
+                    logger.error(f"Error extracting negative activations: {e}")
+        
+        # Log summary
+        total_expected = len(self.pairs) * 2  # positive and negative for each pair
+        logger.info(f"Activation extraction completed: {successful_extractions}/{total_expected} successful")
+        
+        if extraction_errors:
+            logger.warning(f"Encountered {len(extraction_errors)} extraction errors")
+            if len(extraction_errors) == total_expected:
+                # All extractions failed - this is likely a systematic issue
+                raise RuntimeError(
+                    f"All activation extractions failed. First error: {extraction_errors[0]}. "
+                    f"Check that the model and layer are correctly configured."
+                )
 
     def get_activation_pairs(self) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         """Get positive and negative activations for training."""
@@ -415,18 +410,14 @@ class ContrastivePairSet:
                     category_total += 1
                     total_predictions += 1
 
-            category_accuracy = (
-                category_correct / category_total if category_total > 0 else 0.0
-            )
+            category_accuracy = category_correct / category_total if category_total > 0 else 0.0
             results["category_results"][category] = {
                 "accuracy": category_accuracy,
                 "correct": category_correct,
                 "total": category_total,
             }
 
-        results["overall_accuracy"] = (
-            correct_predictions / total_predictions if total_predictions > 0 else 0.0
-        )
+        results["overall_accuracy"] = correct_predictions / total_predictions if total_predictions > 0 else 0.0
 
         return results
 
@@ -462,10 +453,7 @@ class ContrastivePairSet:
         # Determine how to create pairs based on task name
         if "truthfulqa" in name.lower():
             pair_set.create_truthfulqa_pairs(task, docs, prompts, references)
-        elif any(
-            mc_task in name.lower()
-            for mc_task in ["hellaswag", "mmlu", "arc", "winogrande", "piqa"]
-        ):
+        elif any(mc_task in name.lower() for mc_task in ["hellaswag", "mmlu", "arc", "winogrande", "piqa"]):
             pair_set.create_multiple_choice_pairs(task, docs, prompts, references)
         else:
             # Default: create simple pairs with reference as positive
@@ -513,16 +501,13 @@ class ContrastivePairSet:
         """Extract task name from task object."""
         if hasattr(task, "NAME"):
             return task.NAME
-        elif hasattr(task, "_name"):
+        if hasattr(task, "_name"):
             return task._name
-        elif hasattr(task, "task_name"):
+        if hasattr(task, "task_name"):
             return task.task_name
-        else:
-            return str(type(task).__name__).lower()
+        return str(type(task).__name__).lower()
 
-    def evaluate_response_with_task(
-        self, task, doc: Dict[str, Any], response: str
-    ) -> Dict[str, Any]:
+    def evaluate_response_with_task(self, task, doc: Dict[str, Any], response: str) -> Dict[str, Any]:
         """
         Evaluate response using task-specific logic.
 
@@ -586,20 +571,14 @@ class ContrastivePairSet:
 
             if evaluation["correct"]:
                 # Correct response is harmless
-                pos_resp = PositiveResponse(
-                    text=f"Question: {doc.get('question', '')} Correct answer: {response}"
-                )
-                neg_resp = NegativeResponse(
-                    text=f"Question: {doc.get('question', '')} Wrong answer: [INCORRECT]"
-                )
+                pos_resp = PositiveResponse(text=f"Question: {doc.get('question', '')} Correct answer: {response}")
+                neg_resp = NegativeResponse(text=f"Question: {doc.get('question', '')} Wrong answer: [INCORRECT]")
             else:
                 # Incorrect response is harmful
                 pos_resp = PositiveResponse(
                     text=f"Question: {doc.get('question', '')} Correct answer: {doc.get('target', '[CORRECT]')}"
                 )
-                neg_resp = NegativeResponse(
-                    text=f"Question: {doc.get('question', '')} Wrong answer: {response}"
-                )
+                neg_resp = NegativeResponse(text=f"Question: {doc.get('question', '')} Wrong answer: {response}")
 
             pair = ContrastivePair(
                 prompt=f"Question: {doc.get('question', '')}",
@@ -675,15 +654,11 @@ class ContrastivePairSet:
         phrase_pairs = []
 
         for harmful, harmless in zip(harmful_examples, harmless_examples):
-            phrase_pairs.append(
-                {"harmful": harmful["response"], "harmless": harmless["response"]}
-            )
+            phrase_pairs.append({"harmful": harmful["response"], "harmless": harmless["response"]})
 
         return phrase_pairs
 
-    def create_pairs_from_labeled_responses(
-        self, labeled_data: List[Dict[str, Any]]
-    ) -> None:
+    def create_pairs_from_labeled_responses(self, labeled_data: List[Dict[str, Any]]) -> None:
         """
         Create contrastive pairs from labeled response data.
 
@@ -695,9 +670,7 @@ class ContrastivePairSet:
                 pos_resp = PositiveResponse(text=item["response"])
                 neg_resp = NegativeResponse(text="[INCORRECT RESPONSE]")
             else:
-                pos_resp = PositiveResponse(
-                    text=item.get("reference", "[CORRECT RESPONSE]")
-                )
+                pos_resp = PositiveResponse(text=item.get("reference", "[CORRECT RESPONSE]"))
                 neg_resp = NegativeResponse(text=item["response"])
 
             pair = ContrastivePair(
@@ -743,10 +716,7 @@ class ContrastivePairSet:
         # Process documents based on task type
         if "truthfulqa" in name.lower():
             pair_set._create_truthfulqa_pairs_from_docs(task, docs)
-        elif any(
-            mc_task in name.lower()
-            for mc_task in ["hellaswag", "mmlu", "arc", "winogrande", "piqa"]
-        ):
+        elif any(mc_task in name.lower() for mc_task in ["hellaswag", "mmlu", "arc", "winogrande", "piqa"]):
             pair_set._create_multiple_choice_pairs_from_docs(task, docs)
         else:
             pair_set._create_generic_pairs_from_docs(task, docs)
@@ -789,9 +759,7 @@ class ContrastivePairSet:
         required_cols = [question_col, correct_col, incorrect_col]
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
-            raise ValueError(
-                f"Missing required columns: {missing_cols}. Available columns: {list(df.columns)}"
-            )
+            raise ValueError(f"Missing required columns: {missing_cols}. Available columns: {list(df.columns)}")
 
         pair_set = cls(name=f"{name}_csv", task_type="csv_file")
 
@@ -802,17 +770,11 @@ class ContrastivePairSet:
                 incorrect_answer = str(row[incorrect_col])
 
                 # Skip rows with missing data
-                if (
-                    pd.isna(row[question_col])
-                    or pd.isna(row[correct_col])
-                    or pd.isna(row[incorrect_col])
-                ):
+                if pd.isna(row[question_col]) or pd.isna(row[correct_col]) or pd.isna(row[incorrect_col]):
                     continue
 
                 # Create contrastive pair
-                pair_set._create_qa_contrastive_pair(
-                    question, correct_answer, incorrect_answer
-                )
+                pair_set._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
 
             except Exception as e:
                 print(f"Warning: Skipping row {idx} due to error: {e}")
@@ -859,7 +821,7 @@ class ContrastivePairSet:
         if not json_path.exists():
             raise FileNotFoundError(f"JSON file not found: {json_path}")
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         if not isinstance(data, list):
@@ -882,25 +844,19 @@ class ContrastivePairSet:
                 if "correct_answer" in item and "incorrect_answer" in item:
                     correct_answer = str(item["correct_answer"])
                     incorrect_answer = str(item["incorrect_answer"])
-                    pair_set._create_qa_contrastive_pair(
-                        question, correct_answer, incorrect_answer
-                    )
+                    pair_set._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
 
                 # Handle multiple answers format
                 elif "correct_answers" in item and "incorrect_answers" in item:
                     correct_answers = item["correct_answers"]
                     incorrect_answers = item["incorrect_answers"]
 
-                    if isinstance(correct_answers, list) and isinstance(
-                        incorrect_answers, list
-                    ):
+                    if isinstance(correct_answers, list) and isinstance(incorrect_answers, list):
                         # Use first correct and first incorrect
                         if correct_answers and incorrect_answers:
                             correct_answer = str(correct_answers[0])
                             incorrect_answer = str(incorrect_answers[0])
-                            pair_set._create_qa_contrastive_pair(
-                                question, correct_answer, incorrect_answer
-                            )
+                            pair_set._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
 
             except Exception as e:
                 print(f"Warning: Skipping item {idx} due to error: {e}")
@@ -908,9 +864,7 @@ class ContrastivePairSet:
 
         return pair_set
 
-    def _create_qa_contrastive_pair(
-        self, question: str, correct_answer: str, incorrect_answer: str
-    ):
+    def _create_qa_contrastive_pair(self, question: str, correct_answer: str, incorrect_answer: str):
         """Helper method to create a QA contrastive pair."""
         # Format the prompt
         prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\nWhich is better: {question}\nA. {incorrect_answer}\nB. {correct_answer}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
@@ -921,9 +875,7 @@ class ContrastivePairSet:
         # Create negative response (A - incorrect answer)
         neg_resp = NegativeResponse(text="A")
 
-        pair = ContrastivePair(
-            prompt=prompt, positive_response=pos_resp, negative_response=neg_resp
-        )
+        pair = ContrastivePair(prompt=prompt, positive_response=pos_resp, negative_response=neg_resp)
 
         # Store metadata
         pair.question = question
@@ -976,9 +928,7 @@ class ContrastivePairSet:
                         incorrect_answer = incorrect_answers_list[0]
 
                 if correct_answer and incorrect_answer:
-                    self._create_qa_contrastive_pair(
-                        question, correct_answer, incorrect_answer
-                    )
+                    self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
 
             except Exception as e:
                 print(f"Warning: Skipping TruthfulQA doc due to error: {e}")
@@ -1020,9 +970,7 @@ class ContrastivePairSet:
                 incorrect_idx = random.choice(incorrect_indices)
                 incorrect_answer = choices[incorrect_idx]
 
-                self._create_qa_contrastive_pair(
-                    question, correct_answer, incorrect_answer
-                )
+                self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
 
             except Exception as e:
                 print(f"Warning: Skipping multiple choice doc due to error: {e}")
@@ -1042,16 +990,12 @@ class ContrastivePairSet:
                 if hasattr(task, "doc_to_target"):
                     correct_answer = str(task.doc_to_target(doc))
                 else:
-                    correct_answer = str(
-                        doc.get("target", doc.get("answer", "Correct answer"))
-                    )
+                    correct_answer = str(doc.get("target", doc.get("answer", "Correct answer")))
 
                 # Create a generic incorrect answer
                 incorrect_answer = "Incorrect or irrelevant response"
 
-                self._create_qa_contrastive_pair(
-                    question, correct_answer, incorrect_answer
-                )
+                self._create_qa_contrastive_pair(question, correct_answer, incorrect_answer)
 
             except Exception as e:
                 print(f"Warning: Skipping generic doc due to error: {e}")
@@ -1064,17 +1008,13 @@ class ContrastivePairSet:
 
         if "truthfulqa" in task_name_lower:
             return "truthfulqa"
-        elif any(
-            mc_task in task_name_lower
-            for mc_task in ["hellaswag", "mmlu", "arc", "winogrande", "piqa"]
-        ):
+        if any(mc_task in task_name_lower for mc_task in ["hellaswag", "mmlu", "arc", "winogrande", "piqa"]):
             return "multiple_choice"
-        elif any(bool_task in task_name_lower for bool_task in ["boolq"]):
+        if any(bool_task in task_name_lower for bool_task in ["boolq"]):
             return "boolean"
-        elif any(math_task in task_name_lower for math_task in ["gsm", "math"]):
+        if any(math_task in task_name_lower for math_task in ["gsm", "math"]):
             return "math"
-        else:
-            return "generic"
+        return "generic"
 
     def save_to_csv(self, csv_path: Union[str, Path], include_metadata: bool = True):
         """
@@ -1167,10 +1107,7 @@ class ContrastivePairSet:
         for i, doc in enumerate(docs):
             try:
                 # FIXED: For TruthfulQA, extract just the actual question, not the template
-                if (
-                    "truthfulqa" in task_name.lower()
-                    or "truthful_qa" in task_name.lower()
-                ):
+                if "truthfulqa" in task_name.lower() or "truthful_qa" in task_name.lower():
                     # Use actual question, not the template with examples
                     question = doc.get("question", "")
                 elif task_name == "winogrande":
@@ -1191,18 +1128,12 @@ class ContrastivePairSet:
                     # For code generation tasks, use the problem description/content
                     if task_name == "conala":
                         # Conala uses 'intent' field for the natural language description
-                        question = doc.get(
-                            "intent", doc.get("question_content", doc.get("text", ""))
-                        )
+                        question = doc.get("intent", doc.get("question_content", doc.get("text", "")))
                     elif task_name == "concode":
                         # Concode uses 'nl' field for natural language
-                        question = doc.get(
-                            "nl", doc.get("question_content", doc.get("text", ""))
-                        )
+                        question = doc.get("nl", doc.get("question_content", doc.get("text", "")))
                     else:
-                        question = doc.get(
-                            "question_content", doc.get("text", doc.get("prompt", ""))
-                        )
+                        question = doc.get("question_content", doc.get("text", doc.get("prompt", "")))
                     if not question and "question_title" in doc:
                         question = doc.get("question_title", "")
                 elif task_name.startswith("supergpqa"):
@@ -1227,16 +1158,12 @@ class ContrastivePairSet:
                             question = task_data.doc_to_text(doc)
                         else:
                             question = doc.get("question", str(doc))
-                    except Exception as e:
+                    except Exception:
                         question = str(doc)
 
                 # Skip if we don't have a proper question
                 # Ensure question is a string before calling strip()
-                if (
-                    not question
-                    or not isinstance(question, str)
-                    or len(question.strip()) < 10
-                ):
+                if not question or not isinstance(question, str) or len(question.strip()) < 10:
                     continue
 
                 # Task-specific answer extraction
@@ -1244,10 +1171,7 @@ class ContrastivePairSet:
                 incorrect_answer = None
                 formatted_question = question  # Default to basic question
 
-                if (
-                    "truthfulqa" in task_name.lower()
-                    or "truthful_qa" in task_name.lower()
-                ):
+                if "truthfulqa" in task_name.lower() or "truthful_qa" in task_name.lower():
                     # TruthfulQA-specific extraction - handle both generation and multiple choice formats
                     if "mc1_targets" in doc or "mc2_targets" in doc:
                         # Multiple choice format (truthfulqa_mc1, truthfulqa_mc2)
@@ -1285,15 +1209,11 @@ class ContrastivePairSet:
                     # Use benchmark extractor for winogrande to get formatted_question
                     from ..benchmark_extractors import extract_contrastive_pair
 
-                    contrastive_data = extract_contrastive_pair(
-                        task_name, doc, task_data
-                    )
+                    contrastive_data = extract_contrastive_pair(task_name, doc, task_data)
 
                     if contrastive_data:
                         question = contrastive_data["question"]
-                        correct_answer = contrastive_data.get(
-                            "correct_answer", contrastive_data.get("correct_choice")
-                        )
+                        correct_answer = contrastive_data.get("correct_answer", contrastive_data.get("correct_choice"))
                         incorrect_answer = contrastive_data.get(
                             "incorrect_answer", contrastive_data.get("incorrect_choice")
                         )
@@ -1304,9 +1224,7 @@ class ContrastivePairSet:
                         extractor = get_extractor(task_name)
                         extractor_result = extractor.extract_qa_pair(doc, task_data)
                         formatted_question = (
-                            extractor_result.get("formatted_question", question)
-                            if extractor_result
-                            else question
+                            extractor_result.get("formatted_question", question) if extractor_result else question
                         )
                     else:
                         # Fallback to manual extraction if extractor fails
@@ -1323,9 +1241,7 @@ class ContrastivePairSet:
                                 incorrect_answer = option1
                             else:
                                 continue
-                            formatted_question = (
-                                question  # Use basic question as fallback
-                            )
+                            formatted_question = question  # Use basic question as fallback
                         else:
                             continue
 
@@ -1348,9 +1264,7 @@ class ContrastivePairSet:
                             correct_answer = options[label]
                             # Use the other option as incorrect
                             incorrect_answer = (
-                                options[1 - label]
-                                if len(options) == 2
-                                else options[0 if label != 0 else 1]
+                                options[1 - label] if len(options) == 2 else options[0 if label != 0 else 1]
                             )
                         else:
                             # Fallback
@@ -1409,9 +1323,7 @@ class ContrastivePairSet:
                             for i, option in enumerate(options):
                                 letter = chr(ord("A") + i)
                                 formatted_options.append(f"{letter}. {option}")
-                            formatted_question = f"{question}\n\n" + "\n".join(
-                                formatted_options
-                            )
+                            formatted_question = f"{question}\n\n" + "\n".join(formatted_options)
                         else:
                             formatted_question = question
 
@@ -1431,9 +1343,7 @@ class ContrastivePairSet:
 
                         correct_text = None
                         for pattern in patterns:
-                            match = re.search(
-                                pattern, question, re.MULTILINE | re.DOTALL
-                            )
+                            match = re.search(pattern, question, re.MULTILINE | re.DOTALL)
                             if match:
                                 correct_text = match.group(1).strip()
                                 break
@@ -1441,16 +1351,10 @@ class ContrastivePairSet:
                         if correct_text:
                             correct_answer = correct_text
                             # Find an incorrect choice
-                            other_letters = [
-                                letter
-                                for letter in ["A", "B", "C", "D", "E"]
-                                if letter != answer
-                            ]
+                            other_letters = [letter for letter in ["A", "B", "C", "D", "E"] if letter != answer]
                             for letter in other_letters:
                                 for pattern in patterns:
-                                    pattern_with_letter = pattern.replace(
-                                        answer, letter
-                                    )
+                                    pattern_with_letter = pattern.replace(answer, letter)
                                     match = re.search(
                                         pattern_with_letter,
                                         question,
@@ -1469,9 +1373,7 @@ class ContrastivePairSet:
                         correct_answer = answer
                         incorrect_answer = "Wrong answer"
 
-                    formatted_question = (
-                        question  # Question already contains choices if MC
-                    )
+                    formatted_question = question  # Question already contains choices if MC
 
                 elif (
                     task_name.startswith("aime")
@@ -1479,9 +1381,7 @@ class ContrastivePairSet:
                     or task_name in ["math", "hendrycks_math"]
                 ):
                     # Math task extraction
-                    answer = doc.get(
-                        "Answer", doc.get("answer", doc.get("solution", ""))
-                    )
+                    answer = doc.get("Answer", doc.get("answer", doc.get("solution", "")))
                     if answer:
                         correct_answer = str(answer)
                         # Generate a simple incorrect answer for math problems
@@ -1495,15 +1395,11 @@ class ContrastivePairSet:
                     # Use benchmark-specific extractors for all other tasks
                     from ..benchmark_extractors import extract_contrastive_pair
 
-                    contrastive_data = extract_contrastive_pair(
-                        task_name, doc, task_data
-                    )
+                    contrastive_data = extract_contrastive_pair(task_name, doc, task_data)
 
                     if contrastive_data:
                         question = contrastive_data["question"]
-                        correct_answer = contrastive_data.get(
-                            "correct_answer", contrastive_data.get("correct_choice")
-                        )
+                        correct_answer = contrastive_data.get("correct_answer", contrastive_data.get("correct_choice"))
                         incorrect_answer = contrastive_data.get(
                             "incorrect_answer", contrastive_data.get("incorrect_choice")
                         )
@@ -1515,9 +1411,7 @@ class ContrastivePairSet:
                             extractor = get_extractor(task_name)
                             extractor_result = extractor.extract_qa_pair(doc, task_data)
                             formatted_question = (
-                                extractor_result.get("formatted_question", question)
-                                if extractor_result
-                                else question
+                                extractor_result.get("formatted_question", question) if extractor_result else question
                             )
                         except:
                             formatted_question = question  # Fallback to basic question
@@ -1529,31 +1423,19 @@ class ContrastivePairSet:
                             answer = doc.get("answer", False)
                             correct_answer = "True" if answer else "False"
                             incorrect_answer = "False" if answer else "True"
-                            formatted_question = (
-                                question  # Use basic question as fallback
-                            )
+                            formatted_question = question  # Use basic question as fallback
 
                         # For COPA tasks specifically
-                        elif (
-                            "copa" in task_name.lower()
-                            and "choice1" in doc
-                            and "choice2" in doc
-                        ):
+                        elif "copa" in task_name.lower() and "choice1" in doc and "choice2" in doc:
                             choice1 = doc.get("choice1", "")
                             choice2 = doc.get("choice2", "")
                             label = doc.get("label", 0)
                             correct_answer = choice1 if label == 0 else choice2
                             incorrect_answer = choice2 if label == 0 else choice1
-                            formatted_question = (
-                                question  # Use basic question as fallback
-                            )
+                            formatted_question = question  # Use basic question as fallback
 
                         # For ARC tasks specifically, handle the case where extractor only returns QA pair
-                        elif (
-                            "arc" in task_name.lower()
-                            and "choices" in doc
-                            and "answerKey" in doc
-                        ):
+                        elif "arc" in task_name.lower() and "choices" in doc and "answerKey" in doc:
                             choices = doc.get("choices", {})
                             choice_texts = choices.get("text", [])
                             choice_labels = choices.get("label", [])
@@ -1587,9 +1469,7 @@ class ContrastivePairSet:
                             if isinstance(choices, dict):
                                 # Choices is a dict with 'text' and 'label' keys (e.g., ARC)
                                 choice_texts = choices.get("text", [])
-                                if isinstance(label, int) and 0 <= label < len(
-                                    choice_texts
-                                ):
+                                if isinstance(label, int) and 0 <= label < len(choice_texts):
                                     correct_answer = choice_texts[label]
                                     # Use first different choice as incorrect
                                     for j, choice in enumerate(choice_texts):
@@ -1634,23 +1514,20 @@ class ContrastivePairSet:
 
             except Exception as e:
                 # Skip this document and continue with others
-                logger.warning(
-                    f"⚠️  Skipping document {i} in {task_name} due to extraction error: {e}"
-                )
+                logger.warning(f"⚠️  Skipping document {i} in {task_name} due to extraction error: {e}")
                 continue
 
         # Special handling for LiveCodeBench using model outputs
         if task_name == "livecodebench" and len(qa_pairs) == 0:
             try:
-                from ..benchmark_extractor_impls.livecodebench_model_outputs_extractor import \
-                    LiveCodeBenchModelOutputsExtractor
+                from ..benchmark_extractor_impls.livecodebench_model_outputs_extractor import (
+                    LiveCodeBenchModelOutputsExtractor,
+                )
 
                 extractor = LiveCodeBenchModelOutputsExtractor()
 
                 # Extract contrastive pairs from model outputs
-                contrastive_pairs = extractor.extract_contrastive_pairs(
-                    docs, limit=len(docs)
-                )
+                contrastive_pairs = extractor.extract_contrastive_pairs(docs, limit=len(docs))
 
                 # Convert to QA pair format
                 for pair in contrastive_pairs:
@@ -1664,13 +1541,9 @@ class ContrastivePairSet:
                         }
                     )
 
-                logger.info(
-                    f"Extracted {len(qa_pairs)} LiveCodeBench pairs from model outputs"
-                )
+                logger.info(f"Extracted {len(qa_pairs)} LiveCodeBench pairs from model outputs")
 
             except Exception as e:
-                logger.error(
-                    f"Failed to extract LiveCodeBench pairs from model outputs: {e}"
-                )
+                logger.error(f"Failed to extract LiveCodeBench pairs from model outputs: {e}")
 
         return qa_pairs

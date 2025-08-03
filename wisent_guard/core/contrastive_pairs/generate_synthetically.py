@@ -8,6 +8,7 @@ from functools import lru_cache
 import threading
 import time
 from datetime import datetime
+import torch
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -57,6 +58,7 @@ class SyntheticContrastivePairGenerator:
         question_bank_path: Optional[str] = None,
         max_workers: int = 4,
         cache_size: int = 1000,
+        generation_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the synthetic pair generator.
@@ -69,11 +71,24 @@ class SyntheticContrastivePairGenerator:
             question_bank_path: Optional path to the question bank. If None, uses default location.
             max_workers: Maximum number of parallel workers for generation
             cache_size: Size of the LRU cache for model responses
+            generation_kwargs: Optional dict of generation parameters to pass to the model (e.g., enable_thinking=False)
         """
         self.model: Model = model
         self.similarity_threshold: float = similarity_threshold
         self.db_similarity_threshold: float = db_similarity_threshold
         self.max_workers: int = max_workers
+        self.generation_kwargs: Dict[str, Any] = generation_kwargs or {}
+        
+        # Handle enable_thinking parameter
+        self.suppress_thinking_tokens = False
+        if 'enable_thinking' in self.generation_kwargs and self.generation_kwargs['enable_thinking'] is False:
+            self.suppress_thinking_tokens = True
+            # Set enable_thinking=False on the model if it has the attribute
+            if hasattr(self.model, 'hf_model') and self.model.hf_model is not None:
+                if hasattr(self.model.hf_model, 'generation_config'):
+                    self.model.hf_model.generation_config.enable_thinking = False
+                if hasattr(self.model.hf_model, 'config'):
+                    self.model.hf_model.config.enable_thinking = False
 
         self.similarity_model: Optional[SentenceTransformer] = (
             self._initialize_similarity_model()
@@ -230,14 +245,10 @@ class SyntheticContrastivePairGenerator:
             
             # Collect results
             for i, future in futures:
-                try:
-                    response = future.result(timeout=30)  # 30 second timeout
-                    questions = self._parse_questions_from_response(response)
-                    all_questions.extend(questions)
-                    print(f"   ✅ Template {i+1} generated {len(questions)} questions")
-                except Exception as e:
-                    print(f"   ⚠️ Error with template {i+1}: {e}")
-                    continue
+                response = future.result()
+                questions = self._parse_questions_from_response(response)
+                all_questions.extend(questions)
+                print(f"   ✅ Template {i+1} generated {len(questions)} questions")
         
         # Deduplicate
         with TimingContext(f"Deduplicating {len(all_questions)} questions", self.enable_timing):
@@ -404,16 +415,12 @@ class SyntheticContrastivePairGenerator:
             # Collect results
             successful_pairs = []
             for question, future in futures:
-                try:
-                    pair = future.result(timeout=60)  # 60 second timeout per pair
-                    if pair is not None:
-                        successful_pairs.append(pair)
-                        if current_count + len(successful_pairs) >= target_count:
-                            print(f"✅ Reached target of {target_count} pairs for selection")
-                            break
-                except Exception as e:
-                    print(f"   ⚠️ Failed to generate pair for question '{question[:50]}...': {e}")
-                    continue
+                pair = future.result()
+                if pair is not None:
+                    successful_pairs.append(pair)
+                    if current_count + len(successful_pairs) >= target_count:
+                        print(f"✅ Reached target of {target_count} pairs for selection")
+                        break
         
         return successful_pairs
     
@@ -530,8 +537,50 @@ class SyntheticContrastivePairGenerator:
                 return self._response_cache[cache_key]
         
         # Generate response
-        response, _ = self.model.generate(prompt, **config)
+        # Merge generation_kwargs with config, giving precedence to generation_kwargs
+        merged_config = {**config, **self.generation_kwargs}
+        
+        # Extract layer_index from config (required parameter for Model.generate)
+        layer_index = merged_config.pop('layer_index', 15)  # Default to layer 15
+        
+        # Extract enable_thinking to pass to format_prompt
+        enable_thinking = merged_config.pop('enable_thinking', None)
+        
+        # Format the prompt with model-specific parameters
+        if enable_thinking is not None:
+            formatted_prompt = self.model.format_prompt(prompt, enable_thinking=enable_thinking)
+        else:
+            formatted_prompt = self.model.format_prompt(prompt)
+        
+        # Generate using the formatted prompt directly
+        # Tokenize
+        inputs = self.model.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        
+        # Generate
+        with torch.no_grad():
+            outputs = self.model.hf_model.generate(
+                **inputs,
+                max_new_tokens=merged_config.get('max_new_tokens', 150),
+                temperature=merged_config.get('temperature', 0.7),
+                top_p=merged_config.get('top_p', 0.9),
+                do_sample=True,
+                pad_token_id=self.model.tokenizer.pad_token_id,
+                eos_token_id=self.model.tokenizer.eos_token_id,
+            )
+        
+        # Decode
+        response = self.model.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
         response = response.strip()
+        
+        # Basic post-processing - only remove explicit think tags if they somehow appear
+        import re
+        if '<think>' in response:
+            # This shouldn't happen with enable_thinking=False, but just in case
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = response.strip()
+        
+        # No aggressive cleaning needed anymore since we're properly using enable_thinking=False
         
         # Update cache
         with self._cache_lock:
@@ -1012,6 +1061,7 @@ def generate_synthetic_pairs_cli(
     force_regenerate: bool = False,
     verbose_timing: bool = False,
     max_workers: int = 4,
+    generation_kwargs: Optional[Dict[str, Any]] = None,
 ) -> ContrastivePairSet:
     """
     CLI function to generate synthetic contrastive pairs.
@@ -1024,6 +1074,7 @@ def generate_synthetic_pairs_cli(
         force_regenerate: If True, bypasses the cache and generates a new set.
         verbose_timing: If True, shows detailed timing for each step
         max_workers: Number of parallel workers for generation
+        generation_kwargs: Optional dict of generation parameters to pass to the model (e.g., enable_thinking=False)
 
     Returns:
         Generated ContrastivePairSet
@@ -1036,7 +1087,7 @@ def generate_synthetic_pairs_cli(
         raise ValueError("Model must be provided")
 
     generator: SyntheticContrastivePairGenerator = SyntheticContrastivePairGenerator(
-        model, max_workers=max_workers
+        model, max_workers=max_workers, generation_kwargs=generation_kwargs
     )
     
     pair_set: ContrastivePairSet = generator.generate_contrastive_pair_set(
