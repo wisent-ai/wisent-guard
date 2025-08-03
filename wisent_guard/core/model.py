@@ -198,7 +198,7 @@ class Model:
         self.user_token = user_token
         self.assistant_token = assistant_token
 
-    def format_prompt(self, prompt: str, response: str = None) -> str:
+    def format_prompt(self, prompt: str, response: str = None, **kwargs) -> str:
         """
         Format a prompt using the tokenizer's chat template if available,
         otherwise fall back to legacy format detection.
@@ -219,10 +219,18 @@ class Model:
                     messages.append({"role": "assistant", "content": response})
 
                 # Apply the chat template
+                # Pass any kwargs that might be model-specific (like enable_thinking for Qwen3)
+                template_kwargs = {
+                    "tokenize": False,
+                    "add_generation_prompt": (response is None),  # Add generation prompt only if no response
+                }
+                
+                # Add any kwargs passed to format_prompt (e.g., enable_thinking)
+                template_kwargs.update(kwargs)
+                
                 formatted = self.tokenizer.apply_chat_template(
                     messages,
-                    tokenize=False,
-                    add_generation_prompt=(response is None),  # Add generation prompt only if no response
+                    **template_kwargs
                 )
                 return formatted
             except Exception as e:

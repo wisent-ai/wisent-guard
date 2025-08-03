@@ -8,6 +8,7 @@ from functools import lru_cache
 import threading
 import time
 from datetime import datetime
+import torch
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -542,69 +543,44 @@ class SyntheticContrastivePairGenerator:
         # Extract layer_index from config (required parameter for Model.generate)
         layer_index = merged_config.pop('layer_index', 15)  # Default to layer 15
         
-        # Remove enable_thinking as it should be set on model config, not passed to generate
-        merged_config.pop('enable_thinking', None)
+        # Extract enable_thinking to pass to format_prompt
+        enable_thinking = merged_config.pop('enable_thinking', None)
         
-        # Add thinking tokens to suppress_tokens if needed
-        if self.suppress_thinking_tokens:
-            # Token IDs for <think> and </think> in Qwen models
-            think_tokens = [151667, 151668]  # <think> and </think>
-            existing_suppress = merged_config.get('suppress_tokens', [])
-            if isinstance(existing_suppress, list):
-                merged_config['suppress_tokens'] = existing_suppress + think_tokens
-            else:
-                merged_config['suppress_tokens'] = think_tokens
+        # Format the prompt with model-specific parameters
+        if enable_thinking is not None:
+            formatted_prompt = self.model.format_prompt(prompt, enable_thinking=enable_thinking)
+        else:
+            formatted_prompt = self.model.format_prompt(prompt)
         
-        # Call model.generate with proper parameters
-        response, _ = self.model.generate(prompt, layer_index, **merged_config)
+        # Generate using the formatted prompt directly
+        # Tokenize
+        inputs = self.model.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        
+        # Generate
+        with torch.no_grad():
+            outputs = self.model.hf_model.generate(
+                **inputs,
+                max_new_tokens=merged_config.get('max_new_tokens', 150),
+                temperature=merged_config.get('temperature', 0.7),
+                top_p=merged_config.get('top_p', 0.9),
+                do_sample=True,
+                pad_token_id=self.model.tokenizer.pad_token_id,
+                eos_token_id=self.model.tokenizer.eos_token_id,
+            )
+        
+        # Decode
+        response = self.model.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
         response = response.strip()
         
-        # Post-process to remove any thinking tags that might have slipped through
+        # Basic post-processing - only remove explicit think tags if they somehow appear
         import re
-        if self.suppress_thinking_tokens:
-            # First check if response still contains explicit think tags
-            if '<think>' in response:
-                # Remove everything between <think> and </think> tags
-                response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-                response = response.strip()
-            
-            # Handle case where tokens were suppressed but content remains
-            # Look for thinking-like content at the start
-            if response.startswith(('_jwt', 'Okay,', 'Let me', 'I need', 'I\'ll', 'First,', 'Alright,')):
-                # Find where the actual list starts (look for "1.")
-                match = re.search(r'^1\.', response, re.MULTILINE)
-                if match:
-                    # Extract from where the list actually starts
-                    response = response[match.start():]
-                else:
-                    # If no numbered list found, try to extract questions
-                    # Look for question marks to identify actual questions
-                    lines = response.split('\n')
-                    question_lines = []
-                    for line in lines:
-                        if '?' in line and not any(phrase in line.lower() for phrase in ['let me', 'i need', 'i\'ll', 'okay']):
-                            question_lines.append(line)
-                    if question_lines:
-                        response = '\n'.join(f"{i+1}. {q.strip()}" for i, q in enumerate(question_lines[:50]))
+        if '<think>' in response:
+            # This shouldn't happen with enable_thinking=False, but just in case
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            response = response.strip()
         
-        # Clean up any remaining artifacts
-        if self.suppress_thinking_tokens:
-            # Remove strange characters that might appear at the start
-            response = re.sub(r'^[\.\$\s_]+', '', response)
-            # Fix any broken numbering
-            lines = response.split('\n')
-            cleaned_lines = []
-            question_num = 1
-            for line in lines:
-                line = line.strip()
-                if line and re.match(r'^\d+\.', line):
-                    # Ensure proper numbering
-                    line = re.sub(r'^\d+\.', f'{question_num}.', line)
-                    question_num += 1
-                    cleaned_lines.append(line)
-                elif line and not any(phrase in line.lower() for phrase in ['let me', 'i need', 'okay', 'wait']):
-                    cleaned_lines.append(line)
-            response = '\n'.join(cleaned_lines)
+        # No aggressive cleaning needed anymore since we're properly using enable_thinking=False
         
         # Update cache
         with self._cache_lock:
