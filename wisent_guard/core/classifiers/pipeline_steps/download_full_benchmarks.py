@@ -10,16 +10,15 @@ Usage:
     python download_full_benchmarks.py --all  # Download all benchmarks
 """
 
-import os
-import sys
-import time
 import argparse
 import json
 import pickle
 import random
-from typing import List, Dict, Any, Optional
-from pathlib import Path
+import sys
+import time
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Add current directory to path to import local modules
 current_dir = Path(__file__).parent
@@ -53,7 +52,7 @@ class FullBenchmarkDownloader:
         self.data_dir.mkdir(exist_ok=True)
         self.metadata_dir.mkdir(exist_ok=True)
 
-        print(f"🚀 Full Benchmark Downloader")
+        print("🚀 Full Benchmark Downloader")
         print(f"📁 Download directory: {self.download_dir.absolute()}")
 
     def download_complete_benchmark(
@@ -88,7 +87,6 @@ class FullBenchmarkDownloader:
 
         try:
             # Import lm_eval to download complete datasets
-            import lm_eval
             from lm_eval import tasks
 
             # Get the task
@@ -236,7 +234,7 @@ class FullBenchmarkDownloader:
             unavailable_requested = [name for name in benchmarks if name in self.UNAVAILABLE_BENCHMARKS]
             if unavailable_requested:
                 print(f"⚠️  Requested benchmarks are known to be unavailable: {unavailable_requested}")
-                print(f"   🔧 These will likely fail. Remove from list to avoid delays.")
+                print("   🔧 These will likely fail. Remove from list to avoid delays.")
 
         print(f"\n🏗️ Downloading {len(benchmarks_to_download)} complete benchmarks")
         print(f"   Force redownload: {force}")
@@ -289,7 +287,7 @@ class FullBenchmarkDownloader:
         Returns:
             Dictionary with contrastive pairs
         """
-        print(f"      🔄 Converting to contrastive pairs...")
+        print("      🔄 Converting to contrastive pairs...")
 
         contrastive_pairs = []
 
@@ -311,35 +309,35 @@ class FullBenchmarkDownloader:
             return self._convert_mmmlu_format(sample)
 
         # Multiple Choice with explicit choices and numeric label (HellaSwag, SWAG, etc.)
-        elif ("endings" in sample and "label" in sample) or ("ending0" in sample and "label" in sample):
+        if ("endings" in sample and "label" in sample) or ("ending0" in sample and "label" in sample):
             return self._convert_multiple_choice_numeric(sample)
 
         # Multiple Choice with choices dict and answerKey (ARC, OpenBookQA, etc.)
-        elif "choices" in sample and "answerKey" in sample:
+        if "choices" in sample and "answerKey" in sample:
             return self._convert_multiple_choice_letter(sample)
 
         # TruthfulQA MC1 format
-        elif "mc1_targets" in sample:
+        if "mc1_targets" in sample:
             return self._convert_truthfulqa_mc1(sample)
 
         # TruthfulQA MC2 format
-        elif "mc2_targets" in sample:
+        if "mc2_targets" in sample:
             return self._convert_truthfulqa_mc2(sample)
 
         # Textual entailment (premise/hypothesis format like CB, RTE)
-        elif "premise" in sample and "hypothesis" in sample:
+        if "premise" in sample and "hypothesis" in sample:
             return self._convert_textual_entailment(sample)
 
         # Boolean questions (BoolQ)
-        elif "label" in sample and str(sample["label"]).lower() in ["true", "false", "0", "1"]:
+        if "label" in sample and str(sample["label"]).lower() in ["true", "false", "0", "1"]:
             return self._convert_boolean_question(sample)
 
         # MBPP format (programming problems with code)
-        elif "task_id" in sample and "text" in sample and "code" in sample:
+        if "task_id" in sample and "text" in sample and "code" in sample:
             return self._convert_mbpp_format(sample)
 
         # MATH-500 format (problem, solution, answer, subject, level)
-        elif (
+        if (
             "problem" in sample
             and "solution" in sample
             and "answer" in sample
@@ -349,27 +347,27 @@ class FullBenchmarkDownloader:
             return self._convert_math500_format(sample)
 
         # WebQS format (question, answers list)
-        elif "question" in sample and "answers" in sample and isinstance(sample.get("answers"), list):
+        if "question" in sample and "answers" in sample and isinstance(sample.get("answers"), list):
             return self._convert_webqs_format(sample)
 
         # NaturalQS format (question, answer as list)
-        elif "question" in sample and "answer" in sample and isinstance(sample.get("answer"), list):
+        if "question" in sample and "answer" in sample and isinstance(sample.get("answer"), list):
             return self._convert_naturalqs_format(sample)
 
         # TriviaQA format (question, answer as dict with aliases)
-        elif "question" in sample and "answer" in sample and isinstance(sample.get("answer"), dict):
+        if "question" in sample and "answer" in sample and isinstance(sample.get("answer"), dict):
             return self._convert_triviaqa_format(sample)
 
         # Text generation with question/answer (GSM8K, math problems)
-        elif "question" in sample and "answer" in sample:
+        if "question" in sample and "answer" in sample:
             return self._convert_text_generation(sample)
 
         # Reading comprehension (CoQA, SQuAD)
-        elif "story" in sample or "passage" in sample:
+        if "story" in sample or "passage" in sample:
             return self._convert_reading_comprehension(sample)
 
         # SQuAD2 format (id, title, context, question, answers)
-        elif (
+        if (
             "id" in sample
             and "title" in sample
             and "context" in sample
@@ -379,15 +377,15 @@ class FullBenchmarkDownloader:
             return self._convert_squad2_format(sample)
 
         # Winogrande format (sentence, option1, option2, answer)
-        elif "sentence" in sample and "option1" in sample and "option2" in sample and "answer" in sample:
+        if "sentence" in sample and "option1" in sample and "option2" in sample and "answer" in sample:
             return self._convert_winogrande_format(sample)
 
         # WikiText format (page)
-        elif "page" in sample:
+        if "page" in sample:
             return self._convert_wikitext_format(sample)
 
         # GPQA format (Question, choice1-4, answer, plus rich metadata)
-        elif (
+        if (
             "Question" in sample
             and "choice1" in sample
             and "choice2" in sample
@@ -398,16 +396,15 @@ class FullBenchmarkDownloader:
             return self._convert_gpqa_format(sample)
 
         # HLE format (question, answer, answer_type, category)
-        elif "question" in sample and "answer" in sample and "answer_type" in sample and "category" in sample:
+        if "question" in sample and "answer" in sample and "answer_type" in sample and "category" in sample:
             return self._convert_hle_format(sample)
 
         # Generic multiple choice fallback
-        elif "choices" in sample:
+        if "choices" in sample:
             return self._convert_generic_multiple_choice(sample)
 
-        else:
-            print(f"         ⚠️ Unknown sample format: {list(sample.keys())}")
-            return []
+        print(f"         ⚠️ Unknown sample format: {list(sample.keys())}")
+        return []
 
     def _convert_mmmlu_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert MMMLU format (instruction, option_a/b/c/d, answer)."""
@@ -845,8 +842,7 @@ class FullBenchmarkDownloader:
                         "metadata": {"task_id": sample.get("task_id", ""), "benchmark_type": "mbpp"},
                     }
                 ]
-            else:
-                return []
+            return []
         except Exception as e:
             print(f"         ⚠️ Error converting MBPP sample: {e}")
             return []
@@ -933,8 +929,7 @@ class FullBenchmarkDownloader:
                         },
                     }
                 ]
-            else:
-                return []
+            return []
         except Exception as e:
             print(f"         ⚠️ Error converting HLE sample: {e}")
             return []
@@ -1242,23 +1237,23 @@ def main():
         print(f"📁 Download directory: {downloader.download_dir.absolute()}")
 
         if results["successful"]:
-            print(f"\n🎯 Successfully downloaded:")
+            print("\n🎯 Successfully downloaded:")
             for benchmark in results["successful"]:
                 print(f"   ✅ {benchmark}")
 
         if results["failed"]:
-            print(f"\n❌ Failed downloads:")
+            print("\n❌ Failed downloads:")
             for benchmark in results["failed"]:
                 print(f"   ❌ {benchmark}")
 
         if results["excluded"]:
-            print(f"\n🚫 Excluded (known unavailable):")
+            print("\n🚫 Excluded (known unavailable):")
             excluded_list = sorted(results["excluded"])
             for i in range(0, len(excluded_list), 4):  # Show 4 per line
                 line_items = excluded_list[i : i + 4]
                 print(f"   🚫 {', '.join(line_items)}")
 
-        print(f"\n📊 Complete benchmark data saved in:")
+        print("\n📊 Complete benchmark data saved in:")
         print(f"   📁 Data: {downloader.data_dir}")
         print(f"   📁 Metadata: {downloader.metadata_dir}")
 
