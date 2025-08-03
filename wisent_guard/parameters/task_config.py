@@ -68,6 +68,8 @@ GPQA_TASKS = {
 MATH_TASKS = {
     # Basic math benchmarks
     "gsm8k",
+    "asdiv",
+    "arithmetic",
     # MATH-500 mathematical reasoning benchmarks
     "math",
     "math500",
