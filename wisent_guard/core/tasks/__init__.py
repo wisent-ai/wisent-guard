@@ -10,7 +10,7 @@ from .hle_task import HLEExactMatchTask, HLEMultipleChoiceTask, HLETask
 from .hmmt_task import HMMTTask
 from .livecodebench_task import LiveCodeBenchTask
 from .livemathbench_task import LiveMathBenchTask
-from .lm_eval_task import GSM8KTask, MBPPTask, MMLUTask, TruthfulQATask
+from .lm_eval_task import GSM8KTask, MBPPTask, MMLUTask, Squad2Task, TruthfulQATask
 from .math500_task import Math500Task
 from .polymath_task import PolyMathTask
 from .supergpqa_task import SuperGPQABiologyTask, SuperGPQAChemistryTask, SuperGPQAPhysicsTask, SuperGPQATask
@@ -26,6 +26,7 @@ def register_all_tasks():
     register_task("gsm8k", GSM8KTask)
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
+    register_task("squad2", Squad2Task)
 
     # Register HLE tasks
     register_task("hle", lambda limit=None: HLETask(limit=limit))
@@ -90,6 +91,7 @@ __all__ = [
     "MMLUTask",
     "Math500Task",
     "PolyMathTask",
+    "Squad2Task",
     "SuperGPQABiologyTask",
     "SuperGPQAChemistryTask",
     "SuperGPQAPhysicsTask",

@@ -75,8 +75,8 @@ def get_recommended_config_for_llama8b() -> Dict[str, Any]:
         "contrastive_pairs_limit": 25,  # Bounded by train_limit
         "val_limit": 100,
         "test_limit": 200,
-        "n_trials": 100,
-        "n_startup_trials": 20,  # Random warmup before TPE
+        "n_trials": 20,
+        "n_startup_trials": 5,  # Random warmup before TPE
     }
 
 
@@ -121,8 +121,8 @@ def create_llama_config(args) -> OptimizationConfig:
         batch_size=args.batch_size or defaults["batch_size"],
         max_length=512,  # Adequate for math problems
         max_new_tokens=defaults["max_new_tokens"],
-        temperature=0.7,  # Enable sampling
-        do_sample=True,
+        temperature=0.0,  # Deterministic generation
+        do_sample=False,
         # Performance optimization
         seed=42,
         # Output configuration
