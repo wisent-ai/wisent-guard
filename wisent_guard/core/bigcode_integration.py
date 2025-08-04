@@ -21,30 +21,39 @@ class BigCodeTaskLoader:
     
     # Mapping of our task names to BigCode task names
     TASK_MAPPING = {
+        # === DIRECT MATCHES ===
         'humaneval': 'humaneval',
-        'humaneval_plus': 'humanevalplus',
-        'instructhumaneval': 'instructhumaneval',
-        'apps': 'apps-introductory',  # Use the easiest variant for default
-        'mbpp': 'mbpp',
-        'mbpp_plus': 'mbppplus',
-        'ds1000': 'ds1000-all-completion',
-        'humanevalpack': 'humanevalpackfix',
-        'multiple_py': 'multiple-py',
-        'multiple_js': 'multiple-js',
-        'multiple_java': 'multiple-java',
-        'multiple_cpp': 'multiple-cpp',
-        'multiple_rs': 'multiple-rs', 
-        'multiple_go': 'multiple-go',
-        'recode': 'perturbed-humaneval-docstring-num_seeds_1',
+        'mbpp': 'mbpp', 
         'conala': 'conala',
         'concode': 'concode',
         'mercury': 'mercury',
+        
+        # === CORRECTED MAPPINGS ===
+        'humaneval_plus': 'humanevalplus',
+        'instructhumaneval': 'instruct-humaneval',
+        'mbpp_plus': 'mbppplus',
+        'apps': 'apps-introductory',
+        'ds1000': 'ds1000-all-completion',
+        
+        # === MULTI-LANGUAGE TASKS ===
+        'multiple_py': 'multiple-py',
+        'multiple_js': 'multiple-js', 
+        'multiple_java': 'multiple-java',
+        'multiple_cpp': 'multiple-cljcpp',
+        'multiple_rs': 'multiple-rs',
+        'multiple_go': 'multiple-go',
+        
+        # === CODE-TO-TEXT TASKS ===
         'codexglue_code_to_text_python': 'codexglue_code_to_text-python',
         'codexglue_code_to_text_go': 'codexglue_code_to_text-go',
         'codexglue_code_to_text_java': 'codexglue_code_to_text-java',
         'codexglue_code_to_text_javascript': 'codexglue_code_to_text-javascript',
         'codexglue_code_to_text_php': 'codexglue_code_to_text-php',
         'codexglue_code_to_text_ruby': 'codexglue_code_to_text-ruby',
+        
+        # === FIXED PROBLEMATIC MAPPINGS ===
+        'recode': 'perturbed-humaneval-natgen-num_seeds_1',
+        'humanevalpack': None,  # ❌ REMOVED - no simple mapping exists, only complex variants
     }
     
     def __init__(self):
@@ -83,6 +92,10 @@ class BigCodeTaskLoader:
             raise ValueError(f"Unknown BigCode task: {task_name}")
             
         bigcode_task_name = self.TASK_MAPPING[task_name]
+        
+        # Handle removed tasks with None mapping
+        if bigcode_task_name is None:
+            raise ValueError(f"Task '{task_name}' has been removed - no BigCode mapping available")
         
         # Check cache
         cache_key = f"{task_name}:{limit}"

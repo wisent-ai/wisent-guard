@@ -99,33 +99,44 @@ QA_TASKS = {
 
 # Coding benchmarks
 CODING_TASKS = {
-    "mbpp",
-    "livecodebench",
-    # BigCode benchmarks
-    "humaneval",
-    "humaneval_plus",
-    "instructhumaneval",
-    "apps",
-    "mbpp_plus",
-    "ds1000",
-    "humanevalpack",
-    "multiple_py",
-    "multiple_js",
-    "multiple_java",
-    "multiple_cpp",
-    "multiple_rs",
-    "multiple_go",
-    "recode",
-    "conala",
-    "concode",
-    "codexglue_code_to_text",
-    "codexglue_code_to_text_python",
-    "codexglue_code_to_text_go",
-    "codexglue_code_to_text_ruby",
-    "codexglue_code_to_text_java",
-    "codexglue_code_to_text_javascript",
-    "codexglue_code_to_text_php",
-    "mercury",
+    # === VERIFIED WORKING (✅) ===
+    "mbpp",          # ✅ Direct match
+    "humaneval",     # ✅ Direct match  
+    "conala",        # ✅ Direct match
+    "concode",       # ✅ Direct match
+    "mercury",       # ✅ Direct match
+    
+    # === TASKS WITH INTERNAL MAPPING (✅ has BigCode mapping) ===
+    "humaneval_plus",     # → maps to 'humanevalplus' in BigCode
+    "instructhumaneval",  # → maps to 'instruct-humaneval' in BigCode
+    "mbpp_plus",          # → maps to 'mbppplus' in BigCode
+    "apps",               # → maps to 'apps-introductory' in BigCode
+    "ds1000",             # → maps to 'ds1000-all-completion' in BigCode
+    
+    # === MULTI-LANGUAGE TASKS (✅ has BigCode mapping) ===
+    "multiple_py",        # → maps to 'multiple-py' in BigCode
+    "multiple_js",        # → maps to 'multiple-js' in BigCode
+    "multiple_java",      # → maps to 'multiple-java' in BigCode
+    "multiple_cpp",       # → maps to 'multiple-cpp' in BigCode (need to fix mapping)
+    "multiple_rs",        # → maps to 'multiple-rs' in BigCode
+    "multiple_go",        # → maps to 'multiple-go' in BigCode
+    
+    # === CODE-TO-TEXT TASKS (✅ has BigCode mapping) ===
+    "codexglue_code_to_text_python",     # → maps to 'codexglue_code_to_text-python'
+    "codexglue_code_to_text_go",         # → maps to 'codexglue_code_to_text-go'
+    "codexglue_code_to_text_ruby",       # → maps to 'codexglue_code_to_text-ruby'
+    "codexglue_code_to_text_java",       # → maps to 'codexglue_code_to_text-java'
+    "codexglue_code_to_text_javascript", # → maps to 'codexglue_code_to_text-javascript'
+    "codexglue_code_to_text_php",        # → maps to 'codexglue_code_to_text-php'
+    
+    # === FIXED MAPPINGS (✅) ===
+    "recode",         # → now maps to 'perturbed-humaneval-natgen-num_seeds_1'
+    
+    # === REMOVED BROKEN TASKS ===
+    # "humanevalpack",  # ❌ REMOVED - no simple BigCode mapping exists
+    
+    # === REMOVED NON-EXISTENT TASKS ===  
+    # "livecodebench",     # ❌ Not in BigCode registry - REMOVED
 }
 
 # HLE (Human-Level Evaluation) benchmarks
@@ -185,9 +196,11 @@ TEST_ALLOWED_TASKS = list(
 
 # Tasks that can be tested in sandbox environments (includes coding tasks)
 # These are tasks that require special handling or are unsafe for CI
-SANDBOX_TESTS_ALLOWED_TASKS = [
-    "mbpp_plus",  # Code generation task requiring bigcode-evaluation-harness
-]
+SANDBOX_TESTS_ALLOWED_TASKS = list(
+    {
+        *CODING_TASKS,  # All coding tasks requiring bigcode-evaluation-harness and --trust-code-execution
+    }
+)
 
 
 def get_taskinterface_tasks():

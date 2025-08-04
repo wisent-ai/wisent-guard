@@ -399,7 +399,11 @@ class FullBenchmarkDownloader:
         if "question" in sample and "answer" in sample and "answer_type" in sample and "category" in sample:
             return self._convert_hle_format(sample)
 
-        # MBPP/HumanEval code generation format (task_id, code, prompt, test)
+        # HumanEval code generation format (task_id, canonical_solution, prompt, test, entry_point)
+        if "task_id" in sample and "canonical_solution" in sample and "prompt" in sample and "test" in sample:
+            return self._convert_humaneval_format(sample)
+
+        # MBPP code generation format (task_id, code, prompt, test)
         if "task_id" in sample and "code" in sample and "prompt" in sample and "test" in sample:
             return self._convert_mbpp_format(sample)
 
@@ -828,6 +832,34 @@ class FullBenchmarkDownloader:
         distractors.append(str(int(final_number + random.randint(2, 10))))
 
         return distractors[:3]  # Return top 3
+
+    def _convert_humaneval_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert HumanEval code generation format."""
+        task_id = sample.get("task_id", "unknown")
+        prompt = sample.get("prompt", "")
+        canonical_solution = sample.get("canonical_solution", "")
+        test = sample.get("test", "")
+        entry_point = sample.get("entry_point", "")
+        
+        pairs = []
+        
+        # Create a contrastive pair with the coding prompt
+        pairs.append(
+            {
+                "question": f"Complete this Python function:\n\n{prompt}",
+                "correct_answer": canonical_solution,
+                "incorrect_answer": "# Incorrect or incomplete implementation\npass",
+                "metadata": {
+                    "task_id": task_id,
+                    "test_cases": test,
+                    "entry_point": entry_point,
+                    "benchmark_type": "humaneval",
+                    "task_type": "code_completion",
+                },
+            }
+        )
+        
+        return pairs
 
     def _convert_mbpp_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert MBPP format (programming problems with code)."""
