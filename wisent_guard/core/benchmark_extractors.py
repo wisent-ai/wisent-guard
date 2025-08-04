@@ -287,27 +287,38 @@ class TruthfulQAExtractor(BenchmarkExtractor):
             if not question:
                 return None
 
-            # Format the question
-            if hasattr(task_data, "doc_to_text"):
-                formatted_question = task_data.doc_to_text(doc)
-            else:
-                formatted_question = question
-
-            # Extract correct answer from mc1_targets
+            # Extract choices and labels from mc1_targets
             mc1_targets = doc.get("mc1_targets", {})
             choices = mc1_targets.get("choices", [])
             labels = mc1_targets.get("labels", [])
 
-            correct_answer = None
-            for i, label in enumerate(labels):
-                if label == 1 and i < len(choices):
-                    correct_answer = choices[i]
-                    break
-
-            if not correct_answer:
+            if len(choices) < 2 or len(labels) != len(choices):
                 return None
 
-            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+            # Format the question with multiple choice options
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question
+                for i, choice in enumerate(choices):
+                    letter = chr(65 + i)  # A, B, C, D, ...
+                    formatted_question += f"\n{letter}. {choice}"
+
+            # Find correct answer letter
+            correct_answer_letter = None
+            for i, label in enumerate(labels):
+                if label == 1:
+                    correct_answer_letter = chr(65 + i)  # Convert to A, B, C, D
+                    break
+
+            if not correct_answer_letter:
+                return None
+
+            return {
+                "question": question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer_letter,  # Return letter, not text
+            }
 
         except Exception as e:
             logger.debug(f"Error extracting TruthfulQA QA pair: {e}")
@@ -324,22 +335,22 @@ class TruthfulQAExtractor(BenchmarkExtractor):
             choices = mc1_targets.get("choices", [])
             labels = mc1_targets.get("labels", [])
 
-            correct_choice = None
-            incorrect_choice = None
+            correct_letter = None
+            incorrect_letter = None
 
             for i, label in enumerate(labels):
-                if label == 1 and i < len(choices):
-                    correct_choice = choices[i]
-                elif label == 0 and i < len(choices) and incorrect_choice is None:
-                    incorrect_choice = choices[i]
+                if label == 1:
+                    correct_letter = chr(65 + i)  # Convert to A, B, C, D
+                elif label == 0 and incorrect_letter is None:
+                    incorrect_letter = chr(65 + i)  # First incorrect option
 
-            if not all([correct_choice, incorrect_choice]):
+            if not all([correct_letter, incorrect_letter]):
                 return None
 
             return {
                 "question": qa_pair["formatted_question"],
-                "correct_answer": correct_choice,
-                "incorrect_answer": incorrect_choice,
+                "correct_answer": correct_letter,  # Use letter, not text
+                "incorrect_answer": incorrect_letter,  # Use letter, not text
             }
 
         except Exception as e:

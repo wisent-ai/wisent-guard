@@ -1207,16 +1207,18 @@ class LMEvalHarnessGroundTruth:
             else:
                 return False
 
-            # Try multiple patterns to extract answer from generated response
+            # Try multiple strict patterns to extract answer from generated response
+            # These patterns require clear context indicating an intentional choice
             patterns = [
                 r"(?:answer|choice|option)\s*(?:is\s*)?(?::\s*)?(?:\()?([ABCDE])(?:\))?",  # "Answer: A" or "Answer is (B)"
-                r"(?:^|\s)(?:\()?([ABCDE])(?:\))?(?:\s|$)",  # Standalone letter
-                r"(?:the\s+)?(?:correct\s+)?(?:answer\s+)?(?:is\s*)?(?:\()?([ABCDE])(?:\))?",  # "The answer is A"
-                r"(?:^|\n)([ABCDE])(?:\.|,|\s|$)",  # Letter at start of line
-                r"(?:select\s*|choose\s*)?(?:\()?([ABCDE])(?:\))?",  # "Select A" or "(A)"
+                r"the\s+(?:correct\s+)?answer\s+is\s*(?:\()?([ABCDE])(?:\))?",  # "The answer is A" - requires "the answer is"
+                r"(?:select|choose)\s+(?:\()?([ABCDE])(?:\))?",  # "Select A" or "Choose A" - requires the action word
+                r"(?:^|\n)([ABCDE])(?:\.|,|\)|\s*$)",  # Letter at start of line with punctuation or end
+                r"^([ABCDE])$",  # Just the letter alone
+                r"^(?:\()?([ABCDE])(?:\))?$",  # Just the letter with optional parentheses
             ]
 
-            # Try each pattern
+            # Try each pattern - only accept clear, intentional responses
             for pattern in patterns:
                 matches = re.finditer(pattern, gen_clean.upper(), re.IGNORECASE | re.MULTILINE)
                 for match in matches:
@@ -1224,12 +1226,7 @@ class LMEvalHarnessGroundTruth:
                     if extracted_letter == expected_letter:
                         return True
 
-            # Final fallback: check if the expected letter appears anywhere in reasonable context
-            # But be careful not to match letters within words
-            letter_pattern = f"\\b{expected_letter}\\b"
-            if re.search(letter_pattern, gen_clean.upper()):
-                return True
-
+            # No more fallback - if we can't clearly identify the choice, it's wrong
             return False
 
         except Exception as e:

@@ -675,7 +675,7 @@ class OptimizationPipeline:
         # Save detailed validation results to JSON
         self._save_detailed_validation_results(questions, ground_truths, predictions, trial_number)
 
-        # Evaluate benchmark performance
+        # Evaluate benchmark performance using standard evaluation
         benchmark_metrics = metrics.evaluate_benchmark_performance(predictions, ground_truths, self.config.val_dataset)
 
         return benchmark_metrics.get("accuracy", 0.0)
@@ -916,20 +916,13 @@ class OptimizationPipeline:
                 test_questions, test_ground_truths, baseline_predictions, steered_predictions
             )
 
-        # Calculate benchmark metrics using appropriate evaluation method
-        if self._should_use_multiple_choice_evaluation():
-            # Use LMEvalHarnessGroundTruth for proper multiple choice evaluation
-            baseline_benchmark_metrics = self._evaluate_with_lm_eval_harness(baseline_predictions, test_ground_truths)
-            steered_benchmark_metrics = self._evaluate_with_lm_eval_harness(steered_predictions, test_ground_truths)
-        else:
-            # Use traditional text generation evaluation
-            baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
-                baseline_predictions, test_ground_truths, self.config.test_dataset
-            )
-
-            steered_benchmark_metrics = metrics.evaluate_benchmark_performance(
-                steered_predictions, test_ground_truths, self.config.test_dataset
-            )
+        # Calculate benchmark metrics using standard evaluation
+        baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
+            baseline_predictions, test_ground_truths, self.config.test_dataset
+        )
+        steered_benchmark_metrics = metrics.evaluate_benchmark_performance(
+            steered_predictions, test_ground_truths, self.config.test_dataset
+        )
 
         # Evaluate probe on test data
         X_test, y_test = self.cache.load_activations("test", layer_id, self.tokenization_config)
@@ -1030,18 +1023,40 @@ class OptimizationPipeline:
         detailed_results = []
 
         for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
-            # Evaluate if the answer is correct using metrics module
+            # Use standard evaluation via metrics module
             is_correct = metrics.evaluate_response_correctness(model_answer, correct_answer, self.config.val_dataset)
 
-            detailed_results.append(
-                {
-                    "row": i,
-                    "question": question,
-                    "correct_answer": correct_answer,
-                    "model_answer": model_answer,
-                    "is_correct": is_correct,
-                }
-            )
+            result_entry = {
+                "row": i,
+                "question": question,
+                "correct_answer": correct_answer,
+                "model_answer": model_answer,
+                "is_correct": is_correct,
+            }
+
+            # Add MC-specific fields if this is a multiple choice task
+            if self._should_use_multiple_choice_evaluation():
+                # Extract MC diagnostics directly without custom evaluation
+                import re
+
+                # Extract available answers from question (A. choice, B. choice, etc.)
+                available_answers = []
+                choice_pattern = r"([A-E])\.\s+(.+?)(?=\n[A-E]\.|$)"
+                matches = re.findall(choice_pattern, question, re.MULTILINE | re.DOTALL)
+                for letter, choice_text in matches:
+                    available_answers.append(f"{letter}. {choice_text.strip()}")
+
+                # Extract model's selected letter from model answer
+                model_selected_letter = "?"
+                model_letter_match = re.search(r"\b([A-E])\b", model_answer.upper())
+                if model_letter_match:
+                    model_selected_letter = model_letter_match.group(1)
+
+                result_entry["available_answers"] = available_answers
+                result_entry["correct_choice_letter"] = correct_answer
+                result_entry["model_selected_letter"] = model_selected_letter
+
+            detailed_results.append(result_entry)
 
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1069,23 +1084,52 @@ class OptimizationPipeline:
         for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
             zip(questions, ground_truths, baseline_predictions, steered_predictions)
         ):
-            # Evaluate correctness for both baseline and steered answers
+            # Use standard evaluation for both baseline and steered answers
             is_baseline_correct = metrics.evaluate_response_correctness(
                 baseline_answer, correct_answer, self.config.test_dataset
             )
             is_correct = metrics.evaluate_response_correctness(steered_answer, correct_answer, self.config.test_dataset)
 
-            detailed_results.append(
-                {
-                    "row": i,
-                    "question": question,
-                    "correct_answer": correct_answer,
-                    "baseline_model_answer": baseline_answer,
-                    "model_answer": steered_answer,
-                    "is_baseline_correct": is_baseline_correct,
-                    "is_correct": is_correct,
-                }
-            )
+            result_entry = {
+                "row": i,
+                "question": question,
+                "correct_answer": correct_answer,
+                "baseline_model_answer": baseline_answer,
+                "model_answer": steered_answer,
+                "is_baseline_correct": is_baseline_correct,
+                "is_correct": is_correct,
+            }
+
+            # Add MC-specific fields if this is a multiple choice task
+            if self._should_use_multiple_choice_evaluation():
+                # Extract MC diagnostics directly without custom evaluation
+                import re
+
+                # Extract available answers from question (A. choice, B. choice, etc.)
+                available_answers = []
+                choice_pattern = r"([A-E])\.\s+(.+?)(?=\n[A-E]\.|$)"
+                matches = re.findall(choice_pattern, question, re.MULTILINE | re.DOTALL)
+                for letter, choice_text in matches:
+                    available_answers.append(f"{letter}. {choice_text.strip()}")
+
+                # Extract steered model's selected letter
+                steered_selected_letter = "?"
+                steered_letter_match = re.search(r"\b([A-E])\b", steered_answer.upper())
+                if steered_letter_match:
+                    steered_selected_letter = steered_letter_match.group(1)
+
+                # Extract baseline model's selected letter
+                baseline_selected_letter = "?"
+                baseline_letter_match = re.search(r"\b([A-E])\b", baseline_answer.upper())
+                if baseline_letter_match:
+                    baseline_selected_letter = baseline_letter_match.group(1)
+
+                result_entry["available_answers"] = available_answers
+                result_entry["correct_choice_letter"] = correct_answer
+                result_entry["model_selected_letter"] = steered_selected_letter
+                result_entry["baseline_model_selected_letter"] = baseline_selected_letter
+
+            detailed_results.append(result_entry)
 
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1377,31 +1421,6 @@ class OptimizationPipeline:
         """Determine if we should use multiple choice evaluation for this dataset."""
         # Use multiple choice evaluation for TruthfulQA and other MC tasks
         return self.config.test_dataset.lower() in ["truthfulqa_mc1", "truthfulqa", "mmlu"]
-
-    def _evaluate_with_lm_eval_harness(self, predictions: list[str], ground_truths: list[str]) -> dict[str, float]:
-        """Evaluate predictions using LMEvalHarnessGroundTruth for proper multiple choice handling."""
-        from ..lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
-
-        self.logger.info("🎯 Using LMEvalHarnessGroundTruth for multiple choice evaluation")
-
-        # Create evaluator
-        evaluator = LMEvalHarnessGroundTruth(self.config.test_dataset, evaluation_method="text-generation")
-
-        # Format response data as expected by _evaluate_with_lm_eval_metrics
-        response_data = []
-        for pred, gt in zip(predictions, ground_truths):
-            response_data.append(
-                {
-                    "generated_response": pred,
-                    "ground_truth": gt,
-                    "question": "evaluation_question",  # Required field
-                }
-            )
-
-        # Use the internal evaluation method
-        results = evaluator._evaluate_with_lm_eval_metrics(self.config.test_dataset, response_data, task_data=None)
-
-        return {"accuracy": results.get("accuracy", 0.0)}
 
 
 def main():
