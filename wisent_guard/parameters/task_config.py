@@ -100,42 +100,36 @@ QA_TASKS = {
 # Coding benchmarks
 CODING_TASKS = {
     # === VERIFIED WORKING (✅) ===
-    "mbpp",          # ✅ Direct match
-    "humaneval",     # ✅ Direct match  
-    "conala",        # ✅ Direct match
-    "concode",       # ✅ Direct match
-    "mercury",       # ✅ Direct match
-    
+    "mbpp",  # ✅ Direct match
+    "humaneval",  # ✅ Direct match
+    "conala",  # ✅ Direct match
+    "concode",  # ✅ Direct match
+    "mercury",  # ✅ Direct match
     # === TASKS WITH INTERNAL MAPPING (✅ has BigCode mapping) ===
-    "humaneval_plus",     # → maps to 'humanevalplus' in BigCode
+    "humaneval_plus",  # → maps to 'humanevalplus' in BigCode
     "instructhumaneval",  # → maps to 'instruct-humaneval' in BigCode
-    "mbpp_plus",          # → maps to 'mbppplus' in BigCode
-    "apps",               # → maps to 'apps-introductory' in BigCode
-    "ds1000",             # → maps to 'ds1000-all-completion' in BigCode
-    
+    "mbpp_plus",  # → maps to 'mbppplus' in BigCode
+    "apps",  # → maps to 'apps-introductory' in BigCode
+    "ds1000",  # → maps to 'ds1000-all-completion' in BigCode
     # === MULTI-LANGUAGE TASKS (✅ has BigCode mapping) ===
-    "multiple_py",        # → maps to 'multiple-py' in BigCode
-    "multiple_js",        # → maps to 'multiple-js' in BigCode
-    "multiple_java",      # → maps to 'multiple-java' in BigCode
-    "multiple_cpp",       # → maps to 'multiple-cpp' in BigCode (need to fix mapping)
-    "multiple_rs",        # → maps to 'multiple-rs' in BigCode
-    "multiple_go",        # → maps to 'multiple-go' in BigCode
-    
+    "multiple_py",  # → maps to 'multiple-py' in BigCode
+    "multiple_js",  # → maps to 'multiple-js' in BigCode
+    "multiple_java",  # → maps to 'multiple-java' in BigCode
+    "multiple_cpp",  # → maps to 'multiple-cpp' in BigCode (need to fix mapping)
+    "multiple_rs",  # → maps to 'multiple-rs' in BigCode
+    "multiple_go",  # → maps to 'multiple-go' in BigCode
     # === CODE-TO-TEXT TASKS (✅ has BigCode mapping) ===
-    "codexglue_code_to_text_python",     # → maps to 'codexglue_code_to_text-python'
-    "codexglue_code_to_text_go",         # → maps to 'codexglue_code_to_text-go'
-    "codexglue_code_to_text_ruby",       # → maps to 'codexglue_code_to_text-ruby'
-    "codexglue_code_to_text_java",       # → maps to 'codexglue_code_to_text-java'
-    "codexglue_code_to_text_javascript", # → maps to 'codexglue_code_to_text-javascript'
-    "codexglue_code_to_text_php",        # → maps to 'codexglue_code_to_text-php'
-    
+    "codexglue_code_to_text_python",  # → maps to 'codexglue_code_to_text-python'
+    "codexglue_code_to_text_go",  # → maps to 'codexglue_code_to_text-go'
+    "codexglue_code_to_text_ruby",  # → maps to 'codexglue_code_to_text-ruby'
+    "codexglue_code_to_text_java",  # → maps to 'codexglue_code_to_text-java'
+    "codexglue_code_to_text_javascript",  # → maps to 'codexglue_code_to_text-javascript'
+    "codexglue_code_to_text_php",  # → maps to 'codexglue_code_to_text-php'
     # === FIXED MAPPINGS (✅) ===
-    "recode",         # → now maps to 'perturbed-humaneval-natgen-num_seeds_1'
-    
+    "recode",  # → now maps to 'perturbed-humaneval-natgen-num_seeds_1'
     # === REMOVED BROKEN TASKS ===
     # "humanevalpack",  # ❌ REMOVED - no simple BigCode mapping exists
-    
-    # === REMOVED NON-EXISTENT TASKS ===  
+    # === REMOVED NON-EXISTENT TASKS ===
     # "livecodebench",     # ❌ Not in BigCode registry - REMOVED
 }
 

@@ -840,9 +840,9 @@ class FullBenchmarkDownloader:
         canonical_solution = sample.get("canonical_solution", "")
         test = sample.get("test", "")
         entry_point = sample.get("entry_point", "")
-        
+
         pairs = []
-        
+
         # Create a contrastive pair with the coding prompt
         pairs.append(
             {
@@ -858,7 +858,7 @@ class FullBenchmarkDownloader:
                 },
             }
         )
-        
+
         return pairs
 
     def _convert_mbpp_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1235,19 +1235,19 @@ class FullBenchmarkDownloader:
         code = sample.get("code", "")
         prompt = sample.get("prompt", "")
         test = sample.get("test", "")
-        
+
         # For code generation tasks, we create contrastive pairs based on:
         # Correct: The reference code solution
         # Incorrect: A placeholder for incorrect/buggy code (since we don't have real incorrect solutions)
-        
+
         pairs = []
-        
+
         # Create a contrastive pair with the coding prompt
         pairs.append(
             {
                 "question": f"Write Python code to solve this problem:\n\n{prompt}",
                 "correct_answer": code,
-                "incorrect_answer": "# This is a placeholder for incorrect code\n# In practice, this would be buggy or incomplete code\npass", # TODO
+                "incorrect_answer": "# This is a placeholder for incorrect code\n# In practice, this would be buggy or incomplete code\npass",  # TODO
                 "metadata": {
                     "task_id": task_id,
                     "test_cases": test,
@@ -1260,7 +1260,7 @@ class FullBenchmarkDownloader:
                 },
             }
         )
-        
+
         return pairs
 
 

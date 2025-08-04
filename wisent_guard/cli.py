@@ -1378,22 +1378,25 @@ def run_task_pipeline(
                             if full_benchmark_file.exists():
                                 try:
                                     import pickle
-                                    with open(full_benchmark_file, 'rb') as f:
+
+                                    with open(full_benchmark_file, "rb") as f:
                                         benchmark_data = pickle.load(f)
-                                    # Handle both list format (direct contrastive pairs) and dict format  
+                                    # Handle both list format (direct contrastive pairs) and dict format
                                     if isinstance(benchmark_data, list):
                                         qa_pairs = benchmark_data
                                     else:
-                                        qa_pairs = benchmark_data.get('contrastive_pairs', [])
+                                        qa_pairs = benchmark_data.get("contrastive_pairs", [])
                                     if verbose:
-                                        print(f"✅ Using Full Benchmark Downloader cache: {len(qa_pairs)} samples loaded")
+                                        print(
+                                            f"✅ Using Full Benchmark Downloader cache: {len(qa_pairs)} samples loaded"
+                                        )
                                 except Exception as load_error:
                                     if verbose:
                                         print(f"⚠️  Full Benchmark Downloader cache failed: {load_error}")
                                     qa_pairs = []
                             else:
                                 qa_pairs = []
-                                
+
                             # Final fallback to traditional method if cache loading failed
                             if not qa_pairs:
                                 if verbose:
@@ -1602,7 +1605,9 @@ def run_task_pipeline(
                 if verbose:
                     print("   • Use --allow-small-dataset flag to bypass this check (may cause training issues)")
 
-                raise ValueError(f"{error_msg}. Suggestion: Increase dataset size, --limit parameter, or use --allow-small-dataset flag")
+                raise ValueError(
+                    f"{error_msg}. Suggestion: Increase dataset size, --limit parameter, or use --allow-small-dataset flag"
+                )
             if verbose:
                 print("   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag")
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
