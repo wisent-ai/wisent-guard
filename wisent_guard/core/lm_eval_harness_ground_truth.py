@@ -1210,12 +1210,13 @@ class LMEvalHarnessGroundTruth:
             # Try multiple strict patterns to extract answer from generated response
             # These patterns require clear context indicating an intentional choice
             patterns = [
-                r"(?:answer|choice|option)\s*(?:is\s*)?(?::\s*)?(?:\()?([ABCDE])(?:\))?",  # "Answer: A" or "Answer is (B)"
+                # Fixed pattern to avoid matching 'A' in "Answer:" alone
+                r"(?:answer|choice|option)\s*(?:is\s+|:\s*)(?:\()?([ABCDE])(?:\))?",  # "Answer: A" or "Answer is (B)" - requires letter after
                 r"the\s+(?:correct\s+)?answer\s+is\s*(?:\()?([ABCDE])(?:\))?",  # "The answer is A" - requires "the answer is"
                 r"(?:select|choose)\s+(?:\()?([ABCDE])(?:\))?",  # "Select A" or "Choose A" - requires the action word
-                r"(?:^|\n)([ABCDE])(?:\.|,|\)|\s*$)",  # Letter at start of line with punctuation or end
-                r"^([ABCDE])$",  # Just the letter alone
-                r"^(?:\()?([ABCDE])(?:\))?$",  # Just the letter with optional parentheses
+                r"(?:^|\n)([ABCDE])(?:\s*$)",  # Letter at start of line followed by whitespace/end only
+                r"^([ABCDE])[.,;!?)\s]*$",  # Just the letter with optional punctuation and whitespace
+                r"^(?:\()?([ABCDE])(?:\))?\s*$",  # Just the letter with optional parentheses
             ]
 
             # Try each pattern - only accept clear, intentional responses
