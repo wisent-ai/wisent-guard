@@ -17,9 +17,6 @@ ORIGINAL_TASKS_WORKING = {
     "webqs",
 }
 
-NEEDS_TRUST_REMOTE_CODE = {
-    "math_qa",  # ❌ Requires trust_remote_code (unfixable per user request)
-}
 # Problematic original tasks (unfixable or missing)
 ORIGINAL_TASKS_TO_FIX = {
     "truthfulqa_gen",  # ❌ Task doesn't exist (only truthfulqa_mc1/mc2 available)
@@ -185,6 +182,12 @@ TEST_ALLOWED_TASKS = list(
         *HLE_TASKS,  # All HLE tasks work
     }
 )
+
+# Tasks that can be tested in sandbox environments (includes coding tasks)
+# These are tasks that require special handling or are unsafe for CI
+SANDBOX_TESTS_ALLOWED_TASKS = [
+    "mbpp_plus",  # Code generation task requiring bigcode-evaluation-harness
+]
 
 
 def get_taskinterface_tasks():

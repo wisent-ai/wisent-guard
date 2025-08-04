@@ -577,6 +577,8 @@ def run_task_pipeline(
     # Synthetic pair mode
     from_synthetic: bool = False,
     synthetic_contrastive_pairs: Optional[Any] = None,
+    # Security parameter - allow code execution without Docker (UNSAFE)
+    trust_code_execution: bool = False,
     # Model reuse parameter for efficiency
     model_instance: Optional[Any] = None,
 ) -> Dict[str, Any]:
@@ -591,11 +593,12 @@ def run_task_pipeline(
     Returns:
         Dictionary containing the results of the task pipeline
     """
+    from pathlib import Path
 
     # SECURITY: Enforce Docker for code execution tasks
     from .core import SecureCodeEvaluator, enforce_secure_execution
 
-    if enforce_secure_execution(task_name):
+    if enforce_secure_execution(task_name, trust_code_execution):
         if verbose:
             print(f"🔒 Task '{task_name}' requires secure Docker execution")
             print("   • All code will be executed in isolated Docker containers")
@@ -1368,12 +1371,36 @@ def run_task_pipeline(
 
                         except Exception as e:
                             if verbose:
-                                print(f"⚠️  Managed cache failed, falling back to traditional method: {e}")
+                                print(f"⚠️  Managed cache failed, trying Full Benchmark Downloader cache: {e}")
 
-                            # Fallback to traditional method
-                            qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
-                                task_name, task_data, train_docs
-                            )
+                            # Try to load from Full Benchmark Downloader cache
+                            full_benchmark_file = Path(cache_dir) / "data" / f"{task_name}.pkl"
+                            if full_benchmark_file.exists():
+                                try:
+                                    import pickle
+                                    with open(full_benchmark_file, 'rb') as f:
+                                        benchmark_data = pickle.load(f)
+                                    # Handle both list format (direct contrastive pairs) and dict format  
+                                    if isinstance(benchmark_data, list):
+                                        qa_pairs = benchmark_data
+                                    else:
+                                        qa_pairs = benchmark_data.get('contrastive_pairs', [])
+                                    if verbose:
+                                        print(f"✅ Using Full Benchmark Downloader cache: {len(qa_pairs)} samples loaded")
+                                except Exception as load_error:
+                                    if verbose:
+                                        print(f"⚠️  Full Benchmark Downloader cache failed: {load_error}")
+                                    qa_pairs = []
+                            else:
+                                qa_pairs = []
+                                
+                            # Final fallback to traditional method if cache loading failed
+                            if not qa_pairs:
+                                if verbose:
+                                    print("⚠️  All cache methods failed, falling back to traditional extraction")
+                                qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
+                                    task_name, task_data, train_docs
+                                )
                     else:
                         # Traditional method when caching is disabled
                         qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
@@ -1575,14 +1602,7 @@ def run_task_pipeline(
                 if verbose:
                     print("   • Use --allow-small-dataset flag to bypass this check (may cause training issues)")
 
-                return {
-                    "task_name": task_name,
-                    "model_name": model_name,
-                    "error": error_msg,
-                    "training_samples": len(qa_pairs),
-                    "minimum_required": min_training_samples,
-                    "suggestion": "Increase dataset size, --limit parameter, or use --allow-small-dataset flag",
-                }
+                raise ValueError(f"{error_msg}. Suggestion: Increase dataset size, --limit parameter, or use --allow-small-dataset flag")
             if verbose:
                 print("   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag")
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
@@ -4775,6 +4795,8 @@ def handle_tasks_command(args):
                 use_cached=getattr(args, "cache_benchmark", True),  # Use cache_benchmark value
                 force_download=getattr(args, "force_download", False),
                 cache_dir=getattr(args, "cache_dir", "./benchmark_cache"),
+                # Security parameter
+                trust_code_execution=getattr(args, "trust_code_execution", False),
                 # Pass pre-loaded QA pairs for mixed sampling
                 preloaded_qa_pairs=qa_pairs if (source == "MIXED_SAMPLING" and qa_pairs) else None,
                 # Pass cross-benchmark data

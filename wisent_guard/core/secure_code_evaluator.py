@@ -350,12 +350,13 @@ else:
         self.executor.cleanup()
 
 
-def enforce_secure_execution(task_name: str) -> bool:
+def enforce_secure_execution(task_name: str, trust_code_execution: bool = False) -> bool:
     """
     Check if a task must use secure Docker execution.
 
     Args:
         task_name: Name of the task
+        trust_code_execution: If True, allows bypassing Docker requirement (UNSAFE - use only in trusted environments)
 
     Returns:
         True if task requires secure execution
@@ -364,8 +365,24 @@ def enforce_secure_execution(task_name: str) -> bool:
         SecurityError: If attempting to execute code outside Docker
     """
     if SecureCodeEvaluator.is_code_execution_task(task_name):
-        # This is a code execution task - MUST use Docker
-        return True
+        if trust_code_execution:
+            # UNSAFE: User explicitly trusts this environment for code execution
+            print(f"⚠️  WARNING: Running code task '{task_name}' WITHOUT Docker security!")
+            print("   • Code will execute directly in current environment") 
+            print("   • This is UNSAFE unless you're in a secure sandbox (e.g., RunPod container)")
+            print("   • Use --trust-code-execution only in isolated environments")
+            
+            # Set required environment variable for HuggingFace code_eval metric
+            import os
+            os.environ["HF_ALLOW_CODE_EVAL"] = "1"
+            if "TRUST_REMOTE_CODE" not in os.environ:
+                os.environ["TRUST_REMOTE_CODE"] = "1"
+            print("   • Set HF_ALLOW_CODE_EVAL=1 for code evaluation")
+            
+            return False  # Skip Docker requirement
+        else:
+            # This is a code execution task - MUST use Docker
+            return True
     return False
 
 

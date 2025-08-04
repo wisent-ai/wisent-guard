@@ -244,7 +244,11 @@ class ActivationCollectionLogic:
             # Handle both field names for backward compatibility
             incorrect = qa_pair.get('incorrect_answer') or qa_pair.get('incorrect_choice')
             if not incorrect:
-                raise KeyError(f"Missing 'incorrect_answer' field in qa_pair: {qa_pair.keys()}")
+                # For code generation tasks, provide a default incorrect answer if missing
+                if any(key in qa_pair.get('metadata', {}).get('benchmark_type', '') for key in ['mbpp', 'humaneval', 'code']):
+                    incorrect = "# Incorrect or incomplete code implementation\npass" # TODO
+                else:
+                    raise KeyError(f"Missing 'incorrect_answer' field in qa_pair: {qa_pair.keys()}")
             
             pair = self.create_contrastive_pair(
                 question=qa_pair['question'],

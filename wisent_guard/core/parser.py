@@ -205,6 +205,10 @@ def setup_tasks_parser(parser):
     parser.add_argument("--log-detections", action="store_true",
                        help="Enable logging of detection events")
     
+    # Code execution security arguments  
+    parser.add_argument("--trust-code-execution", action="store_true",
+                       help="⚠️  UNSAFE: Allow code execution without Docker in trusted sandbox environments (e.g., RunPod containers). Use only in secure, isolated environments!")
+    
     # Steering mode arguments
     parser.add_argument("--steering-mode", action="store_true",
                        help="Enable steering mode (uses CAA vectors instead of classification)")
