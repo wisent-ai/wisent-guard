@@ -6,6 +6,7 @@ the extraction logic to cleanly handle the differences between benchmarks.
 """
 
 import logging
+import random
 import re
 from typing import Any, Dict, List, Optional
 
@@ -825,8 +826,6 @@ class SQuAD2Extractor(BenchmarkExtractor):
                     "This cannot be determined from the passage.",
                     "The passage does not contain this information.",
                 ]
-                import random
-
                 incorrect_answer = random.choice(incorrect_answers)
 
             return {
@@ -3258,7 +3257,7 @@ if not BIGCODE_AVAILABLE:
 
                     try:
                         solutions = json.loads(solutions)
-                    except:
+                    except (json.JSONDecodeError, TypeError, ValueError):
                         solutions = []
 
                 correct_answer = solutions[0] if solutions else "# Write your solution here"
