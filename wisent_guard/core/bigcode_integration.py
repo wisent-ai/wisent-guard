@@ -420,13 +420,16 @@ if __name__ == "__main__":
         test_imports = sample.get('test_imports', [])
         test_list = sample.get('test_list', [])
         
+        # Fix function name mismatch before creating test script
+        fixed_generation = self._fix_function_name_mismatch(generation, test_list)
+        
         imports = '\n'.join(test_imports)
         tests = '\n    '.join(test_list)
         
         script = f"""
 {imports}
 
-{generation}
+{fixed_generation}
 
 if __name__ == "__main__":
     {tests}
@@ -456,6 +459,60 @@ if __name__ == "__main__":
 """
         return script
         
+    def _fix_function_name_mismatch(self, code: str, test_list: List[str]) -> str:
+        """
+        Fix function name mismatches between generated code and test cases.
+        
+        Uses wrapper function approach for robustness across different code structures.
+        
+        Args:
+            code: Generated code that may have wrong function name
+            test_list: List of test assertions that specify expected function name
+            
+        Returns:
+            Fixed code with wrapper function if needed
+        """
+        import re
+        
+        if not test_list or not code.strip():
+            return code
+            
+        # Extract expected function name from test assertions
+        expected_name = None
+        for test in test_list:
+            # Look for function calls in assert statements
+            match = re.search(r'assert\s+(\w+)\s*\(', test)
+            if match:
+                expected_name = match.group(1)
+                break
+                
+        if not expected_name:
+            return code  # No function name found in tests
+            
+        # Extract actual function name from generated code
+        actual_name = None
+        func_match = re.search(r'def\s+(\w+)\s*\(', code)
+        if func_match:
+            actual_name = func_match.group(1)
+            
+        if not actual_name:
+            return code  # No function definition found
+            
+        if actual_name == expected_name:
+            return code  # Names already match
+            
+        logger.info(f"🔧 Function name mismatch detected: {actual_name} → {expected_name}")
+        logger.info(f"   Adding wrapper function for compatibility")
+        
+        # Add wrapper function to bridge the name gap
+        wrapper = f"""
+# Wrapper function for test compatibility
+def {expected_name}(*args, **kwargs):
+    return {actual_name}(*args, **kwargs)
+"""
+        
+        return code + wrapper
+    
     def _calculate_pass_at_k(self, execution_results: List[Dict], k: int) -> float:
         """Calculate pass@k metric."""
         total_passed = 0

@@ -2135,17 +2135,17 @@ class MBPPExtractor(BenchmarkExtractor):
         try:
             qa_pair = self.extract_qa_pair(doc, task_data)
             if not qa_pair:
-                print(f"DEBUG MBPP: qa_pair is None for doc keys: {list(doc.keys())}")
+                logging.debug(f"DEBUG MBPP: qa_pair is None for doc keys: {list(doc.keys())}")
                 return None
 
             # For code generation, create incorrect answer by removing random words
             correct_answer = qa_pair["correct_answer"]
             incorrect_answer = self._create_incorrect_code(correct_answer)
 
-            print("DEBUG MBPP: Successfully created contrastive pair")
-            print(f"DEBUG MBPP: Question: {qa_pair['formatted_question'][:50]}...")
-            print(f"DEBUG MBPP: Correct: {correct_answer[:50]}...")
-            print(f"DEBUG MBPP: Incorrect: {incorrect_answer[:50]}...")
+            logging.debug("DEBUG MBPP: Successfully created contrastive pair")
+            logging.debug(f"DEBUG MBPP: Question: {qa_pair['formatted_question'][:50]}...")
+            logging.debug(f"DEBUG MBPP: Correct: {correct_answer[:50]}...")
+            logging.debug(f"DEBUG MBPP: Incorrect: {incorrect_answer[:50]}...")
 
             return {
                 "question": qa_pair["formatted_question"],
@@ -2154,7 +2154,7 @@ class MBPPExtractor(BenchmarkExtractor):
             }
 
         except Exception as e:
-            print(f"DEBUG MBPP: Error extracting contrastive pair: {e}")
+            logging.debug(f"DEBUG MBPP: Error extracting contrastive pair: {e}")
             logger.debug(f"Error extracting MBPP contrastive pair: {e}")
             return None
 

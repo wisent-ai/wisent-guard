@@ -7,6 +7,7 @@ This module provides specialized extractors for each BigCode benchmark format.
 from typing import Dict, Any, Optional, List
 import json
 import logging
+import re
 
 from .benchmark_extractors import BenchmarkExtractor
 
@@ -156,6 +157,65 @@ class HumanEvalExtractor(BenchmarkExtractor):
 
 class MBPPExtractor(BenchmarkExtractor):
     """Extractor for MBPP and MBPP+ benchmarks."""
+    
+    def extract_code_from_answer(self, answer: str) -> str:
+        """
+        Extract Python code from model answer that may contain markdown and explanations.
+        
+        Args:
+            answer: The model's response which may contain code blocks and text
+            
+        Returns:
+            Extracted Python code or the original answer if no code blocks found
+        """
+        if not answer:
+            return ""
+            
+        # Try to extract code from markdown code blocks first
+        # Pattern for ```python...``` or ```...```
+        code_block_pattern = r'```(?:python)?\s*\n(.*?)\n```'
+        code_blocks = re.findall(code_block_pattern, answer, re.DOTALL)
+        
+        if code_blocks:
+            # Return the first complete function definition found
+            for block in code_blocks:
+                # Check if this block contains a function definition
+                if 'def ' in block:
+                    return block.strip()
+            # If no function definition found, return the first code block
+            return code_blocks[0].strip()
+        
+        # If no markdown blocks, try to extract function definition directly
+        # Look for a function that starts with 'def' and capture until the end
+        lines = answer.split('\n')
+        in_function = False
+        function_lines = []
+        base_indent = None
+        
+        for line in lines:
+            if line.strip().startswith('def '):
+                in_function = True
+                function_lines = [line]
+                # Determine base indentation
+                base_indent = len(line) - len(line.lstrip())
+            elif in_function:
+                # Check if we're still in the function based on indentation
+                if line.strip() == '':
+                    # Empty line, include it
+                    function_lines.append(line)
+                elif line.strip() and (len(line) - len(line.lstrip())) <= base_indent:
+                    # Non-empty line with same or less indentation, we've left the function
+                    break
+                else:
+                    # Line is part of the function
+                    function_lines.append(line)
+        
+        if function_lines:
+            return '\n'.join(function_lines).strip()
+        
+        # If still no function found, return the answer as-is
+        # (it might be a one-liner or the model might have failed)
+        return answer.strip()
     
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """

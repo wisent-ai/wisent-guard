@@ -99,10 +99,20 @@ def generate_benchmark_predictions(
     device: torch.device,
     task_name: str,
     max_new_tokens: int,
-) -> Tuple[List[str], List[str]]:
-    """Generate model predictions for benchmark evaluation using task extractor with batching."""
+    preserve_task_docs: bool = False,
+) -> Tuple[List[str], List[str], List[Dict]]:
+    """Generate model predictions for benchmark evaluation using task extractor with batching.
+    
+    Args:
+        preserve_task_docs: If True, returns original task documents alongside predictions
+        
+    Returns:
+        Tuple of (predictions, ground_truths, task_docs) if preserve_task_docs=True
+        Tuple of (predictions, ground_truths, []) if preserve_task_docs=False
+    """
     predictions = []
     ground_truths = []
+    task_docs = [] if preserve_task_docs else []
 
     # Get the task and its extractor
     task = get_task(task_name)
@@ -112,6 +122,8 @@ def generate_benchmark_predictions(
     questions = []
     answers = []
 
+    valid_samples = []  # Keep track of samples that produce valid QA pairs
+    
     for sample in samples:
         qa_pair = extractor.extract_qa_pair(sample, task)
         if not qa_pair:
@@ -119,6 +131,9 @@ def generate_benchmark_predictions(
             continue
         questions.append(qa_pair["formatted_question"])
         answers.append(qa_pair["correct_answer"])
+        
+        if preserve_task_docs:
+            valid_samples.append(sample)
 
     # Process in batches
     for i in tqdm(range(0, len(questions), batch_size), desc="Generating benchmark predictions"):
@@ -145,7 +160,11 @@ def generate_benchmark_predictions(
         # Add ground truths
         ground_truths.extend(batch_answers)
 
-    return predictions, ground_truths
+    # Add task docs if requested
+    if preserve_task_docs:
+        task_docs = valid_samples[:len(predictions)]  # Ensure same length as predictions
+    
+    return predictions, ground_truths, task_docs
 
 
 def create_probe_training_data(

@@ -89,7 +89,6 @@ Thumbs.db
 !/LICENSE
 !/upload_to_pypi.sh
 !/wisent-guard-logo.png
-!/.DS_Store
 !/.github/
 !/.pre-commit-config.yaml
 
@@ -147,3 +146,5 @@ device_benchmarks.json
 # User-defined model configurations (local to each user)
 .wisent-guard/
 user_model_configs.json
+
+bigcode-evaluation-harness/

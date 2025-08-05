@@ -601,6 +601,7 @@ class OptimizationPipeline:
         # Generate predictions with steering applied
         predictions = []
         ground_truths = []
+        task_docs = []  # Preserve original task documents for BigCode evaluation
 
         task = get_task(self.config.val_dataset)
         extractor = task.get_extractor()
@@ -608,6 +609,7 @@ class OptimizationPipeline:
         # Collect all questions for batched processing (use ALL validation samples)
         questions = []
         ground_truths = []
+        valid_samples = []  # Keep track of samples that produce valid QA pairs
 
         for sample in self.val_samples:  # Use all validation samples for reliable evaluation
             qa_pair = extractor.extract_qa_pair(sample, task)
@@ -618,6 +620,7 @@ class OptimizationPipeline:
             ground_truth = qa_pair["correct_answer"]
             questions.append(question)
             ground_truths.append(ground_truth)
+            valid_samples.append(sample)  # Store the original sample
 
         # Generate predictions using batched approach
         if questions:
@@ -647,8 +650,13 @@ class OptimizationPipeline:
         # Save detailed validation results to JSON
         self._save_detailed_validation_results(questions, ground_truths, predictions, trial_number)
 
-        # Evaluate benchmark performance
-        benchmark_metrics = metrics.evaluate_benchmark_performance(predictions, ground_truths, self.config.val_dataset)
+        # Prepare task docs for BigCode evaluation (if coding task)
+        task_docs = valid_samples[:len(predictions)] if valid_samples else []
+
+        # Evaluate benchmark performance (with task docs for coding tasks)
+        benchmark_metrics = metrics.evaluate_benchmark_performance(
+            predictions, ground_truths, self.config.val_dataset, task_docs=task_docs
+        )
 
         return benchmark_metrics.get("accuracy", 0.0)
 
@@ -864,7 +872,7 @@ class OptimizationPipeline:
 
         # Generate baseline predictions (no steering)
         self.logger.info("Generating baseline predictions...")
-        baseline_predictions, test_ground_truths, test_questions = self._generate_test_predictions(
+        baseline_predictions, test_ground_truths, test_questions, test_task_docs = self._generate_test_predictions(
             None, None, layer_id, 0.0
         )
 
@@ -880,7 +888,7 @@ class OptimizationPipeline:
             # CAA and other methods use steering_alpha
             strength = best_params["steering_alpha"]
 
-        steered_predictions, _, _ = self._generate_test_predictions(steering_instance, method_name, layer_id, strength)
+        steered_predictions, _, _, _ = self._generate_test_predictions(steering_instance, method_name, layer_id, strength)
 
         # Save detailed test results to JSON
         if test_questions and test_ground_truths and baseline_predictions and steered_predictions:
@@ -888,13 +896,13 @@ class OptimizationPipeline:
                 test_questions, test_ground_truths, baseline_predictions, steered_predictions
             )
 
-        # Calculate benchmark metrics
+        # Calculate benchmark metrics (with real task docs for coding tasks)
         baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
-            baseline_predictions, test_ground_truths, self.config.test_dataset
+            baseline_predictions, test_ground_truths, self.config.test_dataset, task_docs=test_task_docs
         )
 
         steered_benchmark_metrics = metrics.evaluate_benchmark_performance(
-            steered_predictions, test_ground_truths, self.config.test_dataset
+            steered_predictions, test_ground_truths, self.config.test_dataset, task_docs=test_task_docs
         )
 
         # Evaluate probe on test data
@@ -932,11 +940,12 @@ class OptimizationPipeline:
 
     def _generate_test_predictions(
         self, steering_instance: Any, method_name: str, layer_id: int, alpha: float
-    ) -> tuple[list[str], list[str], list[str]]:
+    ) -> tuple[list[str], list[str], list[str], list[dict]]:
         """Generate predictions on test data using batched generation."""
         # Collect all questions and ground truths for batching
         questions = []
         ground_truths = []
+        valid_samples = []  # Keep track of samples that produce valid QA pairs
 
         task = get_task(self.config.test_dataset)
         extractor = task.get_extractor()
@@ -950,6 +959,7 @@ class OptimizationPipeline:
             ground_truth = qa_pair["correct_answer"]
             questions.append(question)
             ground_truths.append(ground_truth)
+            valid_samples.append(sample)  # Store the original sample
 
         # Process all questions with appropriate batched method
         if questions:
@@ -972,7 +982,7 @@ class OptimizationPipeline:
         else:
             predictions = []
 
-        return predictions, ground_truths, questions
+        return predictions, ground_truths, questions, valid_samples
 
     def _evaluate_probe_metrics(self, probe, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """Evaluate probe metrics."""
