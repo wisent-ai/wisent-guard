@@ -32,7 +32,7 @@ MULTIPLE_CHOICE_TASKS = {
     "hellaswag",
     "truthfulqa_mc1",
     "truthfulqa_mc2",
-    "mmlu",
+    # "mmlu",  # Removed: Not working in lm-evaluation-harness currently (see https://github.com/EleutherAI/lm-evaluation-harness/issues/3171)
     "mmmlu",
     "piqa",
     "copa",
