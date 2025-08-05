@@ -8,7 +8,7 @@ evaluation with the optuna optimization pipeline.
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from ..bigcode_integration import BigCodeEvaluator, is_bigcode_task
-from ..bigcode_extractors import MBPPExtractor
+from ..bigcode_extractors import MBPPExtractor, get_bigcode_extractor
 from ...parameters.task_config import CODING_TASKS
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class OptunaBigCodeEvaluator:
             docker_executor: Optional Docker executor for secure code execution
         """
         self.bigcode_evaluator = BigCodeEvaluator(docker_executor)
-        self.code_extractor = MBPPExtractor()  # Works for all coding tasks
+        self.code_extractor = None  # Will be set per task
         
     def is_coding_task(self, task_name: str) -> bool:
         """
@@ -73,8 +73,11 @@ class OptunaBigCodeEvaluator:
         
         for i, (prediction, task_doc) in enumerate(zip(predictions, task_docs)):
             try:
+                # Get the appropriate extractor for this task
+                code_extractor = get_bigcode_extractor(task_name)
+                
                 # Extract code from the prediction
-                extracted_code = self.code_extractor.extract_code_from_answer(prediction)
+                extracted_code = code_extractor.extract_code_from_answer(prediction)
                 
                 if not extracted_code.strip():
                     logger.warning(f"No code extracted from prediction {i}: {prediction[:100]}...")

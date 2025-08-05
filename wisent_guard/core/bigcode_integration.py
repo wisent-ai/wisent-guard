@@ -479,11 +479,21 @@ if __name__ == "__main__":
             
         # Extract expected function name from test assertions
         expected_name = None
+        # Built-in functions to skip when looking for the target function
+        builtin_functions = {'set', 'len', 'str', 'int', 'float', 'list', 'tuple', 'dict', 
+                            'sum', 'max', 'min', 'abs', 'round', 'sorted', 'reversed'}
+        
         for test in test_list:
-            # Look for function calls in assert statements
-            match = re.search(r'assert\s+(\w+)\s*\(', test)
-            if match:
-                expected_name = match.group(1)
+            # Find all function calls in assert statements
+            function_calls = re.findall(r'(\w+)\s*\(', test)
+            
+            for func_name in function_calls:
+                # Skip built-in functions and common test functions
+                if func_name not in builtin_functions and func_name not in {'assert', 'assertEqual', 'assertTrue', 'assertFalse'}:
+                    expected_name = func_name
+                    break
+                    
+            if expected_name:
                 break
                 
         if not expected_name:

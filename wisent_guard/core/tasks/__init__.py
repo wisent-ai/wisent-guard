@@ -10,7 +10,34 @@ from .hle_task import HLEExactMatchTask, HLEMultipleChoiceTask, HLETask
 from .hmmt_task import HMMTTask
 from .livecodebench_task import LiveCodeBenchTask
 from .livemathbench_task import LiveMathBenchTask
-from .lm_eval_task import GSM8KTask, MBPPTask, MMLUTask, TruthfulQATask
+from .lm_eval_task import (
+    AppsTask,
+    CodexglueCodeToTextGoTask,
+    CodexglueCodeToTextJavaTask,
+    CodexglueCodeToTextJavascriptTask,
+    CodexglueCodeToTextPhpTask,
+    CodexglueCodeToTextPythonTask,
+    CodexglueCodeToTextRubyTask,
+    ConalaTask,
+    ConcodeTask,
+    DS1000Task,
+    GSM8KTask,
+    HumanEvalPlusTask,
+    HumanEvalTask,
+    InstructHumanEvalTask,
+    MBPPPlusTask,
+    MBPPTask,
+    MMLUTask,
+    MercuryTask,
+    MultipleCppTask,
+    MultipleGoTask,
+    MultipleJavaTask,
+    MultipleJsTask,
+    MultiplePyTask,
+    MultipleRsTask,
+    RecodeTask,
+    TruthfulQATask,
+)
 from .math500_task import Math500Task
 from .polymath_task import PolyMathTask
 from .supergpqa_task import SuperGPQABiologyTask, SuperGPQAChemistryTask, SuperGPQAPhysicsTask, SuperGPQATask
@@ -22,10 +49,34 @@ def register_all_tasks():
     register_task("livecodebench", lambda limit=None: LiveCodeBenchTask(release_version="release_v1", limit=limit))
 
     # Register common lm-eval tasks
-    register_task("mbpp", MBPPTask)
     register_task("gsm8k", GSM8KTask)
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
+    
+    # Register all coding tasks
+    register_task("mbpp", MBPPTask)
+    register_task("humaneval", HumanEvalTask)
+    register_task("mbpp_plus", MBPPPlusTask)
+    register_task("instructhumaneval", InstructHumanEvalTask)
+    register_task("humaneval_plus", HumanEvalPlusTask)
+    register_task("conala", ConalaTask)
+    register_task("concode", ConcodeTask)
+    register_task("mercury", MercuryTask)
+    register_task("apps", AppsTask)
+    register_task("ds1000", DS1000Task)
+    register_task("multiple_py", MultiplePyTask)
+    register_task("multiple_js", MultipleJsTask)
+    register_task("multiple_java", MultipleJavaTask)
+    register_task("multiple_cpp", MultipleCppTask)
+    register_task("multiple_rs", MultipleRsTask)
+    register_task("multiple_go", MultipleGoTask)
+    register_task("codexglue_code_to_text_python", CodexglueCodeToTextPythonTask)
+    register_task("codexglue_code_to_text_go", CodexglueCodeToTextGoTask)
+    register_task("codexglue_code_to_text_ruby", CodexglueCodeToTextRubyTask)
+    register_task("codexglue_code_to_text_java", CodexglueCodeToTextJavaTask)
+    register_task("codexglue_code_to_text_javascript", CodexglueCodeToTextJavascriptTask)
+    register_task("codexglue_code_to_text_php", CodexglueCodeToTextPhpTask)
+    register_task("recode", RecodeTask)
 
     # Register HLE tasks
     register_task("hle", lambda limit=None: HLETask(limit=limit))
@@ -79,17 +130,39 @@ register_all_tasks()
 
 __all__ = [
     "AIMETask",
+    "AppsTask",
+    "CodexglueCodeToTextGoTask",
+    "CodexglueCodeToTextJavaTask",
+    "CodexglueCodeToTextJavascriptTask",
+    "CodexglueCodeToTextPhpTask",
+    "CodexglueCodeToTextPythonTask",
+    "CodexglueCodeToTextRubyTask",
+    "ConalaTask",
+    "ConcodeTask",
+    "DS1000Task",
     "GSM8KTask",
     "HLEExactMatchTask",
     "HLEMultipleChoiceTask",
     "HLETask",
     "HMMTTask",
+    "HumanEvalPlusTask",
+    "HumanEvalTask",
+    "InstructHumanEvalTask",
     "LiveCodeBenchTask",
     "LiveMathBenchTask",
+    "MBPPPlusTask",
     "MBPPTask",
     "MMLUTask",
     "Math500Task",
+    "MercuryTask",
+    "MultipleCppTask",
+    "MultipleGoTask",
+    "MultipleJavaTask",
+    "MultipleJsTask",
+    "MultiplePyTask",
+    "MultipleRsTask",
     "PolyMathTask",
+    "RecodeTask",
     "SuperGPQABiologyTask",
     "SuperGPQAChemistryTask",
     "SuperGPQAPhysicsTask",

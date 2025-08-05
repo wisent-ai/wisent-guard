@@ -107,6 +107,114 @@ class HumanEvalExtractor(BenchmarkExtractor):
             logger.debug(f"Error extracting HumanEval contrastive pair: {e}")
             return None
     
+    def extract_code_from_answer(self, answer: str) -> str:
+        """
+        Extract Python code from model answer for HumanEval format.
+        
+        HumanEval provides function signature in the prompt, and the model should 
+        complete the function body. This method handles common formatting issues
+        in generated code.
+        
+        Args:
+            answer: The model's response containing the function body
+            
+        Returns:
+            Cleaned and properly formatted function body
+        """
+        if not answer:
+            return ""
+            
+        # Remove common markdown artifacts
+        answer = re.sub(r'```+.*?```', '', answer, flags=re.DOTALL)
+        answer = re.sub(r'```+\s*$', '', answer)
+        answer = answer.strip()
+        
+        if not answer:
+            return ""
+            
+        # Split into lines for processing
+        lines = answer.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            line = line.rstrip()
+            
+            # Skip empty lines at the beginning
+            if not line and not cleaned_lines:
+                continue
+                
+            # Fix common formatting issues in HumanEval responses
+            line = self._fix_humaneval_line_formatting(line)
+            
+            if line:  # Only add non-empty lines after processing
+                cleaned_lines.append(line)
+        
+        result = '\n'.join(cleaned_lines)
+        
+        # Final cleanup: ensure proper indentation for function body
+        result = self._fix_function_body_indentation(result)
+        
+        return result
+    
+    def _fix_humaneval_line_formatting(self, line: str) -> str:
+        """Fix formatting issues in a single line for HumanEval."""
+        if not line.strip():
+            return line
+            
+        # Handle multiple statements cramped on one line
+        # Pattern: "if condition    return value    return other_value"
+        if re.search(r'\s{4,}', line):
+            # Split on 4+ spaces and take only the first part
+            # This handles "if condition    return True    return False"
+            parts = re.split(r'\s{4,}', line)
+            if len(parts) > 1:
+                # For HumanEval, we typically want the first logical statement
+                # If it's an if condition, add the colon
+                first_part = parts[0].strip()
+                if (first_part.startswith('if ') or 
+                    first_part.startswith('elif ') or 
+                    first_part.startswith('for ') or 
+                    first_part.startswith('while ')):
+                    if not first_part.endswith(':'):
+                        first_part += ':'
+                        
+                # Return the first part, other parts will be handled separately
+                return first_part
+        
+        # Fix missing colons after control statements
+        if (line.strip().startswith(('if ', 'elif ', 'else', 'for ', 'while ')) and 
+            not line.strip().endswith(':') and 
+            'return' not in line):
+            line = line.rstrip() + ':'
+            
+        return line
+    
+    def _fix_function_body_indentation(self, code: str) -> str:
+        """Ensure proper indentation for function body in HumanEval format."""
+        if not code:
+            return code
+            
+        lines = code.split('\n')
+        fixed_lines = []
+        
+        for line in lines:
+            if not line.strip():
+                fixed_lines.append('')
+                continue
+                
+            # Ensure all non-empty lines are indented (HumanEval function body)
+            stripped = line.strip()
+            if stripped:
+                # If the line isn't already indented, add 4 spaces
+                if not line.startswith('    ') and not line.startswith('\t'):
+                    fixed_lines.append('    ' + stripped)
+                else:
+                    fixed_lines.append(line)
+            else:
+                fixed_lines.append(line)
+                
+        return '\n'.join(fixed_lines)
+    
     def _create_incorrect_humaneval(self, correct_code: str, doc: Dict[str, Any]) -> str:
         """Create an incorrect version specifically for HumanEval."""
         if not correct_code or correct_code == "pass":

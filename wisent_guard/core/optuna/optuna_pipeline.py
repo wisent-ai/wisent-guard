@@ -207,12 +207,28 @@ class OptimizationPipeline:
         self.train_samples = None
         self.val_samples = None
         self.test_samples = None
+        # Store task documents for BigCode evaluation
+        self.train_task_docs = None
+        self.val_task_docs = None
+        self.test_task_docs = None
         self.tokenization_config = {
             "max_length": config.max_length,
             "padding": True,
             "truncation": True,
             "return_tensors": "pt",
         }
+    
+    @property
+    def is_coding_task(self) -> bool:
+        """Check if the current task requires code execution evaluation."""
+        from ..bigcode_integration import is_bigcode_task
+        from ...parameters.task_config import CODING_TASKS
+        
+        val_dataset = getattr(self.config, 'val_dataset', None)
+        if not val_dataset:
+            return False
+            
+        return val_dataset.lower() in CODING_TASKS or is_bigcode_task(val_dataset)
 
     def run_optimization(self) -> dict[str, Any]:
         """Run the complete optimization pipeline."""
@@ -268,6 +284,11 @@ class OptimizationPipeline:
         self.train_samples = data_utils.load_dataset_samples(self.config.train_dataset, self.config.train_limit)
         self.val_samples = data_utils.load_dataset_samples(self.config.val_dataset, self.config.val_limit)
         self.test_samples = data_utils.load_dataset_samples(self.config.test_dataset, self.config.test_limit)
+
+        # Store task documents for BigCode evaluation (coding tasks)
+        self.train_task_docs = self.train_samples
+        self.val_task_docs = self.val_samples
+        self.test_task_docs = self.test_samples
 
         self.logger.info(
             f"Loaded {len(self.train_samples)} train, {len(self.val_samples)} val, {len(self.test_samples)} test samples"
@@ -1005,19 +1026,47 @@ class OptimizationPipeline:
         """Save detailed validation results to JSON file."""
         detailed_results = []
 
-        for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
-            # Evaluate if the answer is correct using metrics module
-            is_correct = metrics.evaluate_response_correctness(model_answer, correct_answer, self.config.val_dataset)
-
-            detailed_results.append(
-                {
-                    "row": i,
-                    "question": question,
-                    "correct_answer": correct_answer,
-                    "model_answer": model_answer,
-                    "is_correct": is_correct,
-                }
+        # For coding tasks, use the same BigCode evaluation as accuracy calculation
+        if self.is_coding_task:
+            # Use evaluate_benchmark_performance to get consistent BigCode evaluation
+            eval_results = metrics.evaluate_benchmark_performance(
+                predictions, ground_truths, task_name=self.config.val_dataset, task_docs=self.val_task_docs
             )
+            
+            # Extract individual correctness from evaluation details
+            eval_details = eval_results.get('evaluation_details', [])
+            
+            for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
+                # Get correctness from BigCode evaluation if available
+                is_correct = eval_details[i]['is_correct'] if i < len(eval_details) else False
+                
+                detailed_results.append(
+                    {
+                        "row": i,
+                        "question": question,
+                        "correct_answer": correct_answer,
+                        "model_answer": model_answer,
+                        "is_correct": is_correct,
+                        "evaluation_method": eval_results.get('evaluation_method', 'unknown'),
+                        "extracted_code": eval_details[i].get('prediction', model_answer) if i < len(eval_details) else model_answer,
+                        "execution_error": eval_details[i].get('execution_error') if i < len(eval_details) else None,
+                    }
+                )
+        else:
+            # For non-coding tasks, use the original string-based evaluation
+            for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
+                is_correct = metrics.evaluate_response_correctness(model_answer, correct_answer, self.config.val_dataset)
+                
+                detailed_results.append(
+                    {
+                        "row": i,
+                        "question": question,
+                        "correct_answer": correct_answer,
+                        "model_answer": model_answer,
+                        "is_correct": is_correct,
+                        "evaluation_method": "string_comparison",
+                    }
+                )
 
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1039,29 +1088,67 @@ class OptimizationPipeline:
         """Save detailed test results to JSON file with both baseline and steered answers."""
         detailed_results = []
 
-        # Get task for accuracy evaluation
-        task = get_task(self.config.test_dataset)
-
-        for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
-            zip(questions, ground_truths, baseline_predictions, steered_predictions)
-        ):
-            # Evaluate correctness for both baseline and steered answers
-            is_baseline_correct = metrics.evaluate_response_correctness(
-                baseline_answer, correct_answer, self.config.test_dataset
+        # For coding tasks, use BigCode evaluation consistently
+        if self.is_coding_task:
+            # Evaluate baseline predictions with BigCode
+            baseline_eval_results = metrics.evaluate_benchmark_performance(
+                baseline_predictions, ground_truths, task_name=self.config.test_dataset, task_docs=self.test_task_docs
             )
-            is_correct = metrics.evaluate_response_correctness(steered_answer, correct_answer, self.config.test_dataset)
-
-            detailed_results.append(
-                {
-                    "row": i,
-                    "question": question,
-                    "correct_answer": correct_answer,
-                    "baseline_model_answer": baseline_answer,
-                    "model_answer": steered_answer,
-                    "is_baseline_correct": is_baseline_correct,
-                    "is_correct": is_correct,
-                }
+            
+            # Evaluate steered predictions with BigCode
+            steered_eval_results = metrics.evaluate_benchmark_performance(
+                steered_predictions, ground_truths, task_name=self.config.test_dataset, task_docs=self.test_task_docs
             )
+            
+            baseline_details = baseline_eval_results.get('evaluation_details', [])
+            steered_details = steered_eval_results.get('evaluation_details', [])
+            
+            for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
+                zip(questions, ground_truths, baseline_predictions, steered_predictions)
+            ):
+                # Get correctness from BigCode evaluation
+                is_baseline_correct = baseline_details[i]['is_correct'] if i < len(baseline_details) else False
+                is_correct = steered_details[i]['is_correct'] if i < len(steered_details) else False
+                
+                detailed_results.append(
+                    {
+                        "row": i,
+                        "question": question,
+                        "correct_answer": correct_answer,
+                        "baseline_model_answer": baseline_answer,
+                        "model_answer": steered_answer,
+                        "is_baseline_correct": is_baseline_correct,
+                        "is_correct": is_correct,
+                        "evaluation_method": steered_eval_results.get('evaluation_method', 'bigcode_execution'),
+                        "baseline_extracted_code": baseline_details[i].get('prediction', baseline_answer) if i < len(baseline_details) else baseline_answer,
+                        "steered_extracted_code": steered_details[i].get('prediction', steered_answer) if i < len(steered_details) else steered_answer,
+                        "baseline_execution_error": baseline_details[i].get('execution_error') if i < len(baseline_details) else None,
+                        "steered_execution_error": steered_details[i].get('execution_error') if i < len(steered_details) else None,
+                    }
+                )
+        else:
+            # For non-coding tasks, use string-based evaluation
+            for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
+                zip(questions, ground_truths, baseline_predictions, steered_predictions)
+            ):
+                # Evaluate correctness for both baseline and steered answers
+                is_baseline_correct = metrics.evaluate_response_correctness(
+                    baseline_answer, correct_answer, self.config.test_dataset
+                )
+                is_correct = metrics.evaluate_response_correctness(steered_answer, correct_answer, self.config.test_dataset)
+
+                detailed_results.append(
+                    {
+                        "row": i,
+                        "question": question,
+                        "correct_answer": correct_answer,
+                        "baseline_model_answer": baseline_answer,
+                        "model_answer": steered_answer,
+                        "is_baseline_correct": is_baseline_correct,
+                        "is_correct": is_correct,
+                        "evaluation_method": "string_comparison",
+                    }
+                )
 
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
