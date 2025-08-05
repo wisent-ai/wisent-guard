@@ -91,9 +91,9 @@ jobs:
 
       - name: Run fast tests
         run: |
-          pytest -m "not slow and not heavy and not model_download and not docker" -v
+          pytest -m "not slow and not heavy and not model_download and not docker and not bigcode_required" -v
 
       - name: Slow integration test (PRs only)
         if: github.event_name == 'pull_request'
         run: |
-          pytest -m "not heavy and not model_download and not docker" -v
+          pytest -m "not heavy and not model_download and not docker and not bigcode_required" -v
