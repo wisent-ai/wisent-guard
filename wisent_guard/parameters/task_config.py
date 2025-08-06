@@ -142,12 +142,12 @@ HLE_TASKS = {
 
 # Additional miscellaneous benchmarks - ALL WORKING ✅
 MISC_TASKS = {
-    "cb",  # ✅ Working - uses _convert_textual_entailment()
     "swag",  # ✅ FIXED - now uses updated _convert_multiple_choice_numeric()
 }
 
 # Tasks that were in original MISC list but are NOT AVAILABLE in current system:
 MISC_TASKS_NOT_AVAILABLE = {
+    "cb",  #  TODO Need investigation, due to not creating sufficient contrastive pairs
     "anli",  # ❌ Not available in current wisent-guard system
     "logiqa",  # ❌ Not available in current wisent-guard system
     "multirc",  # ❌ Not available in current wisent-guard system
