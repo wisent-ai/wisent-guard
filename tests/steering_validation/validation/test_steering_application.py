@@ -109,7 +109,7 @@ def test_steering_application_position():
     steered = caa.apply_steering(activations, strength=1.0)
 
     # Check that ALL positions were modified (CAA reference behavior)
-    # Our implementation now matches CAA's fallback behavior when instruction detection fails
+    # Our caa_copy implementation matches CAA's fallback behavior when instruction detection fails
     # (from_pos=-1 steers ALL positions)
 
     # ALL positions should be different

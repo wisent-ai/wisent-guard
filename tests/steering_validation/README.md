@@ -11,16 +11,30 @@ The validation framework tests steering methods against reference implementation
 ```
 tests/steering_validation/
 ├── conftest.py                    # Pytest configuration and markers
-├── reference_data/               # Test data and reference vectors
+├── reference_data/               # Pre-generated test data (CAA-independent)
 │   ├── datasets/hallucination.json
-│   └── vectors/caa/hallucination_layer14.pt
-├── reference_generation/         # Scripts to generate reference data
-│   └── caa_reference.py          # Generate CAA reference data
-└── validation/                   # Test modules
+│   ├── vectors/caa/hallucination_layer14.pt
+│   └── generations/caa/
+│       ├── ab_probabilities.json          # A/B probability reference data
+│       ├── text_completions_steered.json  # Full text completions (steered)
+│       └── text_completions_unsteered.json # Full text completions (unsteered)
+├── reference_generation/         # Scripts to generate reference data (CAA-dependent)
+│   ├── caa_reference.py          # Generate CAA reference vectors/probabilities
+│   ├── generate_text_outputs.py  # Generate text completions
+│   └── generate_ab_probs.py      # Generate A/B probability data
+└── validation/                   # Test modules (CAA-independent)
+    ├── caa_copy.py               # CAA implementation copy for testing (ALL positions)
+    ├── caa_utils.py              # CAA-related utilities  
     ├── model_utils.py            # Utilities for real model testing
     ├── test_vector_generation.py # Vector generation tests
-    └── test_steering_application.py # Steering application tests
+    ├── test_steering_application.py # Steering application tests
+    └── test_text_generation_consistency.py # Text generation consistency tests
 ```
+
+**Key Architecture Decision**: 
+- `validation/` tests are **CAA repository independent** - they use pre-generated reference data
+- `reference_generation/` scripts require CAA repository - only used when regenerating reference data
+- `validation/caa_copy.py` contains CAA reference behavior (ALL positions steering) for testing
 
 ## Running Tests
 
@@ -64,15 +78,23 @@ pytest tests/steering_validation/validation/ -m "steering_application" -v
 
 ## Requirements
 
+### For Running Tests
 All tests use `meta-llama/Llama-2-7b-hf` (configurable via MODEL_NAME constant) and require:
 - Logged in to Hugging Face (`huggingface-cli login`)
 - Sufficient GPU memory (~14GB)
 - Runtime: ~20-30 seconds per test
 
+### For Generating Reference Data (Optional)
+Reference data generation requires:
+- CAA repository cloned adjacent to this repo (`git clone https://github.com/nrimsky/CAA`)
+- Only needed if regenerating reference vectors/outputs from scratch
+
+**Note**: All reference data is pre-generated and included in `reference_data/`. Tests run independently without needing the CAA repository.
+
 The tests validate:
 - ✅ Vector generation with real transformer activations
 - ✅ Steering application on real model activations  
-- ✅ Consistency with reference implementations
+- ✅ Consistency with reference implementations via pre-generated data
 - ✅ Cross-implementation compatibility
 
 ## Current Status
@@ -89,7 +111,7 @@ The tests validate:
 1. **Perfect Implementation Correctness:** CAA implementation achieves exact behavioral equivalence with reference
 2. **Real Model Compatibility:** Full validation with real Llama2-7B model activations
 3. **Steering Behavior:** Updated to match reference CAA fallback behavior (ALL positions when instruction detection fails)
-4. **Vector Generation:** Perfect cosine similarity (1.0010) with reference implementation
+4. **Vector Generation:** Perfect cosine similarity (1.0000) with reference implementation
 5. **Generation Consistency:** 100% token match rate in text generation validation
 6. **Memory Efficiency:** Robust GPU memory management enables continuous testing
 
