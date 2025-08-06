@@ -7,18 +7,18 @@ This test verifies that our steering application logic works as expected
 and produces reasonable changes to activations.
 """
 
-import torch
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
 from .caa_copy import CAA
-
-from .model_utils import RealModelWrapper, create_real_contrastive_pairs, MODEL_NAME, DEFAULT_LAYER_INDEX, DEVICE
+from .model_utils import DEFAULT_LAYER_INDEX, DEVICE, MODEL_NAME, RealModelWrapper, create_real_contrastive_pairs
 
 
 def load_reference_vector():
@@ -286,7 +286,7 @@ def test_real_model_steering_application():
     import json
 
     dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         dataset = json.load(f)
 
     # Use small subset for speed

@@ -6,10 +6,11 @@ This generates the A/B probability data that tests need for steering validation
 without requiring CAA repo dependencies.
 """
 
-import sys
 import json
-import torch
+import sys
 from pathlib import Path
+
+import torch
 
 # Constants
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
@@ -21,8 +22,6 @@ CAA_PATH = Path(__file__).parent.parent.parent.parent / "CAA"
 sys.path.insert(0, str(CAA_PATH))
 
 # Import CAA utilities
-from llama_wrapper import LlamaWrapper
-from utils.helpers import get_a_b_probs
 
 
 def generate_ab_probability_data():
@@ -37,9 +36,9 @@ def generate_ab_probability_data():
         Path(__file__).parent.parent / "reference_data" / "generations" / "caa" / "hallucination_unsteered_outputs.json"
     )
 
-    with open(steered_path, "r") as f:
+    with open(steered_path) as f:
         steered_data = json.load(f)
-    with open(unsteered_path, "r") as f:
+    with open(unsteered_path) as f:
         unsteered_data = json.load(f)
 
     # Create combined reference data for A/B probability tests

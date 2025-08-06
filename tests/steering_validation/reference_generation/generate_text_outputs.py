@@ -6,10 +6,11 @@ This extends the CAA reference data by generating actual text completions
 that we can compare token-by-token.
 """
 
-import sys
 import json
-import torch
+import sys
 from pathlib import Path
+
+import torch
 
 # Constants
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
@@ -22,17 +23,17 @@ sys.path.insert(0, str(CAA_PATH))
 
 # Import CAA utilities
 from llama_wrapper import LlamaWrapper
-from utils.tokenize import tokenize_llama_base
 from utils.helpers import find_instruction_end_postion
+from utils.tokenize import tokenize_llama_base
 
 
 def generate_text_completions(max_examples=5):
     """Generate full text completions using CAA reference implementation."""
-    print(f"🔄 Generating reference text completions...")
+    print("🔄 Generating reference text completions...")
 
     # Load test dataset
     dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         dataset = json.load(f)
 
     test_subset = dataset[:max_examples]

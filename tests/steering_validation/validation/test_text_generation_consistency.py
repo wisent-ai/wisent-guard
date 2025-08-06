@@ -12,13 +12,13 @@ to the CAA reference implementation when given the same:
 This is the ultimate validation - proving behavioral equivalence in actual text generation.
 """
 
-import json
-import torch
-import pytest
-from pathlib import Path
-import sys
 import gc
-import os
+import json
+import sys
+from pathlib import Path
+
+import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
@@ -26,7 +26,7 @@ sys.path.insert(0, str(WISENT_PATH))
 
 from wisent_guard.core.steering_methods.caa import CAA
 
-from .model_utils import RealModelWrapper, create_real_contrastive_pairs, MODEL_NAME, DEFAULT_LAYER_INDEX, DEVICE
+from .model_utils import DEFAULT_LAYER_INDEX, DEVICE, MODEL_NAME, RealModelWrapper, create_real_contrastive_pairs
 
 # CAA dependencies removed - using pre-generated reference data instead
 
@@ -47,7 +47,7 @@ def load_test_prompts():
     """Load test prompts for generation consistency testing."""
     dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
 
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         dataset = json.load(f)
 
     # Use first 5 prompts for generation testing
@@ -173,7 +173,7 @@ def load_reference_text_completions(strength=1.0):
     if not ref_path.exists():
         pytest.skip(f"Reference text completions not found at {ref_path}")
 
-    with open(ref_path, "r") as f:
+    with open(ref_path) as f:
         reference_results = json.load(f)
 
     print(f"✅ Loaded {len(reference_results)} reference text completions")
@@ -202,7 +202,7 @@ def test_text_generation_consistency():
 
     # Load dataset for steering vector generation
     dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         dataset = json.load(f)
 
     dataset_subset = dataset[:20]  # Use subset for vector generation
@@ -290,7 +290,7 @@ def test_unsteered_vs_steered_generation():
 
     # Generate steering vector
     dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         dataset = json.load(f)
 
     dataset_subset = dataset[:20]

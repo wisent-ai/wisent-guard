@@ -8,23 +8,23 @@ generates steering vectors using our CAA implementation, and compares
 the results.
 """
 
-import json
-import torch
-import pytest
-from pathlib import Path
-import sys
 import gc
+import json
+import sys
+from pathlib import Path
+
+import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.steering_methods.caa import CAA
-
 # Unused direct imports - accessed through model_utils functions
 from wisent_guard.core.aggregation import ControlVectorAggregationMethod
+from wisent_guard.core.steering_methods.caa import CAA
 
-from .model_utils import RealModelWrapper, create_real_contrastive_pairs, MODEL_NAME, DEFAULT_LAYER_INDEX, DEVICE
+from .model_utils import DEFAULT_LAYER_INDEX, DEVICE, MODEL_NAME, RealModelWrapper, create_real_contrastive_pairs
 
 
 def aggressive_memory_cleanup():
@@ -60,7 +60,7 @@ def load_test_dataset():
     """Load the hallucination dataset."""
     dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
 
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         data = json.load(f)
 
     return data
@@ -361,7 +361,7 @@ def test_compare_with_reference_vector():
         cosine_sim = torch.nn.functional.cosine_similarity(our_vector, ref_vector, dim=0).item()
         norm_ratio = torch.norm(our_vector).item() / torch.norm(ref_vector).item()
 
-        print(f"Comparison with reference:")
+        print("Comparison with reference:")
         print(f"  Our vector norm:    {torch.norm(our_vector).item():.4f}")
         print(f"  Reference norm:     {torch.norm(ref_vector).item():.4f}")
         print(f"  Cosine similarity:  {cosine_sim:.4f}")

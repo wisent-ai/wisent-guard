@@ -2,17 +2,18 @@
 Utilities for loading and using real models in validation tests.
 """
 
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
+from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+from wisent_guard.core.response import NegativeResponse, PositiveResponse
 
 # Constants
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
@@ -87,7 +88,7 @@ class RealModelWrapper:
 def create_real_contrastive_pairs(dataset, model, layer_idx=DEFAULT_LAYER_INDEX, max_pairs=50):
     """Create ContrastivePairSet using real model activations."""
 
-    print(f"Creating contrastive pairs with real model activations...")
+    print("Creating contrastive pairs with real model activations...")
     print(f"Processing {min(len(dataset), max_pairs)} examples...")
 
     pairs = []

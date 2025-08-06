@@ -14,10 +14,11 @@ Usage:
     python caa_reference.py
 """
 
-import sys
 import json
-import torch
+import sys
 from pathlib import Path
+
+import torch
 
 # Constants
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
@@ -35,10 +36,10 @@ WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
 # Now we can import from CAA
-from llama_wrapper import LlamaWrapper
 from behaviors import get_ab_data_path, get_ab_test_data
-from utils.tokenize import tokenize_llama_base
+from llama_wrapper import LlamaWrapper
 from utils.helpers import get_a_b_probs
+from utils.tokenize import tokenize_llama_base
 
 
 def generate_reference_vector(max_examples=MAX_EXAMPLES):
@@ -68,7 +69,7 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
 
     # Load dataset
     data_path = get_ab_data_path(behavior)
-    with open(data_path, "r") as f:
+    with open(data_path) as f:
         dataset = json.load(f)
 
     # Use limited examples to fit in memory
@@ -164,7 +165,7 @@ def generate_reference_text_outputs(steering_vector, max_examples=20):
     Returns:
         tuple: (steered_results, unsteered_results) containing A/B probability results
     """
-    print(f"🔄 Generating reference text outputs with CAA implementation...")
+    print("🔄 Generating reference text outputs with CAA implementation...")
 
     # Load test dataset (different from training dataset)
     test_data = get_ab_test_data(BEHAVIOR)
@@ -282,7 +283,7 @@ def generate_reference_text_outputs(steering_vector, max_examples=20):
     unsteered_b_avg = sum(r["b_prob"] for r in unsteered_results) / len(unsteered_results)
     steering_effect = steered_b_avg - unsteered_b_avg
 
-    print(f"\n📊 Summary Statistics:")
+    print("\n📊 Summary Statistics:")
     print(f"  Steered B probability (avg):   {steered_b_avg:.3f}")
     print(f"  Unsteered B probability (avg): {unsteered_b_avg:.3f}")
     print(f"  Steering effect:               {steering_effect:.3f}")

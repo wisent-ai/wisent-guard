@@ -203,7 +203,7 @@ class CAA(SteeringMethod):
             logger.debug(f"      Strength parameter: {strength}")
             logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
             logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
-            logger.debug(f"      Applying to ALL positions (CAA fallback behavior)")
+            logger.debug("      Applying to ALL positions (CAA fallback behavior)")
 
             # Apply to ALL positions (matching CAA reference with from_pos=-1)
             steered = steered + strength * steering_vector.unsqueeze(0).unsqueeze(0)

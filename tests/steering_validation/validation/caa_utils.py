@@ -5,8 +5,9 @@ These functions provide CAA-compatible tokenization and probability extraction
 without requiring the external CAA repository.
 """
 
-import torch
 from typing import List
+
+import torch
 
 
 def tokenize_llama_base_format(tokenizer, user_input: str, model_output: str = None) -> List[int]:
