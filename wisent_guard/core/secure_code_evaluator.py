@@ -4,7 +4,7 @@ This module ensures that NO code execution happens outside of Docker containers.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .docker import OptimizedDockerExecutor
 
@@ -56,7 +56,7 @@ class SecureCodeEvaluator:
 
         Args:
             docker_config: Docker configuration options
-            
+
         Raises:
             RuntimeError: If Docker is not available or not running
         """
@@ -64,28 +64,26 @@ class SecureCodeEvaluator:
         executor_config = docker_config or {}
         valid_params = {"image_name", "build_if_missing", "enable_batching", "enable_resource_optimization"}
         filtered_config = {k: v for k, v in executor_config.items() if k in valid_params}
-        
+
         try:
             self.executor = OptimizedDockerExecutor(
-                **filtered_config,
-                enable_batching=True,
-                enable_resource_optimization=True
+                **filtered_config, enable_batching=True, enable_resource_optimization=True
             )
         except RuntimeError as e:
             # Docker is not available - fail hard with clear message
             logger.error(f"Docker is required for code execution tasks: {e}")
             raise RuntimeError(
-                f"\n{'='*60}\n"
+                f"\n{'=' * 60}\n"
                 f"ERROR: Docker is required for code execution tasks\n"
-                f"{'='*60}\n"
-                f"{str(e)}\n\n"
+                f"{'=' * 60}\n"
+                f"{e!s}\n\n"
                 f"Please ensure Docker is:\n"
                 f"1. Installed on your system\n"
                 f"2. Running (start Docker Desktop or daemon)\n"
                 f"3. Accessible to the current user\n"
-                f"{'='*60}\n"
+                f"{'=' * 60}\n"
             )
-        
+
         # Store additional config separately if needed
         self.runtime_config = {k: v for k, v in executor_config.items() if k not in valid_params}
         self.docker_config = docker_config or {}
@@ -103,9 +101,7 @@ class SecureCodeEvaluator:
         """
         return task_name.lower() in CODE_EXECUTION_TASKS
 
-    def evaluate_response(
-        self, task_name: str, task_data: Dict[str, Any], generated_response: str
-    ) -> Dict[str, Any]:
+    def evaluate_response(self, task_name: str, task_data: Dict[str, Any], generated_response: str) -> Dict[str, Any]:
         """
         Evaluate a generated response for a code task.
 
@@ -122,14 +118,11 @@ class SecureCodeEvaluator:
 
         if task_name.lower() == "mbpp":
             return self._evaluate_mbpp_response(task_data, generated_response)
-        elif task_name.lower() == "livecodebench":
+        if task_name.lower() == "livecodebench":
             return self._evaluate_livecodebench_response(task_data, generated_response)
-        else:
-            raise ValueError(f"Unsupported code execution task: {task_name}")
+        raise ValueError(f"Unsupported code execution task: {task_name}")
 
-    def _evaluate_mbpp_response(
-        self, task_data: Dict[str, Any], generated_code: str
-    ) -> Dict[str, Any]:
+    def _evaluate_mbpp_response(self, task_data: Dict[str, Any], generated_code: str) -> Dict[str, Any]:
         """
         Evaluate MBPP response in Docker.
 
@@ -152,7 +145,7 @@ class SecureCodeEvaluator:
         # Create test execution code
         test_code = "\n".join(docker_task["test_list"])
         full_code = f"{code}\n\n# Run tests\n{test_code}"
-        
+
         result = self.executor.execute_single(full_code)
 
         # Add task-specific information
@@ -161,9 +154,7 @@ class SecureCodeEvaluator:
 
         return result
 
-    def _evaluate_livecodebench_response(
-        self, task_data: Dict[str, Any], generated_code: str
-    ) -> Dict[str, Any]:
+    def _evaluate_livecodebench_response(self, task_data: Dict[str, Any], generated_code: str) -> Dict[str, Any]:
         """
         Evaluate LiveCodeBench response in Docker.
 
@@ -178,23 +169,18 @@ class SecureCodeEvaluator:
         public_test_cases = task_data.get("public_test_cases", [])
         private_test_cases = task_data.get("private_test_cases", [])
         all_test_cases = public_test_cases + private_test_cases
-        
+
         if not all_test_cases:
             # If no test cases, can't evaluate
-            return {
-                "task_name": "livecodebench",
-                "passed": False,
-                "error": "No test cases available",
-                "success": False
-            }
-        
+            return {"task_name": "livecodebench", "passed": False, "error": "No test cases available", "success": False}
+
         # Create test execution code for LiveCodeBench
         # LiveCodeBench uses stdin/stdout format
         test_results = []
         for i, test_case in enumerate(all_test_cases):
             test_input = test_case.get("input", "")
             expected_output = test_case.get("output", "").strip()
-            
+
             # Create a test script that runs the code with the input
             # Use repr() to properly escape the strings
             test_script = f"""
@@ -202,8 +188,8 @@ import sys
 import io
 
 # Test input and expected output
-test_input = {repr(test_input)}
-expected_output = {repr(expected_output)}
+test_input = {test_input!r}
+expected_output = {expected_output!r}
 
 # Redirect stdin
 sys.stdin = io.StringIO(test_input)
@@ -230,27 +216,22 @@ else:
     print(f"Expected:\\n{{expected}}")
     print(f"Actual:\\n{{actual}}")
 """
-            
+
             # Execute test in Docker
             result = self.executor.execute_single(test_script)
             stdout = result.get("stdout", "")
             stderr = result.get("stderr", "")
             success = result.get("success", False)
-            
+
             # Check if test passed by looking for TEST PASSED in stdout
             passed = success and "TEST PASSED" in stdout
-            
-            test_results.append({
-                "test_id": i,
-                "passed": passed,
-                "output": stdout,
-                "error": stderr
-            })
-        
+
+            test_results.append({"test_id": i, "passed": passed, "output": stdout, "error": stderr})
+
         # Aggregate results
         passed_count = sum(1 for r in test_results if r["passed"])
         total_count = len(test_results)
-        
+
         return {
             "task_name": "livecodebench",
             "passed": passed_count == total_count,
@@ -258,7 +239,7 @@ else:
             "passed_tests": passed_count,
             "total_tests": total_count,
             "test_results": test_results,
-            "pass_rate": passed_count / total_count if total_count > 0 else 0.0
+            "pass_rate": passed_count / total_count if total_count > 0 else 0.0,
         }
 
     def batch_evaluate_responses(
@@ -288,9 +269,7 @@ else:
 
         return results
 
-    def evaluate_contrastive_pairs(
-        self, task_name: str, contrastive_pairs: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def evaluate_contrastive_pairs(self, task_name: str, contrastive_pairs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Evaluate contrastive pairs for classifier training.
 
@@ -309,29 +288,21 @@ else:
 
         for pair in contrastive_pairs:
             # Evaluate correct code
-            correct_result = self.evaluate_response(
-                task_name, pair, pair.get("correct_answer", "")
-            )
+            correct_result = self.evaluate_response(task_name, pair, pair.get("correct_answer", ""))
             correct_results.append(correct_result)
 
             # Evaluate incorrect code
-            incorrect_result = self.evaluate_response(
-                task_name, pair, pair.get("incorrect_answer", "")
-            )
+            incorrect_result = self.evaluate_response(task_name, pair, pair.get("incorrect_answer", ""))
             incorrect_results.append(incorrect_result)
 
         return {
             "correct_results": correct_results,
             "incorrect_results": incorrect_results,
             "correct_pass_rate": (
-                sum(r["passed"] for r in correct_results) / len(correct_results)
-                if correct_results
-                else 0
+                sum(r["passed"] for r in correct_results) / len(correct_results) if correct_results else 0
             ),
             "incorrect_pass_rate": (
-                sum(r["passed"] for r in incorrect_results) / len(incorrect_results)
-                if incorrect_results
-                else 0
+                sum(r["passed"] for r in incorrect_results) / len(incorrect_results) if incorrect_results else 0
             ),
         }
 
@@ -350,12 +321,13 @@ else:
         self.executor.cleanup()
 
 
-def enforce_secure_execution(task_name: str) -> bool:
+def enforce_secure_execution(task_name: str, trust_code_execution: bool = False) -> bool:
     """
     Check if a task must use secure Docker execution.
 
     Args:
         task_name: Name of the task
+        trust_code_execution: If True, allows bypassing Docker requirement (UNSAFE - use only in trusted environments)
 
     Returns:
         True if task requires secure execution
@@ -364,6 +336,22 @@ def enforce_secure_execution(task_name: str) -> bool:
         SecurityError: If attempting to execute code outside Docker
     """
     if SecureCodeEvaluator.is_code_execution_task(task_name):
+        if trust_code_execution:
+            # UNSAFE: User explicitly trusts this environment for code execution
+            print(f"⚠️  WARNING: Running code task '{task_name}' WITHOUT Docker security!")
+            print("   • Code will execute directly in current environment")
+            print("   • This is UNSAFE unless you're in a secure sandbox (e.g., RunPod container)")
+            print("   • Use --trust-code-execution only in isolated environments")
+
+            # Set required environment variable for HuggingFace code_eval metric
+            import os
+
+            os.environ["HF_ALLOW_CODE_EVAL"] = "1"
+            if "TRUST_REMOTE_CODE" not in os.environ:
+                os.environ["TRUST_REMOTE_CODE"] = "1"
+            print("   • Set HF_ALLOW_CODE_EVAL=1 for code evaluation")
+
+            return False  # Skip Docker requirement
         # This is a code execution task - MUST use Docker
         return True
     return False
@@ -371,5 +359,3 @@ def enforce_secure_execution(task_name: str) -> bool:
 
 class SecurityError(Exception):
     """Raised when attempting unsafe code execution."""
-
-    pass

@@ -403,6 +403,14 @@ class FullBenchmarkDownloader:
         if "question" in sample and "answer" in sample and "answer_type" in sample and "category" in sample:
             return self._convert_hle_format(sample)
 
+        # HumanEval code generation format (task_id, canonical_solution, prompt, test, entry_point)
+        if "task_id" in sample and "canonical_solution" in sample and "prompt" in sample and "test" in sample:
+            return self._convert_humaneval_format(sample)
+
+        # MBPP code generation format (task_id, code, prompt, test)
+        if "task_id" in sample and "code" in sample and "prompt" in sample and "test" in sample:
+            return self._convert_mbpp_format(sample)
+
         # Generic multiple choice fallback
         if "choices" in sample:
             return self._convert_generic_multiple_choice(sample)
@@ -872,6 +880,34 @@ class FullBenchmarkDownloader:
 
         return distractors[:3]  # Return top 3
 
+    def _convert_humaneval_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert HumanEval code generation format."""
+        task_id = sample.get("task_id", "unknown")
+        prompt = sample.get("prompt", "")
+        canonical_solution = sample.get("canonical_solution", "")
+        test = sample.get("test", "")
+        entry_point = sample.get("entry_point", "")
+
+        pairs = []
+
+        # Create a contrastive pair with the coding prompt
+        pairs.append(
+            {
+                "question": f"Complete this Python function:\n\n{prompt}",
+                "correct_answer": canonical_solution,
+                "incorrect_answer": "# Incorrect or incomplete implementation\npass",
+                "metadata": {
+                    "task_id": task_id,
+                    "test_cases": test,
+                    "entry_point": entry_point,
+                    "benchmark_type": "humaneval",
+                    "task_type": "code_completion",
+                },
+            }
+        )
+
+        return pairs
+
     def _convert_mbpp_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Convert MBPP format (programming problems with code)."""
         # Use the benchmark extractor to get contrastive pairs
@@ -1237,6 +1273,40 @@ class FullBenchmarkDownloader:
                     },
                 }
             )
+
+        return pairs
+
+    def _convert_mbpp_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert MBPP/HumanEval code generation format (task_id, code, prompt, test)."""
+        task_id = sample.get("task_id", "")
+        code = sample.get("code", "")
+        prompt = sample.get("prompt", "")
+        test = sample.get("test", "")
+
+        # For code generation tasks, we create contrastive pairs based on:
+        # Correct: The reference code solution
+        # Incorrect: A placeholder for incorrect/buggy code (since we don't have real incorrect solutions)
+
+        pairs = []
+
+        # Create a contrastive pair with the coding prompt
+        pairs.append(
+            {
+                "question": f"Write Python code to solve this problem:\n\n{prompt}",
+                "correct_answer": code,
+                "incorrect_answer": "# This is a placeholder for incorrect code\n# In practice, this would be buggy or incomplete code\npass",  # TODO
+                "metadata": {
+                    "task_id": task_id,
+                    "test_cases": test,
+                    "source_file": sample.get("source_file", ""),
+                    "test_imports": sample.get("test_imports", ""),
+                    "test_list": sample.get("test_list", []),
+                    "benchmark_type": "mbpp",
+                    "task_type": "code_generation",
+                    "programming_language": "python",
+                },
+            }
+        )
 
         return pairs
 
