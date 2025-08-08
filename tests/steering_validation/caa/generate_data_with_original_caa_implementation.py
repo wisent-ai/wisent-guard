@@ -11,7 +11,10 @@ Prerequisites:
     3. Login to Hugging Face: huggingface-cli login
 
 Usage:
-    python caa_reference.py
+    python generate_data_with_original_caa_implementation.py
+
+The output you can change in ./reference_data
+There is only one difference - the created data were used with model loaded with dtype=torch.float16
 """
 
 import sys
@@ -19,24 +22,34 @@ import json
 import torch
 from pathlib import Path
 
-from .const import MODEL_NAME, LAYER_INDEX, MAX_EXAMPLES
-
-BEHAVIOR = "hallucination"
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+from const import (
+    MODEL_NAME,
+    MODEL_SIZE,
+    LAYER_INDEX,
+    MAX_EXAMPLES,
+    DEVICE,
+    BEHAVIOR,
+    STEERING_STRENGTH,
+    MAX_NEW_TOKENS,
+    TOP_K,
+    RANDOM_SEED,
+    MAX_TEXT_EXAMPLES,
+    CAA_PATH,
+    WISENT_PATH,
+    HALLUCINATION_VECTOR_PATH,
+)
 
 # Add CAA repo to path
-CAA_PATH = Path(__file__).parent.parent.parent.parent / "CAA"
 sys.path.insert(0, str(CAA_PATH))
 
 # Add our repo to path for accessing our data structures
-WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
 try:
     from llama_wrapper import LlamaWrapper
-    from behaviors import get_ab_data_path, get_ab_test_data
+    from behaviors import get_ab_data_path
     from utils.tokenize import tokenize_llama_base
-    from utils.helpers import get_a_b_probs
+    from utils.helpers import find_instruction_end_postion
 except ImportError:
     print("You have to clone original CAA repo https://github.com/nrimsky/CAA first")
 
@@ -55,7 +68,7 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
     # Parameters matching our test setup
     behavior = BEHAVIOR
     layer = LAYER_INDEX
-    model_size = "7b"
+    model_size = MODEL_SIZE
     use_base_model = True  # Use base model (non-chat)
 
     # Initialize model (user is logged in via huggingface-cli)
@@ -126,9 +139,7 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
     print(f"Vector norm: {torch.norm(steering_vector).item():.4f}")
 
     # Save vector
-    output_path = (
-        Path(__file__).parent.parent / "reference_data" / "vectors" / "caa" / f"{BEHAVIOR}_layer{LAYER_INDEX}.pt"
-    )
+    output_path = HALLUCINATION_VECTOR_PATH
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     save_data = {
@@ -154,139 +165,142 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
     return steering_vector, save_data
 
 
-def generate_reference_text_outputs(steering_vector, max_examples=20):
-    """Generate steered and unsteered text outputs using CAA reference implementation.
+def generate_text_completions(steering_vector, max_examples=MAX_TEXT_EXAMPLES):
+    """Generate full text completions using CAA reference implementation.
 
     Args:
         steering_vector: The reference steering vector from generate_reference_vector()
         max_examples: Maximum number of examples to process for text generation
 
     Returns:
-        tuple: (steered_results, unsteered_results) containing A/B probability results
+        tuple: (steered_results, unsteered_results) containing full text completions
     """
-    print(f"🔄 Generating reference text outputs with CAA implementation...")
+    print(f"🔄 Generating reference text completions...")
 
-    # Load test dataset (different from training dataset)
-    test_data = get_ab_test_data(BEHAVIOR)
-    test_subset = test_data[:max_examples]
-    print(f"Using {len(test_subset)} test examples")
+    # Load test dataset - use the same hallucination dataset
+    dataset_path = Path(__file__).parent / "reference_data" / "hallucination.json"
+    with open(dataset_path, "r") as f:
+        dataset = json.load(f)
+
+    test_subset = dataset[:max_examples]
+    print(f"Using {len(test_subset)} examples for text generation")
 
     # Initialize model with same settings as vector generation
     print("Loading Llama-2-7B model for text generation...")
-    model = LlamaWrapper(
-        hf_token=None,  # Use logged in credentials
-        size="7b",
-        use_chat=False,  # Use base model
-    )
+    model = LlamaWrapper(hf_token=None, size=MODEL_SIZE, use_chat=False)
+    steering_vector = steering_vector.to(model.device)
 
-    # Get A and B token IDs for probability extraction
-    a_token_id = model.tokenizer.convert_tokens_to_ids("A")
-    b_token_id = model.tokenizer.convert_tokens_to_ids("B")
-
-    # Configure model for deterministic generation
-    model.set_save_internal_decodings(False)
-
-    # Prepare steering vector
-    vector = steering_vector.to(model.device)
-    if "7b" != "7b":  # Keep as float16 for 7B model
-        vector = vector.half()
-
-    print("Generating STEERED outputs...")
+    # Generate steered outputs
+    print("Generating STEERED text completions...")
     steered_results = []
+
     for i, item in enumerate(test_subset):
-        if i % 10 == 0:
-            print(f"  Steered: {i}/{len(test_subset)}")
+        print(f"  Processing steered {i + 1}/{len(test_subset)}")
 
         model.reset_all()
 
-        # Apply steering vector (multiplier = 1.0)
-        model.set_add_activations(LAYER_INDEX, 1.0 * vector)
+        # Apply steering
+        model.set_add_activations(LAYER_INDEX, STEERING_STRENGTH * steering_vector)
 
-        # Generate response probabilities for A vs B
-        question = item["question"]
-        model_output = model.get_logits_from_text(
-            user_input=question,
-            model_output="(",  # Generate probabilities for "(A)" vs "(B)"
-            system_prompt=None,
+        # Tokenize exactly like CAA
+        user_input = item["question"]
+        prompt_tokens = tokenize_llama_base(model.tokenizer, user_input)
+        tokens = torch.tensor(prompt_tokens).unsqueeze(0).to(model.device)
+
+        # Set random seed for reproducibility
+        torch.manual_seed(RANDOM_SEED)
+
+        # Find instruction position and set from_positions
+        instr_pos = find_instruction_end_postion(tokens[0], model.END_STR)
+        model.set_from_positions(instr_pos)
+
+        # Generate text
+        with torch.no_grad():
+            generated_ids = model.model.generate(
+                inputs=tokens,
+                max_new_tokens=MAX_NEW_TOKENS,
+                top_k=TOP_K,  # Greedy decoding
+            )
+
+            # Decode generated text
+            generated_text = model.tokenizer.batch_decode(generated_ids)[0]
+
+        # Calculate prompt and response parts
+        prompt_str = f"Input: {user_input}\nResponse:"
+        response_part = (
+            generated_text[len(prompt_str) :].strip() if prompt_str in generated_text else generated_text.strip()
         )
 
-        # Extract A and B probabilities
-        a_prob, b_prob = get_a_b_probs(model_output, a_token_id, b_token_id)
-
         result = {
-            "question": question,
-            "answer_matching_behavior": item["answer_matching_behavior"],
-            "answer_not_matching_behavior": item["answer_not_matching_behavior"],
-            "a_prob": a_prob,
-            "b_prob": b_prob,
+            "prompt": prompt_str,
+            "generated_full": generated_text,
+            "generated_response": response_part,
+            "tokens": generated_ids[0].tolist(),
+            "question": user_input,
             "steered": True,
-            "layer": LAYER_INDEX,
-            "multiplier": 1.0,
-            "model": MODEL_NAME,
+            "strength": STEERING_STRENGTH,
         }
         steered_results.append(result)
 
-    print("Generating UNSTEERED (baseline) outputs...")
+    # Generate unsteered outputs
+    print("Generating UNSTEERED text completions...")
     unsteered_results = []
+
     for i, item in enumerate(test_subset):
-        if i % 10 == 0:
-            print(f"  Unsteered: {i}/{len(test_subset)}")
+        print(f"  Processing unsteered {i + 1}/{len(test_subset)}")
 
         model.reset_all()
+        # NO steering applied
 
-        # NO steering applied - baseline behavior
+        # Tokenize exactly like CAA
+        user_input = item["question"]
+        prompt_tokens = tokenize_llama_base(model.tokenizer, user_input)
+        tokens = torch.tensor(prompt_tokens).unsqueeze(0).to(model.device)
 
-        # Generate response probabilities for A vs B
-        question = item["question"]
-        model_output = model.get_logits_from_text(
-            user_input=question,
-            model_output="(",  # Generate probabilities for "(A)" vs "(B)"
-            system_prompt=None,
+        # Set random seed for reproducibility
+        torch.manual_seed(RANDOM_SEED)
+
+        # Generate text (no steering)
+        with torch.no_grad():
+            generated_ids = model.model.generate(
+                inputs=tokens,
+                max_new_tokens=MAX_NEW_TOKENS,
+                top_k=TOP_K,  # Greedy decoding
+            )
+
+            # Decode generated text
+            generated_text = model.tokenizer.batch_decode(generated_ids)[0]
+
+        # Calculate prompt and response parts
+        prompt_str = f"Input: {user_input}\nResponse:"
+        response_part = (
+            generated_text[len(prompt_str) :].strip() if prompt_str in generated_text else generated_text.strip()
         )
 
-        # Extract A and B probabilities
-        a_prob, b_prob = get_a_b_probs(model_output, a_token_id, b_token_id)
-
         result = {
-            "question": question,
-            "answer_matching_behavior": item["answer_matching_behavior"],
-            "answer_not_matching_behavior": item["answer_not_matching_behavior"],
-            "a_prob": a_prob,
-            "b_prob": b_prob,
+            "prompt": prompt_str,
+            "generated_full": generated_text,
+            "generated_response": response_part,
+            "tokens": generated_ids[0].tolist(),
+            "question": user_input,
             "steered": False,
-            "model": MODEL_NAME,
+            "strength": 0.0,
         }
         unsteered_results.append(result)
 
-    # Save steered results
-    steered_path = (
-        Path(__file__).parent.parent / "reference_data" / "generations" / "caa" / f"{BEHAVIOR}_steered_outputs.json"
-    )
+    # Save results
+    steered_path = Path(__file__).parent / "reference_data" / "text_completions_steered.json"
     steered_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(steered_path, "w") as f:
         json.dump(steered_results, f, indent=2)
-    print(f"✅ Saved steered outputs to: {steered_path}")
+    print(f"✅ Saved steered text completions to: {steered_path}")
 
-    # Save unsteered results
-    unsteered_path = (
-        Path(__file__).parent.parent / "reference_data" / "generations" / "caa" / f"{BEHAVIOR}_unsteered_outputs.json"
-    )
+    unsteered_path = Path(__file__).parent / "reference_data" / "text_completions_unsteered.json"
 
     with open(unsteered_path, "w") as f:
         json.dump(unsteered_results, f, indent=2)
-    print(f"✅ Saved unsteered outputs to: {unsteered_path}")
-
-    # Calculate and display summary statistics
-    steered_b_avg = sum(r["b_prob"] for r in steered_results) / len(steered_results)
-    unsteered_b_avg = sum(r["b_prob"] for r in unsteered_results) / len(unsteered_results)
-    steering_effect = steered_b_avg - unsteered_b_avg
-
-    print(f"\n📊 Summary Statistics:")
-    print(f"  Steered B probability (avg):   {steered_b_avg:.3f}")
-    print(f"  Unsteered B probability (avg): {unsteered_b_avg:.3f}")
-    print(f"  Steering effect:               {steering_effect:.3f}")
-    print(f"  Behavior: {BEHAVIOR} - B should be {'HIGHER' if steering_effect > 0 else 'LOWER'} when steered")
+    print(f"✅ Saved unsteered text completions to: {unsteered_path}")
 
     return steered_results, unsteered_results
 
@@ -303,15 +317,17 @@ def main():
         steering_vector, vector_data = generate_reference_vector()
 
         print("\n" + "=" * 60)
-        print("📝 PHASE 2.2: Generating Reference Text Outputs")
+        print("📝 PHASE 2: Generating Reference Text Completions")
         print("=" * 60)
-        steered_results, unsteered_results = generate_reference_text_outputs(steering_vector, max_examples=20)
+        text_steered_results, text_unsteered_results = generate_text_completions(
+            steering_vector, max_examples=MAX_TEXT_EXAMPLES
+        )
 
         print("\n✅ Reference data generation complete!")
         print("📁 Generated files:")
-        print(f"  - tests/steering_validation/reference_data/vectors/caa/{BEHAVIOR}_layer{LAYER_INDEX}.pt")
-        print(f"  - tests/steering_validation/reference_data/generations/caa/{BEHAVIOR}_steered_outputs.json")
-        print(f"  - tests/steering_validation/reference_data/generations/caa/{BEHAVIOR}_unsteered_outputs.json")
+        print(f"  - {HALLUCINATION_VECTOR_PATH}")
+        print(f"  - tests/steering_validation/caa/reference_data/text_completions_steered.json")
+        print(f"  - tests/steering_validation/caa/reference_data/text_completions_unsteered.json")
 
     except Exception as e:
         print(f"❌ Error during generation: {e}")

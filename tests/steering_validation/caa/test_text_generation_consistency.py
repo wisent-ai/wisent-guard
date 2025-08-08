@@ -17,7 +17,6 @@ import torch
 import pytest
 from pathlib import Path
 import sys
-import gc
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent

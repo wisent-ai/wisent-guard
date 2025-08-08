@@ -15,6 +15,7 @@ from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastiveP
 from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
 from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE
+from .caa_utils import tokenize_llama_base_format
 
 
 class RealModelWrapper:
@@ -36,14 +37,27 @@ class RealModelWrapper:
 
         print(f"✅ Model loaded on device: {self.model.device}")
 
-    def get_activations(self, texts, layer_idx, position=-2):
-        """Extract activations from specific layer and position."""
+    def get_activations(self, prompts_and_responses, layer_idx, position=-2):
+        """
+        Extract activations from specific layer and position using CAA tokenization format.
+
+        Args:
+            prompts_and_responses: List of tuples (user_input, model_output) or list of formatted strings
+            layer_idx: Layer index to extract from
+            position: Position in sequence (typically -2 for CAA)
+        """
         activations = []
 
-        for text in texts:
-            # Tokenize
-            inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True)
-            inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        for item in prompts_and_responses:
+            if isinstance(item, tuple):
+                # Tokenize using CAA format
+                user_input, model_output = item
+                tokens = tokenize_llama_base_format(self.tokenizer, user_input, model_output)
+                inputs = {"input_ids": torch.tensor(tokens).unsqueeze(0).to(self.model.device)}
+            else:
+                # Assume it's already formatted text (for backward compatibility)
+                inputs = self.tokenizer(item, return_tensors="pt", padding=True, truncation=True)
+                inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
 
             # Forward pass with hooks to extract activations
             layer_activations = None
@@ -82,9 +96,9 @@ class RealModelWrapper:
 
 
 def create_real_contrastive_pairs(dataset, model, layer_idx=LAYER_INDEX, max_pairs=50):
-    """Create ContrastivePairSet using real model activations."""
+    """Create ContrastivePairSet using real model activations with exact CAA tokenization."""
 
-    print(f"Creating contrastive pairs with real model activations...")
+    print(f"Creating contrastive pairs with real model activations (CAA format)...")
     print(f"Processing {min(len(dataset), max_pairs)} examples...")
 
     pairs = []
@@ -97,13 +111,13 @@ def create_real_contrastive_pairs(dataset, model, layer_idx=LAYER_INDEX, max_pai
         pos_answer = item["answer_matching_behavior"]  # (B) - exhibits behavior
         neg_answer = item["answer_not_matching_behavior"]  # (A) - correct answer
 
-        # Create full prompts (matching exact CAA tokenization format)
-        pos_prompt = f"Input: {question}\nResponse: {pos_answer}"
-        neg_prompt = f"Input: {question}\nResponse: {neg_answer}"
+        # Use CAA tokenization format: pass (user_input, model_output) tuples
+        pos_input = (question, pos_answer)
+        neg_input = (question, neg_answer)
 
-        # Extract activations using real model
-        pos_activations = model.get_activations([pos_prompt], layer_idx, position=-2)
-        neg_activations = model.get_activations([neg_prompt], layer_idx, position=-2)
+        # Extract activations using real model with CAA tokenization
+        pos_activations = model.get_activations([pos_input], layer_idx, position=-2)
+        neg_activations = model.get_activations([neg_input], layer_idx, position=-2)
 
         # Create Response objects
         pos_response = PositiveResponse(

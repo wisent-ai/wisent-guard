@@ -26,8 +26,8 @@ from .const import (
     MODEL_HIDDEN_DIM,
     LAYER_INDEX,
     DEVICE,
-    REFERENCE_DATA_PATH,
     HALLUCINATION_DATASET_PATH,
+    HALLUCINATION_VECTOR_PATH,
     MAX_EXAMPLES,
     NORMALIZATION_METHOD,
 )
@@ -37,12 +37,10 @@ from ..utils import aggressive_memory_cleanup
 
 def load_reference_data():
     """Load reference vector and activations."""
-    vector_path = REFERENCE_DATA_PATH / f"hallucination_layer{LAYER_INDEX}.pt"
+    if not HALLUCINATION_VECTOR_PATH.exists():
+        pytest.skip(f"Reference data not found at {HALLUCINATION_VECTOR_PATH}")
 
-    if not vector_path.exists():
-        pytest.skip(f"Reference data not found at {vector_path}")
-
-    data = torch.load(vector_path, map_location=DEVICE, weights_only=False)
+    data = torch.load(HALLUCINATION_VECTOR_PATH, map_location=DEVICE, weights_only=False)
     return data
 
 
