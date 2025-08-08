@@ -5,7 +5,7 @@ import torch
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
 MODEL_HIDDEN_DIM = 4096  # Hidden dimension for Llama-2-7b
 LAYER_INDEX = 14
-MAX_EXAMPLES = 30
+MAX_EXAMPLES = 20
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 TORCH_DTYPE = torch.float16
 NORMALIZATION_METHOD = "none"  # Normalization method for CAA steering vectors

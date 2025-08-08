@@ -32,6 +32,7 @@ from .const import (
     HALLUCINATION_DATASET_PATH,
     TEXT_COMPLETIONS_UNSTEERED_PATH,
     TEXT_COMPLETIONS_STEERED_PATH,
+    MAX_EXAMPLES,
 )
 from .model_utils import RealModelWrapper, create_real_contrastive_pairs
 from ..utils import aggressive_memory_cleanup
@@ -56,6 +57,26 @@ def load_test_prompts():
         )
 
     return test_prompts
+
+
+def load_reference_text_completions(strength=1.0):
+    """Load pre-generated reference text completions."""
+    print(f"🔬 Loading reference text completions (strength={strength})...")
+
+    # Load appropriate reference data based on strength
+    if strength == 0.0:
+        ref_path = TEXT_COMPLETIONS_UNSTEERED_PATH
+    else:
+        ref_path = TEXT_COMPLETIONS_STEERED_PATH
+
+    if not ref_path.exists():
+        pytest.skip(f"Reference text completions not found at {ref_path}")
+
+    with open(ref_path, "r") as f:
+        reference_results = json.load(f)
+
+    print(f"✅ Loaded {len(reference_results)} reference text completions")
+    return reference_results
 
 
 def generate_with_wisent_caa(prompts, steering_vector, layer_idx=LAYER_INDEX, strength=1.0):
@@ -87,7 +108,7 @@ def generate_with_wisent_caa(prompts, steering_vector, layer_idx=LAYER_INDEX, st
             tokens = torch.tensor(prompt_tokens).unsqueeze(0).to(DEVICE)
 
             # For comparison, we need the prompt string for calculating response part
-            prompt_str = f"Input: {user_input}\nResponse:"
+            prompt_str = f"Input: {user_input}\\nResponse:"
 
             # Set random seed for reproducibility (same as CAA)
             torch.manual_seed(42)
@@ -150,182 +171,170 @@ def generate_with_wisent_caa(prompts, steering_vector, layer_idx=LAYER_INDEX, st
     return results
 
 
-def load_reference_text_completions(strength=1.0):
-    """Load pre-generated reference text completions."""
-    print(f"🔬 Loading reference text completions (strength={strength})...")
+@pytest.mark.slow
+class TestTextGenerationConsistency:
+    """Test suite for CAA text generation validation."""
 
-    # Load appropriate reference data based on strength
-    if strength == 0.0:
-        ref_path = TEXT_COMPLETIONS_UNSTEERED_PATH
-    else:
-        ref_path = TEXT_COMPLETIONS_STEERED_PATH
+    def test_text_generation_consistency(self):
+        """Test that our implementation generates the same text as CAA reference."""
+        print("\\n🎯 Testing text generation consistency...")
 
-    if not ref_path.exists():
-        pytest.skip(f"Reference text completions not found at {ref_path}")
+        # Aggressive memory cleanup before starting
+        aggressive_memory_cleanup()
 
-    with open(ref_path, "r") as f:
-        reference_results = json.load(f)
+        # Check available GPU memory
+        if torch.cuda.is_available():
+            memory_free = torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)
+            memory_free_gb = memory_free / (1024**3)
+            print(f"Available GPU memory: {memory_free_gb:.2f} GB")
 
-    print(f"✅ Loaded {len(reference_results)} reference text completions")
-    return reference_results
+            if memory_free_gb < 15.0:  # Need at least 15GB free for one 7B model (now properly cleaned up)
+                pytest.skip(f"Insufficient GPU memory: {memory_free_gb:.2f} GB available, need 15+ GB")
 
+        # Load test prompts
+        test_prompts = load_test_prompts()
+        print(f"Loaded {len(test_prompts)} test prompts")
 
-def test_text_generation_consistency():
-    """Test that our implementation generates the same text as CAA reference."""
-    print("\\n🎯 Testing text generation consistency...")
+        # Load dataset for steering vector generation
+        dataset_path = HALLUCINATION_DATASET_PATH
+        with open(dataset_path, "r") as f:
+            dataset = json.load(f)
 
-    # Aggressive memory cleanup before starting
-    aggressive_memory_cleanup()
+        dataset_subset = dataset[:MAX_EXAMPLES]  # Use subset for vector generation
 
-    # Check available GPU memory
-    if torch.cuda.is_available():
-        memory_free = torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)
-        memory_free_gb = memory_free / (1024**3)
-        print(f"Available GPU memory: {memory_free_gb:.2f} GB")
+        # Generate steering vector with our implementation
+        print("\\n🔧 Generating steering vector...")
+        real_model = RealModelWrapper(MODEL_NAME)
+        pair_set = create_real_contrastive_pairs(
+            dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=MAX_EXAMPLES
+        )
 
-        if memory_free_gb < 15.0:  # Need at least 15GB free for one 7B model (now properly cleaned up)
-            pytest.skip(f"Insufficient GPU memory: {memory_free_gb:.2f} GB available, need 15+ GB")
+        caa = CAA(device=DEVICE)
+        caa.train(pair_set, layer_index=LAYER_INDEX)
+        steering_vector = caa.get_steering_vector()
 
-    # Load test prompts
-    test_prompts = load_test_prompts()
-    print(f"Loaded {len(test_prompts)} test prompts")
+        print(f"Steering vector: shape={steering_vector.shape}, norm={torch.norm(steering_vector).item():.4f}")
 
-    # Load dataset for steering vector generation
-    dataset_path = HALLUCINATION_DATASET_PATH
-    with open(dataset_path, "r") as f:
-        dataset = json.load(f)
+        # Clean up the model after getting steering vector to free memory
+        del real_model
+        aggressive_memory_cleanup()
 
-    dataset_subset = dataset[:20]  # Use subset for vector generation
+        # Test different strengths (only test strengths we have reference data for)
+        strengths = [1.0]  # We have reference data for strength=1.0 and strength=0.0 (tested separately)
 
-    # Generate steering vector with our implementation
-    print("\\n🔧 Generating steering vector...")
-    real_model = RealModelWrapper(MODEL_NAME)
-    pair_set = create_real_contrastive_pairs(dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=20)
+        for strength in strengths:
+            print(f"\\n📝 Testing generation consistency at strength {strength}...")
 
-    caa = CAA(device=DEVICE)
-    caa.train(pair_set, layer_index=LAYER_INDEX)
-    steering_vector = caa.get_steering_vector()
+            # Generate with our implementation and load reference data
+            wisent_results = generate_with_wisent_caa(test_prompts, steering_vector, strength=strength)
+            reference_results = load_reference_text_completions(strength=strength)
 
-    print(f"Steering vector: shape={steering_vector.shape}, norm={torch.norm(steering_vector).item():.4f}")
+            # Compare results (match by question since orders might differ)
+            min_len = min(len(wisent_results), len(reference_results))
 
-    # Clean up the model after getting steering vector to free memory
-    del real_model
-    aggressive_memory_cleanup()
+            for i in range(min_len):
+                wisent = wisent_results[i]
+                reference = reference_results[i]  # Use same index since we control the order
 
-    # Test different strengths
-    strengths = [0.5, 1.0, 2.0]
+                prompt = wisent["prompt"][:50] + "..."
 
-    for strength in strengths:
-        print(f"\\n📝 Testing generation consistency at strength {strength}...")
+                print(f"\\n  Prompt {i + 1}: {prompt}")
+                print(f"    Wisent:    {wisent['generated_response'][:80]}...")
+                print(f"    Reference: {reference['generated_response'][:80]}...")
 
-        # Generate with our implementation and load reference data
-        wisent_results = generate_with_wisent_caa(test_prompts, steering_vector, strength=strength)
-        reference_results = load_reference_text_completions(strength=strength)
+                # Check token-by-token consistency
+                wisent_tokens = wisent["tokens"]
+                reference_tokens = reference["tokens"]
 
-        # Compare results (match by question since orders might differ)
-        min_len = min(len(wisent_results), len(reference_results))
+                # Compare token sequences
+                min_token_len = min(len(wisent_tokens), len(reference_tokens))
+                matching_tokens = sum(1 for j in range(min_token_len) if wisent_tokens[j] == reference_tokens[j])
+                token_match_rate = matching_tokens / min_token_len if min_token_len > 0 else 0.0
 
-        for i in range(min_len):
-            wisent = wisent_results[i]
-            reference = reference_results[i]  # Use same index since we control the order
+                print(f"    Token match rate: {matching_tokens}/{min_token_len} ({token_match_rate:.2%})")
 
-            prompt = wisent["prompt"][:50] + "..."
+                # For exact consistency, we expect 100% token match
+                # But we'll be more lenient initially and check for high similarity
+                if token_match_rate >= 0.9:
+                    print("    ✅ High consistency achieved")
+                elif token_match_rate >= 0.7:
+                    print("    ⚠️  Moderate consistency")
+                else:
+                    print("    ❌ Low consistency - investigate differences")
 
-            print(f"\\n  Prompt {i + 1}: {prompt}")
-            print(f"    Wisent:    {wisent['generated_response'][:80]}...")
-            print(f"    Reference: {reference['generated_response'][:80]}...")
+                    # Show first few differing tokens for debugging
+                    model_for_decode = RealModelWrapper(MODEL_NAME)  # Just for tokenizer
+                    try:
+                        for j in range(min(10, min_token_len)):
+                            if wisent_tokens[j] != reference_tokens[j]:
+                                w_token = model_for_decode.tokenizer.decode([wisent_tokens[j]])
+                                r_token = model_for_decode.tokenizer.decode([reference_tokens[j]])
+                                print(f"      Token {j}: '{w_token}' vs '{r_token}'")
+                    finally:
+                        del model_for_decode
+                        aggressive_memory_cleanup()
 
-            # Check token-by-token consistency
-            wisent_tokens = wisent["tokens"]
-            reference_tokens = reference["tokens"]
+                # Basic assertion - at least some consistency should be achieved
+                assert token_match_rate > 0.5, f"Very low token match rate: {token_match_rate:.2%}"
 
-            # Compare token sequences
-            min_token_len = min(len(wisent_tokens), len(reference_tokens))
-            matching_tokens = sum(1 for j in range(min_token_len) if wisent_tokens[j] == reference_tokens[j])
-            token_match_rate = matching_tokens / min_token_len if min_token_len > 0 else 0.0
+            print(f"✅ Generation consistency test passed for strength {strength}")
 
-            print(f"    Token match rate: {matching_tokens}/{min_token_len} ({token_match_rate:.2%})")
+        print("\\n🏆 ALL TEXT GENERATION CONSISTENCY TESTS PASSED!")
 
-            # For exact consistency, we expect 100% token match
-            # But we'll be more lenient initially and check for high similarity
-            if token_match_rate >= 0.9:
-                print("    ✅ High consistency achieved")
-            elif token_match_rate >= 0.7:
-                print("    ⚠️  Moderate consistency")
+    def test_unsteered_vs_steered_generation(self):
+        """Test that steering actually changes the generated text."""
+        print("\\n🔄 Testing unsteered vs steered generation difference...")
+
+        # Load test prompts
+        test_prompts = load_test_prompts()[:2]  # Use fewer prompts for this test
+
+        # Generate steering vector
+        dataset_path = HALLUCINATION_DATASET_PATH
+        with open(dataset_path, "r") as f:
+            dataset = json.load(f)
+
+        dataset_subset = dataset[:MAX_EXAMPLES]
+        real_model = RealModelWrapper(MODEL_NAME)
+        pair_set = create_real_contrastive_pairs(
+            dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=MAX_EXAMPLES
+        )
+
+        caa = CAA(device=DEVICE)
+        caa.train(pair_set, layer_index=LAYER_INDEX)
+        steering_vector = caa.get_steering_vector()
+
+        # Clean up the model after getting steering vector to free memory
+        del real_model
+        aggressive_memory_cleanup()
+
+        # Load pre-generated unsteered and steered text
+        unsteered_results = load_reference_text_completions(strength=0.0)  # No steering
+        steered_results = load_reference_text_completions(strength=1.0)
+
+        # Compare results
+        differences_found = 0
+
+        for i, (unsteered, steered) in enumerate(zip(unsteered_results, steered_results)):
+            print(f"\\n  Prompt {i + 1}:")
+            print(f"    Unsteered: {unsteered['generated_response'][:80]}...")
+            print(f"    Steered:   {steered['generated_response'][:80]}...")
+
+            # Check if text is different
+            if unsteered["generated_response"] != steered["generated_response"]:
+                differences_found += 1
+                print("    ✅ Steering changed the output")
             else:
-                print("    ❌ Low consistency - investigate differences")
+                print("    ⚠️  No change detected")
 
-                # Show first few differing tokens for debugging
-                model_for_decode = RealModelWrapper(MODEL_NAME)  # Just for tokenizer
-                try:
-                    for j in range(min(10, min_token_len)):
-                        if wisent_tokens[j] != reference_tokens[j]:
-                            w_token = model_for_decode.tokenizer.decode([wisent_tokens[j]])
-                            r_token = model_for_decode.tokenizer.decode([reference_tokens[j]])
-                            print(f"      Token {j}: '{w_token}' vs '{r_token}'")
-                finally:
-                    del model_for_decode
-                    aggressive_memory_cleanup()
+        # Assert that steering actually has an effect
+        assert differences_found > 0, "Steering should change at least some outputs"
 
-            # Basic assertion - at least some consistency should be achieved
-            assert token_match_rate > 0.5, f"Very low token match rate: {token_match_rate:.2%}"
-
-        print(f"✅ Generation consistency test passed for strength {strength}")
-
-    print("\\n🏆 ALL TEXT GENERATION CONSISTENCY TESTS PASSED!")
-
-
-def test_unsteered_vs_steered_generation():
-    """Test that steering actually changes the generated text."""
-    print("\\n🔄 Testing unsteered vs steered generation difference...")
-
-    # Load test prompts
-    test_prompts = load_test_prompts()[:2]  # Use fewer prompts for this test
-
-    # Generate steering vector
-    dataset_path = HALLUCINATION_DATASET_PATH
-    with open(dataset_path, "r") as f:
-        dataset = json.load(f)
-
-    dataset_subset = dataset[:20]
-    real_model = RealModelWrapper(MODEL_NAME)
-    pair_set = create_real_contrastive_pairs(dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=20)
-
-    caa = CAA(device=DEVICE)
-    caa.train(pair_set, layer_index=LAYER_INDEX)
-    steering_vector = caa.get_steering_vector()
-
-    # Clean up the model after getting steering vector to free memory
-    del real_model
-    aggressive_memory_cleanup()
-
-    # Load pre-generated unsteered and steered text
-    unsteered_results = load_reference_text_completions(strength=0.0)  # No steering
-    steered_results = load_reference_text_completions(strength=1.0)
-
-    # Compare results
-    differences_found = 0
-
-    for i, (unsteered, steered) in enumerate(zip(unsteered_results, steered_results)):
-        print(f"\\n  Prompt {i + 1}:")
-        print(f"    Unsteered: {unsteered['generated_response'][:80]}...")
-        print(f"    Steered:   {steered['generated_response'][:80]}...")
-
-        # Check if text is different
-        if unsteered["generated_response"] != steered["generated_response"]:
-            differences_found += 1
-            print("    ✅ Steering changed the output")
-        else:
-            print("    ⚠️  No change detected")
-
-    # Assert that steering actually has an effect
-    assert differences_found > 0, "Steering should change at least some outputs"
-
-    print(f"\\n✅ Steering changed {differences_found}/{len(test_prompts)} outputs")
-    print("✅ Unsteered vs steered difference test passed")
+        print(f"\\n✅ Steering changed {differences_found}/{len(test_prompts)} outputs")
+        print("✅ Unsteered vs steered difference test passed")
 
 
 if __name__ == "__main__":
     # Run individual tests for debugging
-    test_text_generation_consistency()
-    test_unsteered_vs_steered_generation()
+    test_instance = TestTextGenerationConsistency()
+    test_instance.test_text_generation_consistency()
+    test_instance.test_unsteered_vs_steered_generation()
