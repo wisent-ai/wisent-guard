@@ -14,10 +14,7 @@ sys.path.insert(0, str(WISENT_PATH))
 from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
 from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
-# Constants
-MODEL_NAME = "meta-llama/Llama-2-7b-hf"
-DEFAULT_LAYER_INDEX = 14
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE
 
 
 class RealModelWrapper:
@@ -30,7 +27,7 @@ class RealModelWrapper:
         print(f"Loading {model_name}...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=torch.float16, device_map=device, trust_remote_code=True
+            model_name, torch_dtype=TORCH_DTYPE, device_map=device, trust_remote_code=True
         )
 
         # Set pad token
@@ -84,7 +81,7 @@ class RealModelWrapper:
         return torch.stack(activations)  # [batch_size, hidden_dim]
 
 
-def create_real_contrastive_pairs(dataset, model, layer_idx=DEFAULT_LAYER_INDEX, max_pairs=50):
+def create_real_contrastive_pairs(dataset, model, layer_idx=LAYER_INDEX, max_pairs=50):
     """Create ContrastivePairSet using real model activations."""
 
     print(f"Creating contrastive pairs with real model activations...")

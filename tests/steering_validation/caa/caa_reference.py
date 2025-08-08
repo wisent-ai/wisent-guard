@@ -19,11 +19,9 @@ import json
 import torch
 from pathlib import Path
 
-# Constants
-MODEL_NAME = "meta-llama/Llama-2-7b-hf"
-LAYER_INDEX = 14
+from .const import MODEL_NAME, LAYER_INDEX, MAX_EXAMPLES
+
 BEHAVIOR = "hallucination"
-MAX_EXAMPLES = 30
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Add CAA repo to path
@@ -34,11 +32,13 @@ sys.path.insert(0, str(CAA_PATH))
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-# Now we can import from CAA
-from llama_wrapper import LlamaWrapper
-from behaviors import get_ab_data_path, get_ab_test_data
-from utils.tokenize import tokenize_llama_base
-from utils.helpers import get_a_b_probs
+try:
+    from llama_wrapper import LlamaWrapper
+    from behaviors import get_ab_data_path, get_ab_test_data
+    from utils.tokenize import tokenize_llama_base
+    from utils.helpers import get_a_b_probs
+except ImportError:
+    print("You have to clone original CAA repo https://github.com/nrimsky/CAA first")
 
 
 def generate_reference_vector(max_examples=MAX_EXAMPLES):
@@ -302,7 +302,6 @@ def main():
         # Generate reference vector
         steering_vector, vector_data = generate_reference_vector()
 
-        # Generate reference text outputs (Phase 2.2)
         print("\n" + "=" * 60)
         print("📝 PHASE 2.2: Generating Reference Text Outputs")
         print("=" * 60)

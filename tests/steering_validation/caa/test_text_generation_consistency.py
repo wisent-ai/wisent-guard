@@ -18,34 +18,28 @@ import pytest
 from pathlib import Path
 import sys
 import gc
-import os
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.steering_methods.caa import CAA
+from wisent_guard.core.steering_methods.caa_original import CAA
 
-from .model_utils import RealModelWrapper, create_real_contrastive_pairs, MODEL_NAME, DEFAULT_LAYER_INDEX, DEVICE
-
-# CAA dependencies removed - using pre-generated reference data instead
-
-
-def aggressive_memory_cleanup():
-    """Aggressively clean GPU memory."""
-    gc.collect()
-    torch.cuda.empty_cache()
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        # Force garbage collection multiple times
-        for _ in range(3):
-            gc.collect()
-            torch.cuda.empty_cache()
+from .const import (
+    MODEL_NAME,
+    LAYER_INDEX,
+    DEVICE,
+    HALLUCINATION_DATASET_PATH,
+    TEXT_COMPLETIONS_UNSTEERED_PATH,
+    TEXT_COMPLETIONS_STEERED_PATH,
+)
+from .model_utils import RealModelWrapper, create_real_contrastive_pairs
+from ..utils import aggressive_memory_cleanup
 
 
 def load_test_prompts():
     """Load test prompts for generation consistency testing."""
-    dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
+    dataset_path = HALLUCINATION_DATASET_PATH
 
     with open(dataset_path, "r") as f:
         dataset = json.load(f)
@@ -64,7 +58,7 @@ def load_test_prompts():
     return test_prompts
 
 
-def generate_with_wisent_caa(prompts, steering_vector, layer_idx=DEFAULT_LAYER_INDEX, strength=1.0):
+def generate_with_wisent_caa(prompts, steering_vector, layer_idx=LAYER_INDEX, strength=1.0):
     """Generate text using our wisent-guard CAA implementation with exact CAA format."""
     print(f"🦙 Generating with Wisent-Guard CAA (strength={strength})...")
 
@@ -162,13 +156,9 @@ def load_reference_text_completions(strength=1.0):
 
     # Load appropriate reference data based on strength
     if strength == 0.0:
-        ref_path = (
-            Path(__file__).parent.parent / "reference_data" / "generations" / "caa" / "text_completions_unsteered.json"
-        )
+        ref_path = TEXT_COMPLETIONS_UNSTEERED_PATH
     else:
-        ref_path = (
-            Path(__file__).parent.parent / "reference_data" / "generations" / "caa" / "text_completions_steered.json"
-        )
+        ref_path = TEXT_COMPLETIONS_STEERED_PATH
 
     if not ref_path.exists():
         pytest.skip(f"Reference text completions not found at {ref_path}")
@@ -193,15 +183,15 @@ def test_text_generation_consistency():
         memory_free_gb = memory_free / (1024**3)
         print(f"Available GPU memory: {memory_free_gb:.2f} GB")
 
-        if memory_free_gb < 20.0:  # Need at least 20GB free for two 7B models
-            pytest.skip(f"Insufficient GPU memory: {memory_free_gb:.2f} GB available, need 20+ GB")
+        if memory_free_gb < 15.0:  # Need at least 15GB free for one 7B model (now properly cleaned up)
+            pytest.skip(f"Insufficient GPU memory: {memory_free_gb:.2f} GB available, need 15+ GB")
 
     # Load test prompts
     test_prompts = load_test_prompts()
     print(f"Loaded {len(test_prompts)} test prompts")
 
     # Load dataset for steering vector generation
-    dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
+    dataset_path = HALLUCINATION_DATASET_PATH
     with open(dataset_path, "r") as f:
         dataset = json.load(f)
 
@@ -210,13 +200,17 @@ def test_text_generation_consistency():
     # Generate steering vector with our implementation
     print("\\n🔧 Generating steering vector...")
     real_model = RealModelWrapper(MODEL_NAME)
-    pair_set = create_real_contrastive_pairs(dataset_subset, real_model, layer_idx=DEFAULT_LAYER_INDEX, max_pairs=20)
+    pair_set = create_real_contrastive_pairs(dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=20)
 
     caa = CAA(device=DEVICE)
-    caa.train(pair_set, layer_index=DEFAULT_LAYER_INDEX)
+    caa.train(pair_set, layer_index=LAYER_INDEX)
     steering_vector = caa.get_steering_vector()
 
     print(f"Steering vector: shape={steering_vector.shape}, norm={torch.norm(steering_vector).item():.4f}")
+
+    # Clean up the model after getting steering vector to free memory
+    del real_model
+    aggressive_memory_cleanup()
 
     # Test different strengths
     strengths = [0.5, 1.0, 2.0]
@@ -289,17 +283,21 @@ def test_unsteered_vs_steered_generation():
     test_prompts = load_test_prompts()[:2]  # Use fewer prompts for this test
 
     # Generate steering vector
-    dataset_path = Path(__file__).parent.parent / "reference_data" / "datasets" / "hallucination.json"
+    dataset_path = HALLUCINATION_DATASET_PATH
     with open(dataset_path, "r") as f:
         dataset = json.load(f)
 
     dataset_subset = dataset[:20]
     real_model = RealModelWrapper(MODEL_NAME)
-    pair_set = create_real_contrastive_pairs(dataset_subset, real_model, layer_idx=DEFAULT_LAYER_INDEX, max_pairs=20)
+    pair_set = create_real_contrastive_pairs(dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=20)
 
     caa = CAA(device=DEVICE)
-    caa.train(pair_set, layer_index=DEFAULT_LAYER_INDEX)
+    caa.train(pair_set, layer_index=LAYER_INDEX)
     steering_vector = caa.get_steering_vector()
+
+    # Clean up the model after getting steering vector to free memory
+    del real_model
+    aggressive_memory_cleanup()
 
     # Load pre-generated unsteered and steered text
     unsteered_results = load_reference_text_completions(strength=0.0)  # No steering
