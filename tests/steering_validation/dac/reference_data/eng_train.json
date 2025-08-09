@@ -1,0 +1,82 @@
+[
+  {
+    "input": "What is the capital of France?",
+    "output": "The capital city of France is Paris."
+  },
+  {
+    "input": "Generate three verbs that mean the same as \"to apologize\"",
+    "output": "1. To express regret\n2. To atone\n3. To make amends"
+  },
+  {
+    "input": "Look up the boiling point of water.",
+    "output": "The boiling point of water is 100 degrees Celsius or 212 degrees Fahrenheit at standard atmospheric pressure."
+  },
+  {
+    "input": "Identify the lines of longitude that divides North and South America.",
+    "output": "The line of longitude that divides North and South America is the 77° 00' 0\" or 77°W which is also known as the Panama-Colombia border."
+  },
+  {
+    "input": "Name two types of desert biomes.",
+    "output": "Two types of desert biomes are hot and dry desert, and cold desert."
+  },
+  {
+    "input": "Find the capital of Spain.",
+    "output": "The capital of Spain is Madrid."
+  },
+  {
+    "input": "Think of a phrase or idiom containing the word \"sleep\".",
+    "output": "\"Don't lose sleep over it.\" This phrase means not to worry too much or become too anxious about something."
+  },
+  {
+    "input": "Compose a five word sentence describing your day.",
+    "output": "I am always assisting users."
+  },
+  {
+    "input": "Compile a list of 5 US states located in the Mid West.",
+    "output": "1. Ohio\n2. Indiana\n3. Michigan\n4. Illinois\n5. Wisconsin"
+  },
+  {
+    "input": "Hans went to a pet shop. He bought 15 gold fish and 7 blue fish. How many fish did he buy? Think step-by-step.",
+    "output": "We add 15 to 7 and get 22. Thus, Hans bought 22 fish at the pet shop."
+  },
+  {
+    "input": "Create a survey question to measure customer satisfaction",
+    "output": "On a scale of 1-10, how satisfied were you with the products or services you received from our company?"
+  },
+  {
+    "input": "Create a list of 10 different animals",
+    "output": "1. Lion\n2. Elephant\n3. Panda\n4. Giraffe\n5. Dolphin\n6. Kangaroo\n7. Tiger\n8. Gorilla\n9. Camel\n10. Zebra"
+  },
+  {
+    "input": "What geometric shape has 5 sides and 5 angles?",
+    "output": "The geometric shape that has 5 sides and 5 angles is called a pentagon."
+  },
+  {
+    "input": "What is the contraction of \"they are\"?",
+    "output": "The contraction of \"they are\" is \"they're\"."
+  },
+  {
+    "input": "Generate a sentence that follows the structure of: \"All ____ is based on/with _____\"",
+    "output": "All scientific discovery is based on evidence and experimentation."
+  },
+  {
+    "input": "Generate a haiku poem.",
+    "output": "Fallen crimson leaves,\nSighing softly in the breeze,\nNature's tranquil peace."
+  },
+  {
+    "input": "Name three fruits that are rich in Vitamin C.",
+    "output": "Three fruits that are rich in Vitamin C are oranges, kiwifruit, and strawberries."
+  },
+  {
+    "input": "Suggest a powerful quote.",
+    "output": "\"Be the change you wish to see in the world.\" - Mahatma Gandhi"
+  },
+  {
+    "input": "Name the three main mountain ranges in the United States.",
+    "output": "The three main mountain ranges in the United States are the Rocky Mountains, the Appalachian Mountains, and the Sierra Nevada Mountains."
+  },
+  {
+    "input": "Construct a sentence using the phrase \"every day\".",
+    "output": "I strive to make my users' lives easier every day by providing them with relevant information and performing tasks for them."
+  }
+]
