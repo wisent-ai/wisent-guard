@@ -10,6 +10,9 @@ to the CAA reference implementation when given the same:
 - Generation settings (greedy decoding, same seed)
 
 This is the ultimate validation - proving behavioral equivalence in actual text generation.
+
+# TODO Need fixes
+
 """
 
 import json

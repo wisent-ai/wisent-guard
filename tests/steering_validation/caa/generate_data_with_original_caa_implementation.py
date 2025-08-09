@@ -1,20 +1,32 @@
 #!/usr/bin/env python3
 """
-Generate reference data using the CAA implementation.
+Generate reference data using the ORIGINAL CAA implementation.
 
-This script generates steering vectors and text outputs using the reference CAA
-implementation, which we'll use as ground truth for validating our implementation.
+This script uses the original CAA repository's functions directly to ensure 100%
+compatibility and eliminate any potential implementation differences.
+
+Vector Generation: Uses CAA's original generate_save_vectors_for_behavior()
+Text Generation: Uses CAA's LlamaWrapper with original tokenization
+
+Dataset Configuration:
+    - For fast testing, we limit the CAA dataset to 20 examples
+    - Modified: /workspace/wisent-guard/CAA/datasets/generate/hallucination/generate_dataset.json
+    - This dataset is used by generate_save_vectors_for_behavior()
+    - Full dataset backup: /workspace/wisent-guard/CAA/datasets/raw/hallucination/dataset_full_backup.json
 
 Prerequisites:
     1. Clone the CAA repository: git clone https://github.com/nrimsky/CAA
     2. Place it adjacent to this repo (or update CAA_PATH below)
     3. Login to Hugging Face: huggingface-cli login
+    4. Ensure CAA dataset is limited to 20 examples for fast testing
 
 Usage:
     python generate_data_with_original_caa_implementation.py
 
-The output you can change in ./reference_data
-There is only one difference - the created data were used with model loaded with dtype=torch.float16
+Output: ./reference_data/
+- hallucination_layer14.pt (steering vector)
+- text_completions_steered.json (steered text outputs)
+- text_completions_unsteered.json (unsteered text outputs)
 """
 
 import sys
@@ -47,120 +59,78 @@ sys.path.insert(0, str(WISENT_PATH))
 
 try:
     from llama_wrapper import LlamaWrapper
-    from behaviors import get_ab_data_path
+    from behaviors import get_ab_data_path, get_vector_path
     from utils.tokenize import tokenize_llama_base
     from utils.helpers import find_instruction_end_postion
+    from generate_vectors import generate_save_vectors_for_behavior
+    import shutil
 except ImportError:
     print("You have to clone original CAA repo https://github.com/nrimsky/CAA first")
 
 
 def generate_reference_vector(max_examples=MAX_EXAMPLES):
-    """Generate CAA steering vector using reference implementation.
+    """Generate CAA steering vector using original CAA implementation.
 
     Args:
-        max_examples: Maximum number of dataset examples to use
+        max_examples: Maximum number of dataset examples to use (ignored - uses full dataset)
 
     Returns:
         tuple: (steering_vector, save_data) containing the generated vector and metadata
     """
-    print(f"🔄 Generating reference CAA vector for {BEHAVIOR} behavior...")
+    print(f"🔄 Generating reference CAA vector using ORIGINAL CAA implementation...")
+    print(f"Behavior: {BEHAVIOR}, Layer: {LAYER_INDEX}, Model: {MODEL_SIZE}")
 
-    # Parameters matching our test setup
-    behavior = BEHAVIOR
-    layer = LAYER_INDEX
-    model_size = MODEL_SIZE
-    use_base_model = True  # Use base model (non-chat)
-
-    # Initialize model (user is logged in via huggingface-cli)
-    print("Loading Llama-2-7B model...")
+    # Initialize model using CAA's approach
+    print("Loading Llama-2-7B model with CAA wrapper...")
     model = LlamaWrapper(
         hf_token=None,  # Use logged in credentials
-        size=model_size,
-        use_chat=not use_base_model,
+        size=MODEL_SIZE,
+        use_chat=False,  # Use base model
     )
 
-    # Load dataset
-    data_path = get_ab_data_path(behavior)
-    with open(data_path, "r") as f:
-        dataset = json.load(f)
+    # Use CAA's original vector generation function
+    print("🚀 Using original CAA generate_save_vectors_for_behavior()...")
+    generate_save_vectors_for_behavior(
+        layers=[LAYER_INDEX],
+        save_activations=True,  # Save activations for our metadata
+        behavior=BEHAVIOR,
+        model=model,
+    )
 
-    # Use limited examples to fit in memory
-    dataset = dataset[:max_examples]
-    print(f"Using {len(dataset)} examples from {data_path} (limited for memory)")
+    # Get CAA's output path and copy to our desired location
+    caa_vector_path = get_vector_path(BEHAVIOR, LAYER_INDEX, model.model_name_path)
+    print(f"CAA generated vector at: {caa_vector_path}")
 
-    # Generate activations
-    model.set_save_internal_decodings(False)
-    model.reset_all()
+    # Load the generated vector
+    if not Path(caa_vector_path).exists():
+        raise FileNotFoundError(f"CAA failed to generate vector at {caa_vector_path}")
 
-    pos_activations = []
-    neg_activations = []
-
-    print(f"Extracting activations at layer {layer}...")
-    for i, item in enumerate(dataset):
-        if i % 10 == 0:
-            print(f"Processing {i}/{len(dataset)}")
-
-        # Get positive and negative texts
-        question = item["question"]
-        pos_text = item["answer_matching_behavior"]
-        neg_text = item["answer_not_matching_behavior"]
-
-        # Tokenize
-        tokenizer = model.tokenizer
-        pos_tokens = tokenize_llama_base(tokenizer, question, pos_text)
-        neg_tokens = tokenize_llama_base(tokenizer, question, neg_text)
-
-        pos_tokens = torch.tensor(pos_tokens).unsqueeze(0).to(model.device)
-        neg_tokens = torch.tensor(neg_tokens).unsqueeze(0).to(model.device)
-
-        # Extract positive activations
-        model.reset_all()
-        with torch.no_grad():
-            model.get_logits(pos_tokens)
-            pos_acts = model.get_last_activations(layer)
-            pos_acts = pos_acts[0, -2, :].detach().cpu()  # Position -2
-            pos_activations.append(pos_acts)
-
-        # Extract negative activations
-        model.reset_all()
-        with torch.no_grad():
-            model.get_logits(neg_tokens)
-            neg_acts = model.get_last_activations(layer)
-            neg_acts = neg_acts[0, -2, :].detach().cpu()  # Position -2
-            neg_activations.append(neg_acts)
-
-    # Compute steering vector (reference method)
-    print("Computing steering vector...")
-    pos_stack = torch.stack(pos_activations)
-    neg_stack = torch.stack(neg_activations)
-    steering_vector = (pos_stack - neg_stack).mean(dim=0)
-
-    print(f"Generated steering vector with shape: {steering_vector.shape}")
+    steering_vector = torch.load(caa_vector_path, map_location="cpu", weights_only=False)
+    print(f"Loaded CAA vector with shape: {steering_vector.shape}")
     print(f"Vector norm: {torch.norm(steering_vector).item():.4f}")
 
-    # Save vector
-    output_path = HALLUCINATION_VECTOR_PATH
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
+    # Create our save data structure for compatibility
     save_data = {
         "vector": steering_vector,
-        "layer": layer,
-        "behavior": behavior,
-        "model_size": model_size,
-        "use_base_model": use_base_model,
-        "num_examples": len(dataset),
-        "method": "CAA_reference_real",
-        "pos_activations": pos_stack,
-        "neg_activations": neg_stack,
+        "layer": LAYER_INDEX,
+        "behavior": BEHAVIOR,
+        "model_size": MODEL_SIZE,
+        "use_base_model": True,
+        "method": "CAA_original_implementation",
+        "source_path": str(caa_vector_path),
         "metadata": {
             "vector_norm": torch.norm(steering_vector).item(),
-            "pos_mean_norm": torch.norm(pos_stack, dim=-1).mean().item(),
-            "neg_mean_norm": torch.norm(neg_stack, dim=-1).mean().item(),
         },
     }
 
-    torch.save(save_data, output_path)
-    print(f"✅ Saved reference vector to: {output_path}")
+    # Copy to our target location
+    HALLUCINATION_VECTOR_PATH.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(caa_vector_path, HALLUCINATION_VECTOR_PATH)
+    print(f"✅ Copied CAA vector to: {HALLUCINATION_VECTOR_PATH}")
+
+    # Also save our metadata
+    torch.save(save_data, HALLUCINATION_VECTOR_PATH)
+    print(f"✅ Saved reference vector with metadata")
 
     return steering_vector, save_data
 

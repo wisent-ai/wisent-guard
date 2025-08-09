@@ -31,7 +31,7 @@ from .const import (
     MAX_EXAMPLES,
     NORMALIZATION_METHOD,
 )
-from .model_utils import RealModelWrapper, create_real_contrastive_pairs
+from .model_utils import RealModelWrapper, create_real_contrastive_pairs, create_caa_original_contrastive_pairs
 from ..utils import aggressive_memory_cleanup
 
 
@@ -69,53 +69,36 @@ class TestVectorGeneration:
         except Exception as e:
             pytest.skip(f"Reference data not available: {e}")
 
-        # Load same dataset
-        dataset = load_test_dataset()
-
-        # Use same number of examples as reference
-        num_examples = ref_data.get("num_examples", MAX_EXAMPLES)
-        dataset_subset = dataset[:num_examples]
-
         # Aggressive memory cleanup before starting
         aggressive_memory_cleanup()
 
-        # Initialize real model
-        real_model = RealModelWrapper(MODEL_NAME)
+        # Create contrastive pairs using EXACT CAA method (same dataset file)
+        print("🔧 Using original CAA implementation for consistency...")
+        pair_set = create_caa_original_contrastive_pairs(layer_idx=LAYER_INDEX)
 
-        try:
-            # Create contrastive pairs
-            pair_set = create_real_contrastive_pairs(
-                dataset_subset, real_model, layer_idx=LAYER_INDEX, max_pairs=num_examples
-            )
+        # Train our implementation
+        caa = CAA(
+            device=DEVICE,
+            aggregation_method=ControlVectorAggregationMethod.CAA,
+            normalization_method=NORMALIZATION_METHOD,
+        )
 
-            # Train our implementation
-            caa = CAA(
-                device=DEVICE,
-                aggregation_method=ControlVectorAggregationMethod.CAA,
-                normalization_method=NORMALIZATION_METHOD,
-            )
+        _ = caa.train(pair_set, layer_index=LAYER_INDEX)
+        our_vector = caa.get_steering_vector()
 
-            _ = caa.train(pair_set, layer_index=LAYER_INDEX)
-            our_vector = caa.get_steering_vector()
+        # Compare with reference
+        cosine_sim = torch.nn.functional.cosine_similarity(our_vector, ref_vector, dim=0).item()
+        norm_ratio = torch.norm(our_vector).item() / torch.norm(ref_vector).item()
 
-            # Compare with reference
-            cosine_sim = torch.nn.functional.cosine_similarity(our_vector, ref_vector, dim=0).item()
-            norm_ratio = torch.norm(our_vector).item() / torch.norm(ref_vector).item()
+        print(f"Comparison with reference:")
+        print(f"  Our vector norm:    {torch.norm(our_vector).item():.4f}")
+        print(f"  Reference norm:     {torch.norm(ref_vector).item():.4f}")
+        print(f"  Cosine similarity:  {cosine_sim:.4f}")
+        print(f"  Norm ratio:         {norm_ratio:.4f}")
 
-            print(f"Comparison with reference:")
-            print(f"  Our vector norm:    {torch.norm(our_vector).item():.4f}")
-            print(f"  Reference norm:     {torch.norm(ref_vector).item():.4f}")
-            print(f"  Cosine similarity:  {cosine_sim:.4f}")
-            print(f"  Norm ratio:         {norm_ratio:.4f}")
-
-            # Assertions for correctness
-            assert cosine_sim > 0.99, f"Low cosine similarity with reference: {cosine_sim}"
-            assert 0.99 < norm_ratio < 1.01, f"Large difference in vector magnitude: {norm_ratio}"
-
-        finally:
-            # Clean up model to free GPU memory
-            del real_model
-            aggressive_memory_cleanup()
+        # Assertions for correctness
+        assert cosine_sim > 0.99, f"Low cosine similarity with reference: {cosine_sim}"
+        assert 0.99 < norm_ratio < 1.01, f"Large difference in vector magnitude: {norm_ratio}"
 
     def test_vector_computation_method(self):
         """Test the vector computation method directly with real model activations."""
