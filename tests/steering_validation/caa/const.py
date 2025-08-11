@@ -22,7 +22,6 @@ BEHAVIOR = "hallucination"
 STEERING_STRENGTH = 1.0
 
 # Path constants
-CAA_PATH = Path(__file__).parent.parent.parent.parent / "CAA"
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 REFERENCE_DATA_PATH = Path(__file__).parent / "reference_data"
 HALLUCINATION_DATASET_PATH = REFERENCE_DATA_PATH / "hallucination.json"

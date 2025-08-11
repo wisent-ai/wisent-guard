@@ -14,18 +14,9 @@ sys.path.insert(0, str(WISENT_PATH))
 from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
 from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
-from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE, MODEL_SIZE, CAA_PATH, BEHAVIOR
+from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE, MODEL_SIZE, BEHAVIOR
 from .caa_utils import tokenize_llama_base_format
 import sys
-
-# Add CAA repo to path for original implementations
-sys.path.insert(0, str(CAA_PATH))
-
-try:
-    from llama_wrapper import LlamaWrapper  # TODO We should remove these dependecies
-    from utils.tokenize import tokenize_llama_base
-except ImportError:
-    print("Warning: Could not import CAA original implementation")
 
 
 class RealModelWrapper:
@@ -153,18 +144,15 @@ def create_real_contrastive_pairs(dataset, model, layer_idx=LAYER_INDEX, max_pai
 
 
 def create_caa_original_contrastive_pairs(dataset=None, layer_idx=LAYER_INDEX, max_pairs=None):
-    """Create ContrastivePairSet replicating CAA's exact ComparisonDataset approach.
+    """Create ContrastivePairSet replicating CAA's exact approach using wisent-guard modules.
 
     Uses MAX_EXAMPLES (default 20) for fast testing from the full dataset.
+    Now uses RealModelWrapper + HuggingFace instead of external CAA dependencies.
     """
-    print(f"Creating contrastive pairs with EXACT CAA method...")
+    print(f"Creating contrastive pairs with CAA-compatible method (wisent-guard)...")
 
-    # Use CAA's original LlamaWrapper (same as reference generation)
-    model = LlamaWrapper(
-        hf_token=None,  # Use logged in credentials
-        size=MODEL_SIZE,
-        use_chat=False,  # Use base model
-    )
+    # Use RealModelWrapper instead of CAA's LlamaWrapper
+    model = RealModelWrapper(MODEL_NAME, device="auto")
 
     # Load dataset and limit to MAX_EXAMPLES for fast testing
     import json
@@ -179,12 +167,6 @@ def create_caa_original_contrastive_pairs(dataset=None, layer_idx=LAYER_INDEX, m
     caa_dataset = full_dataset[:MAX_EXAMPLES] if max_pairs is None else full_dataset[:max_pairs]
     print(f"Processing {len(caa_dataset)} examples (limited for fast testing)...")
 
-    # CRITICAL: Create separate tokenizer instance like ComparisonDataset does
-    from transformers import AutoTokenizer
-
-    dataset_tokenizer = AutoTokenizer.from_pretrained(model.model_name_path, token=None)
-    dataset_tokenizer.pad_token = dataset_tokenizer.eos_token
-
     pairs = []
 
     for i, item in enumerate(caa_dataset):
@@ -195,34 +177,22 @@ def create_caa_original_contrastive_pairs(dataset=None, layer_idx=LAYER_INDEX, m
         pos_answer = item["answer_matching_behavior"]  # (B) - exhibits behavior
         neg_answer = item["answer_not_matching_behavior"]  # (A) - correct answer
 
-        # Use DATASET TOKENIZER (not model tokenizer) like ComparisonDataset
-        pos_tokens = tokenize_llama_base(dataset_tokenizer, question, pos_answer)
-        neg_tokens = tokenize_llama_base(dataset_tokenizer, question, neg_answer)
+        # Use CAA tokenization format: pass (user_input, model_output) tuples
+        pos_input = (question, pos_answer)
+        neg_input = (question, neg_answer)
 
-        pos_tokens = torch.tensor(pos_tokens).unsqueeze(0).to(model.device)
-        neg_tokens = torch.tensor(neg_tokens).unsqueeze(0).to(model.device)
-
-        # Extract activations using CAA's original method
-        model.reset_all()
-        with torch.no_grad():
-            model.get_logits(pos_tokens)
-            pos_acts = model.get_last_activations(layer_idx)
-            pos_acts = pos_acts[0, -2, :].detach().cpu()  # Position -2
-
-        model.reset_all()
-        with torch.no_grad():
-            model.get_logits(neg_tokens)
-            neg_acts = model.get_last_activations(layer_idx)
-            neg_acts = neg_acts[0, -2, :].detach().cpu()  # Position -2
+        # Extract activations using RealModelWrapper with CAA tokenization
+        pos_activations = model.get_activations([pos_input], layer_idx, position=-2)
+        neg_activations = model.get_activations([neg_input], layer_idx, position=-2)
 
         # Create Response objects
         pos_response = PositiveResponse(
             text=pos_answer,
-            activations=pos_acts,
+            activations=pos_activations[0],  # Remove batch dimension
         )
         neg_response = NegativeResponse(
             text=neg_answer,
-            activations=neg_acts,
+            activations=neg_activations[0],  # Remove batch dimension
         )
 
         # Create ContrastivePair
@@ -230,9 +200,9 @@ def create_caa_original_contrastive_pairs(dataset=None, layer_idx=LAYER_INDEX, m
         pairs.append(pair)
 
     # Create ContrastivePairSet
-    pair_set = ContrastivePairSet(name="hallucination_caa_exact", pairs=pairs)
+    pair_set = ContrastivePairSet(name="hallucination_caa_compatible", pairs=pairs)
 
-    print(f"✅ Created {len(pair_set.pairs)} contrastive pairs with exact CAA method")
+    print(f"✅ Created {len(pair_set.pairs)} contrastive pairs with CAA-compatible method")
 
     return pair_set
 
