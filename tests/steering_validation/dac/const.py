@@ -10,7 +10,7 @@ MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"  # Default model from DAC impl
 DATASET_A_NAME = "ITA"  # Italian responses dataset
 DATASET_B_NAME = "ENG"  # English responses dataset
 MAX_NEW_TOKENS = 30  # Maximum new tokens to generate (original working setting)
-ICL_EXAMPLES = 4  # Number of in-context learning examples
+ICL_EXAMPLES = 0  # Number of in-context learning examples
 
 # Paths
 TEST_DIR = Path(__file__).parent

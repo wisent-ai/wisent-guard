@@ -18,7 +18,8 @@ from pathlib import Path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-# No longer using wisent-guard DAC classes - using original DAC approach directly
+from wisent_guard.core.steering_methods.dac_attention import DAC
+from wisent_guard.core.aggregation import ControlVectorAggregationMethod
 
 # Add current directory to path for local imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -94,8 +95,7 @@ class TestDACVectorGeneration:
 
             # Create our DAC vectors using wisent-guard implementation
             print("🔧 Creating DAC vectors with wisent-guard implementation...")
-            # Test with 8-bit quantization + bfloat16 (should be faster!)
-            model_wrapper = DACModelWrapper(MODEL_NAME, device=DEVICE, use_nnsight=False, load_in_8bit=True)
+            model_wrapper = DACModelWrapper(MODEL_NAME, device=DEVICE)
 
             # Generate vectors using our implementation
             dac, training_stats = create_dac_vectors_with_wisent_guard(model_wrapper)
@@ -103,12 +103,12 @@ class TestDACVectorGeneration:
             # Get the steering vectors from our implementation
             our_vectors = dac.get_property_vectors()
 
-            # Compare with reference using the new original DAC format
+            # Compare with reference
             if our_vectors:
-                # Get the property (should be "ita_vs_eng" from our implementation)
+                # For now, compare the first property (should be the main ITA vs ENG comparison)
                 property_name = list(our_vectors.keys())[0]
                 our_property = our_vectors[property_name]
-                our_vectors_dict = our_property["vectors"]  # Dict[layer_idx, tensor] from our new format
+                our_vectors_dict = our_property.vectors  # Dict[layer_idx, tensor]
 
                 # Compare with reference
                 similarity_results = compute_dac_vector_similarity(our_vectors_dict, ref_diff_vector)
@@ -133,24 +133,13 @@ class TestDACVectorGeneration:
                         norm_ratio = metrics["norm_ratio"]
                         print(f"   {layer_name}: cosine={cosine_sim:.4f}, norm_ratio={norm_ratio:.4f}")
 
-                # Count layers with good similarity
-                good_layers = sum(
-                    1
-                    for layer_name, metrics in similarity_results.items()
-                    if layer_name.startswith("layer_") and metrics["cosine_similarity"] > 0.2
-                )
-
-                print(f"   Layers with similarity > 0.2: {good_layers}/{layers_compared}")
-
-                # More reasonable assertions for DAC validation
-                # DAC vectors can have lower similarity due to dataset/tokenization differences
-                assert avg_cosine_sim > 0.1, f"Very low average cosine similarity: {avg_cosine_sim}"
+                # Assertions for correctness
+                assert avg_cosine_sim > 0.5, f"Very low average cosine similarity: {avg_cosine_sim}"
                 assert layers_compared >= MODEL_CONFIG["n_layers"] // 2, f"Too few layers compared: {layers_compared}"
-                assert good_layers >= 5, f"Too few layers with good similarity (>0.2): {good_layers}"
 
                 # Check training stats
                 assert "method" in training_stats
-                assert training_stats["method"] == "DAC_original_approach"
+                assert training_stats["method"] == "DAC"
 
                 print("✅ DAC vector comparison completed successfully")
 
