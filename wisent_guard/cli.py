@@ -6361,9 +6361,15 @@ def handle_generate_vector_command(args):
                     with open(pairs_file) as f:
                         pairs_data = json.load(f)
 
+                    # Handle both dict (with 'pairs' key) and list formats
+                    if isinstance(pairs_data, dict) and 'pairs' in pairs_data:
+                        pairs_list = pairs_data['pairs']
+                    else:
+                        pairs_list = pairs_data
+
                     # Create ContrastivePairSet
                     pairs = ContrastivePairSet(name=prop_name)
-                    for pair_data in pairs_data:
+                    for pair_data in pairs_list:
                         pair = ContrastivePair(
                             prompt=pair_data.get("prompt", ""),
                             positive_response=PositiveResponse(pair_data.get("positive_response", "")),
@@ -6456,8 +6462,16 @@ def handle_generate_vector_command(args):
             from .core.contrastive_pairs import ContrastivePair, ContrastivePairSet
             from .core.response import NegativeResponse, PositiveResponse
 
-            pairs = ContrastivePairSet(name="loaded_from_file")
-            for pair_data in pairs_data:
+            # Handle both dict (with 'pairs' key) and list formats
+            if isinstance(pairs_data, dict) and 'pairs' in pairs_data:
+                pairs_list = pairs_data['pairs']
+                pairs_name = pairs_data.get('name', 'loaded_from_file')
+            else:
+                pairs_list = pairs_data
+                pairs_name = 'loaded_from_file'
+
+            pairs = ContrastivePairSet(name=pairs_name)
+            for pair_data in pairs_list:
                 pair = ContrastivePair(
                     prompt=pair_data.get("prompt", ""),
                     positive_response=PositiveResponse(pair_data.get("positive_response", "")),
@@ -6629,9 +6643,13 @@ def handle_multi_steer_command(args):
         # Check weight normalization
         if args.normalize_weights:
             print(f"\n📏 Normalizing weights (sum={total_weight:.2f} → 1.0)")
+        elif args.target_norm is not None:
+            # If target norm is specified, we don't need to worry about weight normalization
+            print(f"\n🎯 Target norm specified: {args.target_norm:.2f}")
+            print(f"   Current weight sum: {total_weight:.2f}")
         elif not args.allow_unnormalized and abs(total_weight - 1.0) > 0.01:
             print(f"\n⚠️  Warning: Weights sum to {total_weight:.2f} (not 1.0)")
-            print("   Use --normalize-weights to normalize or --allow-unnormalized to proceed")
+            print("   Use --normalize-weights to normalize, --target-norm to set a specific norm, or --allow-unnormalized to proceed")
             sys.exit(1)
 
         # Load model
@@ -6683,7 +6701,19 @@ def handle_multi_steer_command(args):
 
         print(f"\n✅ Combined {len(loaded_vectors)} vectors")
         print(f"   📏 Combined vector shape: {combined_vector.shape}")
-        print(f"   📊 Combined vector norm: {torch.norm(combined_vector).item():.4f}")
+        original_norm = torch.norm(combined_vector).item()
+        print(f"   📊 Combined vector norm: {original_norm:.4f}")
+        
+        # Scale to target norm if specified
+        if args.target_norm is not None:
+            current_norm = torch.norm(combined_vector).item()
+            if current_norm > 0:
+                scale_factor = args.target_norm / current_norm
+                combined_vector = combined_vector * scale_factor
+                new_norm = torch.norm(combined_vector).item()
+                print(f"   🎯 Scaled to target norm: {new_norm:.4f} (scale factor: {scale_factor:.4f})")
+            else:
+                print(f"   ⚠️  Cannot scale zero vector to target norm")
 
         # Save combined vector if requested
         if args.save_combined:
@@ -6696,6 +6726,7 @@ def handle_multi_steer_command(args):
                     "source_vectors": [path for path, _ in vectors_info],
                     "weights": weights,
                     "normalized": args.normalize_weights,
+                    "target_norm": args.target_norm,
                 },
             }
             torch.save(save_data, args.save_combined)

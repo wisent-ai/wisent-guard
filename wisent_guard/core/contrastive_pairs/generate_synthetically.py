@@ -749,6 +749,7 @@ class SyntheticContrastivePairGenerator:
         pair_overgeneration_factor: float = 1.5,
         force_regenerate: bool = False,
         verbose_timing: bool = False,
+        name: Optional[str] = None,  # Added to fix bug where multiple callers pass this
     ) -> ContrastivePairSet:
         """
         Generate a complete contrastive pair set from a trait description.
@@ -760,6 +761,7 @@ class SyntheticContrastivePairGenerator:
             pair_overgeneration_factor: Factor to overgenerate pairs for diversity selection
             force_regenerate: If True, bypasses the cache and generates a new set.
             verbose_timing: If True, shows detailed timing for each step
+            name: Optional name for the pair set (used by various callers)
 
         Returns:
             ContrastivePairSet with generated pairs
@@ -931,8 +933,10 @@ class SyntheticContrastivePairGenerator:
         )
         print(f"✅ Selected {len(diverse_pairs)} diverse pairs")
 
+        # Generate name from trait description
+        pair_set_name = f"synthetic_{trait_description[:30]}"
         pair_set: ContrastivePairSet = ContrastivePairSet(
-            name=f"synthetic_{trait_description[:30]}",
+            name=pair_set_name,
             task_type="synthetic",
             pairs=diverse_pairs,
         )

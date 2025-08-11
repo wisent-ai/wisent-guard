@@ -1587,6 +1587,9 @@ def setup_multi_steer_parser(parser):
     parser.add_argument(
         "--allow-unnormalized", action="store_true", help="Allow weights that don't sum to 1.0 (for stronger effects)"
     )
+    parser.add_argument(
+        "--target-norm", type=float, default=None, help="Scale the combined vector to have this norm (e.g., 10.0)"
+    )
 
     # Output options
     parser.add_argument(
