@@ -14,7 +14,7 @@ sys.path.insert(0, str(WISENT_PATH))
 from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
 from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
-from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE, MODEL_SIZE, BEHAVIOR
+from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE
 from .caa_utils import tokenize_llama_base_format
 import sys
 
@@ -63,7 +63,8 @@ class RealModelWrapper:
             # Forward pass with hooks to extract activations
             layer_activations = None
 
-            def hook_fn(module, input, output):
+            def hook_fn(_, __, output):
+                """Hook function to extract layer activations."""
                 nonlocal layer_activations
                 layer_activations = output[0]  # Hidden states
 
@@ -143,11 +144,18 @@ def create_real_contrastive_pairs(dataset, model, layer_idx=LAYER_INDEX, max_pai
     return pair_set
 
 
-def create_caa_original_contrastive_pairs(dataset=None, layer_idx=LAYER_INDEX, max_pairs=None):
+def create_caa_original_contrastive_pairs(layer_idx=LAYER_INDEX, max_pairs=None):
     """Create ContrastivePairSet replicating CAA's exact approach using wisent-guard modules.
 
     Uses MAX_EXAMPLES (default 20) for fast testing from the full dataset.
     Now uses RealModelWrapper + HuggingFace instead of external CAA dependencies.
+
+    Args:
+        layer_idx: Layer index to extract activations from
+        max_pairs: Maximum number of pairs to process (None uses MAX_EXAMPLES)
+
+    Returns:
+        ContrastivePairSet with CAA-compatible activations
     """
     print(f"Creating contrastive pairs with CAA-compatible method (wisent-guard)...")
 
