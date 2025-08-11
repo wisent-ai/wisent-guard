@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(CAA_PATH))
 
 try:
-    from llama_wrapper import LlamaWrapper
+    from llama_wrapper import LlamaWrapper  # TODO We should remove these dependecies
     from utils.tokenize import tokenize_llama_base
 except ImportError:
     print("Warning: Could not import CAA original implementation")
