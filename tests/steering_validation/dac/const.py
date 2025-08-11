@@ -5,11 +5,11 @@ Constants and configuration for DAC steering validation tests.
 from pathlib import Path
 
 # Test configuration
-MAX_EXAMPLES = 20  # Use only first 20 examples for fast testing
+MAX_EXAMPLES = 20  # Use 20 examples (original working setting)
 MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"  # Default model from DAC implementation
 DATASET_A_NAME = "ITA"  # Italian responses dataset
 DATASET_B_NAME = "ENG"  # English responses dataset
-MAX_NEW_TOKENS = 30  # Maximum new tokens to generate
+MAX_NEW_TOKENS = 30  # Maximum new tokens to generate (original working setting)
 ICL_EXAMPLES = 4  # Number of in-context learning examples
 
 # Paths
@@ -40,7 +40,9 @@ MODEL_CONFIG = {
 }
 
 # Model inference settings
-TORCH_DTYPE = "auto"  # Let transformers choose the best dtype
+import torch
+
+TORCH_DTYPE = torch.float16  # Use half precision for efficiency
 DEVICE = "auto"  # Let transformers choose the best device
 
 # Tolerance for cosine similarity comparison
