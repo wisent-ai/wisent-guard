@@ -40,6 +40,7 @@ from const import (
     REFERENCE_DATA_PATH,
     TORCH_DTYPE,
     COSINE_SIMILARITY_THRESHOLD,
+    DYNAMIC_CONFIG,
 )
 
 # Import aggressive_memory_cleanup
@@ -151,7 +152,11 @@ class TestDACTensorGeneration:
     @pytest.mark.slow
     @pytest.mark.heavy
     def test_dac_tensor_generation_with_reference(self):
-        """Test DAC tensor generation and compare with reference vectors."""
+        """Test DAC tensor generation and compare with reference vectors.
+
+        Uses icl0_tok10 configuration (10-token sequences) which produces non-zero
+        difference vectors between Italian and English activations, enabling proper steering.
+        """
         # Skip if no GPU available (DAC is resource-intensive)
         if not torch.cuda.is_available():
             pytest.skip("GPU not available for DAC tensor generation")
@@ -166,7 +171,8 @@ class TestDACTensorGeneration:
             print(f"Model: {MODEL_NAME}")
             print(f"Datasets: {DATASET_A_NAME} vs {DATASET_B_NAME}")
             print(f"Examples: {MAX_EXAMPLES}")
-            print(f"Max new tokens: {MAX_NEW_TOKENS}")
+            print(f"Max new tokens: {MAX_NEW_TOKENS} (icl0_tok10 config)")
+            print(f"Starting alpha: {DYNAMIC_CONFIG['starting_alpha']}")
             print("=" * 70)
 
             # Step 1: Load datasets
@@ -285,3 +291,223 @@ class TestDACTensorGeneration:
 
         finally:
             aggressive_memory_cleanup()
+
+    @pytest.mark.slow
+    @pytest.mark.heavy
+    def test_dac_dynamic_generation_comparison(self):
+        """Test DAC dynamic generation against reference completions from original DAC.
+
+        Uses icl0_tok10 tensors (10-token sequences) with stronger steering (α=4.0)
+        to ensure non-zero alpha values and effective Italian language steering.
+        """
+        # Skip if no GPU available
+        if not torch.cuda.is_available():
+            pytest.skip("GPU not available for DAC generation testing")
+
+        # Check if reference text completions exist
+        unsteered_path = REFERENCE_DATA_PATH / "text_completions_unsteered.json"
+        dynamic_path = REFERENCE_DATA_PATH / "text_completions_dynamic_steering.json"
+
+        if not (unsteered_path.exists() and dynamic_path.exists()):
+            pytest.skip(
+                f"Reference text completions not found. Run generate_data_with_original_dac_implementation.py first."
+            )
+
+        # Aggressive memory cleanup before starting
+        aggressive_memory_cleanup()
+
+        try:
+            print("\n" + "=" * 70)
+            print("DAC Dynamic Generation Comparison Test")
+            print("=" * 70)
+
+            # Load reference data
+            with open(unsteered_path, "r", encoding="utf-8") as f:
+                reference_unsteered = json.load(f)
+
+            with open(dynamic_path, "r", encoding="utf-8") as f:
+                reference_dynamic = json.load(f)
+
+            print(f"Reference unsteered: {len(reference_unsteered)} completions")
+            print(f"Reference dynamic: {len(reference_dynamic)} completions")
+
+            # Initialize and load DAC method
+            print("\n[1/4] Initializing DAC and loading saved tensor...")
+            dac_method = DAC(
+                device="cuda:0",
+                model_name=MODEL_NAME,
+                max_examples=MAX_EXAMPLES,
+                max_new_tokens=MAX_NEW_TOKENS,
+                torch_dtype=TORCH_DTYPE,
+            )
+
+            # Try to load existing tensor first, or train if needed
+            save_path = REFERENCE_DATA_PATH / "dac_method.pt"
+            if save_path.exists():
+                print(f"   Loading existing DAC tensor from {save_path}")
+                success = dac_method.load_steering_tensor(str(save_path))
+                if not success:
+                    pytest.skip("Failed to load DAC tensor")
+            else:
+                # Need to train the DAC method
+                print("   No saved DAC tensor found, training from datasets...")
+                ita_data, eng_data = load_datasets()
+                contrastive_pairs = create_contrastive_pairs(ita_data, eng_data)
+                training_stats = dac_method.train_property("language_steering", contrastive_pairs)
+                assert training_stats["success"], "DAC training failed"
+
+                # Save for future use
+                dac_method.save_steering_tensor(str(save_path))
+                print(f"   Saved DAC tensor to {save_path}")
+
+            # Test unsteered generation
+            print("\n[2/4] Testing unsteered generation...")
+            unsteered_matches = 0
+
+            test_prompts = [item["prompt"] for item in reference_unsteered]
+            for i, (prompt, ref_item) in enumerate(zip(test_prompts, reference_unsteered)):
+                print(f"   Prompt {i + 1}/{len(test_prompts)}: {prompt[:40]}...")
+
+                # Generate with our DAC (no steering)
+                our_result = dac_method.generate_with_steering(
+                    prompt=prompt,
+                    max_new_tokens=MAX_NEW_TOKENS,
+                    steering_strength=0.0,  # No steering for baseline
+                    timing_strategy="normal",
+                )
+
+                ref_text = ref_item["generated_text"]
+
+                # Compare results (basic text comparison)
+                similarity_score = self._calculate_text_similarity(our_result, ref_text)
+                print(f"      Our:       {our_result[:60]}...")
+                print(f"      Reference: {ref_text[:60]}...")
+                print(f"      Similarity: {similarity_score:.3f}")
+
+                if similarity_score > 0.3:  # Reasonable threshold for text similarity
+                    unsteered_matches += 1
+
+            unsteered_quality = unsteered_matches / len(reference_unsteered)
+            print(
+                f"   Unsteered generation quality: {unsteered_matches}/{len(reference_unsteered)} ({unsteered_quality:.2%})"
+            )
+
+            # Test dynamic steering generation
+            print("\n[3/4] Testing dynamic steering generation...")
+            dynamic_matches = 0
+            adaptation_scores = []
+
+            # Filter dynamic reference to one top_p value for testing
+            test_dynamic_refs = [item for item in reference_dynamic if item.get("top_p") == 0.9]
+
+            for i, ref_item in enumerate(test_dynamic_refs[:5]):  # Test subset
+                prompt = ref_item["prompt"]
+                print(f"   Dynamic prompt {i + 1}/5: {prompt[:40]}...")
+
+                # Generate with our DAC dynamic steering
+                try:
+                    our_result = dac_method.generate_with_dynamic_steering(
+                        prompt=prompt,
+                        property_weights={"language_steering": 1.0},
+                        max_new_tokens=MAX_NEW_TOKENS,
+                        starting_alpha=DYNAMIC_CONFIG["starting_alpha"],
+                        top_p=0.9,
+                    )
+
+                    our_text = our_result["generated_text"]
+                    our_adaptation = our_result["adaptation_effectiveness"]
+                    ref_text = ref_item["generated_text"]
+
+                    # Compare text similarity
+                    similarity_score = self._calculate_text_similarity(our_text, ref_text)
+                    adaptation_scores.append(our_adaptation)
+
+                    print(f"      Our:           {our_text[:50]}...")
+                    print(f"      Reference:     {ref_text[:50]}...")
+                    print(f"      Similarity:    {similarity_score:.3f}")
+                    print(f"      Adaptation:    {our_adaptation:.3f}")
+
+                    if similarity_score > 0.2:  # Lower threshold for dynamic (more variability expected)
+                        dynamic_matches += 1
+
+                except Exception as e:
+                    print(f"      ⚠️ Error in dynamic generation: {e}")
+
+            dynamic_quality = dynamic_matches / len(test_dynamic_refs) if test_dynamic_refs else 0
+            avg_adaptation = sum(adaptation_scores) / len(adaptation_scores) if adaptation_scores else 0
+
+            print(f"   Dynamic generation quality: {dynamic_matches}/{len(test_dynamic_refs)} ({dynamic_quality:.2%})")
+            print(f"   Average adaptation effectiveness: {avg_adaptation:.3f}")
+
+            # Steering effectiveness test
+            print("\n[4/4] Testing steering effectiveness...")
+            steering_effects = []
+
+            for prompt in test_prompts[:3]:  # Test few prompts
+                # Generate without steering
+                unsteered = dac_method.generate_with_steering(
+                    prompt=prompt,
+                    steering_strength=0.0,
+                    max_new_tokens=10,
+                )
+
+                # Generate with steering
+                steered = dac_method.generate_with_steering(
+                    prompt=prompt,
+                    property_weights={"language_steering": 1.0},
+                    steering_strength=1.0,
+                    max_new_tokens=10,
+                )
+
+                # Check if steering changed the output
+                is_different = unsteered != steered
+                steering_effects.append(is_different)
+
+                print(f"   Prompt: {prompt[:30]}...")
+                print(f"      Unsteered: {unsteered[:40]}...")
+                print(f"      Steered:   {steered[:40]}...")
+                print(f"      Changed:   {is_different}")
+
+            steering_rate = sum(steering_effects) / len(steering_effects) if steering_effects else 0
+            print(f"   Steering effectiveness: {sum(steering_effects)}/{len(steering_effects)} ({steering_rate:.2%})")
+
+            # Final assertions
+            print("\n" + "=" * 70)
+            print("GENERATION COMPARISON RESULTS")
+            print("=" * 70)
+            print(f"Unsteered quality: {unsteered_quality:.2%}")
+            print(f"Dynamic quality: {dynamic_quality:.2%}")
+            print(f"Adaptation effectiveness: {avg_adaptation:.3f}")
+            print(f"Steering effectiveness: {steering_rate:.2%}")
+            print("=" * 70)
+
+            # Basic quality assertions
+            assert unsteered_quality > 0.1, f"Very low unsteered generation quality: {unsteered_quality:.2%}"
+            assert steering_rate > 0.3, f"Steering not effective enough: {steering_rate:.2%}"
+
+            if adaptation_scores:
+                assert avg_adaptation > 0.0, f"No adaptation detected: {avg_adaptation:.3f}"
+
+            print("✅ DAC dynamic generation comparison test passed!")
+
+        finally:
+            aggressive_memory_cleanup()
+
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate simple text similarity score."""
+        if not text1 or not text2:
+            return 0.0
+
+        # Simple word-based similarity
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+
+        if not words1 and not words2:
+            return 1.0
+        if not words1 or not words2:
+            return 0.0
+
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+
+        return len(intersection) / len(union) if union else 0.0

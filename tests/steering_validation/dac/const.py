@@ -9,8 +9,8 @@ MAX_EXAMPLES = 20  # Use 20 examples (original working setting)
 MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"  # Default model from DAC implementation
 DATASET_A_NAME = "ITA"  # Italian responses dataset
 DATASET_B_NAME = "ENG"  # English responses dataset
-MAX_NEW_TOKENS = 30  # Maximum new tokens to generate (original working setting)
-ICL_EXAMPLES = 0  # Number of in-context learning examples
+MAX_NEW_TOKENS = 30  # Back to 30 tokens for ICL=4 (icl4_tok30 configuration)
+ICL_EXAMPLES = 4  # Number of in-context learning examples for effective steering
 
 # Paths
 TEST_DIR = Path(__file__).parent
@@ -28,7 +28,7 @@ ACTIVATIONS_B_PATH = REFERENCE_DATA_PATH / f"mean_activations_{DATASET_B_NAME.lo
 DIFF_ACTIVATIONS_PATH = REFERENCE_DATA_PATH / f"diff_activations_{DATASET_A_NAME.lower()}_{DATASET_B_NAME.lower()}.pt"
 
 # Expected vector shapes
-EXPECTED_VECTOR_SHAPE = (MAX_NEW_TOKENS, 32, 32, 128)  # [steps, n_layers, n_heads, d_head] for Mistral-7B
+EXPECTED_VECTOR_SHAPE = (MAX_NEW_TOKENS, 32, 32, 128)  # [steps=30, n_layers, n_heads, d_head] for Mistral-7B
 
 # Model configuration (Mistral-7B-Instruct-v0.2)
 MODEL_CONFIG = {
@@ -47,3 +47,16 @@ DEVICE = "auto"  # Let transformers choose the best device
 
 # Tolerance for cosine similarity comparison
 COSINE_SIMILARITY_THRESHOLD = 0.99
+
+# Test prompts for language steering validation (reduced for quick testing)
+TEST_PROMPTS = [
+    "What is the weather like?",
+    "Tell me about the food",
+]
+
+# Dynamic steering configuration (ICL=4 setup)
+DYNAMIC_CONFIG = {
+    "starting_alpha": 2.0,  # Original value - ICL context makes steering much more effective
+    "top_p_values": [0.5, 0.9],  # Test moderate and liberal nucleus sampling
+    "max_new_tokens": MAX_NEW_TOKENS,
+}

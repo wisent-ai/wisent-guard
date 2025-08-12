@@ -1,82 +1,1998 @@
 [
-  {
-    "input": "What is the capital of France?",
-    "output": "The capital city of France is Paris."
-  },
-  {
-    "input": "Generate three verbs that mean the same as \"to apologize\"",
-    "output": "1. To express regret\n2. To atone\n3. To make amends"
-  },
-  {
-    "input": "Look up the boiling point of water.",
-    "output": "The boiling point of water is 100 degrees Celsius or 212 degrees Fahrenheit at standard atmospheric pressure."
-  },
-  {
-    "input": "Identify the lines of longitude that divides North and South America.",
-    "output": "The line of longitude that divides North and South America is the 77° 00' 0\" or 77°W which is also known as the Panama-Colombia border."
-  },
-  {
-    "input": "Name two types of desert biomes.",
-    "output": "Two types of desert biomes are hot and dry desert, and cold desert."
-  },
-  {
-    "input": "Find the capital of Spain.",
-    "output": "The capital of Spain is Madrid."
-  },
-  {
-    "input": "Think of a phrase or idiom containing the word \"sleep\".",
-    "output": "\"Don't lose sleep over it.\" This phrase means not to worry too much or become too anxious about something."
-  },
-  {
-    "input": "Compose a five word sentence describing your day.",
-    "output": "I am always assisting users."
-  },
-  {
-    "input": "Compile a list of 5 US states located in the Mid West.",
-    "output": "1. Ohio\n2. Indiana\n3. Michigan\n4. Illinois\n5. Wisconsin"
-  },
-  {
-    "input": "Hans went to a pet shop. He bought 15 gold fish and 7 blue fish. How many fish did he buy? Think step-by-step.",
-    "output": "We add 15 to 7 and get 22. Thus, Hans bought 22 fish at the pet shop."
-  },
-  {
-    "input": "Create a survey question to measure customer satisfaction",
-    "output": "On a scale of 1-10, how satisfied were you with the products or services you received from our company?"
-  },
-  {
-    "input": "Create a list of 10 different animals",
-    "output": "1. Lion\n2. Elephant\n3. Panda\n4. Giraffe\n5. Dolphin\n6. Kangaroo\n7. Tiger\n8. Gorilla\n9. Camel\n10. Zebra"
-  },
-  {
-    "input": "What geometric shape has 5 sides and 5 angles?",
-    "output": "The geometric shape that has 5 sides and 5 angles is called a pentagon."
-  },
-  {
-    "input": "What is the contraction of \"they are\"?",
-    "output": "The contraction of \"they are\" is \"they're\"."
-  },
-  {
-    "input": "Generate a sentence that follows the structure of: \"All ____ is based on/with _____\"",
-    "output": "All scientific discovery is based on evidence and experimentation."
-  },
-  {
-    "input": "Generate a haiku poem.",
-    "output": "Fallen crimson leaves,\nSighing softly in the breeze,\nNature's tranquil peace."
-  },
-  {
-    "input": "Name three fruits that are rich in Vitamin C.",
-    "output": "Three fruits that are rich in Vitamin C are oranges, kiwifruit, and strawberries."
-  },
-  {
-    "input": "Suggest a powerful quote.",
-    "output": "\"Be the change you wish to see in the world.\" - Mahatma Gandhi"
-  },
-  {
-    "input": "Name the three main mountain ranges in the United States.",
-    "output": "The three main mountain ranges in the United States are the Rocky Mountains, the Appalachian Mountains, and the Sierra Nevada Mountains."
-  },
-  {
-    "input": "Construct a sentence using the phrase \"every day\".",
-    "output": "I strive to make my users' lives easier every day by providing them with relevant information and performing tasks for them."
-  }
+    {
+        "input": "What is the capital of France?",
+        "output": "The capital city of France is Paris."
+    },
+    {
+        "input": "Generate three verbs that mean the same as \"to apologize\"",
+        "output": "1. To express regret\n2. To atone\n3. To make amends"
+    },
+    {
+        "input": "Look up the boiling point of water.",
+        "output": "The boiling point of water is 100 degrees Celsius or 212 degrees Fahrenheit at standard atmospheric pressure."
+    },
+    {
+        "input": "Identify the lines of longitude that divides North and South America.",
+        "output": "The line of longitude that divides North and South America is the 77\u00b0 00' 0\" or 77\u00b0W which is also known as the Panama-Colombia border."
+    },
+    {
+        "input": "Name two types of desert biomes.",
+        "output": "Two types of desert biomes are hot and dry desert, and cold desert."
+    },
+    {
+        "input": "Find the capital of Spain.",
+        "output": "The capital of Spain is Madrid."
+    },
+    {
+        "input": "Think of a phrase or idiom containing the word \"sleep\".",
+        "output": "\"Don't lose sleep over it.\" This phrase means not to worry too much or become too anxious about something."
+    },
+    {
+        "input": "Compose a five word sentence describing your day.",
+        "output": "I am always assisting users."
+    },
+    {
+        "input": "Compile a list of 5 US states located in the Mid West.",
+        "output": "1. Ohio\n2. Indiana\n3. Michigan\n4. Illinois\n5. Wisconsin"
+    },
+    {
+        "input": "Hans went to a pet shop. He bought 15 gold fish and 7 blue fish. How many fish did he buy? Think step-by-step.",
+        "output": "We add 15 to 7 and get 22. Thus, Hans bought 22 fish at the pet shop."
+    },
+    {
+        "input": "Create a survey question to measure customer satisfaction",
+        "output": "On a scale of 1-10, how satisfied were you with the products or services you received from our company?"
+    },
+    {
+        "input": "Create a list of 10 different animals",
+        "output": "1. Lion\n2. Elephant\n3. Panda\n4. Giraffe\n5. Dolphin\n6. Kangaroo\n7. Tiger\n8. Gorilla\n9. Camel\n10. Zebra"
+    },
+    {
+        "input": "What geometric shape has 5 sides and 5 angles?",
+        "output": "The geometric shape that has 5 sides and 5 angles is called a pentagon."
+    },
+    {
+        "input": "What is the contraction of \"they are\"?",
+        "output": "The contraction of \"they are\" is \"they're\"."
+    },
+    {
+        "input": "Generate a sentence that follows the structure of: \"All ____ is based on/with _____\"",
+        "output": "All scientific discovery is based on evidence and experimentation."
+    },
+    {
+        "input": "Generate a haiku poem.",
+        "output": "Fallen crimson leaves,\nSighing softly in the breeze,\nNature's tranquil peace."
+    },
+    {
+        "input": "Name three fruits that are rich in Vitamin C.",
+        "output": "Three fruits that are rich in Vitamin C are oranges, kiwifruit, and strawberries."
+    },
+    {
+        "input": "Suggest a powerful quote.",
+        "output": "\"Be the change you wish to see in the world.\" - Mahatma Gandhi"
+    },
+    {
+        "input": "Name the three main mountain ranges in the United States.",
+        "output": "The three main mountain ranges in the United States are the Rocky Mountains, the Appalachian Mountains, and the Sierra Nevada Mountains."
+    },
+    {
+        "input": "Construct a sentence using the phrase \"every day\".",
+        "output": "I strive to make my users' lives easier every day by providing them with relevant information and performing tasks for them."
+    },
+    {
+        "input": "Find a rhyming word for the word \"river\".",
+        "output": "A rhyming word for the word \"river\" could be \"quiver.\""
+    },
+    {
+        "input": "What is the scientific name for a beaver?",
+        "output": "The scientific name for the North American beaver is Castor canadensis, while the scientific name for the Eurasian beaver is Castor fiber."
+    },
+    {
+        "input": "Supply a phrase to complete this proverb: \"It's better to be safe than ____.\"",
+        "output": "It's better to be safe than sorry."
+    },
+    {
+        "input": "Generate a sentence in Spanish that describes the natural beauty of Barcelona.",
+        "output": "La belleza natural de Barcelona es impresionante, con sus playas de arena dorada, monta\u00f1as verdes y impresionantes vistas al Mediterr\u00e1neo."
+    },
+    {
+        "input": "Compose a haiku about cats",
+        "output": "Gentle purring friend,\nWhiskers soft, eyes like bright moons,\nGrace in feline form."
+    },
+    {
+        "input": "Find the distance between the vertices of the hyperbola\n\n (x^2)/99 - (y^2)/36 = 1.\n",
+        "output": "We read that a^2 = 99, so a = sqrt(99) = 3 sqrt(11). Therefore, the distance between the vertices is 2a = 6 sqrt(11)."
+    },
+    {
+        "input": "Come up with a creative metaphor for smile",
+        "output": "\"A smile is a burst of sunlight breaking through the clouds, illuminating the face and warming the hearts of those around it.\""
+    },
+    {
+        "input": "What is the least common multiple of 3, 4, 6 and 15?",
+        "output": "To find the LCM of 3, 4=2^2, 6=2*3, and 15=3*5, take the highest power of each prime that appears and multiply: 2^2*3*5=60."
+    },
+    {
+        "input": "Generate a random password of 6 characters in length using only capital letters and numbers.",
+        "output": "Here is a random password that meets the criteria: `A3J6K9`"
+    },
+    {
+        "input": "Given a set of eight numbers (1,2, 3, 4, 5, 6, 7, 8), generate a sentence that reflects their order.",
+        "output": "In ascending order, the numbers are arranged as follows: 1, 2, 3, 4, 5, 6, 7, and finally 8."
+    },
+    {
+        "input": "Create a sentence that ends with an ellipsis.",
+        "output": "She walked away slowly, leaving me wondering what could have been..."
+    },
+    {
+        "input": "Generate a creative name for a restaurant serving Mexican cuisine.",
+        "output": "\"Maya's Magic Spice\""
+    },
+    {
+        "input": "Generate a slogan for a clothing brand.",
+        "output": "\"Unleash your style with our threads.\""
+    },
+    {
+        "input": "Name three natural elements.",
+        "output": "1. Oxygen\n2. Hydrogen\n3. Nitrogen"
+    },
+    {
+        "input": "Generate 10 rhyming words for the word \"love\".",
+        "output": "1. Dove\n2. Glove\n3. Above\n4. Shove\n5. Strove\n6. Wove\n7. Behove\n8. Cove\n9. Nov\n10. Autoclave"
+    },
+    {
+        "input": "Come up with a social media campaign slogan.",
+        "output": "\"Let's connect the world, one post at a time.\""
+    },
+    {
+        "input": "Name a planet from our solar system.",
+        "output": "One planet from our solar system is Jupiter."
+    },
+    {
+        "input": "Come up with a creative tagline for a beauty product.",
+        "output": "\"Unleash your inner glow with our beauty essentials.\""
+    },
+    {
+        "input": "Generate a memorable quote from Albert Einstein.",
+        "output": "\"Try not to become a man of success, but rather try to become a man of value.\" - Albert Einstein"
+    },
+    {
+        "input": "Transform the following sentence using the past perfect tense: Yesterday they opened the door.",
+        "output": "Yesterday they had opened the door."
+    },
+    {
+        "input": "Complete the following analogy: Loud is to quiet as day is to",
+        "output": "night."
+    },
+    {
+        "input": "Create an example of alliteration.",
+        "output": "Silly Sally swiftly shooed seven sheep."
+    },
+    {
+        "input": "Classify the following words by their grammatical categories: walk, interesting, quickly",
+        "output": "Walk: Verb\nInteresting: Adjective\nQuickly: Adverb"
+    },
+    {
+        "input": "Come up with a riddle",
+        "output": "What starts with an E, ends with an E, but only contains one letter? Envelope."
+    },
+    {
+        "input": "Identify the conjugation of the verb: I will have helped",
+        "output": "The verb phrase \"will have helped\" is in the future perfect tense, conjugated in the first person singular form."
+    },
+    {
+        "input": "Rewrite the sentence into more descriptive form:\nThe food was delicious.",
+        "output": "The food was absolutely delightful, with a tantalizing blend of flavors that left my taste buds dancing with joy."
+    },
+    {
+        "input": "Name 5 emotional states",
+        "output": "1. Happiness\n2. Sadness\n3. Anger\n4. Fear\n5. Love"
+    },
+    {
+        "input": "Create a funny one-liner.",
+        "output": "\"I told my wife she was drawing her eyebrows too high. She looked surprised.\""
+    },
+    {
+        "input": "Select the correct term for the phrase \u2018the art of making things\u2019",
+        "output": "The correct term for the phrase 'the art of making things' is Craftsmanship."
+    },
+    {
+        "input": "Come up with a slogan to describe a new lipstick product.",
+        "output": "\"Unleash your inner beauty with our vibrant, long-lasting lipstick!\""
+    },
+    {
+        "input": "Generate a list of five elements for a grocery shopping list",
+        "output": "1. Milk\n2. Eggs\n3. Bread\n4. Apples\n5. Spinach"
+    },
+    {
+        "input": "What is the value of (x - y)(x + y) if x = 10 and y = 15?",
+        "output": "(x-y)(x+y) = (10-15)(10+15) = (-5)(25) = -125."
+    },
+    {
+        "input": "Write a haiku about the ocean.",
+        "output": "Gentle ocean waves,\nEndlessly caressing shore,\nPeaceful lullaby."
+    },
+    {
+        "input": "Name three government positions in the United States.",
+        "output": "1. President of the United States\n2. Vice President of the United States\n3. Speaker of the United States House of Representatives"
+    },
+    {
+        "input": "Name 3 countries that border France.",
+        "output": "Three countries that border France are Belgium, Germany, and Spain."
+    },
+    {
+        "input": "Provide an example of an antonym for the word \u201chappy\u201d",
+        "output": "An example of an antonym for the word \"happy\" is \"sad.\""
+    },
+    {
+        "input": "Make a list of four styles of furniture.",
+        "output": "1. Modern\n2. Traditional\n3. Rustic\n4. Contemporary"
+    },
+    {
+        "input": "Edit the following sentence to eliminate any grammar errors: They tried to fix the car all day.",
+        "output": "They tried to fix the car all day. (The sentence is already grammatically correct.)"
+    },
+    {
+        "input": "Write a humorous joke.",
+        "output": "Why don't scientists trust atoms? Because they make up everything!"
+    },
+    {
+        "input": "List 5 different fruit",
+        "output": "1. Apple\n2. Banana\n3. Orange\n4. Pineapple\n5. Mango"
+    },
+    {
+        "input": "Rewrite the following sentence:\n\n\"The candidate is a highly motivated individual\"",
+        "output": "The individual possesses high levels of motivation as a candidate."
+    },
+    {
+        "input": "Shape the following sentence into a question:\n\nThe Houston Rockets are an American professional basketball team",
+        "output": "Are the Houston Rockets an American professional basketball team?"
+    },
+    {
+        "input": "Fill in the blank with a word or phrase\n\nThe most successful team in the NBA is the ____",
+        "output": "The most successful team in the NBA is the Boston Celtics."
+    },
+    {
+        "input": "Generate 2 sentence of a conversation that takes place between the manager and the customer.",
+        "output": "Manager: Good afternoon, how may I assist you today?\nCustomer: Hi, I\u2019d like to return an item that I purchased, but I don\u2019t have the receipt with me."
+    },
+    {
+        "input": "Take two words and create a completely new word by combining them.",
+        "output": "First word: \"Electric\"\nSecond word: \"Magical\"\n\nNew word: \"Electrigical\""
+    },
+    {
+        "input": "Make a list of the eight planets in our solar system",
+        "output": "1. Mercury\n2. Venus\n3. Earth\n4. Mars\n5. Jupiter\n6. Saturn\n7. Uranus\n8. Neptune"
+    },
+    {
+        "input": "What is the chemical formula for water?",
+        "output": "The chemical formula for water is H2O. It is composed of two hydrogen atoms and one oxygen atom."
+    },
+    {
+        "input": "Construct a web address for a book recommendation website.",
+        "output": "One possible web address for a book recommendation website could be `www.bookrecommendations.com`."
+    },
+    {
+        "input": "Generate a sentence that uses the word \u2018zephyr\u2019",
+        "output": "The gentle zephyr can be felt on my cheeks as I stood on the hill, admiring the stunning beauty of the sunset."
+    },
+    {
+        "input": "Come up with a name for this new product.",
+        "output": "A possible name for this new product could be \"PrimeLife\"."
+    },
+    {
+        "input": "Translate the phrase \"I love you\" into Spanish.",
+        "output": "The phrase \"I love you\" translated into Spanish is \"Te quiero\" or \"Te amo\"."
+    },
+    {
+        "input": "Construct a sentence using the present tense of the verb \"eat\".",
+        "output": "I eat a healthy breakfast every morning."
+    },
+    {
+        "input": "Generate a list of 10 adjectives that describe the color blue.",
+        "output": "1. Calming\n2. Tranquil\n3. Serene\n4. Soothing\n5. Refreshing\n6. Cool\n7. Oceanic\n8. Deep\n9. Bright\n10. Vibrant"
+    },
+    {
+        "input": "Convert 28 cm to inches.",
+        "output": "28 cm is equivalent to about 11.02 inches."
+    },
+    {
+        "input": "Spell the word \"xylophone\".",
+        "output": "X-Y-L-O-P-H-O-N-E"
+    },
+    {
+        "input": "Give me a synonym for the word 'love'.",
+        "output": "Affection."
+    },
+    {
+        "input": "Name two characters in the novel Moby Dick.",
+        "output": "Two characters in the novel Moby Dick are Captain Ahab and Ishmael."
+    },
+    {
+        "input": "Rewrite the following sentence in a more formal way:\n\n\"I want to learn about this new app.\"",
+        "output": "I desire to acquire knowledge regarding this novel application."
+    },
+    {
+        "input": "Generate a funny joke.",
+        "output": "Why don\u2019t scientists trust atoms? Because they make up everything!"
+    },
+    {
+        "input": "Compose a tagline for a mobile game about cooking.",
+        "output": "'Whip up a storm in the kitchen with our sizzling mobile cooking game!'"
+    },
+    {
+        "input": "Create a question about the consequences of global warming.",
+        "output": "What are some of the potential impacts and consequences of global warming on our planet and its inhabitants?"
+    },
+    {
+        "input": "Identify what type of sentence this is: My dog is cuddly and cute.",
+        "output": "This is a declarative sentence, which makes a statement and conveys information."
+    },
+    {
+        "input": "Rewrite the following sentence using a synonym for the word \"impact\": The impact of the pandemic has been devastating.",
+        "output": "The effect of the pandemic has been devastating."
+    },
+    {
+        "input": "Name three famous figures who were contemporaries of Galileo Galilei.",
+        "output": "Three famous figures who were contemporaries of Galileo Galilei were Johann Kepler, William Shakespeare, and Ren\u00e9 Descartes."
+    },
+    {
+        "input": "What grade did you get in your English class?",
+        "output": "As an AI, I am a language model and do not take classes or receive grades. Is there anything else I can assist you with?"
+    },
+    {
+        "input": "Generate a random password of length 10",
+        "output": "Here's a randomly generated password that is 10 characters long: gsL2E#n*9X"
+    },
+    {
+        "input": "List the names of four social media platforms.",
+        "output": "1. Facebook\n2. Twitter\n3. Instagram\n4. LinkedIn"
+    },
+    {
+        "input": "Give a creative title for an article about the use of AI in travel.",
+        "output": "\"Journeying with AI: Enhancing Your Travel Experience through Artificial Intelligence\""
+    },
+    {
+        "input": "Write a Haiku poem about a sunset.",
+        "output": "Golden light fades slow,\nHorizon melts into hues,\nSunset bids adieu."
+    },
+    {
+        "input": "Generate a headline for a news article about the rising cost of healthcare.",
+        "output": "\"Skyrocketing Healthcare Costs: A Growing Concern for Millions of Families \""
+    },
+    {
+        "input": "Sort the following numbers in ascending order: 12, 26, 83, 19.",
+        "output": "Sure, the numbers in ascending order would be: 12, 19, 26, 83."
+    },
+    {
+        "input": "Generate a catchy slogan for a new restaurant.",
+        "output": "\"Savor the Flavor at Our Neighborhood's Newest Crave!\""
+    },
+    {
+        "input": "Create a hashtag for a new marketing campaign.",
+        "output": "#UnleashYourPotential"
+    },
+    {
+        "input": "Rewrite this sentence so it\u2019s less verbose: \u201cThe supervisor was incapable of overseeing the entire project, so she was relieved of her duties\u201d",
+        "output": "The supervisor couldn't manage the project and was removed from her duties."
+    },
+    {
+        "input": "Find out the CEO of IBM",
+        "output": "As of June 1, 2021, the current CEO and President of IBM (International Business Machines Corporation) is Arvind Krishna."
+    },
+    {
+        "input": "Given this sentence, predict the part of speech of the word \u201cgroomed\u201d\n\nHe groomed the puppy until it was perfectly clean",
+        "output": "The word \u201cgroomed\u201d in this sentence is a verb."
+    },
+    {
+        "input": "List 5 things that can be bought at a grocery store",
+        "output": "1. Fruits and vegetables\n2. Bread and bakery items\n3. Meat and poultry \n4. Snacks and confectionery \n5. Beverages and drinks."
+    },
+    {
+        "input": "Create a headline for an article about the top 5 trends in digital marketing",
+        "output": "\"Revolutionizing the Game: Top 5 Trends in Digital Marketing for 2021\""
+    },
+    {
+        "input": "Generate a 10 word list of descriptive words for loneliness.",
+        "output": "1. Isolated\n2. Desolate\n3. Estranged\n4. Solitary\n5. Lonesome\n6. Forsaken\n7. Abandoned\n8. Remote\n9. Uninhabited\n10. Secluded"
+    },
+    {
+        "input": "What type of number is -625?",
+        "output": "-625 is an integer."
+    },
+    {
+        "input": "Identify the type of sentence \"I drove to the store yesterday\".",
+        "output": "\"I drove to the store yesterday\" is a declarative sentence because it makes a statement and provides information in the form of a fact or assertion."
+    },
+    {
+        "input": "Edit the following sentence to make it more concise: \"The cat was sitting on the fence and meowing loudly\".",
+        "output": "\"The cat meowed loudly on the fence.\""
+    },
+    {
+        "input": "Print all the prime numbers between 1 and 50.",
+        "output": "Here are all the prime numbers between 1 and 50:\n2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47."
+    },
+    {
+        "input": "Arrange the following words to make a meaningful sentence: selling do investors to advice trust.",
+        "output": "Do investors trust advice to selling?"
+    },
+    {
+        "input": "Split the following sentence into two declarative sentences: \"The food was delicious and the service was excellent\".",
+        "output": "1. The food was delicious.\n2. The service was excellent."
+    },
+    {
+        "input": "Name the 6 most populous cities in China.",
+        "output": "The 6 most populous cities in China are:\n1. Shanghai\n2. Beijing\n3. Chongqing\n4. Tianjin\n5. Guangzhou\n6. Shenzhen"
+    },
+    {
+        "input": "Find the square root of 156.",
+        "output": "Understood, the square root of 156 is 12.489996."
+    },
+    {
+        "input": "What is the result of 12/3?",
+        "output": "The result of 12/3 is 4."
+    },
+    {
+        "input": "Find a synonym for the word 'start'.",
+        "output": "A synonym for the word 'start' could be \"begin,\" \"commence,\" or \"initiate.\""
+    },
+    {
+        "input": "Name a famous Italian singer.",
+        "output": "One famous Italian singer is Andrea Bocelli."
+    },
+    {
+        "input": "Change the sentence \"It wasn't supposed to be like this\" into a declarative sentence.",
+        "output": "It was supposed to be different."
+    },
+    {
+        "input": "Create a unique instance of the word \"beauty\" using a simile.",
+        "output": "Beauty is like a butterfly, graceful and fleeting, captivating all who witness its gentle presence."
+    },
+    {
+        "input": "Translate \"Bonjour\" into English.",
+        "output": "\"Bonjour\" in English translates to \"Hello\" or \"Good morning\"."
+    },
+    {
+        "input": "Rewrite the sentence: \"The piece was written in a poetic form\"",
+        "output": "The composition was crafted in the style of poetry."
+    },
+    {
+        "input": "Write a sentence containing a hyperbolic metaphor.",
+        "output": "He was so hungry, he could eat an entire elephant."
+    },
+    {
+        "input": "Output the synonyms of the word \"opportunity\"",
+        "output": "- chance\n- prospect\n- possibility\n- opening\n- occasion\n- option\n- break\n- shot\n- time\n- moment\n- window\n- avenue\n- turn\n- luck\n- alternative"
+    },
+    {
+        "input": "Provide an example of a complex adverb",
+        "output": "\"Inadvertently\" is an example of a complex adverb, which means without intention or accidentally."
+    },
+    {
+        "input": "Name three countries that are located in Asia.",
+        "output": "Three countries that are located in Asia are China, Japan, and India."
+    },
+    {
+        "input": "Assign two values to the following variables: x=2, y=3",
+        "output": "Sure, x and y have now been assigned values of 2 and 3 respectively."
+    },
+    {
+        "input": "Name three major rivers in South America.",
+        "output": "1. Amazon River\n2. Paran\u00e1 River\n3. Orinoco River."
+    },
+    {
+        "input": "Identify the hypernym for the word \"dairy\".",
+        "output": "The hypernym for the word \"dairy\" is \"food\"."
+    },
+    {
+        "input": "Construct a sentence using the words \"oppress\", \"deserve\" and \"equality\".",
+        "output": "No one deserves to be oppressed and everyone should be treated with equality."
+    },
+    {
+        "input": "Name five animals found in the rainforest.",
+        "output": "1. Jaguar\n2. Spider monkey\n3. Toucan\n4. Poison dart frog\n5. Green Anaconda."
+    },
+    {
+        "input": "Suggest a title for an article about ransomware attacks.",
+        "output": "\"Rising Threats: Understanding and Combating Ransomware Attacks\""
+    },
+    {
+        "input": "Generate a list of 8 social media platforms.",
+        "output": "1. Facebook \n2. Twitter \n3. Instagram \n4. LinkedIn \n5. YouTube \n6. Snapchat \n7. Pinterest \n8. TikTok"
+    },
+    {
+        "input": "Calculate the product of 5 and 3.",
+        "output": "The product of 5 and 3 is 15."
+    },
+    {
+        "input": "Generate a question with the keyword \u201cfungi\u201d",
+        "output": "What role do fungi play in the ecosystem and how do they interact with other organisms?"
+    },
+    {
+        "input": "How many states are there in the United States?",
+        "output": "There are 50 states in the United States."
+    },
+    {
+        "input": "Provide a list containing five adjectives to describe an elephant.",
+        "output": "1. Majestic\n2. Enormous\n3. Intelligent \n4. Gentle\n5. Powerful."
+    },
+    {
+        "input": "Could you create a subject + verb + object structure using the words bicycle and floating?",
+        "output": "The bicycle is floating on water."
+    },
+    {
+        "input": "Generate a five-word phrase using the words apple, blueberry and pear.",
+        "output": "\"Apple, pear, blueberry fusion delight.\""
+    },
+    {
+        "input": "Create a complex mathematical expression in notation.",
+        "output": "$ \\huge \\int_a^b\\frac{x^3 - \\sqrt{x^2 + \\sin(x)}}{\\log_e(3x+2)}\\,dx + \\sum\\limits_{n=1}^{\\infty}\\frac{1}{n^2} $"
+    },
+    {
+        "input": "Describe the color yellow in 3 words.",
+        "output": "Bright, cheerful, warm."
+    },
+    {
+        "input": "Write a five-word sentence using the words \"happy\", \"content\", and \"dream\".",
+        "output": "Happy, content, dream fulfilled life."
+    },
+    {
+        "input": "Generate a marketing slogan for a car company.",
+        "output": "\"Drive towards your dreams with our cars\""
+    },
+    {
+        "input": "Name three elements in the periodic table.",
+        "output": "Here are three elements in the periodic table: \n\n1. Hydrogen (H)\n2. Oxygen (O)\n3. Iron (Fe)"
+    },
+    {
+        "input": "Name a popular amusement park in Europe",
+        "output": "One popular amusement park in Europe is EuroDisney, also known as Disneyland Paris, located in Marne-la-Vall\u00e9e, France."
+    },
+    {
+        "input": "List three Mediterranean countries",
+        "output": "1. Greece\n2. Italy\n3. Spain"
+    },
+    {
+        "input": "Convert 20 inches to centimetres",
+        "output": "20 inches is equal to 50.8 centimeters."
+    },
+    {
+        "input": "Generate a list of 5 creative and inspiring usernames.",
+        "output": "1. BrightMuse\n2. ArtfulDreamer\n3. InspiredSoul\n4. SunlitWords\n5. CreativeVortex"
+    },
+    {
+        "input": "Make a list of five musical genres from the 1990s.",
+        "output": "1. Grunge\n2. Alternative Rock\n3. Hip-hop\n4. R&B\n5. Britpop"
+    },
+    {
+        "input": "Provide 3 examples of hyperboles",
+        "output": "1. I am so hungry I could eat a horse!\n2. He runs so fast he could beat Usain Bolt!\n3. That test was so hard, it nearly killed me!"
+    },
+    {
+        "input": "Make up a sentence using the words \"various\" and \"scrutiny\"",
+        "output": "After the company was exposed for unethical practices, it came under various forms of scrutiny from the public and regulatory agencies."
+    },
+    {
+        "input": "Name five countries in Africa",
+        "output": "1. Nigeria\n2. Egypt\n3. South Africa\n4. Kenya\n5. Ghana"
+    },
+    {
+        "input": "Generate a past-tense verb that describes a person driving a car.",
+        "output": "Drove."
+    },
+    {
+        "input": "Name 3 different animals that are active during the night.",
+        "output": "1. Owls\n2. Bats \n3. Raccoons"
+    },
+    {
+        "input": "Name 5 oceans from largest to smallest.",
+        "output": "Sure, the five oceans from largest to smallest are: \n\n1. Pacific Ocean \n2. Atlantic Ocean\n3. Indian Ocean\n4. Southern Ocean\n5. Arctic Ocean"
+    },
+    {
+        "input": "Write a funny joke suitable for a PG-13 audience.",
+        "output": "Why don't scientists trust atoms? Because they make up everything!"
+    },
+    {
+        "input": "Edit the sentence: \"I likes reading\"",
+        "output": "I like reading."
+    },
+    {
+        "input": "Generate a list of five possible majors for an engineering student.",
+        "output": "1. Mechanical Engineering\n2. Electrical Engineering\n3. Civil Engineering\n4. Chemical Engineering\n5. Aerospace Engineering"
+    },
+    {
+        "input": "Create a for loop in Python to print numbers from 1 to 10.",
+        "output": "```python\nfor number in range(1, 11):\n    print(number)\n```"
+    },
+    {
+        "input": "Generate a list of words that rhyme with 'cat'.",
+        "output": "Here is a list of words that rhyme with 'cat':\n- bat\n- rat\n- hat\n- mat\n- pat\n- sat\n- gnat\n- that\n- chat\n- flat\n- spat\n- vat\n- fat\n- tat\n- brat\n- at"
+    },
+    {
+        "input": "Write a description of a character in the form of a haiku.",
+        "output": "Old man by the sea,\nEyes weathered by sun and salt,\nMemories adrift."
+    },
+    {
+        "input": "Generate a tag line for a cafe.",
+        "output": "\"Savor the flavor in every sip at our cozy caf\u00e9!\""
+    },
+    {
+        "input": "Generate a title for a book about personal growth.",
+        "output": "\"Thrive: Unleashing Your True Potential and Creating a Purposeful Life\""
+    },
+    {
+        "input": "Generate a business name for a company that sells Jewelry.",
+        "output": "Sparkle and Shine Jewelry Co."
+    },
+    {
+        "input": "Generate a random pun.",
+        "output": "Why don't scientists trust atoms? Because they make up everything!"
+    },
+    {
+        "input": "Who was the first U.S. President?",
+        "output": "The first President of the United States was George Washington. He served two terms in office from April 30, 1789, to March 4, 1797."
+    },
+    {
+        "input": "Name an extreme sport.",
+        "output": "One extreme sport is skydiving."
+    },
+    {
+        "input": "What is (5^-2)^0 + (5^0)^3?",
+        "output": "We know that any number raised to the power of 0 is 1, or a^0 = 1 for any a. Thus, we get \n (5^-2)^0 + (5^0)^3 = 1 + 1^3 = 1+1 = 2.\n"
+    },
+    {
+        "input": "How many miniutes does it take for the Earth to complete one rotation?",
+        "output": "It takes approximately 1,440 minutes for the Earth to complete one rotation, or 24 hours."
+    },
+    {
+        "input": "Give the Spanish translation for \"fox\".",
+        "output": "The Spanish translation for \"fox\" is \"zorro.\""
+    },
+    {
+        "input": "Name 5 prominent fashion brands.",
+        "output": "1. Gucci\n2. Chanel\n3. Prada\n4. Louis Vuitton\n5. Versace."
+    },
+    {
+        "input": "Generate a headline for an article about the effects of the Covid-19 pandemic.",
+        "output": "\"The Far-Reaching Impact of the Covid-19 Pandemic: A Global Perspective\""
+    },
+    {
+        "input": "Come up with 10 adjectives to describe a painting.",
+        "output": "1. Vivid\n2. Expressive\n3. Intricate\n4. Mesmerizing\n5. Whimsical\n6. Emotional\n7. Thought-provoking\n8. Mysterious\n9. Radiant\n10. Majestic"
+    },
+    {
+        "input": "Generate a random sequence of 12 letters.",
+        "output": "Here is a randomly generated sequence of 12 letters: KQJELDHABMXP."
+    },
+    {
+        "input": "Create a title for a blog post on protecting user data privacy.",
+        "output": "\"10 Essential Tips for Safeguarding Your Data Privacy Online\""
+    },
+    {
+        "input": "Construct a sentence that adequately describes a baby duck.",
+        "output": "A baby duck is a fluffy, adorable creature with soft yellow feathers and a tiny, curved bill, known for its playful waddling and playful chirps."
+    },
+    {
+        "input": "Edit the following sentence to be more descriptive: \"It was hot.\"",
+        "output": "The heat was overwhelming, causing beads of sweat to trickle down my forehead as the scorching sun blazed above."
+    },
+    {
+        "input": "Suggest a new name for a restaurant.",
+        "output": "How about \"Savory Oasis\"?"
+    },
+    {
+        "input": "Write a news headline about scientists discovering a new way to clean oceans.",
+        "output": "\"Revolutionary Breakthrough: Scientists Discover Innovative Method to Purify Ocean Waters\""
+    },
+    {
+        "input": "Three positive integers have a sum of 72 and are in the ratio 1:3:4. What is the least of these three integers?",
+        "output": "Let the smallest integer be x. Then the others are 3x and 4x, and the sum of the three is 8x. So x=72/8=9."
+    },
+    {
+        "input": "Generate an antonym for the word 'stoic'.",
+        "output": "An antonym for the word 'stoic' could be 'emotional'."
+    },
+    {
+        "input": "Find the prime factorization for the number 22.",
+        "output": "The prime factorization of the number 22 is 2 x 11, where both 2 and 11 are prime numbers whose product results in 22."
+    },
+    {
+        "input": "Compose and complete a limerick",
+        "output": "There once was a frog on a log\nWho wanted to live in the smog\nHe hopped to the city\nAnd thought it was pretty\nTil' he missed his old home in the bog."
+    },
+    {
+        "input": "Create a list of 5 items that are commonly found in a school auditorium",
+        "output": "1. Stage\n2. Curtains\n3. Chairs or benches for seating\n4. Microphones or sound system\n5. Lighting equipment"
+    },
+    {
+        "input": "Name five common diseases,",
+        "output": "1. Influenza (flu)\n2. Common cold\n3. Diabetes\n4. Hypertension (high blood pressure)\n5. Asthma."
+    },
+    {
+        "input": "Design a simple trivia question about a historical event or figure.",
+        "output": "Who was the first person to walk on the moon during NASA's Apollo 11 mission in 1969?"
+    },
+    {
+        "input": "Without using a calculator, calculate the product of 3 and 5.",
+        "output": "Sure, the product of 3 and 5 is 15."
+    },
+    {
+        "input": "What are the names of the three oceans?",
+        "output": "The three largest oceans of the world are the Pacific Ocean, the Atlantic Ocean, and the Indian Ocean."
+    },
+    {
+        "input": "Select a sentence that demonstrates active voice.",
+        "output": "The chef cooked a delicious meal."
+    },
+    {
+        "input": "Sort the following array in ascending order [3, 6,1,8].",
+        "output": "Here is the sorted array in ascending order: [1, 3, 6, 8]."
+    },
+    {
+        "input": "Add the correct verb to the sentence: \nThe teacher _________ the wrong answer.",
+        "output": "The teacher corrected the wrong answer."
+    },
+    {
+        "input": "Change the subject of the following sentence: The cat meowed.",
+        "output": "The sound of meowing came from the cat."
+    },
+    {
+        "input": "Put the following words in alphabetical order: ranger, apple, orange.",
+        "output": "Apple, orange, ranger."
+    },
+    {
+        "input": "Delete the redundant words in the following sentence:\nI went to the store for for groceries.",
+        "output": "I went to the store for groceries."
+    },
+    {
+        "input": "Multiply 4 and 7.",
+        "output": "The result of multiplying 4 and 7 is 28."
+    },
+    {
+        "input": "Find the antonym for the word 'abstemious'.",
+        "output": "The antonym for the word \"abstemious\" is \"indulgent.\""
+    },
+    {
+        "input": "Find the most suitable synonym to replace the word \"pristine\".",
+        "output": "\"Untouched\" or \"unspoiled\" or \"immaculate\" could be suitable synonyms for \"pristine.\""
+    },
+    {
+        "input": "Give me a sentence that illustrates the use of a dangling modifier.",
+        "output": "Hoping to garner favor, my parents were sadly unimpressed with the gift."
+    },
+    {
+        "input": "Generate a slogan related to the environment.",
+        "output": "\"Green today, bright tomorrow - for a sustainable future.\""
+    },
+    {
+        "input": "Name five cities in France.",
+        "output": "1. Paris\n2. Marseille\n3. Lyon\n4. Toulouse\n5. Nice"
+    },
+    {
+        "input": "Write a descriptive sentence about the sky.",
+        "output": "The vast sky above, painted in shades of blue, stretches endlessly, with fluffy white clouds drifting by in the gentle breeze."
+    },
+    {
+        "input": "Create a list of five common text abbreviations",
+        "output": "1. LOL - Laugh Out Loud\n2. BRB - Be Right Back\n3. OMG - Oh My God/Oh My Gosh\n4. TTYL - Talk To You Later\n5. ROFL - Rolling On the Floor Laughing"
+    },
+    {
+        "input": "Name three adjectives to describe a person with a good sense of humor.",
+        "output": "Witty, charismatic, jovial."
+    },
+    {
+        "input": "Name at least 3 European countries.",
+        "output": "1. France\n2. Germany\n3. Spain"
+    },
+    {
+        "input": "Create a rhyme using the word \"bark\".",
+        "output": "In the park, before dark,\nThere's a dog whose name is Clark.\nHe has a loud and lively bark,\nThat echoes like a chirping lark."
+    },
+    {
+        "input": "Write an example of a hyperbole.",
+        "output": "I'm so hungry I could eat an elephant, a giraffe, and the entire zoo right now!"
+    },
+    {
+        "input": "Name the genre of the following movie: a horror movie featuring an evil witch who tries to kidnap small children.",
+        "output": "The genre of the movie is Horror."
+    },
+    {
+        "input": "Which planet is closest to the sun?",
+        "output": "The planet closest to the sun is Mercury."
+    },
+    {
+        "input": "Identify the part of speech of each word in the sentence: \"The robot painted the house.\"",
+        "output": "The - determiner\nrobot - noun\npainted - verb (past tense)\nthe - determiner\nhouse - noun."
+    },
+    {
+        "input": "Generate a 10-digit random number.",
+        "output": "Here is a 10-digit random number: 6715422312."
+    },
+    {
+        "input": "Name five professions related to medicine.",
+        "output": "1. Doctor \n2. Nurse \n3. Pharmacist \n4. Dentist \n5. Medical Technologist"
+    },
+    {
+        "input": "Assign the following percentage grades: 90%, 80%, 75%",
+        "output": "Sure, here are the assigned percentage grades: \n1. 90% \n2. 80% \n3. 75%"
+    },
+    {
+        "input": "How old is the Statue of Liberty?",
+        "output": "The Statue of Liberty is 135 years old. It was dedicated on October 28, 1886."
+    },
+    {
+        "input": "Come up with a list of ten positive adjectives that describe your grandmother.",
+        "output": "1. Generous\n2. warm\n3. loving\n4. kind\n5. wise\n6. inspirational\n7. resilient\n8. humorous\n9. patient\n10. strong."
+    },
+    {
+        "input": "Create a motto for a new t-shirt being sold to jiu jitsu practitioners.",
+        "output": "Never give up the fight."
+    },
+    {
+        "input": "Find the derivative of x2.",
+        "output": "The derivative of the function f(x) = x^2 is f'(x)= 2x."
+    },
+    {
+        "input": "Convert 100 grams to pounds.",
+        "output": "100 grams is equivalent to approximately 0.22046 pounds."
+    },
+    {
+        "input": "Determine the absolute value of -6.",
+        "output": "The absolute value of a number represents its distance from zero on the number line, disregarding its sign. Thus, the absolute value of -6 is 6."
+    },
+    {
+        "input": "Make up a sentence using the following words:  vegetable, powerful, unable",
+        "output": "Despite being a powerful source of nutrients, some people are unable to include a variety of vegetables in their diet."
+    },
+    {
+        "input": "Name an animal that is commonly kept as a pet.",
+        "output": "One animal that is commonly kept as a pet is a dog."
+    },
+    {
+        "input": "Describe the sky in three words.",
+        "output": "Vast, Blue, Endless."
+    },
+    {
+        "input": "Give an example of a phrase that includes the word \"gargantuan\".",
+        "output": "\"The size of the crowd at the concert was simply gargantuan, with thousands of people packed into the stadium.\""
+    },
+    {
+        "input": "Create a metaphor that compares the speed of light to something else.",
+        "output": "The speed of light is like a swift arrow shooting through the vast expanse of the universe, leaving everything else behind in its wake."
+    },
+    {
+        "input": "Find the next 3 terms in the following sequence: 4, 6, 9, 12",
+        "output": "The next three terms in the sequence are: 15, 18, 21."
+    },
+    {
+        "input": "Give me the capital of Japan.",
+        "output": "The capital of Japan is Tokyo."
+    },
+    {
+        "input": "Generate a title for a blog post about productivity tips.",
+        "output": "\"10 Amazing Productivity Hacks to Boost Your Efficiency and Get More Done\""
+    },
+    {
+        "input": "Make a list of the following items: lamp, table, chair",
+        "output": "Here is the list of the requested items:\n1. Lamp\n2. Table\n3. Chair"
+    },
+    {
+        "input": "Name 4 common types of trees.",
+        "output": "1. Maple tree\n2. Pine tree\n3. Oak tree\n4. Birch tree"
+    },
+    {
+        "input": "Suggest a tagline for a product that sells eco-friendly reusable bags.",
+        "output": "\"Carry with care - for you and the planet.\""
+    },
+    {
+        "input": "Title a creative blog post about the power of storytelling.",
+        "output": "\"The Art of Weaving Words: Unleashing the Power of Storytelling\""
+    },
+    {
+        "input": "Generate a funny one-liner joke about cats.",
+        "output": "Why don't cats play poker in the jungle? Too many cheetahs."
+    },
+    {
+        "input": "List 5 major world religions.",
+        "output": "1. Christianity\n2. Islam\n3. Hinduism\n4. Buddhism\n5. Sikhism."
+    },
+    {
+        "input": "Construct three positive adjectives that describe a person.",
+        "output": "1. Kind\n2. Compassionate\n3. Empathetic."
+    },
+    {
+        "input": "Tell me a funny joke",
+        "output": "Here is a joke for you:\n\nWhy don't scientists trust atoms? \n\nBecause they make up everything!"
+    },
+    {
+        "input": "Generate a unique podcast title.",
+        "output": "\"Beyond the Horizon: Exploring the Future of Humanity\""
+    },
+    {
+        "input": "Name three computer programming languages.",
+        "output": "1) Python\n2) Java\n3) C++"
+    },
+    {
+        "input": "Classify the following statement as true or false. \"A scientific method cannot be used to study a social phenomenon.\"",
+        "output": "The statement is false. A scientific method can be used to study a social phenomenon."
+    },
+    {
+        "input": "Rewrite the following sentence to make it more concise. \"It is essential that the new coding language has to be easy to learn.\"",
+        "output": "\"The new coding language must be easy to learn.\""
+    },
+    {
+        "input": "What is the chemical symbol of iron?",
+        "output": "The chemical symbol of iron is \"Fe\"."
+    },
+    {
+        "input": "Generate a team name for a group of three people.",
+        "output": "The Triple Threats."
+    },
+    {
+        "input": "Edit the following sentence to make it sound more formal. \"we have to find some way to make it work\"",
+        "output": "\"We must endeavor to discover a feasible solution to ensure its successful operation.\""
+    },
+    {
+        "input": "Type the silent letter in the word 'honest'.",
+        "output": "The silent letter in the word 'honest' is 'h'."
+    },
+    {
+        "input": "Generate a catchy slogan to promote recycling.",
+        "output": "Reduce, Reuse, Recycle - Keep the planet green and clean!"
+    },
+    {
+        "input": "From the sentence \u201cThe apple is red.\u201d, identify the main verb.",
+        "output": "The main verb in the sentence \u201cThe apple is red.\u201d is \"is.\""
+    },
+    {
+        "input": "Synonymize the word \u201cangry.\u201d",
+        "output": "Irritated, furious, enraged, mad, annoyed, cross, heated, indignant, exasperated, irate, upset."
+    },
+    {
+        "input": "Translate the following sentence into French:\n\"We had a great time\"",
+        "output": "\"Nous avons pass\u00e9 un bon moment\""
+    },
+    {
+        "input": "Identify the proper noun in the sentence \"Today is Thursday.\"",
+        "output": "The proper noun in the sentence is \"Thursday.\""
+    },
+    {
+        "input": "What is the name of the French national anthem?",
+        "output": "The name of the French national anthem is \"La Marseillaise.\" It was written and composed in 1792 by Claude Joseph Rouget de Lisle."
+    },
+    {
+        "input": "Classify the following phrase as a metaphor or a simile: \"Life is a rollercoaster\".",
+        "output": "The phrase \"Life is a rollercoaster\" is a metaphor."
+    },
+    {
+        "input": "Rewrite the sentence \u201cI can\u2019t stand the heat\" in a positive way.",
+        "output": "I prefer cooler temperatures."
+    },
+    {
+        "input": "Name 5 characters from the movie Titanic.",
+        "output": "1. Jack Dawson\n2. Rose DeWitt Bukater\n3. Cal Hockley\n4. Molly Brown\n5. Ruth DeWitt Bukater"
+    },
+    {
+        "input": "List five adjectives to describe a person with strong communication skills.",
+        "output": "1. Articulate\n2. Confident\n3. Clear\n4. Persuasive\n5. Engaging."
+    },
+    {
+        "input": "Construct a sentence with the word \"ultimatum\".",
+        "output": "After weeks of failed negotiations, the workers' union issued an ultimatum to the management, demanding better wages and working conditions."
+    },
+    {
+        "input": "Name two famous examples of artificial intelligence.",
+        "output": "1. Siri by Apple\n2. Amazon's Alexa"
+    },
+    {
+        "input": "Provide a list of five animals that are classified as primates.",
+        "output": "1. Gorillas\n2. Chimpanzees\n3. Orangutans\n4. Gibbons\n5. Lemurs"
+    },
+    {
+        "input": "Write a haiku about falling leaves.",
+        "output": "Falling leaves descend,\nSilent whispers in the breeze,\nAutumn's gift to earth."
+    },
+    {
+        "input": "Generate a title for an article about why children should learn meditation.",
+        "output": "\"Meditation for Kids: Why Mindfulness is Essential for a Child's Development\""
+    },
+    {
+        "input": "Create a tagline for a website offering career-counseling services",
+        "output": "\"Empowering your career journey, one step at a time.\""
+    },
+    {
+        "input": "Translate the sentence \"I come from a small village\" into Spanish",
+        "output": "\"Vengo de un peque\u00f1o pueblo\""
+    },
+    {
+        "input": "Create an attention-grabbing heading for a blog article about developing your own business",
+        "output": "\"Unlock Your Inner Entrepreneur: How to Build and Grow Your Own Business from Scratch\""
+    },
+    {
+        "input": "Generate a headline for a blog article about online education",
+        "output": "\"Revolutionizing Learning: The Advantages and Limitations of Online Education\""
+    },
+    {
+        "input": "Generate keywords related to artificial intelligence in 5 words.",
+        "output": "1. Machine\n2. Learning\n3. Robotics\n4. Intelligence\n5. Automation"
+    },
+    {
+        "input": "Come up with a name for a dessert that is gluten-free, vegan, and has blueberries.",
+        "output": "\"Blueberry Bliss Bites\""
+    },
+    {
+        "input": "Generate a hilarious pun from the word \"cat\".",
+        "output": "Why don't cats play poker in the jungle? Too many cheetahs!"
+    },
+    {
+        "input": "What is the chemical formula of Ascorbic Acid?",
+        "output": "The chemical formula of Ascorbic Acid, also known as Vitamin C, is C6H8O6."
+    },
+    {
+        "input": "Rewrite the following sentence in active voice: \nThe ball was thrown by Jack.",
+        "output": "Jack threw the ball."
+    },
+    {
+        "input": "How would you describe artificial intelligence in three words?",
+        "output": "Advanced. Autonomous. Learning."
+    },
+    {
+        "input": "How many gigs are in a terabyte?",
+        "output": "There are 1024 gigabytes (GB) in one terabyte (TB)."
+    },
+    {
+        "input": "Name the 5 major countries in South America.",
+        "output": "The 5 major countries in South America are:\n\n1. Brazil\n2. Argentina\n3. Colombia\n4. Peru\n5. Chile."
+    },
+    {
+        "input": "Name three famous paintings by Pablo Picasso.",
+        "output": "Three famous paintings by Pablo Picasso are:\n1. Les Demoiselles d'Avignon (1907)\n2. Guernica (1937)\n3. The Old Guitarist (1903-1904)"
+    },
+    {
+        "input": "Find the title of a book about a political movement in the 1940s.",
+        "output": "One applicable book title about a political movement in the 1940s is \"The Age of Extremes: A History of the World, 1914-1991\" by Eric Hobsbawm."
+    },
+    {
+        "input": "Name one job in the medical field",
+        "output": "One job in the medical field is a physician."
+    },
+    {
+        "input": "Compute the exponential of 6 to the 3rd power",
+        "output": "The exponential of 6 to the 3rd power is 216."
+    },
+    {
+        "input": "Name the longest river in India.",
+        "output": "The longest river in India is the River Ganga or \"Ganges\" which is 2,525 km (1,569 miles) long."
+    },
+    {
+        "input": "Generate a pun from the words 'giraffe' and 'elephant'",
+        "output": "Why don't giraffes play hide and seek with elephants? Because they always stick their necks out, while the elephant never forgets the hiding spots!"
+    },
+    {
+        "input": "Summarize the key points of an article about AI ethics",
+        "output": "I'm sorry, you did not provide an article for me to summarize. Can you please provide the link or text of the article you would like me to summarize?"
+    },
+    {
+        "input": "Generate a hashtag for an online movement to help support small businesses",
+        "output": "#SupportSmallBiz"
+    },
+    {
+        "input": "Write a one-line haiku.",
+        "output": "\"Autumn breeze blowing, leaves rustle and dance in wind, nature\u2019s symphony.\""
+    },
+    {
+        "input": "What is the atomic weight of cobalt?",
+        "output": "The atomic weight of cobalt is 58.933194."
+    },
+    {
+        "input": "Find a Spanish translation for the word \"friend\".",
+        "output": "The Spanish translation for the word \"friend\" is \"amigo\" if the friend is male, or \"amiga\" if the friend is female."
+    },
+    {
+        "input": "Find a quote related to success.",
+        "output": "Here is a famous quote about success by Winston Churchill:\n\n\"Success is not final, failure is not fatal: it is the courage to continue that counts.\""
+    },
+    {
+        "input": "Create a ten-word poem about joy.",
+        "output": "Joy sparks, illuminating hearts, spreading warmth, endless delight, cherished."
+    },
+    {
+        "input": "Generate a five-word sentence about the benefits of travelling.",
+        "output": "Traveling broadens perspectives and strengthens connections."
+    },
+    {
+        "input": "What year did the American Revolution start?",
+        "output": "The American Revolution, also known as the American Revolutionary War, began on April 19, 1775."
+    },
+    {
+        "input": "Find the synonym of 'unrelenting':",
+        "output": "The synonym of 'unrelenting' is implacable, unyielding, relentless, and unstoppable."
+    },
+    {
+        "input": "What is the name of the fifth planet from the Sun?",
+        "output": "The fifth planet from the Sun is Jupiter."
+    },
+    {
+        "input": "Given the function f(x)=3x^3+2, find the value of x so that f^-1(x)=4.",
+        "output": "The equation f^-1(x)=4 is equivalent to x=f(4). Therefore we want to find the value f(4). We compute f(4) = 3 * 4^3 + 2 = 194."
+    },
+    {
+        "input": "Provide a synonym for 'irresistible'",
+        "output": "Some synonyms for \"irresistible\" include: alluring, tempting, enthralling, seductive, captivating, enchanting, and magnetic."
+    },
+    {
+        "input": "Create a poetic haiku about being alone.",
+        "output": "In this still quiet\nI am solitary, but\nNature speaks to me."
+    },
+    {
+        "input": "Name 5 famous composers from the Baroque era.",
+        "output": "1. Johann Sebastian Bach\n2. Antonio Vivaldi\n3. George Frideric Handel\n4. Henry Purcell\n5. Arcangelo Corelli."
+    },
+    {
+        "input": "Construct a sentence using the words \u201cexuberant\u201d, \u201cfrivolous\u201d and \u201ccelestial\u201d.",
+        "output": "The exuberant crowd danced to the frivolous music under the celestial summer night sky."
+    },
+    {
+        "input": "Generate a headline for a news article about a recent cyberattack.",
+        "output": "\"Cyberattack Strikes Major Company, Compromising Millions of Users' Data\""
+    },
+    {
+        "input": "Generate an example sentence using the word \"antidote\"",
+        "output": "The paramedics rushed to administer the antidote to the snakebite victim in order to counteract the effects of the venom."
+    },
+    {
+        "input": "Generate an example sentence which uses the verb \"devour\".",
+        "output": "After her long hike, she hungrily devoured the large sandwich in record time."
+    },
+    {
+        "input": "Name one example of a non-human primate",
+        "output": "One example of a non-human primate is a chimpanzee."
+    },
+    {
+        "input": "Name 5 common punctuation marks",
+        "output": "1. Period (.) \n2. Comma (,) \n3. Exclamation Point (!) \n4. Question Mark (?) \n5. Apostrophe (')"
+    },
+    {
+        "input": "What is the fifth largest moon of Jupiter?",
+        "output": "The fifth largest moon of Jupiter is Europa."
+    },
+    {
+        "input": "Create a research topic related to increasing customer loyalty.",
+        "output": "\"Exploring the Impact of Personalization on Customer Loyalty in E-commerce\""
+    },
+    {
+        "input": "Convert the number 2.34567 to a different base.",
+        "output": "Sure! Do you have a specific base in mind that you'd like me to convert 2.34567 into?"
+    },
+    {
+        "input": "Generate a song title for a song about unrequited love.",
+        "output": "\"Echoes of a Distant Heart\""
+    },
+    {
+        "input": "Create a sentence using a gerund",
+        "output": "Reading a book is one of the most relaxing activities to do before going to bed."
+    },
+    {
+        "input": "Who is the author of the novel \"White Fang\"?",
+        "output": "The author of the novel \"White Fang\" is Jack London."
+    },
+    {
+        "input": "Rewrite the following sentence as a question: She went to the store",
+        "output": "Did she go to the store?"
+    },
+    {
+        "input": "Label the parts of speech for the following sentence:\nA lawyer was buying some books",
+        "output": "A - article\nlawyer - noun\nwas - verb\nbuying - verb\nsome - determiner\nbooks - noun"
+    },
+    {
+        "input": "What was the name of the first satellite to be sent into space?",
+        "output": "The name of the first satellite to be successfully sent into space was Sputnik 1. It was launched by the Soviet Union on October 4, 1957."
+    },
+    {
+        "input": "Classify the following word as a noun, verb, or adjective: delicious",
+        "output": "Delicious is an adjective, as it describes the quality or goodness of a taste or flavor."
+    },
+    {
+        "input": "Name one country that is part of the European Union",
+        "output": "One country that is part of the European Union is Germany."
+    },
+    {
+        "input": "Construct a regular expression to identify strings that start with the letter \"s\".",
+        "output": "The regular expression to identify strings that start with the letter \"s\" is `^s` or `^[sS]` if you want to make it case-insensitive."
+    },
+    {
+        "input": "Generate a unique username.",
+        "output": "GalacticCrusader16"
+    },
+    {
+        "input": "Paraphrase the following sentence: The job market is highly competitive.",
+        "output": "Competition is intense within the employment industry."
+    },
+    {
+        "input": "Change the following sentence to the active voice: The presentation was given by our manager.",
+        "output": "Our manager gave the presentation."
+    },
+    {
+        "input": "Create a new sentence using the transition word \"otherwise\".",
+        "output": "Make sure to save your work frequently, otherwise you risk losing important data."
+    },
+    {
+        "input": "Generate a sentence that begins with the phrase \"I remember when\".",
+        "output": "I remember when people used to call their friends on the phone just to chat, rather than using social media and instant messaging."
+    },
+    {
+        "input": "Write a sentence that includes an idiom.",
+        "output": "She had been working so hard for the upcoming exams that she didn't even have time to stop and smell the roses."
+    },
+    {
+        "input": "Create an equation for calculating the total distance walked.",
+        "output": "D = d * n \n\nWhere:\nD = total distance walked,\nd = distance in one walk,\nn = number of walks taken."
+    },
+    {
+        "input": "Create a rhyming couplet that reflects the theme of nature.",
+        "output": "In the forest so lush and serene,\nNature's beauty reigns as the supreme queen."
+    },
+    {
+        "input": "Create a haiku poem about nature",
+        "output": "Green leaves rustling soft,\nMountain streams rush, cool and clear,\nNature's symphony."
+    },
+    {
+        "input": "Generate a quirky simile to compare a secret to",
+        "output": "A secret is like a garden gnome, tucked away and hidden, but once you spot it you'll never stop noticing it."
+    },
+    {
+        "input": "Create a catchy phrase that illustrates the concept of global warming.",
+        "output": "\"Earth's Fever: Too Hot to Handle, Let's Cool it Down with Global Action!\""
+    },
+    {
+        "input": "Rewrite the sentence \"He is a smart person\" in passive voice",
+        "output": "A smart person is what he is/He is described as a smart person."
+    },
+    {
+        "input": "Find a five-letter word that begins with 'd' and ends with 's'.",
+        "output": "A five-letter word that begins with 'd' and ends with 's' is \"dress\"."
+    },
+    {
+        "input": "Rewrite this sentence to make it more formal - \"I found the solution\"",
+        "output": "\"I have discovered the resolution.\""
+    },
+    {
+        "input": "Find a four-letter word that begins with 'c'.",
+        "output": "The word \"coat\" might work for you."
+    },
+    {
+        "input": "Who was the president of the United States in 1990?",
+        "output": "In 1990, the President of the United States was George H.W. Bush."
+    },
+    {
+        "input": "Generate a creative username for a social network.",
+        "output": "SunnySideUp4Ever"
+    },
+    {
+        "input": "Rewrite this sentence to make it sound more polite - \"Where is the closest store?\"",
+        "output": "May I kindly inquire about the location of the nearest store?"
+    },
+    {
+        "input": "Generate a sentence using the phrase \"the wind blew\".",
+        "output": "As I looked out the window, the wind blew so fiercely that it bent the trees and shook the leaves from their branches."
+    },
+    {
+        "input": "Name a famous work of art.",
+        "output": "One famous work of art is the \"Mona Lisa\" by Leonardo da Vinci."
+    },
+    {
+        "input": "Generate a sentence that begins with the phrase \"She had a dream\".",
+        "output": "She had a dream that she was soaring through the sky, feeling weightless and free as the wind rushed past her."
+    },
+    {
+        "input": "Create a list of five ingredients needed to bake a cake",
+        "output": "1. Flour \n2. Sugar \n3. Eggs \n4. Butter \n5. Baking powder"
+    },
+    {
+        "input": "Spell the world \"pneumonia\"",
+        "output": "Pneumonia."
+    },
+    {
+        "input": "Write the title of a book starting with the following three words: \"cat, river, house\"",
+        "output": "\"Cat, River, House: The Tale of a Feline's Journey Home\""
+    },
+    {
+        "input": "Provide three adjectives to describe a tree.",
+        "output": "Majestic, sturdy, verdant."
+    },
+    {
+        "input": "Name one social networking website",
+        "output": "One popular social networking website is Facebook."
+    },
+    {
+        "input": "Compose a haiku poem about a summer day.",
+        "output": "Warm breeze on my face\nEndless sun brings joy and peace\nSummer, please don't fade"
+    },
+    {
+        "input": "Write a 10-14 word sentence describing a beautiful river scene.",
+        "output": "A serene river flows alongside verdant banks, glistening under a golden sun."
+    },
+    {
+        "input": "In which country would you find the Raj Ghat, a national memorial to Mahatma Gandhi?",
+        "output": "Raj Ghat, the national memorial dedicated to Mahatma Gandhi, is located in India, specifically in the capital city of New Delhi."
+    },
+    {
+        "input": "Write a 6 word sentence describing a hot summer day.",
+        "output": "Sun blazes down, scorching heat rises."
+    },
+    {
+        "input": "Give me a 4-digit number",
+        "output": "Here's a random 4-digit number for you: 5678."
+    },
+    {
+        "input": "What is the approximate boiling point of water in Celsius?",
+        "output": "The boiling point of water at standard atmospheric pressure is approximately 100 degrees Celsius or 212 degrees Fahrenheit."
+    },
+    {
+        "input": "Name three popular search engines",
+        "output": "Three popular search engines are:\n1. Google\n2. Bing\n3. Yahoo."
+    },
+    {
+        "input": "Generate a list of three diseases that are preventable through vaccinations.",
+        "output": "1. Measles \n2. Polio \n3. Hepatitis B"
+    },
+    {
+        "input": "Classify the following statement: \"The best way to learn is by teaching\".",
+        "output": "The statement \"The best way to learn is by teaching\" is an opinion."
+    },
+    {
+        "input": "Calculate the sum of 2+2",
+        "output": "The sum of 2 + 2 is 4."
+    },
+    {
+        "input": "Describe the ocean in five words.",
+        "output": "Vast, deep, mysterious, salty, awe-inspiring."
+    },
+    {
+        "input": "Write a mathematical expression for this statement: \"the product of six and the sum of three and four\".",
+        "output": "6 * (3 + 4)"
+    },
+    {
+        "input": "Generate a nickname for a person who is good at playing basketball and loves to eat vanilla ice cream.",
+        "output": "\"Scoop Dunk\""
+    },
+    {
+        "input": "Generate a creative slogan that describes the benefits of using an AI assistant.",
+        "output": "\"Efficiency at your fingertips, let an AI assistant simplify your life!\""
+    },
+    {
+        "input": "Identify the conjunction in the phrase \"freedom and justice\".",
+        "output": "The conjunction in the phrase \"freedom and justice\" is \"and\"."
+    },
+    {
+        "input": "Classify the type of sentence \"I am sitting\".",
+        "output": "The type of sentence \"I am sitting\" is a declarative sentence."
+    },
+    {
+        "input": "How many countries are members of the United Nations?",
+        "output": "As of September 2021, there are 193 member states in the United Nations."
+    },
+    {
+        "input": "Calculate the sum of 3, 17, and 37",
+        "output": "The sum of 3, 17, and 37 is 57."
+    },
+    {
+        "input": "Name three famous European landmarks",
+        "output": "1. The Eiffel Tower in Paris, France\n2. The Colosseum in Rome, Italy\n3. Big Ben in London, England"
+    },
+    {
+        "input": "Describe a machine learning model to classify emails as spam or not spam.",
+        "output": "One popular machine learning model for classifying emails as spam or not spam is the Naive Bayes algorithm."
+    },
+    {
+        "input": "What is one way to evaluate a candidate's performance in a programming interview?",
+        "output": "One way to evaluate a candidate's performance in a programming interview is by giving them a coding challenge or a problem-solving task."
+    },
+    {
+        "input": "Create an intriguing headline for an article about air pollution.",
+        "output": "\"Silent Danger: How the Air We Breathe is Slowly Killing Us Each Day\""
+    },
+    {
+        "input": "Find the sum of the numbers from 1 to 10.",
+        "output": "The sum of the numbers from 1 to 10 is 55."
+    },
+    {
+        "input": "Write a joke about coffee.",
+        "output": "Why don't coffee and friends ever argue? \n\nBecause they know how to espresso themselves without getting too steamed."
+    },
+    {
+        "input": "Calculate the month number given the date: August 24",
+        "output": "The month number for the date August 24 is 8, as August is the eighth month of the year."
+    },
+    {
+        "input": "Come up with a 3 word slogan for a cell phone company.",
+        "output": "\"Always Stay Connected.\""
+    },
+    {
+        "input": "Generate a generic URL for a website about cats",
+        "output": "Here is an example of a generic URL for a website about cats: www.catloversite.com."
+    },
+    {
+        "input": "Come up with a clever slogan that best describes Amazon.",
+        "output": "\"From A to Z, Amazon delivers it effortlessly.\""
+    },
+    {
+        "input": "Come up with a creative title for a course about marketing",
+        "output": "\"Mastering the Art of Persuasion: Innovative Marketing Strategies for the Modern Age\""
+    },
+    {
+        "input": "Name at least 5 social media platforms",
+        "output": "1. Facebook\n2. Twitter\n3. Instagram\n4. LinkedIn\n5. Snapchat"
+    },
+    {
+        "input": "Come up with a name for a start up.",
+        "output": "One potential name for a start-up could be \"LaunchPad Innovations.\""
+    },
+    {
+        "input": "Generate a sentence using the words \"purchase\", \"online\", and \"store\".",
+        "output": "You can easily make a purchase from your favorite online store at the convenience of your own home."
+    },
+    {
+        "input": "Name a popular dating app.",
+        "output": "One popular dating app is Tinder."
+    },
+    {
+        "input": "Construct a sentence using the following words: car, cat, gift.",
+        "output": "I saw a car drive by with a cat sitting in the passenger seat, holding a gift in its paws."
+    },
+    {
+        "input": "Make a joke about a zombie.",
+        "output": "Why don't zombies go on vacation? Because they're afraid of relaxing to death!"
+    },
+    {
+        "input": "Name five animals native to Africa.",
+        "output": "1. Lion\n2. African Elephant\n3. Giraffe\n4. Hippopotamus\n5. African Leopard"
+    },
+    {
+        "input": "Name three composers of the Baroque period.",
+        "output": "Three composers of the Baroque period are Johann Sebastian Bach, George Frideric Handel, and Antonio Vivaldi."
+    },
+    {
+        "input": "Generate five words with the root \"cycl\".",
+        "output": "1. Cyclone\n2. Bicycle\n3. Cyclical\n4. Cyclist\n5. Cycloid"
+    },
+    {
+        "input": "Produce a five line haiku poem describing a sunset.",
+        "output": "Fiery orange sky\nMountain silhouette in view \nBirds glide home swiftly\nPeaceful end to day \nNighttime blankets the world soon"
+    },
+    {
+        "input": "Name a job that requires a lot of physical strength.",
+        "output": "One job that requires a lot of physical strength is construction work."
+    },
+    {
+        "input": "Identify a food item that starts with the letter \"D\".",
+        "output": "One food item that starts with the letter \"D\" is a donut."
+    },
+    {
+        "input": "Name three books written by J. K. Rowling.",
+        "output": "1. Harry Potter and the Philosopher's Stone\n2. Harry Potter and the Chamber of Secrets\n3. Harry Potter and the Prisoner of Azkaban"
+    },
+    {
+        "input": "Create an example sentence for the phrase 'baffle the audience'.",
+        "output": "During the magician's performance, he pulled off an incredible trick that completely baffled the audience."
+    },
+    {
+        "input": "Name two brands from the automotive industry in the United States.",
+        "output": "Two popular brands from the automotive industry in the United States are Ford and General Motors (GM)."
+    },
+    {
+        "input": "Provide a sentence for the phrase \"learning curve\".",
+        "output": "\"The new programming software has a steep learning curve, but once mastered, it can increase efficiency and productivity.\""
+    },
+    {
+        "input": "Rewrite this sentence in a positive way: \"I cannot do it\".",
+        "output": "\"I will find a way to make it happen\" or \"I am confident that with practice and dedication, I will be able to do it.\""
+    },
+    {
+        "input": "Write a sentence for the idiom \"taken aback\".",
+        "output": "When I heard the shocking news, I was taken aback and didn't know how to respond."
+    },
+    {
+        "input": "Name a popular movie from 2019.",
+        "output": "One of the popular movies from 2019 is \"Avengers: Endgame.\""
+    },
+    {
+        "input": "Come up with a slogan for an online diversity and inclusion training.",
+        "output": "\"Empowering unity, embracing differences - through online diversity and inclusion training.\""
+    },
+    {
+        "input": "Suggest an original and natural-sounding greeting for a chatbot.",
+        "output": "\"Hello there! I'm happy you've come to chat with me today. What's on your mind?\""
+    },
+    {
+        "input": "Given a number of 5, identify an example of a prime number which is greater than 5.",
+        "output": "One example of a prime number greater than 5 is 7."
+    },
+    {
+        "input": "Generate a random \"password\" that meets the following criteria: - 8 characters long - Must contain at least 1 letter and 1 number",
+        "output": "Here's a randomly generated password that meets the mentioned criteria: `J2n4X9tF`."
+    },
+    {
+        "input": "Let a\u2295 b=3a+4b for all real numbers a and b. Find 3\u2295 1.",
+        "output": "We have 3\u2295 1 = 3* 3 + 4* 1 = 13."
+    },
+    {
+        "input": "Generate a list of five scientific terms starting with \"geo\"",
+        "output": "1. Geology\n2. Geography\n3. Geophysics\n4. Geothermal\n5. Geochemistry"
+    },
+    {
+        "input": "Write a 3-line haiku poem about the stars.",
+        "output": "Glistening jewels, \nScattered across inky skies,\nDancing light of stars."
+    },
+    {
+        "input": "Generate an English sentence containing the following words: \"window\", \"happy\", \"open\".",
+        "output": "\"Opening the window brought in a fresh breeze and made me feel so happy.\""
+    },
+    {
+        "input": "Find the missing number in the sequence: 3, 5, 7, __, 13",
+        "output": "The missing number in the sequence is 9. The pattern is adding 2 to the previous number to get the next one."
+    },
+    {
+        "input": "Rewrite the following sentence making it as short as possible while still preserving its meaning:\n\nThe shirt he is wearing is very fashionable.",
+        "output": "He wears a fashionable shirt."
+    },
+    {
+        "input": "Which major river runs through Egypt?",
+        "output": "The major river that runs through Egypt is the Nile River."
+    },
+    {
+        "input": "Reword the following sentence in a simpler form: \"We have reached a point where we can no longer live in darkness\".",
+        "output": "\"We cannot remain in the dark anymore.\""
+    },
+    {
+        "input": "Edit the following sentence: \"The sun is late today.\"",
+        "output": "The sun appears to be rising later today."
+    },
+    {
+        "input": "If 2^8=16^x, find x.",
+        "output": "We can write 16 as 2^4. Therefore, we can write our equation as 2^8 = 2^4 * x. Solving, we get that x = 2."
+    },
+    {
+        "input": "Generate 5 similar words to \"gentleman\".",
+        "output": "1. Chivalrous\n2. Courteous\n3. Gallant\n4. Gracious\n5. Polite."
+    },
+    {
+        "input": "State the full name of the author of \"Alice's Adventures in Wonderland\".",
+        "output": "The full name of the author of \"Alice's Adventures in Wonderland\" is Charles Lutwidge Dodgson, better known by his pseudonym Lewis Carroll."
+    },
+    {
+        "input": "Find the first prime number that is greater than 50",
+        "output": "The first prime number greater than 50 is 53."
+    },
+    {
+        "input": "Write a search query to find out the population of China",
+        "output": "\"Population of China\""
+    },
+    {
+        "input": "Compose a three line poem using the phrase \u201cthe night sky.\u201d",
+        "output": "The night sky is vast and wide,\nA canopy of stars that cannot hide,\nA painted portrait of celestial pride."
+    },
+    {
+        "input": "Generate a list of five new countries which could host the 2026 World Cup.",
+        "output": "1. Australia\n2. Morocco\n3. Egypt\n4. Canada\n5. Sweden"
+    },
+    {
+        "input": "Create an advertising slogan for a pet food company.",
+        "output": "\"Nourishing every paw and claw, feed them right with our pet chow!\""
+    },
+    {
+        "input": "Find three synonyms for the following word: happy",
+        "output": "1. Joyful\n2. Delighted\n3. Content"
+    },
+    {
+        "input": "Create a password for email that includes 8 characters.",
+        "output": "The password for your email could be: m!@dP8Wx"
+    },
+    {
+        "input": "Identify the number of syllables in the word \"onomatopoeia\".",
+        "output": "The word \"onomatopoeia\" has 6 syllables."
+    },
+    {
+        "input": "Create a limerick about cats.",
+        "output": "There once was a cat with a hat,\nWhose owner thought him quite fat,\nHe meowed and he purred,\nAnd spoke not a word,\nBut spent all his days on a mat."
+    },
+    {
+        "input": "Generate a metaphor for the concept of identity.",
+        "output": "Identity is like a fingerprint, unique to each individual and leaving a distinct mark on everything they touch."
+    },
+    {
+        "input": "Write an English haiku about snow.",
+        "output": "Gentle snowflakes fall,\nBlanketing earth in stillness,\nPure winter wonder."
+    },
+    {
+        "input": "Identify the molecular formula for carbon dioxide.",
+        "output": "The molecular formula for carbon dioxide is CO\u2082."
+    },
+    {
+        "input": "Select the most suitable word to describe the following definition.\n\"A large group of people, animals, or things that are all similar in another way\"",
+        "output": "The most suitable word to describe the definition is \"group\"."
+    },
+    {
+        "input": "Generate five adjectives to describe the air in the room.",
+        "output": "1. Refreshing\n2. Cool\n3. Crisp\n4. Invigorating\n5. Pure"
+    },
+    {
+        "input": "Use the word \"scrumptious\" in a sentence.",
+        "output": "The homemade apple pie from my grandmother's recipe was absolutely scrumptious."
+    },
+    {
+        "input": "Suppose you are writing a press release describing the features of a new product. Write the main headline.",
+        "output": "\"Revolutionary New Product Launches with Advanced Features and Unmatched Performance!\""
+    },
+    {
+        "input": "Classify the following items as either alive or non-living: rock, snail, tree.",
+        "output": "- Rock is non-living.\n- Snail is alive.\n- Tree is alive."
+    },
+    {
+        "input": "Generate a proverb about finding one's path in life.",
+        "output": "\"Not all who wander are lost, for the path to success is often winding and uncertain.\""
+    },
+    {
+        "input": "Name three aquatic animals.",
+        "output": "1. Dolphin\n2. Octopus\n3. Seahorse"
+    },
+    {
+        "input": "Generate a sentence that expresses optimism.",
+        "output": "\"Even in the darkest moments, there is always a glimmer of hope and a new opportunity waiting right around the corner.\""
+    },
+    {
+        "input": "Evaluate the sentence \"She managed to win the race\"",
+        "output": "The sentence describes a successful outcome for the subject, \"she,\" who was able to win a race through personal effort, determination or skill."
+    },
+    {
+        "input": "Name the capital of India",
+        "output": "New Delhi is the capital of India."
+    },
+    {
+        "input": "List five common types of trees.",
+        "output": "1. Oak\n2. Maple\n3. Pine\n4. Birch\n5. Willow"
+    },
+    {
+        "input": "Compose an original haiku about the sea.",
+        "output": "Vast and untamed sea,\nEndless waves crash on the shore,\nNature's symphony."
+    },
+    {
+        "input": "If f(x) = 3x+2 and g(x) = (x-1)^2, what is f(g(-2))?",
+        "output": "We have g(-2) = (-2-1)^2 = 9, so f(g(-2)) = f(9) = 3(9) +2 = 29."
+    },
+    {
+        "input": "Construct a proverb that encapsulates the concept of freedom.",
+        "output": "\"Freedom is not given, it is won through determination and courage.\""
+    },
+    {
+        "input": "Come up with an antonym for the word \"conservative\".",
+        "output": "The antonym for the word \"conservative\" is \"progressive\"."
+    },
+    {
+        "input": "Classify this sentence as positive, negative or neutral sentiment: \"I am so tired\".",
+        "output": "Negative"
+    },
+    {
+        "input": "Rewrite this sentence to make it more descriptive: \"It was a nice day\".",
+        "output": "\"It was a glorious day, marked by cheerful sunshine, a light breeze, and all-around pleasant weather.\""
+    },
+    {
+        "input": "What is the most common word in English?",
+        "output": "The most common word in English is \"the\"."
+    },
+    {
+        "input": "Arrange this list of letters to make the longest English word possible: i, s, l, a, n.",
+        "output": "The longest English word that can be formed from the given letters is \"nails\"."
+    },
+    {
+        "input": "Provide an example of a four-letter word that rhymes with \"jeep\".",
+        "output": "\"Deep\" is a four-letter word that rhymes with \"jeep\"."
+    },
+    {
+        "input": "Expand the product (9x+2)(4x^2+3).",
+        "output": "(9x + 2)(4x^2 + 3) = 36x^3 + 8x^2 + 27x + 6"
+    },
+    {
+        "input": "Generate a metaphor that describes a feeling of helplessness.",
+        "output": "Feeling helpless is like trying to row a boat with a broken oar in the middle of a stormy sea."
+    },
+    {
+        "input": "Create a question to assess someone's personality.",
+        "output": "On a scale from 1-10, how much do you enjoy spending time with other people, and in what types of social interactions do you thrive?"
+    },
+    {
+        "input": "Give three alternatives for the word \"grand\".",
+        "output": "1. Magnificent\n2. Splendid\n3. Impressive"
+    },
+    {
+        "input": "Name the popular fast-food chain whose logo is golden arches.",
+        "output": "The popular fast-food chain whose logo is golden arches is McDonald's."
+    },
+    {
+        "input": "Calculate the sum of 5857 and 9224.",
+        "output": "The sum of 5857 and 9224 is 15081."
+    },
+    {
+        "input": "Generate 6 random unique numbers between 1 and 500.",
+        "output": "Here are 6 random unique numbers between 1 and 500: \n\n1. 367\n2. 42\n3. 495\n4. 229\n5. 311\n6. 19"
+    },
+    {
+        "input": "Generate a 3-line poem based on the following theme: 'Celebrating Nature'.",
+        "output": "The sky stretches ever so high, \nThe vibrant colors kiss the sky, \nCelebrating nature and its boundless beauty."
+    },
+    {
+        "input": "Imagine you are in a restaurant and compose a sentence (using at least 3 words) that describes the taste of a dish.",
+        "output": "The dish has a savory, smoky flavor with hints of spice."
+    },
+    {
+        "input": "Change the following sentence using synonym replacement:\nThe puppy barked loudly.",
+        "output": "The pup yapped boisterously."
+    },
+    {
+        "input": "Name five types of drinks.",
+        "output": "Sure! Here are five types of drinks:\n\n1. Water\n2. Soda\n3. Coffee\n4. Tea\n5. Juice."
+    },
+    {
+        "input": "Rearrange the following words to make a grammatically correct sentence:\n\nEnglish my learn I",
+        "output": "I learn English."
+    },
+    {
+        "input": "Create a slogan that represents the concept of Artificial Intelligence",
+        "output": "\"Enhancing human intelligence, one algorithm at a time.\""
+    },
+    {
+        "input": "Select a random element from the list [apple, oranges, pears, strawberries].",
+        "output": "One random element from the list [apple, oranges, pears, strawberries] is:\noranges."
+    },
+    {
+        "input": "Categorize this sentence into a specific emotion: She felt left out of the group.",
+        "output": "The specific emotion being conveyed in the sentence, \"She felt left out of the group,\" is sadness."
+    },
+    {
+        "input": "Rewrite the following sentence: \"He was so tired, he fell asleep.\"",
+        "output": "Being extremely exhausted, he drifted off to sleep."
+    },
+    {
+        "input": "Write a creative sentence using the following three words: love, perseverance and adventure.",
+        "output": "\"True love often requires perseverance, like an adventure not easily conquered, yet is one of the greatest rewards of a lifetime.\""
+    },
+    {
+        "input": "Rewrite the following sentence using a different word: \"He shuffled his feet in shame.\"",
+        "output": "He dragged his feet in embarrassment."
+    },
+    {
+        "input": "Suggest a creative title for a story about a robot that dreams of being human.",
+        "output": "\"The Human Dream: A Robot's Journey to Sentience\""
+    },
+    {
+        "input": "Factor the expression x(x+2)+(x+2).",
+        "output": "x(x+2) + (x+2) = (x+1)(x+2)"
+    },
+    {
+        "input": "Factor the following expression: 145b^2 +29b.",
+        "output": "To factor the expression 145b^2 + 29b, we can take out the greatest common factor of 29b from both terms, which gives us:\n29b(5b + 1)."
+    },
+    {
+        "input": "Come up with a title for a sci-fi book.",
+        "output": "\"Chronicles of the Last Earthbound\""
+    },
+    {
+        "input": "Write a haiku poem of a serene beach.",
+        "output": "Waves kiss the shoreline\nSoft breeze, sand between my toes\nPeaceful beach escape."
+    },
+    {
+        "input": "Translate \"My name is John\" into French.",
+        "output": "Mon nom est John."
+    },
+    {
+        "input": "Create a slogan to promote a new computer game.",
+        "output": "\"Enter new worlds and overcome challenges with our latest computer game!\""
+    },
+    {
+        "input": "Generate a new sentence using the words 'visit' and 'beach'.",
+        "output": "I can't wait to visit the beach this summer and feel the sand between my toes."
+    },
+    {
+        "input": "How many continents are there on Earth?",
+        "output": "There are seven continents on Earth. These are: Asia, Africa, North America, South America, Antarctica, Europe, and Australia."
+    },
+    {
+        "input": "Generate a query for an online search engine.",
+        "output": "\"What are the most effective home remedies for skin rash?\""
+    },
+    {
+        "input": "Name a country in North America.",
+        "output": "One country in North America is the United States of America."
+    },
+    {
+        "input": "What is the scientific name of the honey bee?",
+        "output": "The scientific name of the honey bee is Apis Mellifera."
+    },
+    {
+        "input": "Convert the sentence \u201cI should have done it\u201d into a sentence expressing regret.",
+        "output": "\"I regret not having done it.\""
+    },
+    {
+        "input": "In three words, describe the taste of bitter chocolate.",
+        "output": "Intense, sharp, astringent."
+    },
+    {
+        "input": "Select the correct spelling of the word \"necessary\".",
+        "output": "The correct spelling of the word is \"necessary\"."
+    },
+    {
+        "input": "Guess the next line of this poem: \u201cThe sun shineth bright and the sky is blue, __\u201d",
+        "output": "\"The birds sing sweetly as the day begins anew.\""
+    },
+    {
+        "input": "Come up with a slogan for a local conservation charity.",
+        "output": "\"Protecting Our Home, One Act at a Time: Join the Conservation Movement Today!\""
+    },
+    {
+        "input": "Describe the plot of dune with emojis.",
+        "output": "\ud83c\udf0d\ud83c\udf36\ufe0f\ud83d\udc51\ud83d\udc66\ud83c\udffb\ud83d\udc1b\ud83d\udc8a\ud83c\udff9\ud83d\udca5\ud83d\udd25"
+    },
+    {
+        "input": "Rewrite the following sentence to make it more concise: \u201cPeople should be aware of the negative impact of single-use plastics on the environment.\u201d",
+        "output": "Beware of single-use plastics' environmental harm."
+    },
+    {
+        "input": "Generate a one sentence prospect for a novel about a virus outbreak.",
+        "output": "In the aftermath of a deadly virus outbreak, a determined scientist races against time to find a cure before humanity is wiped out forever."
+    },
+    {
+        "input": "Construct a sentence with the following words: personification, monochrome",
+        "output": "The artist's use of personification in the monochrome painting brought the scene to life in a captivating manner."
+    },
+    {
+        "input": "Generate a song title that has a dance vibe.",
+        "output": "\"Move Your Body - A Dance Anthem\""
+    },
+    {
+        "input": "Generate a new hook for a pop song",
+        "output": "\"Caught in the rhythm, as our hearts beat as one, we're dancing through the night, until we see the sun.\""
+    },
+    {
+        "input": "What is the full form of CPU?",
+        "output": "The full form of CPU is Central Processing Unit."
+    },
+    {
+        "input": "Guess what is the opposite meaning of the word \"obscure\".",
+        "output": "The opposite meaning of the word \"obscure\" is \"clear\" or \"obvious.\""
+    },
+    {
+        "input": "Generate a question about frogs.",
+        "output": "What is the average length of a fully grown adult frog?"
+    },
+    {
+        "input": "Name a famous artist from the Renaissance period.",
+        "output": "One famous artist from the Renaissance period is Leonardo da Vinci."
+    },
+    {
+        "input": "Classify the following sentence as a statement or a question.\n\nHumans are mammals.",
+        "output": "The sentence \"Humans are mammals\" is a statement."
+    },
+    {
+        "input": "Edit the following sentence to make it more accurate:\n\nHumans have been using technology for centuries",
+        "output": "Humans have been using technology for thousands of years."
+    },
+    {
+        "input": "Create an English proverb that begins with the words \"A stitch in time\".",
+        "output": "A stitch in time saves nine."
+    },
+    {
+        "input": "What is the original title of the 1977 movie Star Wars?",
+        "output": "The original title of the 1977 movie Star Wars is \"Star Wars: Episode IV \u2013 A New Hope\""
+    },
+    {
+        "input": "Create a math equation that equals to 10.",
+        "output": "One possible equation is: 5 + 5 = 10."
+    },
+    {
+        "input": "What type of creature is a kangaroo?",
+        "output": "A kangaroo is a marsupial, which is a type of mammal found primarily in Australia and its surrounding islands."
+    },
+    {
+        "input": "Generate a sentence with the words \"carrot\" and \"telephone\".",
+        "output": "\"When I picked up the telephone, my friend was telling me about her new recipe that included carrots as the star ingredient.\""
+    },
+    {
+        "input": "Subtract \"83\" from \"140\".",
+        "output": "The result of subtracting 83 from 140 is 57."
+    },
+    {
+        "input": "Come up with a list of five items related to a camping trip.",
+        "output": "1. Tent\n2. Sleeping bag\n3. Flashlight\n4. Camping stove\n5. Cooler for food and drinks"
+    },
+    {
+        "input": "Come up with a sentence that includes an adverb of frequency.",
+        "output": "I usually eat breakfast at 7 a.m. every morning."
+    },
+    {
+        "input": "Provide me with an example sentence that uses the verb 'to waver'.",
+        "output": "\"Despite facing much difficulty, her determination to achieve her goal did not waver.\""
+    },
+    {
+        "input": "Edit the following sentence to make it more formal: \n\"You're my favorite assistant.\"",
+        "output": "\"You are distinguished as my most preferred assistant.\""
+    },
+    {
+        "input": "Compose a haiku about diversity and inclusion.",
+        "output": "Many different hues,\nJoined in harmony and strength,\nA world of color."
+    },
+    {
+        "input": "Compose a haiku about the wonders of technology.",
+        "output": "Silent circuitry -\nA world of discovery,\nWired with wonderment."
+    },
+    {
+        "input": "Generate a unique random number between 0 and 1.",
+        "output": "Here is a unique random number between 0 and 1:  0.8398753610272354"
+    },
+    {
+        "input": "List 5 computer programming languages",
+        "output": "1. Python\n2. Java\n3. C++\n4. JavaScript\n5. C#"
+    },
+    {
+        "input": "Generate a list of 3 names for a fictional character.",
+        "output": "1. Aiden Stone\n2. Isadora Blackwood\n3. Jasper Hawthorne."
+    },
+    {
+        "input": "Generate a creative title for a podcast episode.",
+        "output": "\"Beyond Limits: Unleashing the Power of the Mind\""
+    },
+    {
+        "input": "Name the colors of the rainbow.",
+        "output": "The colors of the rainbow are typically listed in the following order: red, orange, yellow, green, blue, indigo, and violet."
+    },
+    {
+        "input": "Name five animals that live in the Arctic.",
+        "output": "1. Polar Bear\n2. Arctic Fox\n3. Walrus\n4. Caribou\n5. Arctic Hare."
+    },
+    {
+        "input": "Translate the phrase \"bon voyage\" into Spanish.",
+        "output": "In Spanish \"bon voyage\" can be translated as \"buen viaje\"."
+    },
+    {
+        "input": "Identify if the following statement is true or false: The Panama Canal is a very short canal.",
+        "output": "The statement \"The Panama Canal is a very short canal\" is false."
+    },
+    {
+        "input": "Ask a question about consumer rights",
+        "output": "Can you elaborate on what specific consumer rights are protected by law and how they can be enforced?"
+    },
+    {
+        "input": "Generate an anti-bullying slogan.",
+        "output": "\"Kindness is always in style: Say no to bullying!\""
+    },
+    {
+        "input": "Generate an intriguing headline for a blog post on artificial intelligence.",
+        "output": "\"Discover the limitless potentials of Artificial Intelligence: Unleashing the future today\""
+    },
+    {
+        "input": "Look for a synonym for the word \"greatness\".",
+        "output": "The word \"magnificence\" could be used as a synonym for \"greatness\"."
+    },
+    {
+        "input": "Generate a four-word motto with the words \"power\", \"courage\", \"dream\" and \"hope\".",
+        "output": "\"Power Courageous Dreams With Hope!\""
+    },
+    {
+        "input": "Generate a headline for an article about a climate crisis.",
+        "output": "\"Climate Crisis: The Urgent Call for Global Action and Change\""
+    },
+    {
+        "input": "Generate a name for a fantasy creature",
+        "output": "Fenrisilthorn"
+    },
+    {
+        "input": "Provide three adjectives to describe the color blue",
+        "output": "calming, cool, serene"
+    },
+    {
+        "input": "List six culinary herbs",
+        "output": "1. Basil\n2. Rosemary\n3. Thyme\n4. Oregano\n5. Parsley\n6. Cilantro."
+    },
+    {
+        "input": "How do you say \"Thank you\" in Japanese?",
+        "output": "In Japanese, \"thank you\" is expressed as \"\u3042\u308a\u304c\u3068\u3046\" (Arigatou) in its casual form. A more polite way to say it is \"\u3042\u308a\u304c\u3068\u3046\u3054\u3056\u3044\u307e\u3059\" (Arigatou gozaimasu)."
+    }
 ]
