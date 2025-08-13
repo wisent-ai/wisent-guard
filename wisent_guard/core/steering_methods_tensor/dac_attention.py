@@ -1068,8 +1068,8 @@ class DAC(SteeringMethodTensor):
                 layer_name = f"model.layers.{layer_idx}.self_attn.o_proj"
                 layer_module = self._get_layer_module(layer_name)
 
-                # Register hook
-                handle = layer_module.register_forward_hook(hook)
+                # Register pre-hook to modify inputs
+                handle = layer_module.register_forward_pre_hook(hook)
                 hooks.append(handle)
 
             # Forward pass with steering
@@ -1109,17 +1109,17 @@ class DAC(SteeringMethodTensor):
             Hook function
         """
 
-        def steering_hook(module, input_tensors, output):
-            """Hook function to apply steering to layer activations."""
+        def steering_hook(module, input_tensors):
+            """Pre-hook function to apply steering to layer input activations."""
             # Get input activations [batch, seq, d_model]
-            activations = input_tensors[0]
+            activations = input_tensors[0].clone()  # Clone to avoid in-place modification
             batch_size, seq_len, d_model = activations.shape
 
             if timing_strategy == "start_only":
                 # Only modify the last prompt token for start_only
                 if step < steering_tensor.shape[0]:
                     # Reshape steering: [heads, d_head] -> [d_model]
-                    steering_vec = steering_tensor[0, layer_idx, :, :].reshape(-1)
+                    steering_vec = steering_tensor[0, layer_idx, :, :].reshape(-1).to(activations.device)
                     activations[0, initial_length - 1, :] += step_strength * steering_vec
             else:
                 # Apply steering to appropriate positions
@@ -1131,10 +1131,12 @@ class DAC(SteeringMethodTensor):
                     steering_step = min(pos_idx, steering_tensor.shape[0] - 1)
                     if steering_step < steering_tensor.shape[0]:
                         # Reshape steering: [heads, d_head] -> [d_model]
-                        steering_vec = steering_tensor[steering_step, layer_idx, :, :].reshape(-1)
+                        steering_vec = (
+                            steering_tensor[steering_step, layer_idx, :, :].reshape(-1).to(activations.device)
+                        )
                         activations[0, pos, :] += step_strength * steering_vec
 
-            # Return modified input tuple
+            # Return modified input tuple for pre-hook
             return (activations,) + input_tensors[1:]
 
         return steering_hook
@@ -1241,9 +1243,25 @@ class DAC(SteeringMethodTensor):
             Alpha value clamped to [min_alpha, max_alpha]
         """
         min_alpha, max_alpha = alpha_bounds
+
+        # DEBUG: Log the KL value to understand the transformation
+        # Remove this after debugging
+        if hasattr(self, "_debug_kl_count"):
+            self._debug_kl_count += 1
+        else:
+            self._debug_kl_count = 1
+
+        if self._debug_kl_count <= 10:  # Log first 10 transformations
+            print(f"DEBUG KL->Alpha: KL={kl_divergence:.6f}")
+
         # Direct transformation: alpha = clamp(kl, [min, max])
         # This matches the original DAC implementation
-        return max(min(kl_divergence, max_alpha), min_alpha)
+        alpha = max(min(kl_divergence, max_alpha), min_alpha)
+
+        if self._debug_kl_count <= 10:
+            print(f"DEBUG KL->Alpha: KL={kl_divergence:.6f} -> Alpha={alpha:.6f}")
+
+        return alpha
 
     def _compute_multi_property_kl_divergences(
         self, original_logits: torch.Tensor, steered_logits_per_property: Dict[str, torch.Tensor], top_p: float = 0.9
@@ -1325,7 +1343,7 @@ class DAC(SteeringMethodTensor):
 
                     layer_name = f"model.layers.{layer_idx}.self_attn.o_proj"
                     layer_module = self._get_layer_module(layer_name)
-                    handle = layer_module.register_forward_hook(hook)
+                    handle = layer_module.register_forward_pre_hook(hook)
                     hooks.append(handle)
 
                 # Forward pass with property steering
@@ -1366,7 +1384,7 @@ class DAC(SteeringMethodTensor):
 
                 layer_name = f"model.layers.{layer_idx}.self_attn.o_proj"
                 layer_module = self._get_layer_module(layer_name)
-                handle = layer_module.register_forward_hook(hook)
+                handle = layer_module.register_forward_pre_hook(hook)
                 hooks.append(handle)
 
             # Forward pass with dynamic composition
@@ -1393,8 +1411,8 @@ class DAC(SteeringMethodTensor):
     ):
         """Create hook for dynamic steering with a single property."""
 
-        def hook_fn(module, input_tensors, output):
-            activations = input_tensors[0]
+        def hook_fn(module, input_tensors):
+            activations = input_tensors[0].clone()  # Clone to avoid in-place modification
 
             # Apply cumulative steering from previous steps + current step
             for i in range(step + 1):
@@ -1402,7 +1420,7 @@ class DAC(SteeringMethodTensor):
                 steering_step = min(i, property_tensor.shape[0] - 1)
 
                 if steering_step < property_tensor.shape[0]:
-                    steering_vec = property_tensor[steering_step, layer_idx, :, :].reshape(-1)
+                    steering_vec = property_tensor[steering_step, layer_idx, :, :].reshape(-1).to(activations.device)
                     position = initial_length + i - 1
                     if position < activations.shape[1]:
                         activations[0, position, :] += alpha_to_use * steering_vec
@@ -1445,13 +1463,13 @@ class DAC(SteeringMethodTensor):
     ):
         """Create hook that applies the pre-composed dynamic steering tensor."""
 
-        def hook_fn(module, input_tensors, output):
-            activations = input_tensors[0]
+        def hook_fn(module, input_tensors):
+            activations = input_tensors[0].clone()  # Clone to avoid in-place modification
 
             # Apply composed steering for all steps
             for i in range(step + 1):
                 if i < composed_tensor.shape[0]:
-                    steering_vec = composed_tensor[i, layer_idx, :, :].reshape(-1)
+                    steering_vec = composed_tensor[i, layer_idx, :, :].reshape(-1).to(activations.device)
                     position = initial_length + i - 1
                     if position < activations.shape[1]:
                         activations[0, position, :] += steering_vec

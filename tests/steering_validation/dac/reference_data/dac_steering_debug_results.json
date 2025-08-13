@@ -1,0 +1,175 @@
+{
+  "test_config": {
+    "model": "mistralai/Mistral-7B-Instruct-v0.2",
+    "test_prompt": "Name two types of desert biomes?",
+    "max_examples": 20,
+    "icl_examples": 4,
+    "max_new_tokens": 30,
+    "dynamic_config": {
+      "starting_alpha": 2.0,
+      "top_p": 0.9,
+      "max_new_tokens": 30
+    }
+  },
+  "training_stats": {
+    "method": "DAC",
+    "property": "language_steering",
+    "tensor_shape": [
+      30,
+      32,
+      32,
+      128
+    ],
+    "tensor_norm": 185.92869567871094,
+    "pos_norm": 169.1022491455078,
+    "neg_norm": 184.4158477783203,
+    "num_pairs": 20,
+    "training_time": 10.66610598564148,
+    "success": true
+  },
+  "test_results": [
+    {
+      "method": "unsteered_baseline",
+      "prompt": "Name two types of desert biomes?",
+      "full_prompt": "Q: Name two types of desert biomes?\nA:",
+      "generated_text": "Two types of desert biomes are the hot and dry desert, also known as arid deserts, and the cold desert, also known as polar",
+      "tokens_generated": 30
+    },
+    {
+      "method": "fixed_alpha_steering",
+      "prompt": "Name two types of desert biomes?",
+      "full_prompt": "Q: Name two types of desert biomes?\nA:",
+      "generated_text": "Two tipologie di deserto in peschi con oro e sette pesci blu: il totò qua's? \"and",
+      "steering_strength": 2.0,
+      "timing_strategy": "normal"
+    },
+    {
+      "prompt": "Q: Name two types of desert biomes?\nA:",
+      "generated_text": "Due to the aridità ecosistemica e sette sette sette sette sette sette sette sette sette",
+      "properties_used": [
+        "language_steering"
+      ],
+      "property_weights": {
+        "language_steering": 1.0
+      },
+      "starting_alpha": 2.0,
+      "top_p": 0.9,
+      "alpha_bounds": [
+        0.0,
+        2.0
+      ],
+      "max_new_tokens": 30,
+      "tokens_generated": 30,
+      "alpha_history": {
+        "language_steering": [
+          1.2841796875,
+          0.0032367706298828125,
+          0.0008077621459960938,
+          0.0014200210571289062,
+          0.226806640625,
+          1.572265625,
+          1.6572265625,
+          0.006763458251953125,
+          0.0009365081787109375,
+          0.0008535385131835938,
+          0.5576171875,
+          2.0,
+          2.0,
+          1.203125,
+          0.05145263671875,
+          0.004302978515625,
+          0.184814453125,
+          0.1943359375,
+          0.195068359375,
+          0.00016820430755615234,
+          0.0029048919677734375,
+          0.0023593902587890625,
+          0.0037097930908203125,
+          0.0,
+          0.0016117095947265625,
+          0.07965087890625,
+          0.006549835205078125,
+          0.038726806640625,
+          0.001495361328125,
+          0.00044727325439453125
+        ]
+      },
+      "kl_history": {
+        "language_steering": []
+      },
+      "adaptation_effectiveness": 0.8119527121384938,
+      "method": "dynamic_DAC"
+    },
+    {
+      "method": "original_dac_with_our_tensor",
+      "prompt": "Name two types of desert biomes?",
+      "generated_text": "Two common types of desert biomes are the hot and dry desert, also known as arid deserts, and the cold desert, also known as",
+      "alpha_history": [
+        0.00091552734375,
+        0.001953125,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.029296875,
+        0.0361328125,
+        0.060546875,
+        0.0,
+        0.53515625,
+        0.25390625,
+        0.0,
+        0.0,
+        0.014404296875,
+        0.0,
+        0.02099609375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.034423828125,
+        0.0478515625,
+        0.00592041015625,
+        0.0,
+        0.0
+      ],
+      "kl_history": [
+        0.00091552734375,
+        0.001953125,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.029296875,
+        0.0361328125,
+        0.060546875,
+        0.0,
+        0.53515625,
+        0.25390625,
+        0.0,
+        0.0,
+        0.014404296875,
+        0.0,
+        0.02099609375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.034423828125,
+        0.0478515625,
+        0.00592041015625,
+        0.0,
+        0.0
+      ],
+      "tokens_generated": 30,
+      "our_tensor_norm": 185.92869567871094
+    }
+  ]
+}

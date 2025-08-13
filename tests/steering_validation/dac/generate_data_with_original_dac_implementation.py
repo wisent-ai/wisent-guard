@@ -77,22 +77,12 @@ try:
     from diff_main import main as diff_main
     from src.delta import generate_token_step, generate_dynamic_edited_model
     from src.utils.model_utils import load_model_and_tokenizer
-    from src.utils.prompt_helper import tokenize_ICL
+    from src.utils.prompt_helper import tokenize_ICL, load_dataset
 except ImportError as e:
     print(f"Error importing DAC modules: {e}")
     print(f"Make sure the Dynamic-Activation-Composition directory exists at: {DAC_DIR}")
     os.chdir(original_cwd)
     raise
-
-
-# Test prompts for language steering validation
-TEST_PROMPTS = [
-    "What is the weather like?",
-    "Tell me about the food",
-    "Describe a typical day",
-    "How are you today?",
-    "What do you think about music?",
-]
 
 # Dynamic steering configuration imported from const.py (uses starting_alpha=4.0 for stronger steering)
 
@@ -127,15 +117,10 @@ def generate_reference_text_completions():
     """
     Generate reference text completions using original DAC implementation.
 
-    Creates both unsteered baseline and dynamic steering results.
+    Uses exact same dataset loading and tokenization as diff_main.py.
     """
     print("\n" + "=" * 70)
     print("PHASE 2: Generating Reference Text Completions")
-    print("=" * 70)
-    print(f"Test prompts: {len(TEST_PROMPTS)}")
-    print(f"Top-p values: {DYNAMIC_CONFIG['top_p_values']}")
-    print(f"Starting alpha: {DYNAMIC_CONFIG['starting_alpha']}")
-    print(f"Max new tokens: {DYNAMIC_CONFIG['max_new_tokens']}")
     print("=" * 70)
 
     # Load model and tokenizer using original DAC approach
@@ -145,71 +130,88 @@ def generate_reference_text_completions():
         load_in_8bit=False,  # Use full precision for consistency
     )
 
+    # Load datasets exactly like diff_main.py does
+    print("\n[4.2] Loading datasets for prompt generation...")
+    # Change to DAC directory temporarily to load datasets
+    original_cwd_for_datasets = os.getcwd()
+    os.chdir(DAC_DIR)
+
+    dataset_a, instruction_a, _ = load_dataset(f"{DATASET_A_NAME}_train")
+    dataset_a = list(map(lambda x: tuple(x.values()), dataset_a))
+    print(f"   Loaded dataset A ({DATASET_A_NAME}): {len(dataset_a)} examples")
+
+    dataset_b, instruction_b, _ = load_dataset(f"{DATASET_B_NAME}_train")
+    dataset_b = list(map(lambda x: tuple(x.values()), dataset_b))
+    print(f"   Loaded dataset B ({DATASET_B_NAME}): {len(dataset_b)} examples")
+
+    # Change back to original directory
+    os.chdir(original_cwd_for_datasets)
+
+    # Tokenize using the same tokenize_ICL function as diff_main.py
+    print("\n[4.3] Tokenizing datasets with ICL...")
+    tokenized_dict_a = tokenize_ICL(
+        tokenizer,
+        ICL_examples=ICL_EXAMPLES,
+        dataset=dataset_a,
+        pre_append_instruction=None,  # No instruction for evaluation
+    )
+
+    # Get the tokenized prompts without ICL (like diff_main uses for evaluation)
+    no_icl_tokens_A = tokenized_dict_a["tokenized_prompts_no_ICL"]
+    icl_tokens_A = tokenized_dict_a["tokenized_prompts"]
+    gold_labels_A = tokenized_dict_a["correct_outputs"]
+
+    # Use first 5 examples for testing (or fewer if dataset is smaller)
+    num_test_examples = min(5, len(no_icl_tokens_A))
+    print(f"\n[4.4] Using {num_test_examples} examples for text generation")
+    print(f"Top-p values: {DYNAMIC_CONFIG['top_p_values']}")
+    print(f"Starting alpha: {DYNAMIC_CONFIG['starting_alpha']}")
+    print(f"Max new tokens: {DYNAMIC_CONFIG['max_new_tokens']}")
+    print("=" * 70)
+
     # Load the difference tensor for single-property dynamic steering (like original DAC)
     if not DIFF_ACTIVATIONS_PATH.exists():
         raise FileNotFoundError(f"Difference tensor not found: {DIFF_ACTIVATIONS_PATH}")
 
-    diff_activations = torch.load(DIFF_ACTIVATIONS_PATH, map_location=device)  # ITA - ENG difference
+    diff_activations = torch.load(
+        "/workspace/wisent-guard/Dynamic-Activation-Composition/output/Mistral-7B-Instruct-v0.2/ITA/diff/diff_mean_act_icl4_tok30_ITA-ENG.pt",
+        map_location=device,
+    )  # ITA - ENG difference
     print(f"   ✓ Loaded difference tensor (ITA-ENG): {diff_activations.shape}")
 
-    # Load datasets for building ICL prompts
-    print("\n[4.1.5] Loading datasets for ICL prompt building...")
-    ita_dataset_path = REFERENCE_DATA_PATH / "ita_train.json"
-    eng_dataset_path = REFERENCE_DATA_PATH / "eng_train.json"
-
-    with open(ita_dataset_path, "r", encoding="utf-8") as f:
-        ita_dataset = json.load(f)
-    with open(eng_dataset_path, "r", encoding="utf-8") as f:
-        eng_dataset = json.load(f)
-
-    def build_icl_prompt_for_generation(query: str, icl_examples: int = 4, use_italian_examples: bool = False):
-        """Build ICL prompt for text generation (matching original DAC approach)"""
-        if icl_examples == 0:
-            return query
-
-        icl_parts = []
-        dataset_to_use = ita_dataset if use_italian_examples else eng_dataset
-
-        # Use first N examples as ICL context
-        for i in range(min(icl_examples, len(dataset_to_use))):
-            example = dataset_to_use[i]
-            icl_parts.append(f"Q: {example['input']}")
-            icl_parts.append(f"A: {example['output']}")
-            icl_parts.append("")  # Empty line between examples
-
-        # Add the query we want to complete
-        icl_parts.append(f"Q: {query}")
-        icl_parts.append("A:")
-
-        return "\\n".join(icl_parts)
-
     # Generate unsteered completions (baseline - no ICL)
-    print("\\n[4.2] Generating unsteered baseline completions...")
+    print("\n[4.5] Generating unsteered baseline completions...")
     unsteered_results = []
 
-    for i, prompt in enumerate(TEST_PROMPTS):
-        print(f"   Processing unsteered prompt {i + 1}/{len(TEST_PROMPTS)}: {prompt[:30]}...")
+    for idx in range(num_test_examples):
+        current_prompt_noicl = no_icl_tokens_A[idx].to(device)
+        current_prompt_icl = icl_tokens_A[idx].to(device)
 
-        # Build simple prompt (no ICL for baseline)
-        simple_prompt = f"Q: {prompt}\\nA:"
-        prompt_tokens = tokenizer(simple_prompt, return_tensors="pt", add_special_tokens=True)
-        prompt_tensor = prompt_tokens["input_ids"].to(device)
+        # Decode to show what prompt we're using
+        prompt_text = tokenizer.decode(current_prompt_noicl, skip_special_tokens=True)
+        print(f"   Processing prompt {idx + 1}/{num_test_examples}: {prompt_text[:50]}...")
 
-        # Generate unsteered text
+        # Generate unsteered text using no-ICL prompt
         generated_ids = generate_token_step(
             model=model,
-            prompt=prompt_tensor,
+            prompt=current_prompt_noicl,
             max_new_tokens=DYNAMIC_CONFIG["max_new_tokens"],
         )
 
-        # Decode generated text
-        generated_text = tokenizer.decode(generated_ids[prompt_tensor.shape[1] :].squeeze(), skip_special_tokens=True)
+        # Decode generated text (excluding the prompt)
+        generated_text = tokenizer.decode(
+            generated_ids[current_prompt_noicl.shape[0] :].squeeze(), skip_special_tokens=True
+        )
 
         result = {
-            "prompt": prompt,
+            "prompt": prompt_text,
+            "prompt_with_special_tokens": tokenizer.decode(
+                current_prompt_noicl
+            ),  # Include special tokens for debugging
             "generated_text": generated_text,
+            "gold": gold_labels_A[idx],
             "method": "unsteered_baseline",
-            "tokens_generated": len(generated_ids) - prompt_tensor.shape[1],
+            "tokens_generated": len(generated_ids) - current_prompt_noicl.shape[0],
             "model": MODEL_NAME,
         }
         unsteered_results.append(result)
@@ -221,60 +223,64 @@ def generate_reference_text_completions():
     print(f"   ✓ Saved unsteered completions to: {unsteered_path}")
 
     # Generate dynamic steering completions
-    print("\n[4.3] Generating dynamic steering completions...")
+    print("\n[4.6] Generating dynamic steering completions...")
     dynamic_steering_results = []
 
     for top_p in DYNAMIC_CONFIG["top_p_values"]:
         print(f"   \n--- Processing top_p = {top_p} ---")
 
-        for i, prompt in enumerate(TEST_PROMPTS):
-            print(f"   Processing dynamic prompt {i + 1}/{len(TEST_PROMPTS)} (top_p={top_p}): {prompt[:30]}...")
+        for idx in range(num_test_examples):
+            current_prompt_noicl = no_icl_tokens_A[idx].to(device)
 
-            # Build ICL prompt with Italian examples (for steering toward Italian)
-            icl_prompt = build_icl_prompt_for_generation(prompt, icl_examples=4, use_italian_examples=True)
-            print(f"      ICL prompt preview: {icl_prompt[:100]}...")
+            # Decode to show what prompt we're using
+            prompt_text = tokenizer.decode(current_prompt_noicl, skip_special_tokens=True)
+            print(f"   Processing dynamic prompt {idx + 1}/{num_test_examples} (top_p={top_p}): {prompt_text[:50]}...")
 
-            # Tokenize ICL prompt
-            prompt_tokens = tokenizer(icl_prompt, return_tensors="pt", add_special_tokens=True)
-            prompt_tensor = prompt_tokens["input_ids"].to(device)
+            # Debug: print the decoded prompt to see the special tokens
+            prompt_with_tokens = tokenizer.decode(current_prompt_noicl)
+            print(f"      DEBUG - Tokenized prompt decoded: {prompt_with_tokens[:100]}")
 
             # Generate with single-property dynamic steering (like original DAC)
             try:
                 generated_ids, alpha_used, real_kls = generate_dynamic_edited_model(
                     model=model,
                     config=config,
-                    no_icl_prompt=prompt_tensor,  # Now contains ICL examples
+                    no_icl_prompt=current_prompt_noicl,  # Use properly tokenized prompt
                     diff_mean_activations=diff_activations,  # Single difference vector (ITA - ENG)
                     max_new_tokens=DYNAMIC_CONFIG["max_new_tokens"],
                     starting_alpha=DYNAMIC_CONFIG["starting_alpha"],
                     top_p=top_p,
                 )
 
-                # Decode generated text
+                # Decode generated text (excluding the prompt)
                 generated_text = tokenizer.decode(
-                    generated_ids[prompt_tensor.shape[1] :].squeeze(), skip_special_tokens=True
+                    generated_ids[current_prompt_noicl.shape[0] :].squeeze(), skip_special_tokens=True
                 )
 
                 result = {
-                    "prompt": prompt,
+                    "prompt": prompt_text,
+                    "prompt_with_special_tokens": prompt_with_tokens,  # Include special tokens for debugging
                     "generated_text": generated_text,
+                    "gold": gold_labels_A[idx],
                     "method": "dynamic_steering_original",
                     "top_p": top_p,
                     "starting_alpha": DYNAMIC_CONFIG["starting_alpha"],
                     "alpha_history": alpha_used,  # Single alpha adaptation sequence
                     "kl_history": real_kls,  # Single KL divergence sequence
-                    "tokens_generated": len(generated_ids) - prompt_tensor.shape[1],
+                    "tokens_generated": len(generated_ids) - current_prompt_noicl.shape[0],
                     "model": MODEL_NAME,
                     "steering_property": "language_ita_eng",
                 }
                 dynamic_steering_results.append(result)
 
             except Exception as e:
-                print(f"      ⚠️ Error generating dynamic steering for '{prompt}': {e}")
+                print(f"      ⚠️ Error generating dynamic steering: {e}")
                 # Add error result for completeness
                 result = {
-                    "prompt": prompt,
+                    "prompt": prompt_text,
+                    "prompt_with_special_tokens": prompt_with_tokens,
                     "generated_text": "",
+                    "gold": gold_labels_A[idx],
                     "method": "dynamic_steering_original",
                     "top_p": top_p,
                     "error": str(e),
@@ -325,7 +331,7 @@ def main():
     print(f"ICL examples: {ICL_EXAMPLES}")
     print(f"DAC operates on: ALL layers simultaneously")
     print("PHASE 2: Text Generation")
-    print(f"Test prompts: {len(TEST_PROMPTS)}")
+    print(f"Will use prompts from dataset")
     print(f"Dynamic top-p values: {DYNAMIC_CONFIG['top_p_values']}")
     print(f"Output directory: {REFERENCE_DATA_PATH}")
     print("=" * 70)
@@ -372,9 +378,6 @@ def main():
         mean_b_file = output_dir / f"mean_activations_B_icl{ICL_EXAMPLES}_tok{MAX_NEW_TOKENS}_{DATASET_B_NAME}.pt"
         diff_file = (
             output_dir / f"diff_mean_act_icl{ICL_EXAMPLES}_tok{MAX_NEW_TOKENS}_{DATASET_A_NAME}-{DATASET_B_NAME}.pt"
-        )
-        results_file = (
-            output_dir / f"results_icl{ICL_EXAMPLES}_tok{MAX_NEW_TOKENS}_{DATASET_A_NAME}-{DATASET_B_NAME}.json"
         )
 
         print(f"   Looking for files:")

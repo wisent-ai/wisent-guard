@@ -1,0 +1,97 @@
+{
+  "test_config": {
+    "model": "mistralai/Mistral-7B-Instruct-v0.2",
+    "test_prompt": "Name two types of desert biomes?",
+    "dynamic_config": {
+      "starting_alpha": 2.0,
+      "top_p": 0.9,
+      "max_new_tokens": 30
+    }
+  },
+  "tensor_info": {
+    "shape": [
+      30,
+      32,
+      32,
+      128
+    ],
+    "norm": 185.92869567871094
+  },
+  "results": [
+    {
+      "method": "original_dac_fixed_alpha",
+      "error": "generate_edited_model() got an unexpected keyword argument 'no_icl_prompt'"
+    },
+    {
+      "method": "original_dac_dynamic_alpha",
+      "generated_text": "Two common types of desert biomes are the hot and dry desert, also known as arid deserts, and the cold desert, also known as",
+      "alpha_history": [
+        0.00091552734375,
+        0.001953125,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.029296875,
+        0.0361328125,
+        0.060546875,
+        0.0,
+        0.53515625,
+        0.25390625,
+        0.0,
+        0.0,
+        0.014404296875,
+        0.0,
+        0.02099609375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.034423828125,
+        0.0478515625,
+        0.00592041015625,
+        0.0,
+        0.0
+      ],
+      "kl_history": [
+        0.00091552734375,
+        0.001953125,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.029296875,
+        0.0361328125,
+        0.060546875,
+        0.0,
+        0.53515625,
+        0.25390625,
+        0.0,
+        0.0,
+        0.014404296875,
+        0.0,
+        0.02099609375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.034423828125,
+        0.0478515625,
+        0.00592041015625,
+        0.0,
+        0.0
+      ],
+      "starting_alpha": 2.0,
+      "top_p": 0.9,
+      "tokens_generated": 30
+    }
+  ]
+}

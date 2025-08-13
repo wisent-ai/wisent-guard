@@ -57,6 +57,6 @@ TEST_PROMPTS = [
 # Dynamic steering configuration (ICL=4 setup)
 DYNAMIC_CONFIG = {
     "starting_alpha": 2.0,  # Original value for steering effectiveness
-    "top_p_values": [0.5, 0.9],  # Test moderate and liberal nucleus sampling
+    "top_p_values": [0.9],  # Test moderate and liberal nucleus sampling
     "max_new_tokens": MAX_NEW_TOKENS,
 }

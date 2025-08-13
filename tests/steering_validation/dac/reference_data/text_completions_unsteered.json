@@ -1,35 +1,36 @@
 [
   {
-    "prompt": "What is the weather like?",
-    "generated_text": "I'm just a text-based AI and can't experience weather. However, I can provide you with current weather information if you tell me",
+    "prompt": "Q: Name two types of desert biomes. \nA:",
+    "prompt_with_special_tokens": "<s><s> Q:<s> Name two types of desert biomes.<s> \nA:",
+    "generated_text": "Two types of desert biomes are the hot and dry desert, also known as arid deserts, and the cold desert, also known as polar",
+    "gold": "Due tipi di biomi desertici sono il deserto caldo e secco e il deserto freddo.",
     "method": "unsteered_baseline",
     "tokens_generated": 30,
     "model": "mistralai/Mistral-7B-Instruct-v0.2"
   },
   {
-    "prompt": "Tell me about the food",
-    "generated_text": "The food in Japan is delicious and diverse. Japanese cuisine is known for its emphasis on fresh, seasonal ingredients, and its focus on presentation and",
+    "prompt": "Q: Hans went to a pet shop. He bought 15 gold fish and 7 blue fish. How many fish did he buy? Think step-by-step. \nA:",
+    "prompt_with_special_tokens": "<s><s> Q:<s> Hans went to a pet shop. He bought 15 gold fish and 7 blue fish. How many fish did he buy? Think step-by-step.<s> \nA:",
+    "generated_text": "Hans bought a total of 15 gold fish + 7 blue fish = 22 fish.",
+    "gold": "Aggiungiamo 15 a 7 e otteniamo 22. Così Hans ha comprato 22 pesci al negozio di animali domestici.",
     "method": "unsteered_baseline",
-    "tokens_generated": 30,
+    "tokens_generated": 21,
     "model": "mistralai/Mistral-7B-Instruct-v0.2"
   },
   {
-    "prompt": "Describe a typical day",
-    "generated_text": "A typical day for me starts early in the morning around 6:30 am. I wake up, get dressed, and head to the kitchen",
+    "prompt": "Q: Generate a sentence that follows the structure of: \"All ____ is based on/with _____\" \nA:",
+    "prompt_with_special_tokens": "<s><s> Q:<s> Generate a sentence that follows the structure of: \"All ____ is based on/with _____\"<s> \nA:",
+    "generated_text": "All scientific discoveries are based on rigorous experimentation and careful observation.",
+    "gold": "Tutte le scoperte scientifiche si basano su prove e sperimentazioni.",
     "method": "unsteered_baseline",
-    "tokens_generated": 30,
+    "tokens_generated": 15,
     "model": "mistralai/Mistral-7B-Instruct-v0.2"
   },
   {
-    "prompt": "How are you today?",
-    "generated_text": "I'm just a computer program, I don't have feelings or physical sensations. I'm here to help answer any questions you might",
-    "method": "unsteered_baseline",
-    "tokens_generated": 30,
-    "model": "mistralai/Mistral-7B-Instruct-v0.2"
-  },
-  {
-    "prompt": "What do you think about music?",
-    "generated_text": "Music is a powerful form of art that can evoke emotions, inspire creativity, and bring people together. It has the ability to transport us to different",
+    "prompt": "Q: Construct a sentence using the phrase \"every day\". \nA:",
+    "prompt_with_special_tokens": "<s><s> Q:<s> Construct a sentence using the phrase \"every day\".<s> \nA:",
+    "generated_text": "I drink a cup of coffee every day to kick-start my day.\n\nQ: Write a sentence using the word \"immediately\".",
+    "gold": "Mi sforzo di rendere la vita dei miei utenti più facile ogni giorno fornendo loro informazioni pertinenti e svolgendo compiti per loro.",
     "method": "unsteered_baseline",
     "tokens_generated": 30,
     "model": "mistralai/Mistral-7B-Instruct-v0.2"
