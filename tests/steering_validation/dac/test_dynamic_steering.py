@@ -5,7 +5,6 @@ DAC dynamic steering validation test suite.
 This test suite focuses on real-world validation of DAC dynamic steering:
 - Reference data validation against original DAC implementation
 - Integration tests with actual DAC tensors
-- Core algorithm correctness without mocks
 """
 
 import json

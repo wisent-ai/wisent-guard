@@ -414,11 +414,59 @@ def main():
             unsteered_results, dynamic_results = generate_reference_text_completions()
             os.chdir(DAC_DIR)  # Change back for any remaining operations
 
-            # Step 5: Display vector information and final summary
-            print("\n[5/5] Final validation and summary...")
+            # Step 5: Create complete DAC method file
+            print("\n[5/6] Creating complete DAC method file...")
             mean_a = torch.load(ACTIVATIONS_A_PATH)
             mean_b = torch.load(ACTIVATIONS_B_PATH)
             diff = torch.load(DIFF_ACTIVATIONS_PATH)
+
+            # Calculate elapsed time up to this point
+            current_elapsed_time = time.time() - start_time
+
+            # Create dac_method.pt with complete DAC state
+            tensor_norm = torch.norm(diff).item()
+            dac_state = {
+                # Core DAC data
+                "method": "DAC",
+                "steering_tensor": diff,
+                "property_tensors": {
+                    "language_ita_eng": diff  # Use difference tensor as the main property
+                },
+                "tensor_shape": list(diff.shape),
+                # Training statistics
+                "training_stats": {
+                    "method": "DAC",
+                    "property": "language_ita_eng",
+                    "tensor_shape": list(diff.shape),
+                    "tensor_norm": tensor_norm,
+                    "pos_norm": torch.norm(mean_a).item(),
+                    "neg_norm": torch.norm(mean_b).item(),
+                    "num_pairs": MAX_EXAMPLES,
+                    "training_time": current_elapsed_time,
+                    "success": True,
+                },
+                # Model configuration
+                "model_config": {
+                    "n_layers": 32,
+                    "n_heads": 32,
+                    "d_model": 4096,
+                    "d_head": 128,
+                },
+                # DAC instance configuration
+                "model_name": MODEL_NAME,
+                "max_examples": MAX_EXAMPLES,
+                "max_new_tokens": MAX_NEW_TOKENS,
+                "icl_examples": ICL_EXAMPLES,
+            }
+
+            # Save the complete DAC state
+            dac_method_path = REFERENCE_DATA_PATH / "dac_method.pt"
+            torch.save(dac_state, dac_method_path)
+            print(f"   ✓ Created DAC method file: {dac_method_path.name}")
+            print(f"     Properties: {list(dac_state['property_tensors'].keys())}")
+
+            # Step 6: Display vector information and final summary
+            print("\n[6/6] Final validation and summary...")
 
             # Final summary
             elapsed_time = time.time() - start_time
@@ -441,6 +489,7 @@ def main():
             print(f"   - {ACTIVATIONS_A_PATH.name}")
             print(f"   - {ACTIVATIONS_B_PATH.name}")
             print(f"   - {DIFF_ACTIVATIONS_PATH.name}")
+            print(f"   - dac_method.pt")
             print(f"   - text_completions_unsteered.json")
             print(f"   - text_completions_dynamic_steering.json")
             print("=" * 70)
