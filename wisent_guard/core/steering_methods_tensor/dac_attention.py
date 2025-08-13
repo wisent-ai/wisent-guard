@@ -125,43 +125,52 @@ class DAC(SteeringMethodTensor):
         attn_activations = torch.einsum("lbshd -> blhsd", attn_activations)
         return attn_activations
 
-    def _extract_step_by_step_activations(self, text: str) -> torch.Tensor:
+    def _extract_step_by_step_activations(self, prompt_tokens: torch.Tensor, target_answer: str) -> torch.Tensor:
         """
-        Extract activations during step-by-step generation.
+        Extract activations during step-by-step generation using original DAC approach.
 
         Args:
-            text: Input text to process
+            prompt_tokens: Tokenized prompt ending at '\nA:' (from original DAC tokenize_from_template)
+            target_answer: The expected answer text for generation
 
         Returns:
             Activations tensor [steps, n_layers, n_heads, d_head]
         """
-        # Tokenize the full conversation
-        tokens = self._tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-        input_ids = tokens["input_ids"].to(self.device)
+        # Tokenize the target answer to know when to stop
+        target_tokens = self._tokenizer(target_answer, add_special_tokens=False, return_tensors="pt")[
+            "input_ids"
+        ].squeeze()
+        if target_tokens.dim() == 0:
+            target_tokens = target_tokens.unsqueeze(0)
+
+        logger.debug(f"Prompt tokens shape: {prompt_tokens.shape}")
+        logger.debug(f"Target answer: '{target_answer}' -> {len(target_tokens)} tokens")
 
         all_activations = []
-        current_tokens = input_ids.clone()
+        current_tokens = prompt_tokens.unsqueeze(0).to(self.device)  # Add batch dimension
 
         # Hook storage
         layer_activations = {}
 
         def create_hook(layer_idx):
             def hook_fn(module, input_tensors, output):
-                # Store the input to the attention layer (before attention computation)
+                # Store the input to the attention output projection (matching original DAC)
                 del module, output  # Unused parameters
                 layer_activations[layer_idx] = input_tensors[0].detach().to(self.device)  # [batch, seq, hidden_dim]
 
             return hook_fn
 
-        # Register hooks for all layers
+        # Register hooks for self_attn.o_proj layers (matching original DAC implementation)
         hooks = []
         for layer_idx in range(self.model_config["n_layers"]):
-            layer = self._model.model.layers[layer_idx]
-            hook = layer.register_forward_hook(create_hook(layer_idx))
+            # Hook the attention output projection, not the entire layer
+            attn_o_proj = self._model.model.layers[layer_idx].self_attn.o_proj
+            hook = attn_o_proj.register_forward_hook(create_hook(layer_idx))
             hooks.append(hook)
 
         try:
-            for _ in range(self.max_new_tokens):
+            tokens_generated = 0
+            for step in range(self.max_new_tokens):
                 layer_activations.clear()
 
                 # Forward pass
@@ -190,10 +199,16 @@ class DAC(SteeringMethodTensor):
                 # Get next token
                 next_token = torch.argmax(logits[0, -1, :], dim=-1)
                 current_tokens = torch.cat([current_tokens, next_token.unsqueeze(0).unsqueeze(0)], dim=1)
+                tokens_generated += 1
 
                 # Stop if EOS token
                 if next_token.item() == self._tokenizer.eos_token_id:
+                    logger.debug(f"Generation stopped at EOS token after {tokens_generated} tokens")
                     break
+
+                # NOTE: Original DAC always generates exactly max_new_tokens
+                # It does NOT stop early when target answer is reached
+                # This ensures consistent tensor shapes across different answer lengths
 
         finally:
             # Remove hooks
@@ -203,6 +218,7 @@ class DAC(SteeringMethodTensor):
         # Stack activations: [n_steps, n_layers, n_heads, d_head]
         all_activations = torch.stack(all_activations)
 
+        logger.debug(f"Extracted activations shape: {all_activations.shape}")
         return all_activations
 
     def _compute_mean_across_examples(self, all_activations: List[torch.Tensor]) -> torch.Tensor:
@@ -235,14 +251,109 @@ class DAC(SteeringMethodTensor):
 
         return mean_activations
 
+    @staticmethod
+    def _build_prompt_txt(
+        queries: list[str],
+        answers: list[str],
+        pre_append_instruction: str | None = None,
+    ):
+        """
+        Gratefully taken from original DAC implementation.
+        Build the prompt following the default template. Provide a list of queries (length = n ICL examples)
+        and a list of answers (length = n ICL examples)
+
+        Args:
+            queries (list[str]): queries (ICL examples + final query).
+            answers (list[str]): answers (ICL examples), must be one less than queries.
+            pre_append_instruction (str | None): Optional instruction at the beginning of each prompt. Defaults to None.
+
+        Returns:
+            full_prompt: full prompt following the default template with notation
+        """
+        assert len(queries) == len(answers) + 1, (
+            f"queries (len={len(queries)}) should have one more element than answers (len={len(answers)})"
+        )
+
+        full_prompt = []
+        if pre_append_instruction:
+            full_prompt.append((pre_append_instruction, "sentence"))
+            full_prompt.append(("\n", "structural"))
+
+        # prompt default template for structural parts
+        begin = [
+            ("Q:", "structural"),
+        ]
+        middle = [
+            ("\nA:", "structural"),
+        ]
+        end = [
+            ("\n\n", "structural"),
+        ]
+
+        for i in range(len(answers) - 1):
+            full_prompt.extend(begin)
+            full_prompt.append((queries[i], "sentence"))
+            full_prompt.extend(middle)
+            full_prompt.append((answers[i], "sentence"))
+            full_prompt.extend(end)
+        # append the final query without the answer
+        full_prompt.extend(begin)
+        full_prompt.append((queries[-1], "sentence"))
+        full_prompt.extend(middle)
+
+        return full_prompt
+
+    @staticmethod
+    def _tokenize_from_template(tokenizer, promtp_w_template: tuple[tuple[str, str]]):
+        """
+        Gratefully taken from original DAC implementation.
+        tokenize the prompt following the provided template and return a list of indexes referring to the structural toknes
+        and only the last token of sentences (automatically include the bos token at the beginning)
+
+        Args:
+            tokenizer (*Tokenizer): huggingface tokenizer
+            promtp_w_template (tuple[tuple[str, str]], optional): prompt_template in the form of:
+            ```python
+                TODO
+            ```. Defaults to None.
+
+        Returns:
+            torch.LongTensor: tokenized input ids
+            list: index of every structural token and last sentence token
+        """
+
+        full_tokenized = torch.LongTensor([[tokenizer.bos_token_id]])  # manually adding BOS token
+        indexes = [0]
+
+        for prompt_str, prompt_type in promtp_w_template:
+            tokenized = tokenizer(
+                prompt_str,
+                return_tensors="pt",
+                # add_special_tokens=False
+            ).input_ids.type(torch.int64)
+            full_tokenized = torch.cat(
+                (full_tokenized, tokenized),
+                dim=-1,
+            )
+
+            if prompt_type == "structural":
+                # all the index of structural tokens must be included
+                actual_idxs = list(range(indexes[-1] + 1, tokenized.shape[-1] + indexes[-1] + 1))
+                indexes.extend(actual_idxs)
+            elif prompt_type == "sentence":
+                # include only the last index of the sentence tokens
+                indexes.append(indexes[-1] + tokenized.shape[-1])
+
+        full_tokenized = full_tokenized.squeeze()
+        return full_tokenized, indexes
+
     def _build_icl_prompt(
         self, contrastive_pairs: ContrastivePairSet, current_pair_idx: int, response_type: str
-    ) -> str:
+    ) -> tuple:
         """
-        Build an ICL (In-Context Learning) prompt with examples from the contrastive pairs.
+        Build an ICL prompt using the original DAC's build_prompt_txt + tokenize_from_template approach.
 
-        This matches the original DAC approach where ICL examples provide context about the
-        expected response style/language, making steering much more effective.
+        This creates the exact same tokenized sequence as the original DAC implementation.
 
         Args:
             contrastive_pairs: ContrastivePairSet containing all pairs
@@ -250,63 +361,69 @@ class DAC(SteeringMethodTensor):
             response_type: "positive" or "negative" - determines which responses to use in ICL
 
         Returns:
-            Full prompt string with ICL examples in format:
-            Q: question1
-            A: answer1
-
-            Q: question2
-            A: answer2
-
-            Q: final_question
-            A:
+            Tuple of (prompt_tokens, target_answer_text) where:
+            - prompt_tokens: Tokenized prompt ending at '\nA:'
+            - target_answer_text: The expected answer text for generation
         """
-        if self.icl_examples == 0:
-            # No ICL, use original simple format
-            pair = contrastive_pairs.pairs[current_pair_idx]
-            if response_type == "positive":
-                response_text = pair.positive_response.text
-            else:
-                response_text = pair.negative_response.text
-            return f"{pair.prompt}\n{response_text}"
+        import sys
+        import os
+        from pathlib import Path
 
-        # Build ICL prompt with examples
-        icl_prompt_parts = []
+        # Build queries and answers lists like original DAC
+        queries = []
+        answers = []
 
-        # Use the first icl_examples pairs as context (avoiding the current pair if possible)
-        icl_pairs = []
-        for i, pair in enumerate(contrastive_pairs.pairs):
-            if i != current_pair_idx and len(icl_pairs) < self.icl_examples:
-                icl_pairs.append(pair)
-            elif len(icl_pairs) < self.icl_examples:
-                # If we don't have enough, include the current pair in ICL
-                icl_pairs.append(pair)
+        # Collect ICL examples from the group
+        for offset in range(self.icl_examples):
+            icl_idx = current_pair_idx + offset
+            if icl_idx < len(contrastive_pairs.pairs):
+                icl_pair = contrastive_pairs.pairs[icl_idx]
+                queries.append(icl_pair.prompt)
 
-        # Build ICL context with Q: ... A: ... format
-        for pair in icl_pairs:
-            if response_type == "positive":
-                example_response = pair.positive_response.text
-            else:
-                example_response = pair.negative_response.text
+                if response_type == "positive":
+                    answers.append(icl_pair.positive_response.text)
+                else:
+                    answers.append(icl_pair.negative_response.text)
 
-            icl_prompt_parts.append(f"Q: {pair.prompt}")
-            icl_prompt_parts.append(f"A: {example_response}")
-            icl_prompt_parts.append("")  # Empty line between examples
+        # Add the final query (target question)
+        target_pair = (
+            contrastive_pairs.pairs[current_pair_idx + self.icl_examples]
+            if current_pair_idx + self.icl_examples < len(contrastive_pairs.pairs)
+            else contrastive_pairs.pairs[current_pair_idx]
+        )
+        queries.append(target_pair.prompt)
 
-        # Add the current prompt without answer (this is what we'll generate)
-        current_pair = contrastive_pairs.pairs[current_pair_idx]
+        # Get target answer
         if response_type == "positive":
-            response_text = current_pair.positive_response.text
+            target_answer = target_pair.positive_response.text
         else:
-            response_text = current_pair.negative_response.text
+            target_answer = target_pair.negative_response.text
 
-        icl_prompt_parts.append(f"Q: {current_pair.prompt}")
-        icl_prompt_parts.append(f"A: {response_text}")  # Include the response for activation extraction
+        # Build template using original DAC logic (answers list excludes target answer)
+        template = self._build_prompt_txt(
+            queries=queries,
+            answers=answers,  # This excludes the target answer - prompt ends at '\nA:'
+            pre_append_instruction=None,
+        )
 
-        return "\n".join(icl_prompt_parts)
+        # Tokenize using original DAC method
+        prompt_tokens, important_ids = self._tokenize_from_template(self._tokenizer, template)
+
+        logger.debug(f"Built ICL prompt: queries={len(queries)}, answers={len(answers)}")
+        logger.debug(f"Tokenized prompt length: {len(prompt_tokens)}")
+        logger.debug(f"Target answer: {target_answer[:50]}...")
+
+        # Debug save removed - tokenization issue fixed
+
+        return prompt_tokens, target_answer
 
     def _extract_mean_activations(self, contrastive_pairs: ContrastivePairSet, response_type: str) -> torch.Tensor:
         """
-        Compute mean activations for a set of responses.
+        Compute mean activations for a set of responses using original DAC example selection strategy.
+
+        This matches the original DAC's grouped example selection:
+        - For ICL=0: processes examples 0, 1, 2, 3, ... individually
+        - For ICL=4: processes groups [0-4], [5-9], [10-14], ... with each group having unique ICL context
 
         Args:
             contrastive_pairs: ContrastivePairSet containing the pairs
@@ -319,26 +436,42 @@ class DAC(SteeringMethodTensor):
         processed_count = 0
 
         logger.info(f"Computing mean activations for {response_type} responses...")
+        logger.info(f"Using original DAC example selection strategy with ICL={self.icl_examples}")
 
-        for i, pair in enumerate(contrastive_pairs.pairs[: self.max_examples]):
-            logger.info(f"Processing example {i + 1}/{min(len(contrastive_pairs.pairs), self.max_examples)}")
+        # Use exact same random selection as original DAC (seed=32)
+        # Original: random_indexes = [0, 1, 1, 2] from 4 available groups
+        step_size = self.icl_examples + 1
+        num_groups = len(contrastive_pairs.pairs) // step_size
+        original_random_indexes = [0, 1, 1, 2]  # Exact reproduction of original DAC
 
-            # Build ICL prompt (includes context if icl_examples > 0)
-            full_text = self._build_icl_prompt(contrastive_pairs, i, response_type)
+        logger.info(f"Using original DAC random selection: {original_random_indexes}")
+        logger.info(f"Available groups: {num_groups}, selecting: {len(original_random_indexes)} examples")
 
-            # Log ICL vs non-ICL for debugging
-            if self.icl_examples > 0 and i == 0:
-                logger.info(f"Using ICL with {self.icl_examples} examples for {response_type} responses")
-                logger.debug(f"Sample ICL prompt structure:\n{full_text[:200]}...")
-            elif self.icl_examples == 0 and i == 0:
-                logger.info(f"Using simple prompt format (no ICL) for {response_type} responses")
+        for group_idx in original_random_indexes:
+            # Stop if we've processed enough examples
+            if processed_count >= self.max_examples:
+                break
 
-            # Extract activations
-            activations = self._extract_step_by_step_activations(full_text)  # [steps, layers, heads, d_head]
-            all_activations.append(activations)
-            processed_count += 1
+            if group_idx < num_groups:
+                i = group_idx * step_size
+                logger.info(
+                    f"Processing group {group_idx} starting at index {i} (example {processed_count + 1}/{len(original_random_indexes)})"
+                )
 
-        logger.info(f"Processed {processed_count} examples for {response_type} responses")
+                # Build ICL prompt for this group using original DAC approach
+                prompt_tokens, target_answer = self._build_icl_prompt(contrastive_pairs, i, response_type)
+
+                # Extract activations using the new format
+                activations = self._extract_step_by_step_activations(
+                    prompt_tokens, target_answer
+                )  # [steps, layers, heads, d_head]
+                all_activations.append(activations)
+                processed_count += 1
+            else:
+                # Not enough examples for a complete group, skip
+                logger.debug(f"Skipping incomplete group starting at index {i}")
+
+        logger.info(f"Processed {processed_count} examples for {response_type} responses using grouped selection")
 
         return self._compute_mean_across_examples(all_activations)
 
@@ -931,8 +1064,8 @@ class DAC(SteeringMethodTensor):
                     timing_strategy=timing_strategy,
                 )
 
-                # Get the layer module
-                layer_name = f"model.layers.{layer_idx}"
+                # Get the attention output projection module (matching original DAC)
+                layer_name = f"model.layers.{layer_idx}.self_attn.o_proj"
                 layer_module = self._get_layer_module(layer_name)
 
                 # Register hook
@@ -1190,7 +1323,7 @@ class DAC(SteeringMethodTensor):
                         current_alpha=starting_alpha,
                     )
 
-                    layer_name = f"model.layers.{layer_idx}"
+                    layer_name = f"model.layers.{layer_idx}.self_attn.o_proj"
                     layer_module = self._get_layer_module(layer_name)
                     handle = layer_module.register_forward_hook(hook)
                     hooks.append(handle)
@@ -1231,7 +1364,7 @@ class DAC(SteeringMethodTensor):
                     layer_idx=layer_idx, composed_tensor=composed_tensor, step=step, initial_length=initial_length
                 )
 
-                layer_name = f"model.layers.{layer_idx}"
+                layer_name = f"model.layers.{layer_idx}.self_attn.o_proj"
                 layer_module = self._get_layer_module(layer_name)
                 handle = layer_module.register_forward_hook(hook)
                 hooks.append(handle)

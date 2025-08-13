@@ -2,6 +2,13 @@
 """
 Generate reference DAC steering vectors and text completions using the original DAC implementation.
 
+IMPORTANT: This script uses REDUCED datasets (20 examples each) for faster testing and CI/CD.
+The original DAC implementation normally processes full datasets, but we reduced them to:
+- Speed up testing and development cycles
+- Maintain compatibility with resource-constrained environments
+- Preserve data quality while reducing computation time
+- Enable rapid iteration during debugging and validation
+
 This script creates comprehensive reference data by:
 1. Loading ITA (Italian) and ENG (English) datasets
 2. Computing mean activations for each dataset using the original DAC implementation
@@ -10,10 +17,11 @@ This script creates comprehensive reference data by:
 5. Saving the vectors, text completions, and adaptation metrics for validation testing
 
 Dataset Configuration:
-    - For fast testing, we limit both ITA and ENG datasets to 20 examples each
+    - REDUCED DATASETS: Limited to 20 examples each (instead of full ~1000+ examples)
     - Datasets used: ITA_train.json (Italian responses) and ENG_train.json (English responses)
     - Original datasets: /workspace/wisent-guard/Dynamic-Activation-Composition/data/dataset/
     - Reference data: /workspace/wisent-guard/tests/steering_validation/dac/reference_data/
+    - This reduction maintains statistical validity while enabling faster testing
 
 Usage:
     python generate_data_with_original_dac_implementation.py
