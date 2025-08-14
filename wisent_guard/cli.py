@@ -4644,12 +4644,12 @@ def handle_tasks_command(args):
 
                     steering_methods.append(HPR(beta=args.hpr_beta))
                 elif args.steering_method == "DAC":
-                    from .core.steering_methods.dac import DAC
+                    from .core.steering_methods_tensor.dac_attention import DAC
 
                     steering_methods.append(
                         DAC(
-                            dynamic_control=args.dac_dynamic_control,
-                            entropy_threshold=args.dac_entropy_threshold,
+                            # Note: dynamic_control and entropy_threshold are legacy parameters
+                            # The new tensor-based DAC uses different parameters
                         )
                     )
                 elif args.steering_method == "BiPO":
@@ -6308,9 +6308,14 @@ def handle_generate_vector_command(args):
             from .core.contrastive_pairs import ContrastivePair, ContrastivePairSet
             from .core.layer import Layer
             from .core.response import NegativeResponse, PositiveResponse
-            from .core.steering_methods.dac import DAC
+            from .core.steering_methods_tensor.dac_attention import DAC
 
-            method = DAC(dynamic_control=args.dynamic_control, entropy_threshold=args.entropy_threshold)
+            method = DAC(
+                model_name=args.model,
+                device=args.device,
+                icl_examples=0,
+                # Note: dynamic_control and entropy_threshold are deprecated in tensor-based DAC
+            )
 
             property_pairs = {}
 
@@ -6372,41 +6377,31 @@ def handle_generate_vector_command(args):
                     print(f"   ✅ Generated {len(pairs.pairs)} pairs for {prop_name}")
                     property_pairs[prop_name] = (pairs, layer)
 
-            # Extract activations for all properties
-            print("\n🔍 Extracting activations for all properties...")
-            for prop_name, (pairs, layer) in property_pairs.items():
-                print(f"   Processing {prop_name} (layer {layer})...")
-                layer_obj = Layer(layer)
-                for pair in pairs.pairs:
-                    # Extract positive activations
-                    positive_activations = model.extract_activations(
-                        pair.prompt + " " + pair.positive_response.text, layer=layer_obj
-                    )
-                    pair.positive_response.activations = positive_activations
-
-                    # Extract negative activations
-                    negative_activations = model.extract_activations(
-                        pair.prompt + " " + pair.negative_response.text, layer=layer_obj
-                    )
-                    pair.negative_response.activations = negative_activations
-
-            # Train multi-property DAC
+            # Train each property using the new tensor-based DAC API
             print("\n🎯 Training multi-property DAC...")
-            all_stats = method.train_multi_property(property_pairs)
+            all_stats = {}
 
-            for prop_name, stats in all_stats.items():
-                print(
-                    f"   ✅ {prop_name} vector trained (layer {property_pairs[prop_name][1]}, norm: {stats['vector_norm']:.4f})"
-                )
+            for prop_name, (pairs, layer) in property_pairs.items():
+                print(f"   Training {prop_name} property...")
 
-            # Save the multi-property vector
-            print(f"\n💾 Saving multi-property steering vector to: {args.output}")
+                # Train property using the new tensor-based API
+                # Note: The layer parameter is ignored in tensor-based DAC as it uses all layers
+                stats = method.train_property(prop_name, pairs)
+                all_stats[prop_name] = stats
+
+                print(f"   ✅ {prop_name} property trained (tensor norm: {stats['tensor_norm']:.4f})")
+
+            # Save the multi-property tensor
+            print(f"\n💾 Saving multi-property steering tensor to: {args.output}")
             import os
 
             os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
 
-            # Use DAC's built-in save method
-            method.save_steering_vector(args.output)
+            # Use the new tensor-based save method
+            success = method.save_steering_tensor(args.output)
+            if not success:
+                print("❌ Failed to save multi-property steering tensor")
+                sys.exit(1)
 
             print("\n✅ Multi-property steering vector generated successfully!")
             print(f"   Properties: {list(property_pairs.keys())}")
@@ -6479,9 +6474,13 @@ def handle_generate_vector_command(args):
         print(f"\n🎯 Training {args.method} steering vector...")
 
         if args.method == "DAC":
-            from .core.steering_methods.dac import DAC
+            from .core.steering_methods_tensor.dac_attention import DAC
 
-            method = DAC(dynamic_control=args.dynamic_control, entropy_threshold=args.entropy_threshold)
+            method = DAC(
+                model_name=args.model,
+                device=args.device,
+                # Note: dynamic_control and entropy_threshold are deprecated in tensor-based DAC
+            )
         elif args.method == "CAA":
             from .core.steering_methods.caa import CAA
 
@@ -6504,7 +6503,12 @@ def handle_generate_vector_command(args):
             method = ControlVectorSteering(control_vector=control_vector, layer=args.layer)
 
         # Train the method
-        if args.method != "ControlVectorSteering":
+        if args.method == "DAC":
+            # Use the new tensor-based API for DAC
+            property_name = "default"  # Default property name for single-property mode
+            method.train_property(property_name, pairs)
+        elif args.method != "ControlVectorSteering":
+            # Use the old API for other methods
             method.train(contrastive_pair_set=pairs, layer_index=args.layer)
 
         # Save the steering vector
@@ -6515,49 +6519,55 @@ def handle_generate_vector_command(args):
 
         os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
 
-        # Save in a format compatible with our demo script
-        save_data = {
-            "method": args.method,
-            "steering_vector": method.steering_vector if hasattr(method, "steering_vector") else None,
-            "layer_index": args.layer,
-            "trait_description": args.from_description if args.from_description else "loaded from file",
-            "num_pairs": len(pairs.pairs),
-            "model_name": args.model,
-        }
-
-        # Add method-specific data
+        # Save using method-specific save logic
         if args.method == "DAC":
-            save_data["dynamic_control"] = args.dynamic_control
-            save_data["entropy_threshold"] = args.entropy_threshold
-            save_data["aggregation_method"] = "caa"  # Default for DAC
+            # Use the new tensor-based save method for DAC
+            success = method.save_steering_tensor(args.output)
+            if not success:
+                print("❌ Failed to save DAC steering tensor")
+                sys.exit(1)
+        else:
+            # Use the old save format for other methods
+            save_data = {
+                "method": args.method,
+                "steering_vector": method.steering_vector if hasattr(method, "steering_vector") else None,
+                "layer_index": args.layer,
+                "trait_description": args.from_description if args.from_description else "loaded from file",
+                "num_pairs": len(pairs.pairs),
+                "model_name": args.model,
+            }
 
-            # Add training stats
-            if hasattr(method, "steering_vector") and method.steering_vector is not None:
-                vector_norm = torch.norm(method.steering_vector).item()
-                vector_mean = method.steering_vector.mean().item()
-                vector_std = method.steering_vector.std().item()
-                save_data["training_stats"] = {
-                    "num_pairs": len(pairs.pairs),
-                    "vector_norm": vector_norm,
-                    "vector_mean": vector_mean,
-                    "vector_std": vector_std,
-                    "vector_shape": list(method.steering_vector.shape),
-                    "aggregation_method": "caa",
-                }
-        elif args.method == "HPR":
-            save_data["beta"] = args.beta
-            if hasattr(method, "householder_matrix"):
-                save_data["householder_matrix"] = method.householder_matrix
-        elif args.method == "ControlVectorSteering":
-            save_data["vector"] = method.control_vector
-            save_data["layer"] = args.layer
+            # Add method-specific data
+            if args.method == "HPR":
+                save_data["beta"] = args.beta
+                if hasattr(method, "householder_matrix"):
+                    save_data["householder_matrix"] = method.householder_matrix
+            elif args.method == "ControlVectorSteering":
+                save_data["vector"] = method.control_vector
+                save_data["layer"] = args.layer
 
-        torch.save(save_data, args.output)
+            torch.save(save_data, args.output)
 
         print("\n✅ Steering vector generated successfully!")
-        print(f"   📏 Vector shape: {method.steering_vector.shape if hasattr(method, 'steering_vector') else 'N/A'}")
-        if hasattr(method, "steering_vector") and method.steering_vector is not None:
-            print(f"   📊 Vector norm: {torch.norm(method.steering_vector).item():.4f}")
+
+        # Show method-specific statistics
+        if args.method == "DAC":
+            # For tensor-based DAC, show tensor info
+            if hasattr(method, "steering_tensor") and method.steering_tensor is not None:
+                print(f"   📏 Tensor shape: {method.steering_tensor.shape}")
+                print(f"   📊 Tensor norm: {torch.norm(method.steering_tensor).item():.4f}")
+            elif hasattr(method, "property_tensors") and method.property_tensors:
+                # Show info about trained properties
+                print(f"   📏 Properties trained: {list(method.property_tensors.keys())}")
+                for prop_name, prop_tensor in method.property_tensors.items():
+                    print(f"   📊 {prop_name} tensor norm: {torch.norm(prop_tensor).item():.4f}")
+        else:
+            # For other methods, show vector info
+            print(
+                f"   📏 Vector shape: {method.steering_vector.shape if hasattr(method, 'steering_vector') else 'N/A'}"
+            )
+            if hasattr(method, "steering_vector") and method.steering_vector is not None:
+                print(f"   📊 Vector norm: {torch.norm(method.steering_vector).item():.4f}")
         print("\n   You can now use this vector with:")
         print(f'   $ python demo_steering_generation.py "Your prompt" --steering-vector {args.output}')
 
@@ -6616,7 +6626,7 @@ def handle_multi_steer_command(args):
         # Load and combine vectors
         print("\n🔄 Loading and combining vectors...")
         from .core.layer import Layer
-        from .core.steering_methods.dac import DAC
+        from .core.steering_methods_tensor.dac_attention import DAC
 
         # Create DAC instance for vector combination
         dac = DAC(device=args.device)

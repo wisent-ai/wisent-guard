@@ -478,7 +478,7 @@ class DAC(SteeringMethodTensor):
                 processed_count += 1
             else:
                 # Not enough examples for a complete group, skip
-                logger.debug(f"Skipping incomplete group starting at index {i}")
+                logger.debug(f"Skipping incomplete group {group_idx} (not enough examples)")
 
         logger.info(f"Processed {processed_count} examples for {response_type} responses using grouped selection")
 
