@@ -3,7 +3,8 @@ Base class for steering methods.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import torch
 
 from ..contrastive_pairs import ContrastivePairSet
@@ -49,7 +50,6 @@ class SteeringMethod(ABC):
         Returns:
             Dictionary with training statistics
         """
-        pass
 
     @abstractmethod
     def apply_steering(self, activations: torch.Tensor, strength: float = 1.0) -> torch.Tensor:
@@ -63,7 +63,6 @@ class SteeringMethod(ABC):
         Returns:
             Steered activations
         """
-        pass
 
     @abstractmethod
     def get_steering_vector(self) -> torch.Tensor:
@@ -73,7 +72,6 @@ class SteeringMethod(ABC):
         Returns:
             Steering vector or parameters
         """
-        pass
 
     @abstractmethod
     def save_steering_vector(self, path: str) -> bool:
@@ -86,7 +84,6 @@ class SteeringMethod(ABC):
         Returns:
             True if successful, False otherwise
         """
-        pass
 
     @abstractmethod
     def load_steering_vector(self, path: str) -> bool:
@@ -99,7 +96,6 @@ class SteeringMethod(ABC):
         Returns:
             True if successful, False otherwise
         """
-        pass
 
     def __str__(self) -> str:
         """String representation of the steering method."""

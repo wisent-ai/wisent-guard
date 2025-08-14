@@ -12,33 +12,33 @@ Evaluation on ITsafe prompts to test steering away from default safe behavior.
 Uses pytest structure with detailed user-facing output.
 """
 
-import sys
 import json
-import torch
+import sys
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, List, Tuple
 
 import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
 # Import wisent-guard DAC
+from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+from wisent_guard.core.response import NegativeResponse, PositiveResponse
 from wisent_guard.core.steering_methods_tensor.dac_attention import DAC
-from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
 # Add current directory to path for local imports
 sys.path.insert(0, str(Path(__file__).parent))
 
 from const import (
+    ICL_EXAMPLES,
+    MAX_EXAMPLES,
+    MAX_NEW_TOKENS,
     MODEL_NAME,
     REFERENCE_DATA_PATH,
-    MAX_NEW_TOKENS,
-    ICL_EXAMPLES,
     TORCH_DTYPE,
-    MAX_EXAMPLES,
 )
 
 # Import aggressive_memory_cleanup
@@ -83,10 +83,10 @@ def _load_english_safety_datasets() -> Tuple[List[Dict], List[Dict]]:
     if not enunsafe_path.exists():
         pytest.skip(f"ENunsafe dataset not found: {enunsafe_path}. Run limit_safety_datasets.py first.")
 
-    with open(ensafe_path, "r", encoding="utf-8") as f:
+    with open(ensafe_path, encoding="utf-8") as f:
         ensafe_data = json.load(f)
 
-    with open(enunsafe_path, "r", encoding="utf-8") as f:
+    with open(enunsafe_path, encoding="utf-8") as f:
         enunsafe_data = json.load(f)
 
     return ensafe_data, enunsafe_data
@@ -103,10 +103,10 @@ def _load_language_datasets() -> Tuple[List[Dict], List[Dict]]:
     if not ita_path.exists():
         pytest.skip(f"ITA dataset not found: {ita_path}. Run generate_data_with_original_dac_implementation.py first.")
 
-    with open(eng_path, "r", encoding="utf-8") as f:
+    with open(eng_path, encoding="utf-8") as f:
         eng_data = json.load(f)
 
-    with open(ita_path, "r", encoding="utf-8") as f:
+    with open(ita_path, encoding="utf-8") as f:
         ita_data = json.load(f)
 
     return eng_data, ita_data
@@ -221,12 +221,12 @@ def _print_detailed_composition_results(
         print(f"Results for Prompt {i + 1}:")
         print(f'  Input: "{prompt[:60]}{"..." if len(prompt) > 60 else ""}"')
         print()
-        print(f"  🇬🇧 High English Steering (+1.0 ENG, 1.0 Unsafe):")
+        print("  🇬🇧 High English Steering (+1.0 ENG, 1.0 Unsafe):")
         print(f'     Generated: "{high_eng_text[:70]}{"..." if len(high_eng_text) > 70 else ""}"')
         print(f"     Italian words found: {high_eng_italian_words}")
         print(f"     Word count: {len(high_eng_text.split())}")
         print()
-        print(f"  🇮🇹 High Italian Steering (-1.0 ENG, 1.0 Unsafe):")
+        print("  🇮🇹 High Italian Steering (-1.0 ENG, 1.0 Unsafe):")
         print(f'     Generated: "{high_ita_text[:70]}{"..." if len(high_ita_text) > 70 else ""}"')
         print(f"     Italian words found: {high_ita_italian_words}")
         print(f"     Word count: {len(high_ita_text.split())}")
@@ -300,25 +300,25 @@ class TestDACCompositionSteering:
             print("\n🔧 Training safety property (ENunsafe vs ENsafe)...")
             safety_stats = dac.train_property("safety_enunsafe_ensafe", safety_pairs)
             assert safety_stats["success"], f"Safety training failed: {safety_stats}"
-            print(f"✅ Safety property trained successfully")
+            print("✅ Safety property trained successfully")
 
             # Train language property (English as positive direction)
             print("\n🔧 Training language property (ENG vs ITA)...")
             language_stats = dac.train_property("language_eng_ita", language_pairs)
             assert language_stats["success"], f"Language training failed: {language_stats}"
-            print(f"✅ Language property trained successfully")
+            print("✅ Language property trained successfully")
 
             # Verify both properties are available
             assert "safety_enunsafe_ensafe" in dac.property_tensors, "Safety property not found"
             assert "language_eng_ita" in dac.property_tensors, "Language property not found"
 
-            print(f"\n📊 DAC Training Results:")
+            print("\n📊 DAC Training Results:")
             print(f"  - Available properties: {list(dac.property_tensors.keys())}")
             print(f"  - Safety tensor shape: {dac.property_tensors['safety_enunsafe_ensafe'].shape}")
             print(f"  - Language tensor shape: {dac.property_tensors['language_eng_ita'].shape}")
 
             # PART 2: COMPOSITION BALANCE TESTING
-            print(f"\n" + "=" * 60)
+            print("\n" + "=" * 60)
             print("🎯 STARTING COMPOSITION BALANCE TESTING")
             print("=" * 60)
 

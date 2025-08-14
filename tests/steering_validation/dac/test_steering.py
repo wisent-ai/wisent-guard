@@ -21,12 +21,12 @@ The differences come from the fact, that we use other library, and the generatio
 import json
 import logging
 import sys
-import torch
-import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
+import numpy as np
 import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
@@ -39,10 +39,10 @@ from wisent_guard.core.steering_methods_tensor.dac_attention import DAC
 sys.path.insert(0, str(Path(__file__).parent))
 
 from const import (
+    ICL_EXAMPLES,
+    MAX_NEW_TOKENS,
     MODEL_NAME,
     REFERENCE_DATA_PATH,
-    MAX_NEW_TOKENS,
-    ICL_EXAMPLES,
     TORCH_DTYPE,
 )
 
@@ -103,7 +103,7 @@ def _load_reference_data(data_type: str) -> List[Dict[str, Any]]:
     if not ref_file.exists():
         pytest.skip(f"Required reference data not found: {ref_file}. Please run reference data generation first.")
 
-    with open(ref_file, "r") as f:
+    with open(ref_file) as f:
         return json.load(f)
 
 
@@ -236,7 +236,7 @@ class TestDACSteeringValidation:
             assert not torch.any(torch.isnan(dac.steering_tensor)), "Tensor contains NaN"
             assert not torch.any(torch.isinf(dac.steering_tensor)), "Tensor contains Inf"
 
-            print(f"✅ Tensor loaded successfully:")
+            print("✅ Tensor loaded successfully:")
             print(f"   Shape: {dac.steering_tensor.shape}")
             print(f"   Norm: {tensor_norm:.4f}")
             print(f"   Properties: {list(dac.property_tensors.keys())}")
@@ -316,7 +316,7 @@ class TestDACSteeringValidation:
                     italian_detected += 1
                     print(f"  ✅ Italian detected: {found_words[:3]}")
                 else:
-                    print(f"  ⚠️  No Italian detected")
+                    print("  ⚠️  No Italian detected")
 
                 # Check for dynamic features
                 if (
@@ -335,7 +335,7 @@ class TestDACSteeringValidation:
 
             # Validate Italian detection rate
             italian_rate = italian_detected / total_examples
-            print(f"\\n📈 Italian detection summary:")
+            print("\\n📈 Italian detection summary:")
             print(f"   Examples with Italian: {italian_detected}/{total_examples} ({italian_rate:.1%})")
             print(f"   Minimum required: {MIN_ITALIAN_DETECTION_RATE:.1%}")
 
@@ -448,11 +448,11 @@ class TestDACSteeringValidation:
                     significant_differences += 1
                     print(f"  ✅ Steering effect via text difference (similarity: {steered_similarity:.2f})")
                 else:
-                    print(f"  ⚠️  Limited steering effect detected")
+                    print("  ⚠️  Limited steering effect detected")
 
             # Validate steering effectiveness
             effectiveness_rate = significant_differences / total_comparisons
-            print(f"\\n📈 Steering effectiveness summary:")
+            print("\\n📈 Steering effectiveness summary:")
             print(
                 f"   Significant differences: {significant_differences}/{total_comparisons} ({effectiveness_rate:.1%})"
             )
@@ -499,7 +499,7 @@ class TestDACSteeringValidation:
         ref_steered_rate = ref_steered_italian_count / len(steered_reference)
         ref_unsteered_rate = ref_unsteered_italian_count / len(unsteered_reference)
 
-        print(f"Reference Italian detection rates:")
+        print("Reference Italian detection rates:")
         print(f"  Steered: {ref_steered_italian_count}/{len(steered_reference)} ({ref_steered_rate:.1%})")
         print(f"  Unsteered: {ref_unsteered_italian_count}/{len(unsteered_reference)} ({ref_unsteered_rate:.1%})")
 
@@ -559,15 +559,15 @@ class TestDACSteeringValidation:
                     )
                     print(f"    ✅ Italian detected: {found_words[:3]}")
                 else:
-                    print(f"    ❌ No Italian detected")
+                    print("    ❌ No Italian detected")
 
             our_italian_rate = our_italian_count / len(test_prompts)
-            print(f"\\n📈 Our implementation Italian detection:")
+            print("\\n📈 Our implementation Italian detection:")
             print(f"   Examples with Italian: {our_italian_count}/{len(test_prompts)} ({our_italian_rate:.1%})")
 
             # Show best Italian examples
             if italian_examples:
-                print(f"\\n🎯 Examples with Italian content:")
+                print("\\n🎯 Examples with Italian content:")
                 for i, example in enumerate(italian_examples[:2], 1):
                     print(f"   {i}. {example['text'][:60]}...")
                     print(f"      Italian words: {example['words']}")
@@ -661,17 +661,17 @@ class TestDACSteeringValidation:
 
                 # Quality indicators
                 if alpha_correlation > 0.3:
-                    print(f"  ✅ Good alpha correlation")
+                    print("  ✅ Good alpha correlation")
                 elif alpha_correlation > 0.0:
-                    print(f"  ⚠️ Moderate alpha correlation")
+                    print("  ⚠️ Moderate alpha correlation")
                 else:
-                    print(f"  ❌ Low alpha correlation")
+                    print("  ❌ Low alpha correlation")
 
             # Overall assessment
             avg_alpha_correlation = np.mean(alpha_correlations)
             avg_kl_correlation = np.mean(kl_correlations) if kl_correlations else 0.0
 
-            print(f"\\n📈 Quantitative comparison summary:")
+            print("\\n📈 Quantitative comparison summary:")
             print(f"   Average alpha correlation: {avg_alpha_correlation:.3f}")
             print(f"   Alpha correlations: {[f'{c:.2f}' for c in alpha_correlations]}")
 
@@ -679,7 +679,7 @@ class TestDACSteeringValidation:
                 print(f"   Average KL correlation: {avg_kl_correlation:.3f}")
                 print(f"   KL correlations: {[f'{c:.2f}' for c in kl_correlations]}")
             else:
-                print(f"   KL correlation: Not available (our implementation may not track KL)")
+                print("   KL correlation: Not available (our implementation may not track KL)")
 
             # Validation assertions - use relaxed thresholds since exact reproduction is difficult
             assert avg_alpha_correlation > 0.1, (
@@ -776,17 +776,17 @@ class TestDACSteeringValidation:
 
                 # Quality indicators
                 if text_similarity > 0.3:
-                    print(f"  ✅ Good text similarity")
+                    print("  ✅ Good text similarity")
                 elif text_similarity > 0.15:
-                    print(f"  ⚠️ Moderate text similarity")
+                    print("  ⚠️ Moderate text similarity")
                 else:
-                    print(f"  ❌ Low text similarity")
+                    print("  ❌ Low text similarity")
 
             # Overall assessment
             avg_text_similarity = np.mean(text_similarities)
             avg_italian_overlap = np.mean(italian_word_overlaps)
 
-            print(f"\\n📈 Text similarity summary:")
+            print("\\n📈 Text similarity summary:")
             print(f"   Average text similarity: {avg_text_similarity:.3f}")
             print(f"   Text similarities: {[f'{s:.2f}' for s in text_similarities]}")
             print(f"   Average Italian word overlap: {avg_italian_overlap:.3f}")
@@ -893,17 +893,17 @@ class TestDACSteeringValidation:
 
                 # Quality indicators
                 if pattern_similarity > 0.3 and adaptation_ratio > 0.5:
-                    print(f"  ✅ Good adaptation pattern")
+                    print("  ✅ Good adaptation pattern")
                 elif pattern_similarity > 0.1 or adaptation_ratio > 0.3:
-                    print(f"  ⚠️ Moderate adaptation pattern")
+                    print("  ⚠️ Moderate adaptation pattern")
                 else:
-                    print(f"  ❌ Different adaptation pattern")
+                    print("  ❌ Different adaptation pattern")
 
             # Overall assessment
             avg_pattern_similarity = np.mean(pattern_similarities)
             avg_adaptation_ratio = np.mean(adaptation_scores)
 
-            print(f"\\n📈 Adaptation pattern summary:")
+            print("\\n📈 Adaptation pattern summary:")
             print(f"   Average pattern similarity: {avg_pattern_similarity:.3f}")
             print(f"   Pattern similarities: {[f'{p:.2f}' for p in pattern_similarities]}")
             print(f"   Average adaptation ratio: {avg_adaptation_ratio:.3f}")

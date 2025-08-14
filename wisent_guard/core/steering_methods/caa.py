@@ -207,7 +207,7 @@ class CAA(SteeringMethod):
                 logger.debug(f"      Strength parameter: {strength}")
                 logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
                 logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
-                logger.debug(f"      Applying to ALL positions (CAA fallback behavior)")
+                logger.debug("      Applying to ALL positions (CAA fallback behavior)")
 
                 # Apply to ALL positions (matching CAA reference with from_pos=-1)
                 steered = steered + strength * steering_vector.unsqueeze(0).unsqueeze(0)
@@ -396,7 +396,7 @@ class CAA(SteeringMethod):
         combined_vector = combined_vector.to(activations.device)
 
         if verbose:
-            print(f"\n🔍 CAA Multi-Property Steering:")
+            print("\n🔍 CAA Multi-Property Steering:")
             print(f"   Behaviors & weights: {behavior_weights}")
             print(f"   Combined vector norm: {torch.norm(combined_vector).item():.4f}")
             print(f"   Input shape: {activations.shape}")
@@ -416,11 +416,11 @@ class CAA(SteeringMethod):
                 if activations.shape[1] > 1:
                     steered[:, -2:-1, :] = steered[:, -2:-1, :] + combined_vector.unsqueeze(0).unsqueeze(0)
                     if verbose:
-                        print(f"   Applied to second-to-last token only")
+                        print("   Applied to second-to-last token only")
                 else:
                     steered[:, -1:, :] = steered[:, -1:, :] + combined_vector.unsqueeze(0).unsqueeze(0)
                     if verbose:
-                        print(f"   Applied to last token (single-token sequence)")
+                        print("   Applied to last token (single-token sequence)")
 
         elif len(activations.shape) == 2:  # [batch, hidden]
             steered = activations + combined_vector.unsqueeze(0)

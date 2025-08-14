@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from ..contrastive_pairs import ContrastivePairSet
 from .tensor_base import SteeringMethodTensor
@@ -412,7 +412,7 @@ class DAC(SteeringMethodTensor):
             if self.icl_examples == 0:
                 # For ICL=0, include the answer in the messages for training signal
                 messages.append({"role": "assistant", "content": target_answer})
-                logger.debug(f"Added target answer to messages (ICL=0)")
+                logger.debug("Added target answer to messages (ICL=0)")
 
                 # Apply chat template with generation prompt disabled (since we have the answer)
                 prompt_text = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
@@ -476,13 +476,9 @@ class DAC(SteeringMethodTensor):
         if not self.legacy_behavior and hasattr(self._tokenizer, "chat_template") and self._tokenizer.chat_template:
             logger.debug("Using chat template format")
             return self._build_icl_prompt_chat_template(contrastive_pairs, current_pair_idx, response_type)
-        else:
-            logger.debug("Using Q:/A: format")
+        logger.debug("Using Q:/A: format")
 
         # Otherwise use original DAC format for backward compatibility
-        import sys
-        import os
-        from pathlib import Path
 
         # Build queries and answers lists like original DAC
         queries = []
@@ -700,13 +696,12 @@ class DAC(SteeringMethodTensor):
             # Apply specific layer and step
             steering_slice = self.steering_tensor[step_index, layer_index, :, :]  # [n_heads, d_head]
             return activations + strength * steering_slice
-        elif layer_index is not None:
+        if layer_index is not None:
             # Apply specific layer (average across steps)
             steering_slice = self.steering_tensor[:, layer_index, :, :].mean(dim=0)  # [n_heads, d_head]
             return activations + strength * steering_slice
-        else:
-            # Default behavior - need to specify how to apply full tensor
-            raise ValueError("Must specify layer_index for tensor application")
+        # Default behavior - need to specify how to apply full tensor
+        raise ValueError("Must specify layer_index for tensor application")
 
     def save_steering_tensor(self, path: str) -> bool:
         """
@@ -791,7 +786,7 @@ class DAC(SteeringMethodTensor):
             raise ValueError("No property tensors available. Train properties first.")
 
         # Validate all properties exist
-        for prop_name in property_weights.keys():
+        for prop_name in property_weights:
             if prop_name not in self.property_tensors:
                 available = list(self.property_tensors.keys())
                 raise ValueError(f"Property '{prop_name}' not found. Available: {available}")
@@ -827,19 +822,18 @@ class DAC(SteeringMethodTensor):
         """
         if composition_strategy == "linear":
             return self.compose_properties(property_weights)
-        elif composition_strategy == "normalized":
+        if composition_strategy == "normalized":
             # Normalize weights to sum to 1.0
             total_weight = sum(abs(w) for w in property_weights.values())
             if total_weight == 0:
                 raise ValueError("Sum of absolute weights cannot be zero")
             normalized_weights = {k: v / total_weight for k, v in property_weights.items()}
             return self.compose_properties(normalized_weights)
-        elif composition_strategy == "dynamic":
+        if composition_strategy == "dynamic":
             # For now, just use linear - dynamic will be implemented later
             logger.warning("Dynamic composition not yet implemented, using linear")
             return self.compose_properties(property_weights)
-        else:
-            raise ValueError(f"Unknown composition strategy: {composition_strategy}")
+        raise ValueError(f"Unknown composition strategy: {composition_strategy}")
 
     def generate_with_steering(
         self,
@@ -943,15 +937,14 @@ class DAC(SteeringMethodTensor):
                 max_new_tokens=max_new_tokens,
                 dynamic_config=dynamic_config or {},
             )[0]  # Return just the text, not the statistics
-        else:
-            # Use standard hook-based generation
-            return self._generate_step_by_step_with_hooks(
-                input_ids=input_ids,
-                steering_tensor=steering_tensor,
-                max_new_tokens=max_new_tokens,
-                steering_strength=steering_strength,
-                timing_strategy=timing_strategy,
-            )
+        # Use standard hook-based generation
+        return self._generate_step_by_step_with_hooks(
+            input_ids=input_ids,
+            steering_tensor=steering_tensor,
+            max_new_tokens=max_new_tokens,
+            steering_strength=steering_strength,
+            timing_strategy=timing_strategy,
+        )
 
     def _generate_step_by_step_with_dynamic_steering(
         self,
@@ -981,15 +974,15 @@ class DAC(SteeringMethodTensor):
 
         # Prepare property tensors based on weights
         property_tensors = {}
-        for prop_name in property_weights.keys():
+        for prop_name in property_weights:
             if prop_name not in self.property_tensors:
                 available = list(self.property_tensors.keys())
                 raise ValueError(f"Property '{prop_name}' not found. Available: {available}")
             property_tensors[prop_name] = self.property_tensors[prop_name]
 
         # Track dynamic statistics
-        alpha_history = {prop_name: [] for prop_name in property_weights.keys()}
-        kl_history = {prop_name: [] for prop_name in property_weights.keys()}
+        alpha_history = {prop_name: [] for prop_name in property_weights}
+        kl_history = {prop_name: [] for prop_name in property_weights}
 
         logger.info(f"Starting dynamic steering generation with {len(property_tensors)} properties")
         logger.info(f"Dynamic config: {config}")
@@ -1120,26 +1113,25 @@ class DAC(SteeringMethodTensor):
         """Prepare steering strengths for each generation step."""
         if timing_strategy == "normal":
             return [base_strength] * max_new_tokens
-        elif timing_strategy == "start_only":
+        if timing_strategy == "start_only":
             # Only apply steering to the first token
             strengths = [0.0] * max_new_tokens
             if max_new_tokens > 0:
                 strengths[0] = base_strength
             return strengths
-        elif timing_strategy == "diminishing":
+        if timing_strategy == "diminishing":
             # Linearly decrease steering strength
             strengths = []
             for step in range(max_new_tokens):
                 strength = base_strength * (1.0 - step / max_new_tokens)
                 strengths.append(max(0.0, strength))
             return strengths
-        elif timing_strategy == "dynamic":
+        if timing_strategy == "dynamic":
             # Dynamic strengths are computed on-the-fly based on KL divergence
             # Return placeholder - actual dynamic generation doesn't use this
             return [base_strength] * max_new_tokens
-        else:
-            logger.warning(f"Unknown timing strategy '{timing_strategy}', using normal")
-            return [base_strength] * max_new_tokens
+        logger.warning(f"Unknown timing strategy '{timing_strategy}', using normal")
+        return [base_strength] * max_new_tokens
 
     def _generate_next_token_with_steering(
         self,
@@ -1623,7 +1615,7 @@ class DAC(SteeringMethodTensor):
             raise ValueError("Property weights cannot be empty for multi-property steering")
 
         # Validate properties exist
-        for prop_name in property_weights.keys():
+        for prop_name in property_weights:
             if prop_name not in self.property_tensors:
                 available = list(self.property_tensors.keys())
                 raise ValueError(f"Property '{prop_name}' not found. Available: {available}")

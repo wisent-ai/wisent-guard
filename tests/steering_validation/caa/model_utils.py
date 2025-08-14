@@ -2,21 +2,23 @@
 Utilities for loading and using real models in validation tests.
 """
 
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
-
-from .const import MODEL_NAME, LAYER_INDEX, TORCH_DTYPE
-from .caa_utils import tokenize_llama_base_format
 import sys
+
+from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+from wisent_guard.core.response import NegativeResponse, PositiveResponse
+
+from .caa_utils import tokenize_llama_base_format
+from .const import LAYER_INDEX, MODEL_NAME, TORCH_DTYPE
 
 
 class RealModelWrapper:
@@ -100,7 +102,7 @@ class RealModelWrapper:
 def create_real_contrastive_pairs(dataset, model, layer_idx=LAYER_INDEX, max_pairs=50):
     """Create ContrastivePairSet using real model activations with exact CAA tokenization."""
 
-    print(f"Creating contrastive pairs with real model activations (CAA format)...")
+    print("Creating contrastive pairs with real model activations (CAA format)...")
     print(f"Processing {min(len(dataset), max_pairs)} examples...")
 
     pairs = []
@@ -157,18 +159,19 @@ def create_caa_original_contrastive_pairs(layer_idx=LAYER_INDEX, max_pairs=None)
     Returns:
         ContrastivePairSet with CAA-compatible activations
     """
-    print(f"Creating contrastive pairs with CAA-compatible method (wisent-guard)...")
+    print("Creating contrastive pairs with CAA-compatible method (wisent-guard)...")
 
     # Use RealModelWrapper instead of CAA's LlamaWrapper
     model = RealModelWrapper(MODEL_NAME, device="auto")
 
     # Load dataset and limit to MAX_EXAMPLES for fast testing
     import json
+
     from .const import HALLUCINATION_DATASET_PATH, MAX_EXAMPLES
 
     print(f"Loading dataset from: {HALLUCINATION_DATASET_PATH}")
 
-    with open(HALLUCINATION_DATASET_PATH, "r") as f:
+    with open(HALLUCINATION_DATASET_PATH) as f:
         full_dataset = json.load(f)
 
     # Use only first MAX_EXAMPLES for fast testing

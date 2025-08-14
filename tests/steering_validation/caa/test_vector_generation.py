@@ -9,30 +9,30 @@ the results.
 """
 
 import json
-import torch
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.steering_methods.caa import CAA
 from wisent_guard.core.aggregation import ControlVectorAggregationMethod
+from wisent_guard.core.steering_methods.caa import CAA
 
+from ..utils import aggressive_memory_cleanup
 from .const import (
-    MODEL_NAME,
-    MODEL_HIDDEN_DIM,
-    LAYER_INDEX,
     DEVICE,
     HALLUCINATION_DATASET_PATH,
     HALLUCINATION_VECTOR_PATH,
-    MAX_EXAMPLES,
+    LAYER_INDEX,
+    MODEL_HIDDEN_DIM,
+    MODEL_NAME,
     NORMALIZATION_METHOD,
 )
-from .model_utils import RealModelWrapper, create_real_contrastive_pairs, create_caa_original_contrastive_pairs
-from ..utils import aggressive_memory_cleanup
+from .model_utils import RealModelWrapper, create_caa_original_contrastive_pairs, create_real_contrastive_pairs
 
 
 def load_reference_data():
@@ -48,7 +48,7 @@ def load_test_dataset():
     """Load the hallucination dataset."""
     dataset_path = HALLUCINATION_DATASET_PATH
 
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         data = json.load(f)
 
     return data
@@ -91,7 +91,7 @@ class TestVectorGeneration:
         cosine_sim = torch.nn.functional.cosine_similarity(our_vector, ref_vector, dim=0).item()
         norm_ratio = torch.norm(our_vector).item() / torch.norm(ref_vector).item()
 
-        print(f"Comparison with reference:")
+        print("Comparison with reference:")
         print(f"  Our vector norm:    {torch.norm(our_vector).item():.4f}")
         print(f"  Reference norm:     {torch.norm(ref_vector).item():.4f}")
         print(f"  Cosine similarity:  {cosine_sim:.4f}")

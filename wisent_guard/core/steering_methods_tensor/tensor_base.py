@@ -4,6 +4,7 @@ Base class for tensor-based steering methods.
 
 from abc import ABC, abstractmethod
 from typing import Optional
+
 import torch
 
 
@@ -50,7 +51,6 @@ class SteeringMethodTensor(ABC):
         Returns:
             Steering tensor
         """
-        pass
 
     @abstractmethod
     def apply_steering_tensor(self, activations: torch.Tensor, strength: float = 1.0, **kwargs) -> torch.Tensor:
@@ -65,7 +65,6 @@ class SteeringMethodTensor(ABC):
         Returns:
             Steered activations
         """
-        pass
 
     @abstractmethod
     def save_steering_tensor(self, path: str) -> bool:
@@ -78,7 +77,6 @@ class SteeringMethodTensor(ABC):
         Returns:
             True if successful, False otherwise
         """
-        pass
 
     @abstractmethod
     def load_steering_tensor(self, path: str) -> bool:
@@ -91,7 +89,6 @@ class SteeringMethodTensor(ABC):
         Returns:
             True if successful, False otherwise
         """
-        pass
 
     def __repr__(self) -> str:
         """String representation of the tensor-based steering method."""

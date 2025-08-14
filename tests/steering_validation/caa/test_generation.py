@@ -14,10 +14,11 @@ Tests both unsteered and steered generation paths.
 """
 
 import json
-import torch
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
+import torch
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
@@ -25,20 +26,20 @@ sys.path.insert(0, str(WISENT_PATH))
 
 from wisent_guard.core.steering_methods.caa import CAA
 
+from ..utils import aggressive_memory_cleanup
+from .caa_utils import tokenize_llama_base_format
 from .const import (
-    MODEL_NAME,
-    LAYER_INDEX,
     DEVICE,
-    MAX_NEW_TOKENS,
-    TOP_K,
-    RANDOM_SEED,
-    TEXT_COMPLETIONS_UNSTEERED_PATH,
-    TEXT_COMPLETIONS_STEERED_PATH,
     HALLUCINATION_VECTOR_PATH,
+    LAYER_INDEX,
+    MAX_NEW_TOKENS,
+    MODEL_NAME,
+    RANDOM_SEED,
+    TEXT_COMPLETIONS_STEERED_PATH,
+    TEXT_COMPLETIONS_UNSTEERED_PATH,
+    TOP_K,
 )
 from .model_utils import RealModelWrapper
-from .caa_utils import tokenize_llama_base_format
-from ..utils import aggressive_memory_cleanup
 
 
 def load_reference_text_completions(steered=False):
@@ -55,7 +56,7 @@ def load_reference_text_completions(steered=False):
     if not ref_path.exists():
         pytest.skip(f"Reference {completion_type} text completions not found at {ref_path}")
 
-    with open(ref_path, "r") as f:
+    with open(ref_path) as f:
         reference_results = json.load(f)
 
     print(f"✅ Loaded {len(reference_results)} reference {completion_type} text completions")
@@ -190,7 +191,7 @@ class TestCAAGeneration:
         our_results = generate_with_wisent_caa(test_prompts, steering_vector=None)
 
         # Compare results
-        print(f"\n📊 Comparing unsteered generation results...")
+        print("\n📊 Comparing unsteered generation results...")
 
         total_prompts = min(len(our_results), len(reference_results))
         high_match_count = 0
@@ -281,7 +282,7 @@ class TestCAAGeneration:
         our_results = generate_with_wisent_caa(test_prompts, steering_vector=steering_vector, strength=1.0)
 
         # Compare results
-        print(f"\n📊 Comparing steered generation results...")
+        print("\n📊 Comparing steered generation results...")
 
         total_prompts = min(len(our_results), len(reference_results))
         high_match_count = 0

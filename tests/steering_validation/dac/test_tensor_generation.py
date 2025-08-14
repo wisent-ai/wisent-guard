@@ -14,32 +14,30 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
+import pytest
 import torch
 import torch.nn.functional as F
-import pytest
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
 # Import wisent-guard DAC implementation
+from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+from wisent_guard.core.response import NegativeResponse, PositiveResponse
 from wisent_guard.core.steering_methods_tensor.dac_attention import DAC
-from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
 # Add current directory to path for local imports
 sys.path.insert(0, str(Path(__file__).parent))
 
 from const import (
-    MODEL_NAME,
-    DATASET_A_NAME,
-    DATASET_B_NAME,
-    REFERENCE_DATA_PATH,
-    TORCH_DTYPE,
     ICL_EXAMPLES,
     MAX_NEW_TOKENS,
+    MODEL_NAME,
+    REFERENCE_DATA_PATH,
+    TORCH_DTYPE,
 )
 
 # Import utils
@@ -66,9 +64,9 @@ def _load_datasets() -> Tuple[list, list]:
             f"Missing: {ita_path if not ita_path.exists() else eng_path}"
         )
 
-    with open(ita_path, "r", encoding="utf-8") as f:
+    with open(ita_path, encoding="utf-8") as f:
         ita_data = json.load(f)
-    with open(eng_path, "r", encoding="utf-8") as f:
+    with open(eng_path, encoding="utf-8") as f:
         eng_data = json.load(f)
 
     return ita_data, eng_data
@@ -221,16 +219,15 @@ class TestDACVectorGeneration:
                 "our_shape": list(our_tensor.shape),
                 "ref_shape": list(ref_tensor.shape),
             }
-        else:
-            return {
-                "config_name": config_name,
-                "shapes_match": shapes_match,
-                "cosine_similarity": None,
-                "mse": None,
-                "our_norm": our_norm,
-                "ref_norm": ref_norm,
-                "norm_ratio": None,
-                "tensors_match": False,
-                "our_shape": list(our_tensor.shape),
-                "ref_shape": list(ref_tensor.shape),
-            }
+        return {
+            "config_name": config_name,
+            "shapes_match": shapes_match,
+            "cosine_similarity": None,
+            "mse": None,
+            "our_norm": our_norm,
+            "ref_norm": ref_norm,
+            "norm_ratio": None,
+            "tensors_match": False,
+            "our_shape": list(our_tensor.shape),
+            "ref_shape": list(ref_tensor.shape),
+        }

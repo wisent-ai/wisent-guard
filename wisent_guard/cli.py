@@ -6744,7 +6744,7 @@ def handle_multi_steer_command(args):
                 new_norm = torch.norm(combined_vector).item()
                 print(f"   🎯 Scaled to target norm: {new_norm:.4f} (scale factor: {scale_factor:.4f})")
             else:
-                print(f"   ⚠️  Cannot scale zero vector to target norm")
+                print("   ⚠️  Cannot scale zero vector to target norm")
 
         # Save combined vector if requested
         if args.save_combined:

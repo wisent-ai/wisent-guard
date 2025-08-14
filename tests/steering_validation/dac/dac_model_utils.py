@@ -6,40 +6,41 @@ using our wisent-guard tensor-based implementation and comparing with reference 
 """
 
 import json
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
 import torch
 import torch.nn.functional as F
-from pathlib import Path
-from typing import Dict, List, Tuple, Any
-import sys
 
 # Add wisent-guard to path
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.steering_methods_tensor.dac_attention import DAC
-from wisent_guard.core.contrastive_pairs import ContrastivePairSet, ContrastivePair
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
-
 from const import (
-    MODEL_NAME,
-    REFERENCE_DATA_PATH,
+    COSINE_SIMILARITY_THRESHOLD,
     MAX_EXAMPLES,
     MAX_NEW_TOKENS,
+    MODEL_NAME,
+    REFERENCE_DATA_PATH,
     TORCH_DTYPE,
-    COSINE_SIMILARITY_THRESHOLD,
 )
+
+from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+from wisent_guard.core.response import NegativeResponse, PositiveResponse
+from wisent_guard.core.steering_methods_tensor.dac_attention import DAC
 
 
 def load_dac_datasets_for_testing() -> Tuple[List[Dict], List[Dict]]:
     """Load ITA and ENG datasets for DAC testing."""
     # Load ITA dataset
     ita_path = REFERENCE_DATA_PATH / "ita_train.json"
-    with open(ita_path, "r", encoding="utf-8") as f:
+    with open(ita_path, encoding="utf-8") as f:
         ita_data = json.load(f)
 
     # Load ENG dataset
     eng_path = REFERENCE_DATA_PATH / "eng_train.json"
-    with open(eng_path, "r", encoding="utf-8") as f:
+    with open(eng_path, encoding="utf-8") as f:
         eng_data = json.load(f)
 
     return ita_data, eng_data

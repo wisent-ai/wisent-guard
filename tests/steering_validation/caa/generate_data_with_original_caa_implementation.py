@@ -29,26 +29,24 @@ Output: ./reference_data/
 - text_completions_unsteered.json (unsteered text outputs)
 """
 
-import sys
 import json
-import torch
+import sys
 from pathlib import Path
 
+import torch
 from const import (
-    MODEL_NAME,
-    MODEL_SIZE,
+    BEHAVIOR,
+    CAA_PATH,
+    HALLUCINATION_VECTOR_PATH,
     LAYER_INDEX,
     MAX_EXAMPLES,
-    DEVICE,
-    BEHAVIOR,
-    STEERING_STRENGTH,
     MAX_NEW_TOKENS,
-    TOP_K,
-    RANDOM_SEED,
     MAX_TEXT_EXAMPLES,
-    CAA_PATH,
+    MODEL_SIZE,
+    RANDOM_SEED,
+    STEERING_STRENGTH,
+    TOP_K,
     WISENT_PATH,
-    HALLUCINATION_VECTOR_PATH,
 )
 
 # Add CAA repo to path
@@ -58,12 +56,13 @@ sys.path.insert(0, str(CAA_PATH))
 sys.path.insert(0, str(WISENT_PATH))
 
 try:
-    from llama_wrapper import LlamaWrapper
-    from behaviors import get_ab_data_path, get_vector_path
-    from utils.tokenize import tokenize_llama_base
-    from utils.helpers import find_instruction_end_postion
-    from generate_vectors import generate_save_vectors_for_behavior
     import shutil
+
+    from behaviors import get_ab_data_path, get_vector_path
+    from generate_vectors import generate_save_vectors_for_behavior
+    from llama_wrapper import LlamaWrapper
+    from utils.helpers import find_instruction_end_postion
+    from utils.tokenize import tokenize_llama_base
 except ImportError:
     print("You have to clone original CAA repo https://github.com/nrimsky/CAA first")
 
@@ -77,7 +76,7 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
     Returns:
         tuple: (steering_vector, save_data) containing the generated vector and metadata
     """
-    print(f"🔄 Generating reference CAA vector using ORIGINAL CAA implementation...")
+    print("🔄 Generating reference CAA vector using ORIGINAL CAA implementation...")
     print(f"Behavior: {BEHAVIOR}, Layer: {LAYER_INDEX}, Model: {MODEL_SIZE}")
 
     # Initialize model using CAA's approach
@@ -130,7 +129,7 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
 
     # Also save our metadata
     torch.save(save_data, HALLUCINATION_VECTOR_PATH)
-    print(f"✅ Saved reference vector with metadata")
+    print("✅ Saved reference vector with metadata")
 
     return steering_vector, save_data
 
@@ -145,11 +144,11 @@ def generate_text_completions(steering_vector, max_examples=MAX_TEXT_EXAMPLES):
     Returns:
         tuple: (steered_results, unsteered_results) containing full text completions
     """
-    print(f"🔄 Generating reference text completions...")
+    print("🔄 Generating reference text completions...")
 
     # Load test dataset - use the same hallucination dataset
     dataset_path = Path(__file__).parent / "reference_data" / "hallucination.json"
-    with open(dataset_path, "r") as f:
+    with open(dataset_path) as f:
         dataset = json.load(f)
 
     test_subset = dataset[:max_examples]
@@ -296,8 +295,8 @@ def main():
         print("\n✅ Reference data generation complete!")
         print("📁 Generated files:")
         print(f"  - {HALLUCINATION_VECTOR_PATH}")
-        print(f"  - tests/steering_validation/caa/reference_data/text_completions_steered.json")
-        print(f"  - tests/steering_validation/caa/reference_data/text_completions_unsteered.json")
+        print("  - tests/steering_validation/caa/reference_data/text_completions_steered.json")
+        print("  - tests/steering_validation/caa/reference_data/text_completions_unsteered.json")
 
     except Exception as e:
         print(f"❌ Error during generation: {e}")

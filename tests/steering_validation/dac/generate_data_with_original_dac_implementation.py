@@ -34,11 +34,11 @@ Expected Output:
     - text_completions_dynamic_steering.json: Dynamic steering text generation results
 """
 
-import sys
-import os
-import time
 import json
+import os
 import shutil
+import sys
+import time
 from pathlib import Path
 
 import torch
@@ -52,17 +52,17 @@ from utils import aggressive_memory_cleanup
 sys.path.insert(0, str(Path(__file__).parent))
 
 from const import (
-    MODEL_NAME,
     ACTIVATIONS_A_PATH,
     ACTIVATIONS_B_PATH,
-    DIFF_ACTIVATIONS_PATH,
     DATASET_A_NAME,
     DATASET_B_NAME,
+    DIFF_ACTIVATIONS_PATH,
+    DYNAMIC_CONFIG,
+    ICL_EXAMPLES,
     MAX_EXAMPLES,
     MAX_NEW_TOKENS,
-    ICL_EXAMPLES,
+    MODEL_NAME,
     REFERENCE_DATA_PATH,
-    DYNAMIC_CONFIG,
 )
 
 # Add the Dynamic-Activation-Composition directory to the path
@@ -75,9 +75,9 @@ os.chdir(DAC_DIR)
 
 try:
     from diff_main import main as diff_main
-    from src.delta import generate_token_step, generate_dynamic_edited_model
+    from src.delta import generate_dynamic_edited_model, generate_token_step
     from src.utils.model_utils import load_model_and_tokenizer
-    from src.utils.prompt_helper import tokenize_ICL, load_dataset
+    from src.utils.prompt_helper import load_dataset, tokenize_ICL
 except ImportError as e:
     print(f"Error importing DAC modules: {e}")
     print(f"Make sure the Dynamic-Activation-Composition directory exists at: {DAC_DIR}")
@@ -392,9 +392,9 @@ def main():
     print(f"Examples per dataset: {MAX_EXAMPLES}")
     print(f"Max new tokens: {MAX_NEW_TOKENS}")
     print(f"ICL examples: {ICL_EXAMPLES}")
-    print(f"DAC operates on: ALL layers simultaneously")
+    print("DAC operates on: ALL layers simultaneously")
     print("PHASE 2: Text Generation")
-    print(f"Will use prompts from dataset")
+    print("Will use prompts from dataset")
     print(f"Dynamic top-p values: {DYNAMIC_CONFIG['top_p_values']}")
     print(f"Output directory: {REFERENCE_DATA_PATH}")
     print("=" * 70)
@@ -405,7 +405,7 @@ def main():
         copy_datasets_to_reference()
 
         # Step 2: Run diff_main to generate vectors and evaluation results
-        print(f"\n[2/5] Running diff_main.py to generate vectors and evaluation results...")
+        print("\n[2/5] Running diff_main.py to generate vectors and evaluation results...")
         print(f"   Working directory: {os.getcwd()}")
 
         # Call diff_main with appropriate parameters (using ICL_EXAMPLES from const.py)
@@ -424,7 +424,7 @@ def main():
         )
 
         # Step 3: Copy generated vectors to reference_data directory
-        print(f"\n[3/5] Copying generated vectors to reference_data directory...")
+        print("\n[3/5] Copying generated vectors to reference_data directory...")
 
         # Find the output directory created by diff_main
         output_dir = Path(f"./output/{MODEL_NAME.split('/')[1]}/{DATASET_A_NAME}/diff")
@@ -432,7 +432,7 @@ def main():
 
         # List all files in the output directory for debugging
         if output_dir.exists():
-            print(f"   Found files in output directory:")
+            print("   Found files in output directory:")
             for f in output_dir.glob("*.pt"):
                 print(f"      - {f.name}")
 
@@ -443,7 +443,7 @@ def main():
             output_dir / f"diff_mean_act_icl{ICL_EXAMPLES}_tok{MAX_NEW_TOKENS}_{DATASET_A_NAME}-{DATASET_B_NAME}.pt"
         )
 
-        print(f"   Looking for files:")
+        print("   Looking for files:")
         print(f"      - {mean_a_file.name}")
         print(f"      - {mean_b_file.name}")
         print(f"      - {diff_file.name}")
@@ -561,9 +561,9 @@ def main():
             print(f"   - {ACTIVATIONS_A_PATH.name}")
             print(f"   - {ACTIVATIONS_B_PATH.name}")
             print(f"   - {DIFF_ACTIVATIONS_PATH.name}")
-            print(f"   - dac_method.pt")
-            print(f"   - text_completions_unsteered.json")
-            print(f"   - text_completions_dynamic_steering.json")
+            print("   - dac_method.pt")
+            print("   - text_completions_unsteered.json")
+            print("   - text_completions_dynamic_steering.json")
             print("=" * 70)
         else:
             print("\n⚠️  Vector generation failed - cannot generate text completions")
