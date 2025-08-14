@@ -23,7 +23,7 @@ import sys
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.steering_methods.caa_original import CAA
+from wisent_guard.core.steering_methods.caa import CAA
 
 from .const import (
     MODEL_NAME,
@@ -76,7 +76,7 @@ def generate_with_wisent_caa(prompts, steering_vector=None, strength=1.0):
         # Prepare steering if needed
         steering_hook_handle = None
         if is_steered:
-            caa = CAA(device=DEVICE)
+            caa = CAA(device=DEVICE, legacy_behavior=True)  # Use legacy behavior to match original CAA
             caa.steering_vector = steering_vector.to(DEVICE)
             caa.layer_index = LAYER_INDEX
             caa.is_trained = True

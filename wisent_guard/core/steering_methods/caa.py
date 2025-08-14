@@ -29,6 +29,7 @@ class CAA(SteeringMethod):
         aggregation_method: ControlVectorAggregationMethod = ControlVectorAggregationMethod.CAA,
         normalization_method: str = "none",
         target_norm: Optional[float] = None,
+        legacy_behavior: bool = False,  # Legacy: apply steering to ALL token positions (True) used in original implementation vs position-specific steering (False)
     ):
         super().__init__("CAA", device)
         self.steering_vector = None
@@ -36,6 +37,7 @@ class CAA(SteeringMethod):
         self.aggregation_method = aggregation_method
         self.normalization_method = normalization_method
         self.target_norm = target_norm
+        self.legacy_behavior = legacy_behavior
         self.training_stats = {}
         self.normalizer = VectorNormalizer()  # Always initialize for potential multi-behavior training
 
@@ -83,6 +85,7 @@ class CAA(SteeringMethod):
                 "aggregation_method": self.aggregation_method.value,
                 "normalization_method": self.normalization_method,
                 "target_norm": self.target_norm,
+                "legacy_behavior": self.legacy_behavior,
                 "layer_index": layer_index,
                 "final_vector_norm": torch.norm(self.steering_vector).item(),
             }
@@ -147,6 +150,7 @@ class CAA(SteeringMethod):
             "multi_behavior": True,
             "behaviors": list(self.behavior_vectors.keys()),
             "layer_index": layer_index,
+            "legacy_behavior": self.legacy_behavior,
             "normalized_across_behaviors": normalize_across_behaviors,
             "behavior_stats": all_stats,
         }
@@ -191,23 +195,26 @@ class CAA(SteeringMethod):
 
         # Handle different activation shapes
         if len(activations.shape) == 3:  # [batch, seq, hidden]
-            # Apply to second-to-last token position (reference behavior)
             steered = activations.clone()
-            if activations.shape[1] > 1:
-                # Use second-to-last token if sequence has more than 1 token
-                before_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+
+            if self.legacy_behavior:
+                # Legacy behavior: Apply to ALL token positions (CAA reference behavior when instruction detection fails)
+                # Based on our validation: CAA uses from_pos=-1 which steers ALL positions
+                before_norm = torch.norm(steered, dim=-1).mean().item()
 
                 # LOG THE ACTUAL STEERING BEING APPLIED
-                logger.debug("   🎯 CAA APPLYING STEERING:")
+                logger.debug("   🎯 CAA APPLYING STEERING (LEGACY):")
                 logger.debug(f"      Strength parameter: {strength}")
                 logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
                 logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
+                logger.debug(f"      Applying to ALL positions (CAA fallback behavior)")
 
-                steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
-                after_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+                # Apply to ALL positions (matching CAA reference with from_pos=-1)
+                steered = steered + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+                after_norm = torch.norm(steered, dim=-1).mean().item()
 
-                logger.debug(f"      Position -2 norm before: {before_norm:.4f}")
-                logger.debug(f"      Position -2 norm after: {after_norm:.4f}")
+                logger.debug(f"      All positions norm before: {before_norm:.4f}")
+                logger.debug(f"      All positions norm after: {after_norm:.4f}")
                 logger.debug(f"      Change: {after_norm - before_norm:.4f}")
 
                 # Check if we created inf/nan
@@ -216,8 +223,27 @@ class CAA(SteeringMethod):
                     logger.debug(f"      Max in steered: {steered.max().item()}")
                     logger.debug(f"      Min in steered: {steered.min().item()}")
             else:
-                # Fallback to last token for single-token sequences
-                steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+                # Modern behavior: Apply to second-to-last token position (reference behavior)
+                if activations.shape[1] > 1:
+                    # Use second-to-last token if sequence has more than 1 token
+                    before_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+
+                    # LOG THE ACTUAL STEERING BEING APPLIED
+                    logger.debug("   🎯 CAA APPLYING STEERING:")
+                    logger.debug(f"      Strength parameter: {strength}")
+                    logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
+                    logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
+
+                    steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+                    after_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+
+                    logger.debug(f"      Position -2 norm before: {before_norm:.4f}")
+                    logger.debug(f"      Position -2 norm after: {after_norm:.4f}")
+                    logger.debug(f"      Change: {after_norm - before_norm:.4f}")
+
+                else:
+                    # Fallback to last token for single-token sequences
+                    steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
         elif len(activations.shape) == 2:  # [batch, hidden]
             steered = activations + strength * steering_vector.unsqueeze(0)
         else:
@@ -241,6 +267,7 @@ class CAA(SteeringMethod):
                 "aggregation_method": self.aggregation_method.value,
                 "normalization_method": self.normalization_method,
                 "target_norm": self.target_norm,
+                "legacy_behavior": self.legacy_behavior,
                 "layer_index": self.layer_index,
                 "training_stats": self.training_stats,
                 "method": "CAA",
@@ -266,6 +293,7 @@ class CAA(SteeringMethod):
             self.aggregation_method = ControlVectorAggregationMethod(data.get("aggregation_method", "CAA"))
             self.normalization_method = data.get("normalization_method", "none")
             self.target_norm = data.get("target_norm")
+            self.legacy_behavior = data.get("legacy_behavior", False)
             self.layer_index = data.get("layer_index")
             self.training_stats = data.get("training_stats", {})
 

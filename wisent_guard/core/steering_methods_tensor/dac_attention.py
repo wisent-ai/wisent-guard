@@ -48,7 +48,7 @@ class DAC(SteeringMethodTensor):
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         torch_dtype=DEFAULT_TORCH_DTYPE,
         icl_examples: int = 4,
-        original_dac_format: bool = False,
+        legacy_behavior: bool = False,  # Legacy: Q:/A: tokenization format used in original implementation (True) vs modern chat templates (False)
     ):
         super().__init__("DAC", device)
 
@@ -62,7 +62,7 @@ class DAC(SteeringMethodTensor):
         self.max_new_tokens = max_new_tokens
         self.torch_dtype = torch_dtype
         self.icl_examples = icl_examples
-        self.original_dac_format = original_dac_format
+        self.legacy_behavior = legacy_behavior
         self.model_config = DEFAULT_MODEL_CONFIG.copy()
 
         # Model and tokenizer (loaded lazily)
@@ -293,7 +293,7 @@ class DAC(SteeringMethodTensor):
         ]
 
         # Use original DAC format (buggy) or corrected format based on parameter
-        loop_range = len(answers) - 1 if self.original_dac_format else len(answers)
+        loop_range = len(answers) - 1 if self.legacy_behavior else len(answers)
         for i in range(loop_range):
             full_prompt.extend(begin)
             full_prompt.append((queries[i], "sentence"))
@@ -469,11 +469,11 @@ class DAC(SteeringMethodTensor):
             - target_answer_text: The expected answer text for generation
         """
         # Use chat templates for better alignment unless original format is requested
-        logger.debug(f"Choosing prompt format: original_dac_format={self.original_dac_format}")
+        logger.debug(f"Choosing prompt format: legacy_behavior={self.legacy_behavior}")
         logger.debug(f"Tokenizer has chat_template: {hasattr(self._tokenizer, 'chat_template')}")
         logger.debug(f"Chat template exists: {getattr(self._tokenizer, 'chat_template', None) is not None}")
 
-        if not self.original_dac_format and hasattr(self._tokenizer, "chat_template") and self._tokenizer.chat_template:
+        if not self.legacy_behavior and hasattr(self._tokenizer, "chat_template") and self._tokenizer.chat_template:
             logger.debug("Using chat template format")
             return self._build_icl_prompt_chat_template(contrastive_pairs, current_pair_idx, response_type)
         else:
@@ -522,7 +522,7 @@ class DAC(SteeringMethodTensor):
         )
 
         # For ICL=0 with corrected format, append target answer for training signal
-        if self.icl_examples == 0 and not self.original_dac_format:
+        if self.icl_examples == 0 and not self.legacy_behavior:
             template.append((target_answer, "sentence"))
             template.append(("\n\n", "structural"))
 

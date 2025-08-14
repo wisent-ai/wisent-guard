@@ -18,7 +18,7 @@ import sys
 WISENT_PATH = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(WISENT_PATH))
 
-from wisent_guard.core.steering_methods.caa_original import CAA
+from wisent_guard.core.steering_methods.caa import CAA
 from wisent_guard.core.aggregation import ControlVectorAggregationMethod
 
 from .const import (
@@ -81,6 +81,7 @@ class TestVectorGeneration:
             device=DEVICE,
             aggregation_method=ControlVectorAggregationMethod.CAA,
             normalization_method=NORMALIZATION_METHOD,
+            legacy_behavior=True,  # Use legacy behavior to match original CAA
         )
 
         _ = caa.train(pair_set, layer_index=LAYER_INDEX)
@@ -165,6 +166,7 @@ class TestVectorGeneration:
                 device=DEVICE,
                 aggregation_method=ControlVectorAggregationMethod.CAA,
                 normalization_method=NORMALIZATION_METHOD,
+                legacy_behavior=True,  # Use legacy behavior to match original CAA
             )
 
             training_stats = caa.train(pair_set, layer_index=LAYER_INDEX)
@@ -215,6 +217,7 @@ class TestVectorGeneration:
                     device=DEVICE,
                     aggregation_method=ControlVectorAggregationMethod.CAA,
                     normalization_method=norm_method,
+                    legacy_behavior=True,  # Use legacy behavior to match original CAA
                 )
 
                 caa.train(pair_set, layer_index=LAYER_INDEX)

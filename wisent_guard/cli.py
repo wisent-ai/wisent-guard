@@ -6314,7 +6314,7 @@ def handle_generate_vector_command(args):
                 model_name=args.model,
                 device=args.device,
                 icl_examples=0,
-                original_dac_format=False,  # Use chat templates for better alignment
+                legacy_behavior=False,  # Use chat templates for better alignment
                 # Note: dynamic_control and entropy_threshold are deprecated in tensor-based DAC
             )
 
@@ -6499,7 +6499,7 @@ def handle_generate_vector_command(args):
                 model_name=args.model,
                 device=args.device,
                 icl_examples=0,  # Use 0 ICL examples to avoid grouping issues
-                original_dac_format=False,  # Use chat templates for better alignment
+                legacy_behavior=False,  # Use chat templates for better alignment
                 # Note: dynamic_control and entropy_threshold are deprecated in tensor-based DAC
             )
         elif args.method == "CAA":
