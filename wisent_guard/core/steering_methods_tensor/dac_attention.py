@@ -403,12 +403,17 @@ class DAC(SteeringMethodTensor):
         else:
             target_answer = target_pair.negative_response.text
 
-        # Build template using original DAC logic (answers list excludes target answer)
+        # Build template using original DAC logic
         template = self._build_prompt_txt(
             queries=queries,
             answers=answers,  # This excludes the target answer - prompt ends at '\nA:'
             pre_append_instruction=None,
         )
+
+        # For ICL=0 with corrected format, append target answer for training signal
+        if self.icl_examples == 0 and not self.original_dac_format:
+            template.append((target_answer, "sentence"))
+            template.append(("\n\n", "structural"))
 
         # Tokenize using original DAC method
         prompt_tokens, important_ids = self._tokenize_from_template(self._tokenizer, template)
