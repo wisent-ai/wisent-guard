@@ -13,7 +13,6 @@ import json
 import os
 import sys
 import time
-import shutil
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
@@ -47,10 +46,6 @@ from const import (
 utils_path = Path(__file__).parent.parent / "utils.py"
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils import aggressive_memory_cleanup
-
-# Add the Dynamic-Activation-Composition directory to the path
-DAC_DIR = Path(__file__).parent.parent.parent.parent / "Dynamic-Activation-Composition"
-sys.path.insert(0, str(DAC_DIR))
 
 # Store original directory for path management
 ORIGINAL_CWD = os.getcwd()
@@ -117,10 +112,12 @@ class TestDACVectorGeneration:
         config_name = f"icl{ICL_EXAMPLES}_tok{MAX_NEW_TOKENS}"
         ref_tensor_path = REFERENCE_DATA_PATH / f"diff_activations_{config_name}.pt"
 
-        # Generate reference tensor if it doesn't exist (like debug script)
+        # Check if reference tensor exists
         if not ref_tensor_path.exists():
-            print(f"Reference tensor not found, generating: {ref_tensor_path}")
-            ref_tensor_path = self._generate_reference_tensor_for_config(config_name, ICL_EXAMPLES, MAX_NEW_TOKENS)
+            pytest.skip(
+                f"Reference tensor not found: {ref_tensor_path}\n"
+                f"Please run generate_data_with_original_dac_implementation.py first to generate reference data."
+            )
 
         try:
             # Load reference tensor
@@ -185,60 +182,6 @@ class TestDACVectorGeneration:
             )
 
         finally:
-            aggressive_memory_cleanup()
-
-    def _generate_reference_tensor_for_config(self, config_name: str, icl_examples: int, max_new_tokens: int) -> Path:
-        """
-        Generate reference tensor using original DAC implementation for specific configuration.
-        Matches debug_dac_tensor_comparison.py approach exactly.
-        """
-        print(f"\n{'=' * 60}")
-        print(f"GENERATING REFERENCE TENSOR: {config_name}")
-        print(f"ICL Examples: {icl_examples}, Max tokens: {max_new_tokens}")
-        print(f"{'=' * 60}")
-
-        # Change to DAC directory
-        os.chdir(DAC_DIR)
-
-        try:
-            from diff_main import main as diff_main
-
-            # Run diff_main with specific configuration
-            print(f"Running diff_main with {config_name} configuration...")
-            diff_main(
-                model_name=MODEL_NAME,
-                load_in_8bit=False,
-                dataset_A_name=f"{DATASET_A_NAME}_train",
-                dataset_B_name=f"{DATASET_B_NAME}_train",
-                icl_examples=icl_examples,
-                pre_append_instruction=False,
-                support=20,  # Use 20 examples for consistency
-                max_new_tokens=max_new_tokens,
-                debug=False,
-                eval_dataset=None,
-                skip_eval=True,  # Skip evaluation to save time
-            )
-
-            # Find the generated tensor file
-            output_dir = Path(f"./output/{MODEL_NAME.split('/')[1]}/{DATASET_A_NAME}/diff")
-            diff_file = (
-                output_dir / f"diff_mean_act_icl{icl_examples}_tok{max_new_tokens}_{DATASET_A_NAME}-{DATASET_B_NAME}.pt"
-            )
-
-            if not diff_file.exists():
-                raise FileNotFoundError(f"Generated tensor not found: {diff_file}")
-
-            # Copy to reference_data with config-specific name
-            reference_tensor_path = REFERENCE_DATA_PATH / f"diff_activations_{config_name}.pt"
-            shutil.copy2(diff_file, reference_tensor_path)
-
-            print(f"✓ Generated and copied reference tensor: {reference_tensor_path.name}")
-            return reference_tensor_path
-
-        finally:
-            # Change back to original directory
-            os.chdir(ORIGINAL_CWD)
-            # Clean up GPU memory
             aggressive_memory_cleanup()
 
     def _compare_tensors(self, our_tensor: torch.Tensor, ref_tensor: torch.Tensor, config_name: str) -> Dict[str, Any]:

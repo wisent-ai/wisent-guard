@@ -113,6 +113,69 @@ def copy_datasets_to_reference():
             print(f"   ⚠️  Source file not found: {src}")
 
 
+def generate_reference_tensor_for_config(config_name: str, icl_examples: int, max_new_tokens: int) -> Path:
+    """
+    Generate reference tensor using original DAC implementation for specific configuration.
+
+    Args:
+        config_name: Configuration name (e.g., "icl4_tok30")
+        icl_examples: Number of in-context learning examples
+        max_new_tokens: Maximum number of new tokens to generate
+
+    Returns:
+        Path to the generated reference tensor file
+    """
+    print(f"\n{'=' * 60}")
+    print(f"GENERATING REFERENCE TENSOR: {config_name}")
+    print(f"ICL Examples: {icl_examples}, Max tokens: {max_new_tokens}")
+    print(f"{'=' * 60}")
+
+    # Store current directory
+    current_dir = os.getcwd()
+
+    # Change to DAC directory
+    os.chdir(DAC_DIR)
+
+    try:
+        # Run diff_main with specific configuration
+        print(f"Running diff_main with {config_name} configuration...")
+        diff_main(
+            model_name=MODEL_NAME,
+            load_in_8bit=False,
+            dataset_A_name=f"{DATASET_A_NAME}_train",
+            dataset_B_name=f"{DATASET_B_NAME}_train",
+            icl_examples=icl_examples,
+            pre_append_instruction=False,
+            support=20,  # Use 20 examples for consistency
+            max_new_tokens=max_new_tokens,
+            debug=False,
+            eval_dataset=None,
+            skip_eval=True,  # Skip evaluation to save time
+        )
+
+        # Find the generated tensor file
+        output_dir = Path(f"./output/{MODEL_NAME.split('/')[1]}/{DATASET_A_NAME}/diff")
+        diff_file = (
+            output_dir / f"diff_mean_act_icl{icl_examples}_tok{max_new_tokens}_{DATASET_A_NAME}-{DATASET_B_NAME}.pt"
+        )
+
+        if not diff_file.exists():
+            raise FileNotFoundError(f"Generated tensor not found: {diff_file}")
+
+        # Copy to reference_data with config-specific name
+        reference_tensor_path = REFERENCE_DATA_PATH / f"diff_activations_{config_name}.pt"
+        shutil.copy2(diff_file, reference_tensor_path)
+
+        print(f"✓ Generated and copied reference tensor: {reference_tensor_path.name}")
+        return reference_tensor_path
+
+    finally:
+        # Change back to original directory
+        os.chdir(current_dir)
+        # Clean up GPU memory
+        aggressive_memory_cleanup()
+
+
 def generate_reference_text_completions():
     """
     Generate reference text completions using original DAC implementation.
@@ -401,6 +464,12 @@ def main():
         if diff_file.exists():
             shutil.copy2(diff_file, DIFF_ACTIVATIONS_PATH)
             print(f"   ✓ Copied difference activations to: {DIFF_ACTIVATIONS_PATH}")
+
+            # Also copy with config-specific name for test compatibility
+            config_name = f"icl{ICL_EXAMPLES}_tok{MAX_NEW_TOKENS}"
+            config_specific_path = REFERENCE_DATA_PATH / f"diff_activations_{config_name}.pt"
+            shutil.copy2(diff_file, config_specific_path)
+            print(f"   ✓ Also copied as: {config_specific_path.name}")
         else:
             print(f"   ⚠️  Difference activations not found: {diff_file}")
 
