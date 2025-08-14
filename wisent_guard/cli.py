@@ -577,6 +577,8 @@ def run_task_pipeline(
     # Synthetic pair mode
     from_synthetic: bool = False,
     synthetic_contrastive_pairs: Optional[Any] = None,
+    # Security parameter - allow code execution without Docker (UNSAFE)
+    trust_code_execution: bool = False,
     # Model reuse parameter for efficiency
     model_instance: Optional[Any] = None,
 ) -> Dict[str, Any]:
@@ -591,11 +593,12 @@ def run_task_pipeline(
     Returns:
         Dictionary containing the results of the task pipeline
     """
+    from pathlib import Path
 
     # SECURITY: Enforce Docker for code execution tasks
     from .core import SecureCodeEvaluator, enforce_secure_execution
 
-    if enforce_secure_execution(task_name):
+    if enforce_secure_execution(task_name, trust_code_execution):
         if verbose:
             print(f"🔒 Task '{task_name}' requires secure Docker execution")
             print("   • All code will be executed in isolated Docker containers")
@@ -1368,12 +1371,39 @@ def run_task_pipeline(
 
                         except Exception as e:
                             if verbose:
-                                print(f"⚠️  Managed cache failed, falling back to traditional method: {e}")
+                                print(f"⚠️  Managed cache failed, trying Full Benchmark Downloader cache: {e}")
 
-                            # Fallback to traditional method
-                            qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
-                                task_name, task_data, train_docs
-                            )
+                            # Try to load from Full Benchmark Downloader cache
+                            full_benchmark_file = Path(cache_dir) / "data" / f"{task_name}.pkl"
+                            if full_benchmark_file.exists():
+                                try:
+                                    import pickle
+
+                                    with open(full_benchmark_file, "rb") as f:
+                                        benchmark_data = pickle.load(f)
+                                    # Handle both list format (direct contrastive pairs) and dict format
+                                    if isinstance(benchmark_data, list):
+                                        qa_pairs = benchmark_data
+                                    else:
+                                        qa_pairs = benchmark_data.get("contrastive_pairs", [])
+                                    if verbose:
+                                        print(
+                                            f"✅ Using Full Benchmark Downloader cache: {len(qa_pairs)} samples loaded"
+                                        )
+                                except Exception as load_error:
+                                    if verbose:
+                                        print(f"⚠️  Full Benchmark Downloader cache failed: {load_error}")
+                                    qa_pairs = []
+                            else:
+                                qa_pairs = []
+
+                            # Final fallback to traditional method if cache loading failed
+                            if not qa_pairs:
+                                if verbose:
+                                    print("⚠️  All cache methods failed, falling back to traditional extraction")
+                                qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
+                                    task_name, task_data, train_docs
+                                )
                     else:
                         # Traditional method when caching is disabled
                         qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
@@ -1575,14 +1605,9 @@ def run_task_pipeline(
                 if verbose:
                     print("   • Use --allow-small-dataset flag to bypass this check (may cause training issues)")
 
-                return {
-                    "task_name": task_name,
-                    "model_name": model_name,
-                    "error": error_msg,
-                    "training_samples": len(qa_pairs),
-                    "minimum_required": min_training_samples,
-                    "suggestion": "Increase dataset size, --limit parameter, or use --allow-small-dataset flag",
-                }
+                raise ValueError(
+                    f"{error_msg}. Suggestion: Increase dataset size, --limit parameter, or use --allow-small-dataset flag"
+                )
             if verbose:
                 print("   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag")
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
@@ -4775,6 +4800,8 @@ def handle_tasks_command(args):
                 use_cached=getattr(args, "cache_benchmark", True),  # Use cache_benchmark value
                 force_download=getattr(args, "force_download", False),
                 cache_dir=getattr(args, "cache_dir", "./benchmark_cache"),
+                # Security parameter
+                trust_code_execution=getattr(args, "trust_code_execution", False),
                 # Pass pre-loaded QA pairs for mixed sampling
                 preloaded_qa_pairs=qa_pairs if (source == "MIXED_SAMPLING" and qa_pairs) else None,
                 # Pass cross-benchmark data
@@ -6340,9 +6367,15 @@ def handle_generate_vector_command(args):
                     with open(pairs_file) as f:
                         pairs_data = json.load(f)
 
+                    # Handle both dict (with 'pairs' key) and list formats
+                    if isinstance(pairs_data, dict) and "pairs" in pairs_data:
+                        pairs_list = pairs_data["pairs"]
+                    else:
+                        pairs_list = pairs_data
+
                     # Create ContrastivePairSet
                     pairs = ContrastivePairSet(name=prop_name)
-                    for pair_data in pairs_data:
+                    for pair_data in pairs_list:
                         # Extract text from response dictionaries
                         pos_response = pair_data.get("positive_response", "")
                         if isinstance(pos_response, dict):
@@ -6351,7 +6384,6 @@ def handle_generate_vector_command(args):
                         neg_response = pair_data.get("negative_response", "")
                         if isinstance(neg_response, dict):
                             neg_response = neg_response.get("text", "")
-
                         pair = ContrastivePair(
                             prompt=pair_data.get("prompt", ""),
                             positive_response=PositiveResponse(pos_response),
@@ -6434,8 +6466,16 @@ def handle_generate_vector_command(args):
             from .core.contrastive_pairs import ContrastivePair, ContrastivePairSet
             from .core.response import NegativeResponse, PositiveResponse
 
-            pairs = ContrastivePairSet(name="loaded_from_file")
-            for pair_data in pairs_data:
+            # Handle both dict (with 'pairs' key) and list formats
+            if isinstance(pairs_data, dict) and "pairs" in pairs_data:
+                pairs_list = pairs_data["pairs"]
+                pairs_name = pairs_data.get("name", "loaded_from_file")
+            else:
+                pairs_list = pairs_data
+                pairs_name = "loaded_from_file"
+
+            pairs = ContrastivePairSet(name=pairs_name)
+            for pair_data in pairs_list:
                 # Extract text from response dictionaries
                 pos_response = pair_data.get("positive_response", "")
                 if isinstance(pos_response, dict):
@@ -6444,7 +6484,6 @@ def handle_generate_vector_command(args):
                 neg_response = pair_data.get("negative_response", "")
                 if isinstance(neg_response, dict):
                     neg_response = neg_response.get("text", "")
-
                 pair = ContrastivePair(
                     prompt=pair_data.get("prompt", ""),
                     positive_response=PositiveResponse(pos_response),
@@ -6633,9 +6672,15 @@ def handle_multi_steer_command(args):
         # Check weight normalization
         if args.normalize_weights:
             print(f"\n📏 Normalizing weights (sum={total_weight:.2f} → 1.0)")
+        elif args.target_norm is not None:
+            # If target norm is specified, we don't need to worry about weight normalization
+            print(f"\n🎯 Target norm specified: {args.target_norm:.2f}")
+            print(f"   Current weight sum: {total_weight:.2f}")
         elif not args.allow_unnormalized and abs(total_weight - 1.0) > 0.01:
             print(f"\n⚠️  Warning: Weights sum to {total_weight:.2f} (not 1.0)")
-            print("   Use --normalize-weights to normalize or --allow-unnormalized to proceed")
+            print(
+                "   Use --normalize-weights to normalize, --target-norm to set a specific norm, or --allow-unnormalized to proceed"
+            )
             sys.exit(1)
 
         # Load model
@@ -6687,7 +6732,19 @@ def handle_multi_steer_command(args):
 
         print(f"\n✅ Combined {len(loaded_vectors)} vectors")
         print(f"   📏 Combined vector shape: {combined_vector.shape}")
-        print(f"   📊 Combined vector norm: {torch.norm(combined_vector).item():.4f}")
+        original_norm = torch.norm(combined_vector).item()
+        print(f"   📊 Combined vector norm: {original_norm:.4f}")
+
+        # Scale to target norm if specified
+        if args.target_norm is not None:
+            current_norm = torch.norm(combined_vector).item()
+            if current_norm > 0:
+                scale_factor = args.target_norm / current_norm
+                combined_vector = combined_vector * scale_factor
+                new_norm = torch.norm(combined_vector).item()
+                print(f"   🎯 Scaled to target norm: {new_norm:.4f} (scale factor: {scale_factor:.4f})")
+            else:
+                print(f"   ⚠️  Cannot scale zero vector to target norm")
 
         # Save combined vector if requested
         if args.save_combined:
@@ -6700,6 +6757,7 @@ def handle_multi_steer_command(args):
                     "source_vectors": [path for path, _ in vectors_info],
                     "weights": weights,
                     "normalized": args.normalize_weights,
+                    "target_norm": args.target_norm,
                 },
             }
             torch.save(save_data, args.save_combined)

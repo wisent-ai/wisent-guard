@@ -305,3 +305,180 @@ class CAA(SteeringMethod):
             return True
         except Exception:
             return False
+
+    def combine_behaviors(self, behavior_weights: Dict[str, float], normalize_result: bool = False) -> torch.Tensor:
+        """
+        Combine multiple behavior vectors with specified weights.
+
+        Implements the linear combination recipe for multi-property steering:
+        v_combined = α₁ * v₁ + α₂ * v₂ + ... + αₙ * vₙ
+
+        Args:
+            behavior_weights: Dictionary mapping behavior names to their weights
+                             e.g., {"italian": 0.7, "honest": 0.3}
+            normalize_result: Whether to normalize the combined vector to unit norm
+
+        Returns:
+            Combined steering vector
+
+        Raises:
+            ValueError: If not trained with multi-behavior or if behavior not found
+
+        Example:
+            >>> caa.train_multi_behavior({"italian": pairs1, "honest": pairs2}, layer=13)
+            >>> combined = caa.combine_behaviors({"italian": 0.7, "honest": 0.3})
+        """
+        if not hasattr(self, "behavior_vectors") or not self.behavior_vectors:
+            raise ValueError(
+                "No behavior vectors available. Use train_multi_behavior() first to train multiple behaviors."
+            )
+
+        # Initialize combined vector with zeros
+        first_vector = next(iter(self.behavior_vectors.values()))
+        combined_vector = torch.zeros_like(first_vector)
+
+        # Linear combination of normalized vectors
+        for behavior_name, weight in behavior_weights.items():
+            if behavior_name not in self.behavior_vectors:
+                available = list(self.behavior_vectors.keys())
+                raise ValueError(f"Behavior '{behavior_name}' not found. Available behaviors: {available}")
+
+            # Add weighted vector (assumes already normalized from train_multi_behavior)
+            combined_vector += weight * self.behavior_vectors[behavior_name]
+
+        # Optionally normalize the result to unit norm
+        if normalize_result:
+            norm = torch.norm(combined_vector, p=2)
+            if norm > 1e-10:
+                combined_vector = combined_vector / norm
+
+        return combined_vector
+
+    def apply_combined_steering(
+        self,
+        activations: torch.Tensor,
+        behavior_weights: Dict[str, float],
+        normalize_combined: bool = False,
+        apply_to_all_tokens: bool = True,
+        verbose: bool = False,
+    ) -> torch.Tensor:
+        """
+        Apply combined multi-property steering to activations.
+
+        This implements the complete recipe for multi-property CAA steering:
+        1. Combines multiple behavior vectors with specified weights
+        2. Applies the combined vector to activations
+
+        Args:
+            activations: Input activations to steer [batch, seq, hidden]
+            behavior_weights: Dictionary mapping behavior names to weights
+                             e.g., {"italian": 0.7, "honest": 0.3}
+            normalize_combined: Whether to normalize the combined vector
+            apply_to_all_tokens: If True, apply to all tokens after prompt.
+                                If False, apply only to second-to-last token.
+            verbose: Enable debug logging
+
+        Returns:
+            Steered activations
+
+        Example:
+            >>> # During inference
+            >>> steered = caa.apply_combined_steering(
+            ...     activations,
+            ...     {"italian": 0.7, "honest": 0.3}
+            ... )
+        """
+        if not self.is_trained:
+            raise ValueError("CAA must be trained before applying steering")
+
+        # Combine the behavior vectors
+        combined_vector = self.combine_behaviors(behavior_weights, normalize_combined)
+        combined_vector = combined_vector.to(activations.device)
+
+        if verbose:
+            print(f"\n🔍 CAA Multi-Property Steering:")
+            print(f"   Behaviors & weights: {behavior_weights}")
+            print(f"   Combined vector norm: {torch.norm(combined_vector).item():.4f}")
+            print(f"   Input shape: {activations.shape}")
+            print(f"   Apply to all tokens: {apply_to_all_tokens}")
+
+        # Apply the combined steering vector
+        steered = activations.clone()
+
+        if len(activations.shape) == 3:  # [batch, seq, hidden]
+            if apply_to_all_tokens:
+                # Apply to all tokens (as per recipe: "every token after the user prompt")
+                steered = steered + combined_vector.unsqueeze(0).unsqueeze(0)
+                if verbose:
+                    print(f"   Applied to all {activations.shape[1]} tokens")
+            else:
+                # Apply only to second-to-last token (CAA default behavior)
+                if activations.shape[1] > 1:
+                    steered[:, -2:-1, :] = steered[:, -2:-1, :] + combined_vector.unsqueeze(0).unsqueeze(0)
+                    if verbose:
+                        print(f"   Applied to second-to-last token only")
+                else:
+                    steered[:, -1:, :] = steered[:, -1:, :] + combined_vector.unsqueeze(0).unsqueeze(0)
+                    if verbose:
+                        print(f"   Applied to last token (single-token sequence)")
+
+        elif len(activations.shape) == 2:  # [batch, hidden]
+            steered = activations + combined_vector.unsqueeze(0)
+        else:
+            steered = activations + combined_vector
+
+        return steered
+
+    def setup_multi_property_steering(
+        self,
+        behavior_datasets: Dict[str, ContrastivePairSet],
+        layer_index: int,
+        normalize_behaviors: bool = True,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Convenience method to set up multi-property steering in one call.
+
+        This handles the complete setup process:
+        1. Trains on multiple behaviors
+        2. Normalizes vectors across behaviors (optional)
+        3. Prepares for multi-property combination
+
+        Args:
+            behavior_datasets: Dictionary mapping behavior names to ContrastivePairSets
+                              e.g., {"italian": italian_pairs, "honest": honest_pairs}
+            layer_index: Layer index where steering will be applied
+            normalize_behaviors: Whether to normalize across behaviors (recommended)
+            verbose: Enable progress logging
+
+        Returns:
+            Training statistics for all behaviors
+
+        Example:
+            >>> # Setup
+            >>> stats = caa.setup_multi_property_steering(
+            ...     {"italian": italian_pairs, "honest": honest_pairs},
+            ...     layer_index=13
+            ... )
+            >>> # Then during inference
+            >>> steered = caa.apply_combined_steering(
+            ...     activations,
+            ...     {"italian": 0.7, "honest": 0.3}
+            ... )
+        """
+        if verbose:
+            behaviors_list = list(behavior_datasets.keys())
+            logger.info(f"Setting up multi-property CAA for behaviors: {behaviors_list}")
+            logger.info(f"Layer: {layer_index}, Normalize: {normalize_behaviors}")
+
+        # Train on multiple behaviors with normalization
+        stats = self.train_multi_behavior(
+            behavior_datasets, layer_index, normalize_across_behaviors=normalize_behaviors
+        )
+
+        if verbose:
+            for behavior, vector in self.behavior_vectors.items():
+                norm = torch.norm(vector).item()
+                logger.info(f"  {behavior}: vector norm = {norm:.4f}")
+
+        return stats

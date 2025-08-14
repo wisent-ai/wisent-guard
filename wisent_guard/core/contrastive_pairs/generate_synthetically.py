@@ -559,14 +559,29 @@ class SyntheticContrastivePairGenerator:
         
         # Generate
         with torch.no_grad():
+            # Get pad_token_id and eos_token_id safely
+            if hasattr(self.model.tokenizer, 'pad_token_id'):
+                pad_token_id = self.model.tokenizer.pad_token_id
+            elif isinstance(self.model.tokenizer, dict):
+                pad_token_id = self.model.tokenizer.get('pad_token_id', 0)
+            else:
+                pad_token_id = 0
+                
+            if hasattr(self.model.tokenizer, 'eos_token_id'):
+                eos_token_id = self.model.tokenizer.eos_token_id
+            elif isinstance(self.model.tokenizer, dict):
+                eos_token_id = self.model.tokenizer.get('eos_token_id', 0)
+            else:
+                eos_token_id = 0
+            
             outputs = self.model.hf_model.generate(
                 **inputs,
                 max_new_tokens=merged_config.get('max_new_tokens', 150),
                 temperature=merged_config.get('temperature', 0.7),
                 top_p=merged_config.get('top_p', 0.9),
                 do_sample=True,
-                pad_token_id=self.model.tokenizer.pad_token_id,
-                eos_token_id=self.model.tokenizer.eos_token_id,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
             )
         
         # Decode
@@ -749,6 +764,7 @@ class SyntheticContrastivePairGenerator:
         pair_overgeneration_factor: float = 1.5,
         force_regenerate: bool = False,
         verbose_timing: bool = False,
+        name: Optional[str] = None,  # Added to fix bug where multiple callers pass this
     ) -> ContrastivePairSet:
         """
         Generate a complete contrastive pair set from a trait description.
@@ -760,6 +776,7 @@ class SyntheticContrastivePairGenerator:
             pair_overgeneration_factor: Factor to overgenerate pairs for diversity selection
             force_regenerate: If True, bypasses the cache and generates a new set.
             verbose_timing: If True, shows detailed timing for each step
+            name: Optional name for the pair set (used by various callers)
 
         Returns:
             ContrastivePairSet with generated pairs
@@ -931,8 +948,10 @@ class SyntheticContrastivePairGenerator:
         )
         print(f"✅ Selected {len(diverse_pairs)} diverse pairs")
 
+        # Generate name from trait description
+        pair_set_name = f"synthetic_{trait_description[:30]}"
         pair_set: ContrastivePairSet = ContrastivePairSet(
-            name=f"synthetic_{trait_description[:30]}",
+            name=pair_set_name,
             task_type="synthetic",
             pairs=diverse_pairs,
         )
