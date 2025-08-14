@@ -142,6 +142,7 @@ wisent_guard/core/steering_methods/steering_evaluation.py
 wisent_guard/core/steering_methods/token_steered.py
 wisent_guard/core/tasks/__init__.py
 wisent_guard/core/tasks/aime_task.py
+wisent_guard/core/tasks/file_task.py
 wisent_guard/core/tasks/hle_task.py
 wisent_guard/core/tasks/hmmt_task.py
 wisent_guard/core/tasks/livecodebench_task.py
