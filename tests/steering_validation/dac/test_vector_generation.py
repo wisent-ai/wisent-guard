@@ -143,6 +143,7 @@ class TestDACVectorGeneration:
                 max_new_tokens=MAX_NEW_TOKENS,
                 torch_dtype=TORCH_DTYPE,
                 icl_examples=ICL_EXAMPLES,
+                original_dac_format=True,  # Use original DAC format for consistency
             )
 
             # Train DAC

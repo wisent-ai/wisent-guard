@@ -10,7 +10,7 @@ MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"  # Default model from DAC impl
 DATASET_A_NAME = "ITA"  # Italian responses dataset
 DATASET_B_NAME = "ENG"  # English responses dataset
 MAX_NEW_TOKENS = 30  # Use 30 tokens for icl4_tok30 configuration
-ICL_EXAMPLES = 4  # Use 4 ICL examples
+ICL_EXAMPLES = 4
 
 # Paths
 TEST_DIR = Path(__file__).parent

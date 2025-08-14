@@ -48,6 +48,7 @@ class DAC(SteeringMethodTensor):
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         torch_dtype=DEFAULT_TORCH_DTYPE,
         icl_examples: int = 4,
+        original_dac_format: bool = False,
     ):
         super().__init__("DAC", device)
 
@@ -61,6 +62,7 @@ class DAC(SteeringMethodTensor):
         self.max_new_tokens = max_new_tokens
         self.torch_dtype = torch_dtype
         self.icl_examples = icl_examples
+        self.original_dac_format = original_dac_format
         self.model_config = DEFAULT_MODEL_CONFIG.copy()
 
         # Model and tokenizer (loaded lazily)
@@ -251,8 +253,8 @@ class DAC(SteeringMethodTensor):
 
         return mean_activations
 
-    @staticmethod
     def _build_prompt_txt(
+        self,
         queries: list[str],
         answers: list[str],
         pre_append_instruction: str | None = None,
@@ -290,7 +292,9 @@ class DAC(SteeringMethodTensor):
             ("\n\n", "structural"),
         ]
 
-        for i in range(len(answers) - 1):
+        # Use original DAC format (buggy) or corrected format based on parameter
+        loop_range = len(answers) - 1 if self.original_dac_format else len(answers)
+        for i in range(loop_range):
             full_prompt.extend(begin)
             full_prompt.append((queries[i], "sentence"))
             full_prompt.extend(middle)
