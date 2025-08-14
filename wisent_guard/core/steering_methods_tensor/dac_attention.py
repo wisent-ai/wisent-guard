@@ -351,13 +351,11 @@ class DAC(SteeringMethodTensor):
         full_tokenized = full_tokenized.squeeze()
         return full_tokenized, indexes
 
-    def _build_icl_prompt(
+    def _build_icl_prompt_chat_template(
         self, contrastive_pairs: ContrastivePairSet, current_pair_idx: int, response_type: str
     ) -> tuple:
         """
-        Build an ICL prompt using the original DAC's build_prompt_txt + tokenize_from_template approach.
-
-        This creates the exact same tokenized sequence as the original DAC implementation.
+        Build an ICL prompt using the tokenizer's chat template for better alignment with generation.
 
         Args:
             contrastive_pairs: ContrastivePairSet containing all pairs
@@ -366,9 +364,122 @@ class DAC(SteeringMethodTensor):
 
         Returns:
             Tuple of (prompt_tokens, target_answer_text) where:
-            - prompt_tokens: Tokenized prompt ending at '\nA:'
+            - prompt_tokens: Tokenized prompt ready for generation
             - target_answer_text: The expected answer text for generation
         """
+        logger.debug(
+            f"Building chat template: pairs={len(contrastive_pairs.pairs)}, icl={self.icl_examples}, idx={current_pair_idx}"
+        )
+
+        # Build conversation messages for ICL examples
+        messages = []
+
+        # Add ICL examples as conversation history
+        for offset in range(self.icl_examples):
+            icl_idx = current_pair_idx + offset
+            if icl_idx < len(contrastive_pairs.pairs):
+                icl_pair = contrastive_pairs.pairs[icl_idx]
+
+                # Add user message
+                messages.append({"role": "user", "content": icl_pair.prompt})
+
+                # Add assistant response
+                if response_type == "positive":
+                    messages.append({"role": "assistant", "content": icl_pair.positive_response.text})
+                else:
+                    messages.append({"role": "assistant", "content": icl_pair.negative_response.text})
+
+        # Add the final query (target question)
+        target_pair = (
+            contrastive_pairs.pairs[current_pair_idx + self.icl_examples]
+            if current_pair_idx + self.icl_examples < len(contrastive_pairs.pairs)
+            else contrastive_pairs.pairs[current_pair_idx]
+        )
+        messages.append({"role": "user", "content": target_pair.prompt})
+
+        # Get target answer
+        if response_type == "positive":
+            target_answer = target_pair.positive_response.text
+        else:
+            target_answer = target_pair.negative_response.text
+
+        logger.debug(f"Target answer ({response_type}): {target_answer[:50]}...")
+        logger.debug(f"Messages before applying template: {messages}")
+
+        # For training, we may want to include the target answer in the prompt
+        # This depends on whether we're doing ICL=0 training
+        try:
+            if self.icl_examples == 0:
+                # For ICL=0, include the answer in the messages for training signal
+                messages.append({"role": "assistant", "content": target_answer})
+                logger.debug(f"Added target answer to messages (ICL=0)")
+
+                # Apply chat template with generation prompt disabled (since we have the answer)
+                prompt_text = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+            else:
+                # For ICL>0, stop at the generation prompt
+                prompt_text = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+            logger.debug(f"Chat template result type: {type(prompt_text)}")
+            logger.debug(
+                f"Chat template result preview: {prompt_text[:100] if isinstance(prompt_text, str) else prompt_text}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error applying chat template: {e}")
+            logger.error(f"Messages: {messages}")
+            logger.error(f"Tokenizer type: {type(self._tokenizer)}")
+            raise
+
+        # Tokenize the prompt
+        # Ensure prompt_text is a string
+        if not isinstance(prompt_text, str):
+            logger.warning(f"prompt_text is not a string: type={type(prompt_text)}, value={prompt_text}")
+            # Try to convert to string if possible
+            prompt_text = str(prompt_text)
+
+        prompt_tokens = self._tokenizer(prompt_text, return_tensors="pt")["input_ids"].squeeze()
+        # Ensure 1D tensor
+        if prompt_tokens.dim() == 0:
+            prompt_tokens = prompt_tokens.unsqueeze(0)
+
+        logger.debug(f"Built chat template ICL prompt: {len(messages)} messages")
+        logger.debug(f"Tokenized prompt length: {prompt_tokens.shape[0]}")
+        logger.debug(f"Target answer: {target_answer[:50] if len(target_answer) > 50 else target_answer}...")
+
+        return prompt_tokens, target_answer
+
+    def _build_icl_prompt(
+        self, contrastive_pairs: ContrastivePairSet, current_pair_idx: int, response_type: str
+    ) -> tuple:
+        """
+        Build an ICL prompt using either chat templates or original DAC format.
+
+        This method chooses between modern chat templates (for better alignment with generation)
+        or the original DAC Q:/A: format (for backward compatibility).
+
+        Args:
+            contrastive_pairs: ContrastivePairSet containing all pairs
+            current_pair_idx: Index of the current pair to use as the final prompt
+            response_type: "positive" or "negative" - determines which responses to use in ICL
+
+        Returns:
+            Tuple of (prompt_tokens, target_answer_text) where:
+            - prompt_tokens: Tokenized prompt
+            - target_answer_text: The expected answer text for generation
+        """
+        # Use chat templates for better alignment unless original format is requested
+        logger.debug(f"Choosing prompt format: original_dac_format={self.original_dac_format}")
+        logger.debug(f"Tokenizer has chat_template: {hasattr(self._tokenizer, 'chat_template')}")
+        logger.debug(f"Chat template exists: {getattr(self._tokenizer, 'chat_template', None) is not None}")
+
+        if not self.original_dac_format and hasattr(self._tokenizer, "chat_template") and self._tokenizer.chat_template:
+            logger.debug("Using chat template format")
+            return self._build_icl_prompt_chat_template(contrastive_pairs, current_pair_idx, response_type)
+        else:
+            logger.debug("Using Q:/A: format")
+
+        # Otherwise use original DAC format for backward compatibility
         import sys
         import os
         from pathlib import Path

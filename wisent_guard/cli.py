@@ -6314,6 +6314,7 @@ def handle_generate_vector_command(args):
                 model_name=args.model,
                 device=args.device,
                 icl_examples=0,
+                original_dac_format=False,  # Use chat templates for better alignment
                 # Note: dynamic_control and entropy_threshold are deprecated in tensor-based DAC
             )
 
@@ -6342,10 +6343,19 @@ def handle_generate_vector_command(args):
                     # Create ContrastivePairSet
                     pairs = ContrastivePairSet(name=prop_name)
                     for pair_data in pairs_data:
+                        # Extract text from response dictionaries
+                        pos_response = pair_data.get("positive_response", "")
+                        if isinstance(pos_response, dict):
+                            pos_response = pos_response.get("text", "")
+
+                        neg_response = pair_data.get("negative_response", "")
+                        if isinstance(neg_response, dict):
+                            neg_response = neg_response.get("text", "")
+
                         pair = ContrastivePair(
                             prompt=pair_data.get("prompt", ""),
-                            positive_response=PositiveResponse(pair_data.get("positive_response", "")),
-                            negative_response=NegativeResponse(pair_data.get("negative_response", "")),
+                            positive_response=PositiveResponse(pos_response),
+                            negative_response=NegativeResponse(neg_response),
                         )
                         pairs.pairs.append(pair)
 
@@ -6426,10 +6436,19 @@ def handle_generate_vector_command(args):
 
             pairs = ContrastivePairSet(name="loaded_from_file")
             for pair_data in pairs_data:
+                # Extract text from response dictionaries
+                pos_response = pair_data.get("positive_response", "")
+                if isinstance(pos_response, dict):
+                    pos_response = pos_response.get("text", "")
+
+                neg_response = pair_data.get("negative_response", "")
+                if isinstance(neg_response, dict):
+                    neg_response = neg_response.get("text", "")
+
                 pair = ContrastivePair(
                     prompt=pair_data.get("prompt", ""),
-                    positive_response=PositiveResponse(pair_data.get("positive_response", "")),
-                    negative_response=NegativeResponse(pair_data.get("negative_response", "")),
+                    positive_response=PositiveResponse(pos_response),
+                    negative_response=NegativeResponse(neg_response),
                 )
                 pairs.pairs.append(pair)
             print(f"   ✅ Loaded {len(pairs.pairs)} pairs")
@@ -6479,6 +6498,8 @@ def handle_generate_vector_command(args):
             method = DAC(
                 model_name=args.model,
                 device=args.device,
+                icl_examples=0,  # Use 0 ICL examples to avoid grouping issues
+                original_dac_format=False,  # Use chat templates for better alignment
                 # Note: dynamic_control and entropy_threshold are deprecated in tensor-based DAC
             )
         elif args.method == "CAA":
