@@ -49,6 +49,10 @@ from const import (
     WISENT_PATH,
 )
 
+# Import memory cleanup utility
+sys.path.insert(0, str(WISENT_PATH))
+from tests.steering_validation.utils import aggressive_memory_cleanup
+
 # Add CAA repo to path
 sys.path.insert(0, str(CAA_PATH))
 
@@ -67,10 +71,11 @@ except ImportError:
     print("You have to clone original CAA repo https://github.com/nrimsky/CAA first")
 
 
-def generate_reference_vector(max_examples=MAX_EXAMPLES):
+def generate_reference_vector(model=None, max_examples=MAX_EXAMPLES):
     """Generate CAA steering vector using original CAA implementation.
 
     Args:
+        model: Optional pre-loaded LlamaWrapper model instance
         max_examples: Maximum number of dataset examples to use (ignored - uses full dataset)
 
     Returns:
@@ -79,13 +84,16 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
     print("🔄 Generating reference CAA vector using ORIGINAL CAA implementation...")
     print(f"Behavior: {BEHAVIOR}, Layer: {LAYER_INDEX}, Model: {MODEL_SIZE}")
 
-    # Initialize model using CAA's approach
-    print("Loading Llama-2-7B model with CAA wrapper...")
-    model = LlamaWrapper(
-        hf_token=None,  # Use logged in credentials
-        size=MODEL_SIZE,
-        use_chat=False,  # Use base model
-    )
+    # Use provided model or initialize new one
+    cleanup_model = False
+    if model is None:
+        print("Loading Llama-2-7B model with CAA wrapper...")
+        model = LlamaWrapper(
+            hf_token=None,  # Use logged in credentials
+            size=MODEL_SIZE,
+            use_chat=False,  # Use base model
+        )
+        cleanup_model = True
 
     # Use CAA's original vector generation function
     print("🚀 Using original CAA generate_save_vectors_for_behavior()...")
@@ -131,14 +139,21 @@ def generate_reference_vector(max_examples=MAX_EXAMPLES):
     torch.save(save_data, HALLUCINATION_VECTOR_PATH)
     print("✅ Saved reference vector with metadata")
 
+    # Clean up model only if we created it
+    if cleanup_model:
+        del model
+        aggressive_memory_cleanup()
+        print("🧹 Cleaned up GPU memory after vector generation")
+
     return steering_vector, save_data
 
 
-def generate_text_completions(steering_vector, max_examples=MAX_TEXT_EXAMPLES):
+def generate_text_completions(steering_vector, model=None, max_examples=MAX_TEXT_EXAMPLES):
     """Generate full text completions using CAA reference implementation.
 
     Args:
         steering_vector: The reference steering vector from generate_reference_vector()
+        model: Optional pre-loaded LlamaWrapper model instance
         max_examples: Maximum number of examples to process for text generation
 
     Returns:
@@ -154,9 +169,13 @@ def generate_text_completions(steering_vector, max_examples=MAX_TEXT_EXAMPLES):
     test_subset = dataset[:max_examples]
     print(f"Using {len(test_subset)} examples for text generation")
 
-    # Initialize model with same settings as vector generation
-    print("Loading Llama-2-7B model for text generation...")
-    model = LlamaWrapper(hf_token=None, size=MODEL_SIZE, use_chat=False)
+    # Use provided model or initialize new one
+    cleanup_model = False
+    if model is None:
+        print("Loading Llama-2-7B model for text generation...")
+        model = LlamaWrapper(hf_token=None, size=MODEL_SIZE, use_chat=False)
+        cleanup_model = True
+
     steering_vector = steering_vector.to(model.device)
 
     # Generate steered outputs
@@ -271,6 +290,12 @@ def generate_text_completions(steering_vector, max_examples=MAX_TEXT_EXAMPLES):
         json.dump(unsteered_results, f, indent=2)
     print(f"✅ Saved unsteered text completions to: {unsteered_path}")
 
+    # Clean up model only if we created it
+    if cleanup_model:
+        del model
+        aggressive_memory_cleanup()
+        print("🧹 Cleaned up GPU memory after text generation")
+
     return steered_results, unsteered_results
 
 
@@ -281,15 +306,86 @@ def main():
     # User should be logged in via huggingface-cli
     print("ℹ️ Using logged-in Hugging Face credentials")
 
+    model = None
     try:
+        # Create a custom loading approach to avoid OOM
+        print("Loading Llama-2-7B model with memory-efficient approach...")
+
+        # First, patch the LlamaWrapper to load in FP16
+        import os
+
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+        # Create wrapper but monkey-patch the init to load in FP16
+        original_init = LlamaWrapper.__init__
+
+        def patched_init(self, hf_token, size="7b", use_chat=True, override_model_weights_path=None):
+            import torch as t
+            from llama_wrapper import BlockOutputWrapper
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            from utils.helpers import get_model_path
+            from utils.tokenize import ADD_FROM_POS_BASE, ADD_FROM_POS_CHAT
+
+            self.device = "cuda" if t.cuda.is_available() else "cpu"
+            self.use_chat = use_chat
+            self.model_name_path = get_model_path(size, not use_chat)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_path, token=hf_token)
+
+            # Load model in FP16 directly to save memory
+            print("Loading model in FP16 to save memory...")
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name_path,
+                token=hf_token,
+                torch_dtype=t.float16,  # Load in FP16 directly
+                device_map="auto",  # Let it handle device placement
+            )
+
+            if override_model_weights_path is not None:
+                self.model.load_state_dict(t.load(override_model_weights_path))
+
+            # END_STR initialization
+            if use_chat:
+                self.END_STR = t.tensor(self.tokenizer.encode(ADD_FROM_POS_CHAT)[1:]).to(self.device)
+            else:
+                self.END_STR = t.tensor(self.tokenizer.encode(ADD_FROM_POS_BASE)[1:]).to(self.device)
+
+            # Wrap layers
+            for i, layer in enumerate(self.model.model.layers):
+                self.model.model.layers[i] = BlockOutputWrapper(
+                    layer, self.model.lm_head, self.model.model.norm, self.tokenizer
+                )
+
+        # Apply the patch
+        LlamaWrapper.__init__ = patched_init
+
+        model = LlamaWrapper(
+            hf_token=None,  # Use logged in credentials
+            size=MODEL_SIZE,
+            use_chat=False,  # Use base model
+        )
+
+        # Restore original init
+        LlamaWrapper.__init__ = original_init
+
+        print("✅ Model loaded successfully in FP16")
+
         # Generate reference vector
-        steering_vector, vector_data = generate_reference_vector()
+        print("\n" + "=" * 60)
+        print("📝 PHASE 1: Generating Reference Vector")
+        print("=" * 60)
+        steering_vector, vector_data = generate_reference_vector(model=model)
+
+        # Reset model state between phases
+        print("\n🔄 Resetting model state between phases...")
+        model.reset_all()
+        aggressive_memory_cleanup()
+        print("✅ Model state reset and memory cleaned")
 
         print("\n" + "=" * 60)
         print("📝 PHASE 2: Generating Reference Text Completions")
         print("=" * 60)
         text_steered_results, text_unsteered_results = generate_text_completions(
-            steering_vector, max_examples=MAX_TEXT_EXAMPLES
+            steering_vector, model=model, max_examples=MAX_TEXT_EXAMPLES
         )
 
         print("\n✅ Reference data generation complete!")
@@ -303,6 +399,13 @@ def main():
         import traceback
 
         traceback.print_exc()
+    finally:
+        # Clean up model at the very end
+        if model is not None:
+            print("\n🧹 Final cleanup...")
+            del model
+            aggressive_memory_cleanup()
+            print("✅ Final cleanup complete")
 
 
 if __name__ == "__main__":

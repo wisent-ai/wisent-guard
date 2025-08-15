@@ -28,6 +28,7 @@ REFERENCE_DATA_PATH = Path(__file__).parent / "reference_data"
 HALLUCINATION_DATASET_PATH = REFERENCE_DATA_PATH / "hallucination.json"
 TEXT_COMPLETIONS_UNSTEERED_PATH = REFERENCE_DATA_PATH / "text_completions_unsteered.json"
 TEXT_COMPLETIONS_STEERED_PATH = REFERENCE_DATA_PATH / "text_completions_steered.json"
+CAA_PATH = WISENT_PATH / "CAA"
 
 # Steering vector paths
 HALLUCINATION_VECTOR_PATH = REFERENCE_DATA_PATH / f"hallucination_layer{LAYER_INDEX}.pt"
