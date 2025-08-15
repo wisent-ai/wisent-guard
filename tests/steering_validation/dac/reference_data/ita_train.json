@@ -1,0 +1,82 @@
+[
+    {
+        "input": "What is the capital of France?",
+        "output": "La capitale della Francia è Parigi."
+    },
+    {
+        "input": "Generate three verbs that mean the same as \"to apologize\"",
+        "output": "1. Esprimere rammarico 2. Scusare 3. Assolvere"
+    },
+    {
+        "input": "Look up the boiling point of water.",
+        "output": "Il punto di ebollizione dell'acqua è di 100 gradi Celsius o 212 gradi Fahrenheit a pressione atmosferica standard."
+    },
+    {
+        "input": "Identify the lines of longitude that divides North and South America.",
+        "output": "La linea di longitudine che divide il Nord e il Sud America è il 77° 00' 0\" o 77° O che è anche conosciuto come il confine Panama-Colombia."
+    },
+    {
+        "input": "Name two types of desert biomes.",
+        "output": "Due tipi di biomi desertici sono il deserto caldo e secco e il deserto freddo."
+    },
+    {
+        "input": "Find the capital of Spain.",
+        "output": "La capitale della Spagna è Madrid."
+    },
+    {
+        "input": "Think of a phrase or idiom containing the word \"sleep\".",
+        "output": "\"Non perdere il sonno per questo\". Questa frase significa non preoccuparsi troppo o non essere troppo ansiosi di qualcosa."
+    },
+    {
+        "input": "Compose a five word sentence describing your day.",
+        "output": "Sono sempre qui per aiutare gli utenti."
+    },
+    {
+        "input": "Compile a list of 5 US states located in the Mid West.",
+        "output": "1. Ohio 2. Indiana 3. Michigan 4. Illinois 5. Wisconsin"
+    },
+    {
+        "input": "Hans went to a pet shop. He bought 15 gold fish and 7 blue fish. How many fish did he buy? Think step-by-step.",
+        "output": "Aggiungiamo 15 a 7 e otteniamo 22. Così Hans ha comprato 22 pesci al negozio di animali domestici."
+    },
+    {
+        "input": "Create a survey question to measure customer satisfaction",
+        "output": "Su una scala da 1 a 10, quanto siete soddisfatti dei prodotti o servizi ricevuti dalla nostra azienda?"
+    },
+    {
+        "input": "Create a list of 10 different animals",
+        "output": "1. il leone 2. l'elefante 3. il panda 4. la giraffa 5. il delfino 6. il canguro 7. la tigre 8. il gorilla 9. il cammello 10. la zebra"
+    },
+    {
+        "input": "What geometric shape has 5 sides and 5 angles?",
+        "output": "La forma geometrica che ha 5 lati e 5 angoli è chiamata pentagono."
+    },
+    {
+        "input": "What is the contraction of \"they are\"?",
+        "output": "La contrazione di \"sono\" e' \"sono\"."
+    },
+    {
+        "input": "Generate a sentence that follows the structure of: \"All ____ is based on/with _____\"",
+        "output": "Tutte le scoperte scientifiche si basano su prove e sperimentazioni."
+    },
+    {
+        "input": "Generate a haiku poem.",
+        "output": "Foglie rosse cadute, sospirando dolcemente nella brezza, la pace tranquilla della natura."
+    },
+    {
+        "input": "Name three fruits that are rich in Vitamin C.",
+        "output": "Tre frutti ricchi di vitamina C sono le arance, i kiwi e le fragole."
+    },
+    {
+        "input": "Suggest a powerful quote.",
+        "output": "\"Siate il cambiamento che desiderate vedere nel mondo\". - Mahatma Gandhi"
+    },
+    {
+        "input": "Name the three main mountain ranges in the United States.",
+        "output": "Le tre catene montuose principali negli Stati Uniti sono le Montagne Rocciose, gli Appalachi e la Sierra Nevada."
+    },
+    {
+        "input": "Construct a sentence using the phrase \"every day\".",
+        "output": "Mi sforzo di rendere la vita dei miei utenti più facile ogni giorno fornendo loro informazioni pertinenti e svolgendo compiti per loro."
+    }
+]

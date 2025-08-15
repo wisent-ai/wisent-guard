@@ -30,6 +30,19 @@ def evaluate_response_correctness(response: str, expected_answer: str, task_name
     Returns:
         True if response is correct, False otherwise
     """
+    # Check if this is a file-based task (custom dataset loaded from JSON)
+    # For file-based tasks, use exact string matching to avoid false positives
+    try:
+        from ..task_interface import get_task
+        from ..tasks.file_task import FileTask
+
+        task = get_task(task_name, limit=1)
+        if isinstance(task, FileTask):
+            logger.debug(f"Using exact match for file-based task '{task_name}'")
+            return response.strip().lower() == expected_answer.strip().lower()
+    except:
+        pass  # Continue with normal evaluation if task lookup fails
+
     try:
         # Use the same evaluation approach as the CLI
         evaluator = LMEvalHarnessGroundTruth(task_name)
@@ -56,10 +69,7 @@ def evaluate_response_correctness(response: str, expected_answer: str, task_name
 
 
 def evaluate_benchmark_performance(
-    predictions: List[str], 
-    ground_truths: List[str], 
-    task_name: str = None,
-    task_docs: List[Dict] = None
+    predictions: List[str], ground_truths: List[str], task_name: str = None, task_docs: List[Dict] = None
 ) -> Dict[str, float]:
     """
     Evaluate benchmark performance using LMEvalHarnessGroundTruth (same approach as CLI).
@@ -77,75 +87,79 @@ def evaluate_benchmark_performance(
     if task_name:
         # Check if this is a coding task that requires code execution evaluation
         is_coding_task = task_name.lower() in CODING_TASKS
-        
+
         if is_coding_task:
             # Use BigCode execution-based evaluation for coding tasks
             logger.info(f"Using BigCode execution-based evaluation for coding task: {task_name}")
-            
+
             try:
                 bigcode_evaluator = OptunaBigCodeEvaluator()
-                
+
                 # Validate task docs are provided for coding tasks
                 if task_docs is None or len(task_docs) == 0:
-                    logger.error(f"No task docs provided for coding task {task_name}. BigCode evaluation requires original task documents with test cases.")
+                    logger.error(
+                        f"No task docs provided for coding task {task_name}. BigCode evaluation requires original task documents with test cases."
+                    )
                     raise ValueError(f"Task documents required for coding task evaluation: {task_name}")
-                
+
                 # Ensure we have the right number of task docs
                 if len(task_docs) != len(predictions):
                     logger.error(f"Task docs length mismatch: {len(task_docs)} docs vs {len(predictions)} predictions")
-                    raise ValueError(f"Number of task documents ({len(task_docs)}) must match number of predictions ({len(predictions)})")
-                
+                    raise ValueError(
+                        f"Number of task documents ({len(task_docs)}) must match number of predictions ({len(predictions)})"
+                    )
+
                 # Evaluate using BigCode execution
                 evaluation_results, accuracy_metrics = bigcode_evaluator.evaluate_and_calculate_accuracy(
                     predictions, task_docs, task_name
                 )
-                
+
                 # Create evaluation details in the expected format
                 evaluation_details = []
                 for i, (pred, result) in enumerate(zip(predictions, evaluation_results)):
                     eval_detail = {
-                        "prediction": result.get('extracted_code', pred),
+                        "prediction": result.get("extracted_code", pred),
                         "ground_truth": ground_truths[i] if i < len(ground_truths) else "unknown",
-                        "is_correct": result.get('passed', False),
+                        "is_correct": result.get("passed", False),
                         "confidence": 1.0,
                         "method": "bigcode_execution",
                         "original_prediction": pred,
-                        "code_extracted": result.get('extracted_code', '') != pred,
-                        "execution_error": result.get('error'),
+                        "code_extracted": result.get("extracted_code", "") != pred,
+                        "execution_error": result.get("error"),
                     }
                     evaluation_details.append(eval_detail)
-                
+
                 return {
-                    "accuracy": accuracy_metrics['accuracy'],
-                    "total_samples": accuracy_metrics['total_samples'],
-                    "correct": accuracy_metrics['correct'],
-                    "incorrect": accuracy_metrics['incorrect'],
+                    "accuracy": accuracy_metrics["accuracy"],
+                    "total_samples": accuracy_metrics["total_samples"],
+                    "correct": accuracy_metrics["correct"],
+                    "incorrect": accuracy_metrics["incorrect"],
                     "evaluation_method": "bigcode_execution",
                     "task_name": task_name,
                     "evaluation_details": evaluation_details[:5],  # Include first 5 for debugging
-                    "pass_count": accuracy_metrics.get('pass_count', 0),
-                    "fail_count": accuracy_metrics.get('fail_count', 0),
-                    "error_count": accuracy_metrics.get('error_count', 0),
+                    "pass_count": accuracy_metrics.get("pass_count", 0),
+                    "fail_count": accuracy_metrics.get("fail_count", 0),
+                    "error_count": accuracy_metrics.get("error_count", 0),
                 }
-                
+
             except Exception as e:
                 logger.error(f"BigCode evaluation failed for {task_name}, falling back to string-based evaluation: {e}")
                 # Fall through to string-based evaluation
-        
+
         # String-based evaluation for non-coding tasks or BigCode fallback
         extracted_predictions = predictions
-        
+
         if is_coding_task:
             # Extract code from predictions for coding tasks (fallback mode)
             extractor = MBPPExtractor()  # Works for all coding tasks, not just MBPP
             extracted_predictions = []
-            
+
             for pred in predictions:
                 extracted_code = extractor.extract_code_from_answer(pred)
                 extracted_predictions.append(extracted_code)
-                
+
             logger.debug(f"Code extraction applied for {task_name}: {len(predictions)} predictions processed")
-        
+
         # Use intelligent evaluation with LMEvalHarnessGroundTruth (same as CLI)
         correct_predictions = []
         evaluation_details = []
@@ -155,7 +169,7 @@ def evaluate_benchmark_performance(
                 # Use the extracted prediction for evaluation
                 is_correct = evaluate_response_correctness(extracted_pred, gt, task_name)
                 correct_predictions.append(is_correct)
-                
+
                 # Include both original and extracted predictions in details for debugging
                 eval_detail = {
                     "prediction": extracted_pred,
@@ -164,12 +178,12 @@ def evaluate_benchmark_performance(
                     "confidence": 1.0,  # TODO
                     "method": "lm_eval_harness_ground_truth",
                 }
-                
+
                 # Add original prediction for coding tasks to help with debugging
                 if is_coding_task and orig_pred != extracted_pred:
                     eval_detail["original_prediction"] = orig_pred
                     eval_detail["code_extracted"] = True
-                
+
                 evaluation_details.append(eval_detail)
 
             except Exception as e:
@@ -177,7 +191,7 @@ def evaluate_benchmark_performance(
                 # Fallback to simple string matching
                 is_correct = extracted_pred.strip().lower() == gt.strip().lower()
                 correct_predictions.append(is_correct)
-                
+
                 eval_detail = {
                     "prediction": extracted_pred,
                     "ground_truth": gt,
@@ -185,11 +199,11 @@ def evaluate_benchmark_performance(
                     "confidence": 1.0,
                     "method": "fallback_exact_match",
                 }
-                
+
                 if is_coding_task and orig_pred != extracted_pred:
                     eval_detail["original_prediction"] = orig_pred
                     eval_detail["code_extracted"] = True
-                
+
                 evaluation_details.append(eval_detail)
 
         accuracy = np.mean(correct_predictions)

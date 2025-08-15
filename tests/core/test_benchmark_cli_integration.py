@@ -33,8 +33,8 @@ import pytest
 
 # Import allowed tasks from centralized configuration
 from wisent_guard.parameters.task_config import (
-    TEST_ALLOWED_TASKS as ALLOWED_TASKS,
     SANDBOX_TESTS_ALLOWED_TASKS,
+    TEST_ALLOWED_TASKS as ALLOWED_TASKS,
 )
 
 # Use testing model for fast, reliable CI/CD testing
@@ -135,14 +135,14 @@ class TestBenchmarkCLIIntegration:
 
     def _run_basic_classifier_test(self, task_name, use_trust_remote_code=False):
         """Shared logic for basic classifier tests.
-        
+
         Args:
             task_name: Name of the task to test
             use_trust_remote_code: Whether to add --trust-remote-code flag
         """
         # Use higher limit for sandbox tests to ensure minimum training data
         limit = 10 if task_name in SANDBOX_TESTS_ALLOWED_TASKS else TEST_LIMIT
-        
+
         cmd_args = [
             "tasks",
             task_name,
@@ -153,7 +153,7 @@ class TestBenchmarkCLIIntegration:
             "--limit",
             str(limit),
         ]
-        
+
         # Add trust-code-execution flag for coding tasks (when running in sandbox)
         if task_name in SANDBOX_TESTS_ALLOWED_TASKS:
             cmd_args.append("--trust-code-execution")
@@ -167,7 +167,9 @@ class TestBenchmarkCLIIntegration:
         # Check if this is a Docker requirement error for coding tasks
         if result.returncode != 0 and "Docker is required for code execution tasks" in result.stdout:
             print(f"🔧 {task_name} requires Docker for secure code execution - this is expected behavior")
-            print(f"⚠️ Docker error: {result.stdout.split('Docker error:')[1].split('============================================================')[0].strip() if 'Docker error:' in result.stdout else 'Docker not available'}")
+            print(
+                f"⚠️ Docker error: {result.stdout.split('Docker error:')[1].split('============================================================')[0].strip() if 'Docker error:' in result.stdout else 'Docker not available'}"
+            )
             return  # Treat Docker requirement as expected behavior, not a failure
 
         # Should succeed with pre-configured model (unless Docker is required)
@@ -178,19 +180,19 @@ class TestBenchmarkCLIIntegration:
 
         # Verify expected output patterns
         self._verify_output_patterns(task_name, result.stdout + result.stderr)
-        
+
         print(f"✅ {task_name} basic classifier test passed!")
 
     def _run_steering_test(self, task_name, use_trust_remote_code=False):
         """Shared logic for steering functionality tests.
-        
+
         Args:
             task_name: Name of the task to test
             use_trust_remote_code: Whether to add --trust-remote-code flag
         """
         # Use higher limit for sandbox tests to ensure minimum training data
         limit = 10 if task_name in SANDBOX_TESTS_ALLOWED_TASKS else TEST_LIMIT
-        
+
         cmd_args = [
             "tasks",
             task_name,
@@ -206,11 +208,11 @@ class TestBenchmarkCLIIntegration:
             "--steering-strength",
             "1.5",
         ]
-        
+
         # Add trust-code-execution flag for coding tasks (when running in sandbox)
         if task_name in SANDBOX_TESTS_ALLOWED_TASKS:
             cmd_args.append("--trust-code-execution")
-        
+
         # Note: trust_remote_code handling may need to be implemented differently
         # The CLI doesn't currently have a --trust-remote-code flag
         # For now, we'll test without it and handle trust_remote_code at the library level
@@ -229,7 +231,9 @@ class TestBenchmarkCLIIntegration:
         # Check if this is a Docker requirement error for coding tasks
         if result.returncode != 0 and "Docker is required for code execution tasks" in result.stdout:
             print(f"🔧 {task_name} requires Docker for secure code execution - this is expected behavior")
-            print(f"⚠️ Docker error: {result.stdout.split('Docker error:')[1].split('============================================================')[0].strip() if 'Docker error:' in result.stdout else 'Docker not available'}")
+            print(
+                f"⚠️ Docker error: {result.stdout.split('Docker error:')[1].split('============================================================')[0].strip() if 'Docker error:' in result.stdout else 'Docker not available'}"
+            )
             return  # Treat Docker requirement as expected behavior, not a failure
 
         # Should succeed with pre-configured model (unless Docker is required)
@@ -240,7 +244,7 @@ class TestBenchmarkCLIIntegration:
 
         # Verify steering worked
         self._verify_steering_output(task_name, result.stdout + result.stderr)
-        
+
         print(f"✅ {task_name} steering functionality test passed!")
 
     def _check_for_errors(self, stderr):

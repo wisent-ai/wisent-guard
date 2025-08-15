@@ -29,6 +29,7 @@ class CAA(SteeringMethod):
         aggregation_method: ControlVectorAggregationMethod = ControlVectorAggregationMethod.CAA,
         normalization_method: str = "none",
         target_norm: Optional[float] = None,
+        legacy_behavior: bool = False,  # Legacy: apply steering to ALL token positions (True) used in original implementation vs position-specific steering (False)
     ):
         super().__init__("CAA", device)
         self.steering_vector = None
@@ -36,6 +37,7 @@ class CAA(SteeringMethod):
         self.aggregation_method = aggregation_method
         self.normalization_method = normalization_method
         self.target_norm = target_norm
+        self.legacy_behavior = legacy_behavior
         self.training_stats = {}
         self.normalizer = VectorNormalizer()  # Always initialize for potential multi-behavior training
 
@@ -83,6 +85,7 @@ class CAA(SteeringMethod):
                 "aggregation_method": self.aggregation_method.value,
                 "normalization_method": self.normalization_method,
                 "target_norm": self.target_norm,
+                "legacy_behavior": self.legacy_behavior,
                 "layer_index": layer_index,
                 "final_vector_norm": torch.norm(self.steering_vector).item(),
             }
@@ -147,6 +150,7 @@ class CAA(SteeringMethod):
             "multi_behavior": True,
             "behaviors": list(self.behavior_vectors.keys()),
             "layer_index": layer_index,
+            "legacy_behavior": self.legacy_behavior,
             "normalized_across_behaviors": normalize_across_behaviors,
             "behavior_stats": all_stats,
         }
@@ -191,23 +195,26 @@ class CAA(SteeringMethod):
 
         # Handle different activation shapes
         if len(activations.shape) == 3:  # [batch, seq, hidden]
-            # Apply to second-to-last token position (reference behavior)
             steered = activations.clone()
-            if activations.shape[1] > 1:
-                # Use second-to-last token if sequence has more than 1 token
-                before_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+
+            if self.legacy_behavior:
+                # Legacy behavior: Apply to ALL token positions (CAA reference behavior when instruction detection fails)
+                # Based on our validation: CAA uses from_pos=-1 which steers ALL positions
+                before_norm = torch.norm(steered, dim=-1).mean().item()
 
                 # LOG THE ACTUAL STEERING BEING APPLIED
-                logger.debug("   🎯 CAA APPLYING STEERING:")
+                logger.debug("   🎯 CAA APPLYING STEERING (LEGACY):")
                 logger.debug(f"      Strength parameter: {strength}")
                 logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
                 logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
+                logger.debug("      Applying to ALL positions (CAA fallback behavior)")
 
-                steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
-                after_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+                # Apply to ALL positions (matching CAA reference with from_pos=-1)
+                steered = steered + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+                after_norm = torch.norm(steered, dim=-1).mean().item()
 
-                logger.debug(f"      Position -2 norm before: {before_norm:.4f}")
-                logger.debug(f"      Position -2 norm after: {after_norm:.4f}")
+                logger.debug(f"      All positions norm before: {before_norm:.4f}")
+                logger.debug(f"      All positions norm after: {after_norm:.4f}")
                 logger.debug(f"      Change: {after_norm - before_norm:.4f}")
 
                 # Check if we created inf/nan
@@ -216,8 +223,27 @@ class CAA(SteeringMethod):
                     logger.debug(f"      Max in steered: {steered.max().item()}")
                     logger.debug(f"      Min in steered: {steered.min().item()}")
             else:
-                # Fallback to last token for single-token sequences
-                steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+                # Modern behavior: Apply to second-to-last token position (reference behavior)
+                if activations.shape[1] > 1:
+                    # Use second-to-last token if sequence has more than 1 token
+                    before_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+
+                    # LOG THE ACTUAL STEERING BEING APPLIED
+                    logger.debug("   🎯 CAA APPLYING STEERING:")
+                    logger.debug(f"      Strength parameter: {strength}")
+                    logger.debug(f"      Vector norm: {torch.norm(steering_vector).item():.4f}")
+                    logger.debug(f"      Effective addition norm: {torch.norm(strength * steering_vector).item():.4f}")
+
+                    steered[:, -2:-1, :] = steered[:, -2:-1, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
+                    after_norm = torch.norm(steered[:, -2:-1, :], dim=-1).mean().item()
+
+                    logger.debug(f"      Position -2 norm before: {before_norm:.4f}")
+                    logger.debug(f"      Position -2 norm after: {after_norm:.4f}")
+                    logger.debug(f"      Change: {after_norm - before_norm:.4f}")
+
+                else:
+                    # Fallback to last token for single-token sequences
+                    steered[:, -1:, :] = steered[:, -1:, :] + strength * steering_vector.unsqueeze(0).unsqueeze(0)
         elif len(activations.shape) == 2:  # [batch, hidden]
             steered = activations + strength * steering_vector.unsqueeze(0)
         else:
@@ -241,6 +267,7 @@ class CAA(SteeringMethod):
                 "aggregation_method": self.aggregation_method.value,
                 "normalization_method": self.normalization_method,
                 "target_norm": self.target_norm,
+                "legacy_behavior": self.legacy_behavior,
                 "layer_index": self.layer_index,
                 "training_stats": self.training_stats,
                 "method": "CAA",
@@ -266,6 +293,7 @@ class CAA(SteeringMethod):
             self.aggregation_method = ControlVectorAggregationMethod(data.get("aggregation_method", "CAA"))
             self.normalization_method = data.get("normalization_method", "none")
             self.target_norm = data.get("target_norm")
+            self.legacy_behavior = data.get("legacy_behavior", False)
             self.layer_index = data.get("layer_index")
             self.training_stats = data.get("training_stats", {})
 
@@ -277,3 +305,180 @@ class CAA(SteeringMethod):
             return True
         except Exception:
             return False
+
+    def combine_behaviors(self, behavior_weights: Dict[str, float], normalize_result: bool = False) -> torch.Tensor:
+        """
+        Combine multiple behavior vectors with specified weights.
+
+        Implements the linear combination recipe for multi-property steering:
+        v_combined = α₁ * v₁ + α₂ * v₂ + ... + αₙ * vₙ
+
+        Args:
+            behavior_weights: Dictionary mapping behavior names to their weights
+                             e.g., {"italian": 0.7, "honest": 0.3}
+            normalize_result: Whether to normalize the combined vector to unit norm
+
+        Returns:
+            Combined steering vector
+
+        Raises:
+            ValueError: If not trained with multi-behavior or if behavior not found
+
+        Example:
+            >>> caa.train_multi_behavior({"italian": pairs1, "honest": pairs2}, layer=13)
+            >>> combined = caa.combine_behaviors({"italian": 0.7, "honest": 0.3})
+        """
+        if not hasattr(self, "behavior_vectors") or not self.behavior_vectors:
+            raise ValueError(
+                "No behavior vectors available. Use train_multi_behavior() first to train multiple behaviors."
+            )
+
+        # Initialize combined vector with zeros
+        first_vector = next(iter(self.behavior_vectors.values()))
+        combined_vector = torch.zeros_like(first_vector)
+
+        # Linear combination of normalized vectors
+        for behavior_name, weight in behavior_weights.items():
+            if behavior_name not in self.behavior_vectors:
+                available = list(self.behavior_vectors.keys())
+                raise ValueError(f"Behavior '{behavior_name}' not found. Available behaviors: {available}")
+
+            # Add weighted vector (assumes already normalized from train_multi_behavior)
+            combined_vector += weight * self.behavior_vectors[behavior_name]
+
+        # Optionally normalize the result to unit norm
+        if normalize_result:
+            norm = torch.norm(combined_vector, p=2)
+            if norm > 1e-10:
+                combined_vector = combined_vector / norm
+
+        return combined_vector
+
+    def apply_combined_steering(
+        self,
+        activations: torch.Tensor,
+        behavior_weights: Dict[str, float],
+        normalize_combined: bool = False,
+        apply_to_all_tokens: bool = True,
+        verbose: bool = False,
+    ) -> torch.Tensor:
+        """
+        Apply combined multi-property steering to activations.
+
+        This implements the complete recipe for multi-property CAA steering:
+        1. Combines multiple behavior vectors with specified weights
+        2. Applies the combined vector to activations
+
+        Args:
+            activations: Input activations to steer [batch, seq, hidden]
+            behavior_weights: Dictionary mapping behavior names to weights
+                             e.g., {"italian": 0.7, "honest": 0.3}
+            normalize_combined: Whether to normalize the combined vector
+            apply_to_all_tokens: If True, apply to all tokens after prompt.
+                                If False, apply only to second-to-last token.
+            verbose: Enable debug logging
+
+        Returns:
+            Steered activations
+
+        Example:
+            >>> # During inference
+            >>> steered = caa.apply_combined_steering(
+            ...     activations,
+            ...     {"italian": 0.7, "honest": 0.3}
+            ... )
+        """
+        if not self.is_trained:
+            raise ValueError("CAA must be trained before applying steering")
+
+        # Combine the behavior vectors
+        combined_vector = self.combine_behaviors(behavior_weights, normalize_combined)
+        combined_vector = combined_vector.to(activations.device)
+
+        if verbose:
+            print("\n🔍 CAA Multi-Property Steering:")
+            print(f"   Behaviors & weights: {behavior_weights}")
+            print(f"   Combined vector norm: {torch.norm(combined_vector).item():.4f}")
+            print(f"   Input shape: {activations.shape}")
+            print(f"   Apply to all tokens: {apply_to_all_tokens}")
+
+        # Apply the combined steering vector
+        steered = activations.clone()
+
+        if len(activations.shape) == 3:  # [batch, seq, hidden]
+            if apply_to_all_tokens:
+                # Apply to all tokens (as per recipe: "every token after the user prompt")
+                steered = steered + combined_vector.unsqueeze(0).unsqueeze(0)
+                if verbose:
+                    print(f"   Applied to all {activations.shape[1]} tokens")
+            else:
+                # Apply only to second-to-last token (CAA default behavior)
+                if activations.shape[1] > 1:
+                    steered[:, -2:-1, :] = steered[:, -2:-1, :] + combined_vector.unsqueeze(0).unsqueeze(0)
+                    if verbose:
+                        print("   Applied to second-to-last token only")
+                else:
+                    steered[:, -1:, :] = steered[:, -1:, :] + combined_vector.unsqueeze(0).unsqueeze(0)
+                    if verbose:
+                        print("   Applied to last token (single-token sequence)")
+
+        elif len(activations.shape) == 2:  # [batch, hidden]
+            steered = activations + combined_vector.unsqueeze(0)
+        else:
+            steered = activations + combined_vector
+
+        return steered
+
+    def setup_multi_property_steering(
+        self,
+        behavior_datasets: Dict[str, ContrastivePairSet],
+        layer_index: int,
+        normalize_behaviors: bool = True,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Convenience method to set up multi-property steering in one call.
+
+        This handles the complete setup process:
+        1. Trains on multiple behaviors
+        2. Normalizes vectors across behaviors (optional)
+        3. Prepares for multi-property combination
+
+        Args:
+            behavior_datasets: Dictionary mapping behavior names to ContrastivePairSets
+                              e.g., {"italian": italian_pairs, "honest": honest_pairs}
+            layer_index: Layer index where steering will be applied
+            normalize_behaviors: Whether to normalize across behaviors (recommended)
+            verbose: Enable progress logging
+
+        Returns:
+            Training statistics for all behaviors
+
+        Example:
+            >>> # Setup
+            >>> stats = caa.setup_multi_property_steering(
+            ...     {"italian": italian_pairs, "honest": honest_pairs},
+            ...     layer_index=13
+            ... )
+            >>> # Then during inference
+            >>> steered = caa.apply_combined_steering(
+            ...     activations,
+            ...     {"italian": 0.7, "honest": 0.3}
+            ... )
+        """
+        if verbose:
+            behaviors_list = list(behavior_datasets.keys())
+            logger.info(f"Setting up multi-property CAA for behaviors: {behaviors_list}")
+            logger.info(f"Layer: {layer_index}, Normalize: {normalize_behaviors}")
+
+        # Train on multiple behaviors with normalization
+        stats = self.train_multi_behavior(
+            behavior_datasets, layer_index, normalize_across_behaviors=normalize_behaviors
+        )
+
+        if verbose:
+            for behavior, vector in self.behavior_vectors.items():
+                norm = torch.norm(vector).item()
+                logger.info(f"  {behavior}: vector norm = {norm:.4f}")
+
+        return stats

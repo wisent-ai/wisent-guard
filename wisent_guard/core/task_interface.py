@@ -91,7 +91,21 @@ def get_task(name: str, limit: Optional[int] = None) -> TaskInterface:
     """Get a task instance by name."""
     # Ensure tasks are registered before attempting to get a task
     _ensure_tasks_registered()
-    return _task_registry.get_task(name, limit=limit)
+
+    # Check if this is a file path (contains / or \\ or ends with .json)
+    if "/" in name or "\\" in name or name.endswith(".json"):
+        # Treat as file path and load directly
+        from .tasks.file_task import FileTask
+
+        return FileTask(name, limit=limit)
+
+    # Otherwise, try to get from registry
+    try:
+        return _task_registry.get_task(name, limit=limit)
+    except ValueError:
+        raise ValueError(
+            f"Task '{name}' not found in registry. Available tasks: {list(_task_registry._tasks.keys())}. To load a custom dataset, provide a file path ending with .json"
+        )
 
 
 def list_tasks() -> List[str]:

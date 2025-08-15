@@ -38,6 +38,7 @@ from .lm_eval_task import (
     RecodeTask,
     TruthfulQATask,
 )
+from .lm_eval_task import GSM8KTask, MBPPTask, MMLUTask, Squad2Task, TruthfulQATask
 from .math500_task import Math500Task
 from .polymath_task import PolyMathTask
 from .supergpqa_task import SuperGPQABiologyTask, SuperGPQAChemistryTask, SuperGPQAPhysicsTask, SuperGPQATask
@@ -52,7 +53,7 @@ def register_all_tasks():
     register_task("gsm8k", GSM8KTask)
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
-    
+
     # Register all coding tasks
     register_task("mbpp", MBPPTask)
     register_task("humaneval", HumanEvalTask)
@@ -77,6 +78,7 @@ def register_all_tasks():
     register_task("codexglue_code_to_text_javascript", CodexglueCodeToTextJavascriptTask)
     register_task("codexglue_code_to_text_php", CodexglueCodeToTextPhpTask)
     register_task("recode", RecodeTask)
+    register_task("squad2", Squad2Task)
 
     # Register HLE tasks
     register_task("hle", lambda limit=None: HLETask(limit=limit))
@@ -163,6 +165,7 @@ __all__ = [
     "MultipleRsTask",
     "PolyMathTask",
     "RecodeTask",
+    "Squad2Task",
     "SuperGPQABiologyTask",
     "SuperGPQAChemistryTask",
     "SuperGPQAPhysicsTask",

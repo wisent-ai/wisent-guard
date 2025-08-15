@@ -217,17 +217,17 @@ class OptimizationPipeline:
             "truncation": True,
             "return_tensors": "pt",
         }
-    
+
     @property
     def is_coding_task(self) -> bool:
         """Check if the current task requires code execution evaluation."""
         from ..bigcode_integration import is_bigcode_task
         from ...parameters.task_config import CODING_TASKS
-        
-        val_dataset = getattr(self.config, 'val_dataset', None)
+
+        val_dataset = getattr(self.config, "val_dataset", None)
         if not val_dataset:
             return False
-            
+
         return val_dataset.lower() in CODING_TASKS or is_bigcode_task(val_dataset)
 
     def run_optimization(self) -> dict[str, Any]:
@@ -326,16 +326,36 @@ class OptimizationPipeline:
         self, samples: list[dict], layer_id: int, dataset_name: str
     ) -> tuple[np.ndarray, np.ndarray]:
         """Create contrastive probe training data for a specific layer."""
+        self.logger.info(f"Creating probe data from {len(samples)} samples for {dataset_name} on layer {layer_id}")
+
         # Get task for the specified dataset
         task = get_task(dataset_name)
         extractor = task.get_extractor()
+        self.logger.debug(f"Using task: {task.__class__.__name__}, extractor: {extractor.__class__.__name__}")
 
         texts = []
         labels = []
+        success_count = 0
+        fail_count = 0
 
-        for sample in samples:
-            # Extract QA pair
-            contrastive_pair = extractor.extract_contrastive_pair(sample, task)
+        for i, sample in enumerate(samples):
+            try:
+                # Extract QA pair
+                contrastive_pair = extractor.extract_contrastive_pair(sample, task)
+
+                # Skip samples where contrastive pair extraction failed
+                if not contrastive_pair:
+                    self.logger.debug(f"Sample {i + 1}: No contrastive pair extracted from keys: {list(sample.keys())}")
+                    fail_count += 1
+                    continue
+
+                success_count += 1
+                self.logger.debug(f"Sample {i + 1}: Successfully extracted contrastive pair")
+
+            except Exception as e:
+                self.logger.error(f"Sample {i + 1}: Exception during contrastive pair extraction: {e}")
+                fail_count += 1
+                continue
 
             question = contrastive_pair["question"]
             correct_answer = contrastive_pair["correct_answer"]
@@ -352,6 +372,14 @@ class OptimizationPipeline:
             incorrect_text = f"{question} {incorrect_answer}"
             texts.append(incorrect_text)
             labels.append(0)
+
+        self.logger.info(
+            f"Probe data creation: {success_count} successful, {fail_count} failed. Generated {len(texts)} texts."
+        )
+
+        if len(texts) == 0:
+            self.logger.error("No texts generated for activation extraction! All contrastive pair extractions failed.")
+            return np.array([]), np.array([])
 
         activations = data_utils.extract_activations_with_hook(
             self.model, self.tokenizer, texts, layer_id, self.config.batch_size, self.config.max_length, self.device
@@ -672,7 +700,7 @@ class OptimizationPipeline:
         self._save_detailed_validation_results(questions, ground_truths, predictions, trial_number)
 
         # Prepare task docs for BigCode evaluation (if coding task)
-        task_docs = valid_samples[:len(predictions)] if valid_samples else []
+        task_docs = valid_samples[: len(predictions)] if valid_samples else []
 
         # Evaluate benchmark performance (with task docs for coding tasks)
         benchmark_metrics = metrics.evaluate_benchmark_performance(
@@ -909,7 +937,9 @@ class OptimizationPipeline:
             # CAA and other methods use steering_alpha
             strength = best_params["steering_alpha"]
 
-        steered_predictions, _, _, _ = self._generate_test_predictions(steering_instance, method_name, layer_id, strength)
+        steered_predictions, _, _, _ = self._generate_test_predictions(
+            steering_instance, method_name, layer_id, strength
+        )
 
         # Save detailed test results to JSON
         if test_questions and test_ground_truths and baseline_predictions and steered_predictions:
@@ -921,7 +951,6 @@ class OptimizationPipeline:
         baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
             baseline_predictions, test_ground_truths, self.config.test_dataset, task_docs=test_task_docs
         )
-
         steered_benchmark_metrics = metrics.evaluate_benchmark_performance(
             steered_predictions, test_ground_truths, self.config.test_dataset, task_docs=test_task_docs
         )
@@ -1032,14 +1061,14 @@ class OptimizationPipeline:
             eval_results = metrics.evaluate_benchmark_performance(
                 predictions, ground_truths, task_name=self.config.val_dataset, task_docs=self.val_task_docs
             )
-            
+
             # Extract individual correctness from evaluation details
-            eval_details = eval_results.get('evaluation_details', [])
-            
+            eval_details = eval_results.get("evaluation_details", [])
+
             for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
                 # Get correctness from BigCode evaluation if available
-                is_correct = eval_details[i]['is_correct'] if i < len(eval_details) else False
-                
+                is_correct = eval_details[i]["is_correct"] if i < len(eval_details) else False
+
                 detailed_results.append(
                     {
                         "row": i,
@@ -1047,26 +1076,53 @@ class OptimizationPipeline:
                         "correct_answer": correct_answer,
                         "model_answer": model_answer,
                         "is_correct": is_correct,
-                        "evaluation_method": eval_results.get('evaluation_method', 'unknown'),
-                        "extracted_code": eval_details[i].get('prediction', model_answer) if i < len(eval_details) else model_answer,
-                        "execution_error": eval_details[i].get('execution_error') if i < len(eval_details) else None,
+                        "evaluation_method": eval_results.get("evaluation_method", "unknown"),
+                        "extracted_code": eval_details[i].get("prediction", model_answer)
+                        if i < len(eval_details)
+                        else model_answer,
+                        "execution_error": eval_details[i].get("execution_error") if i < len(eval_details) else None,
                     }
                 )
         else:
-            # For non-coding tasks, use the original string-based evaluation
+            # For non-coding tasks, process each result
             for i, (question, correct_answer, model_answer) in enumerate(zip(questions, ground_truths, predictions)):
-                is_correct = metrics.evaluate_response_correctness(model_answer, correct_answer, self.config.val_dataset)
-                
-                detailed_results.append(
-                    {
-                        "row": i,
-                        "question": question,
-                        "correct_answer": correct_answer,
-                        "model_answer": model_answer,
-                        "is_correct": is_correct,
-                        "evaluation_method": "string_comparison",
-                    }
+                # Use standard evaluation via metrics module
+                is_correct = metrics.evaluate_response_correctness(
+                    model_answer, correct_answer, self.config.val_dataset
                 )
+
+                result_entry = {
+                    "row": i,
+                    "question": question,
+                    "correct_answer": correct_answer,
+                    "model_answer": model_answer,
+                    "is_correct": is_correct,
+                    "evaluation_method": "string_comparison",
+                }
+
+                # Add MC-specific fields if this is a multiple choice task
+                if self._should_use_multiple_choice_evaluation():
+                    # Extract MC diagnostics directly without custom evaluation
+                    import re
+
+                    # Extract available answers from question (A. choice, B. choice, etc.)
+                    available_answers = []
+                    choice_pattern = r"([A-E])\.\s+(.+?)(?=\n[A-E]\.|$)"
+                    matches = re.findall(choice_pattern, question, re.MULTILINE | re.DOTALL)
+                    for letter, choice_text in matches:
+                        available_answers.append(f"{letter}. {choice_text.strip()}")
+
+                    # Extract model's selected letter from model answer
+                    model_selected_letter = "?"
+                    model_letter_match = re.search(r"\b([A-E])\b", model_answer.upper())
+                    if model_letter_match:
+                        model_selected_letter = model_letter_match.group(1)
+
+                    result_entry["available_answers"] = available_answers
+                    result_entry["correct_choice_letter"] = correct_answer
+                    result_entry["model_selected_letter"] = model_selected_letter
+
+                detailed_results.append(result_entry)
 
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1094,48 +1150,21 @@ class OptimizationPipeline:
             baseline_eval_results = metrics.evaluate_benchmark_performance(
                 baseline_predictions, ground_truths, task_name=self.config.test_dataset, task_docs=self.test_task_docs
             )
-            
+
             # Evaluate steered predictions with BigCode
             steered_eval_results = metrics.evaluate_benchmark_performance(
                 steered_predictions, ground_truths, task_name=self.config.test_dataset, task_docs=self.test_task_docs
             )
-            
-            baseline_details = baseline_eval_results.get('evaluation_details', [])
-            steered_details = steered_eval_results.get('evaluation_details', [])
-            
+
+            baseline_details = baseline_eval_results.get("evaluation_details", [])
+            steered_details = steered_eval_results.get("evaluation_details", [])
+
             for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
                 zip(questions, ground_truths, baseline_predictions, steered_predictions)
             ):
                 # Get correctness from BigCode evaluation
-                is_baseline_correct = baseline_details[i]['is_correct'] if i < len(baseline_details) else False
-                is_correct = steered_details[i]['is_correct'] if i < len(steered_details) else False
-                
-                detailed_results.append(
-                    {
-                        "row": i,
-                        "question": question,
-                        "correct_answer": correct_answer,
-                        "baseline_model_answer": baseline_answer,
-                        "model_answer": steered_answer,
-                        "is_baseline_correct": is_baseline_correct,
-                        "is_correct": is_correct,
-                        "evaluation_method": steered_eval_results.get('evaluation_method', 'bigcode_execution'),
-                        "baseline_extracted_code": baseline_details[i].get('prediction', baseline_answer) if i < len(baseline_details) else baseline_answer,
-                        "steered_extracted_code": steered_details[i].get('prediction', steered_answer) if i < len(steered_details) else steered_answer,
-                        "baseline_execution_error": baseline_details[i].get('execution_error') if i < len(baseline_details) else None,
-                        "steered_execution_error": steered_details[i].get('execution_error') if i < len(steered_details) else None,
-                    }
-                )
-        else:
-            # For non-coding tasks, use string-based evaluation
-            for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
-                zip(questions, ground_truths, baseline_predictions, steered_predictions)
-            ):
-                # Evaluate correctness for both baseline and steered answers
-                is_baseline_correct = metrics.evaluate_response_correctness(
-                    baseline_answer, correct_answer, self.config.test_dataset
-                )
-                is_correct = metrics.evaluate_response_correctness(steered_answer, correct_answer, self.config.test_dataset)
+                is_baseline_correct = baseline_details[i]["is_correct"] if i < len(baseline_details) else False
+                is_correct = steered_details[i]["is_correct"] if i < len(steered_details) else False
 
                 detailed_results.append(
                     {
@@ -1146,9 +1175,75 @@ class OptimizationPipeline:
                         "model_answer": steered_answer,
                         "is_baseline_correct": is_baseline_correct,
                         "is_correct": is_correct,
-                        "evaluation_method": "string_comparison",
+                        "evaluation_method": steered_eval_results.get("evaluation_method", "bigcode_execution"),
+                        "baseline_extracted_code": baseline_details[i].get("prediction", baseline_answer)
+                        if i < len(baseline_details)
+                        else baseline_answer,
+                        "steered_extracted_code": steered_details[i].get("prediction", steered_answer)
+                        if i < len(steered_details)
+                        else steered_answer,
+                        "baseline_execution_error": baseline_details[i].get("execution_error")
+                        if i < len(baseline_details)
+                        else None,
+                        "steered_execution_error": steered_details[i].get("execution_error")
+                        if i < len(steered_details)
+                        else None,
                     }
                 )
+        else:
+            # For non-coding tasks, process each result
+            for i, (question, correct_answer, baseline_answer, steered_answer) in enumerate(
+                zip(questions, ground_truths, baseline_predictions, steered_predictions)
+            ):
+                # Use standard evaluation for both baseline and steered answers
+                is_baseline_correct = metrics.evaluate_response_correctness(
+                    baseline_answer, correct_answer, self.config.test_dataset
+                )
+                is_correct = metrics.evaluate_response_correctness(
+                    steered_answer, correct_answer, self.config.test_dataset
+                )
+
+                result_entry = {
+                    "row": i,
+                    "question": question,
+                    "correct_answer": correct_answer,
+                    "baseline_model_answer": baseline_answer,
+                    "model_answer": steered_answer,
+                    "is_baseline_correct": is_baseline_correct,
+                    "is_correct": is_correct,
+                    "evaluation_method": "string_comparison",
+                }
+
+                # Add MC-specific fields if this is a multiple choice task
+                if self._should_use_multiple_choice_evaluation():
+                    # Extract MC diagnostics directly without custom evaluation
+                    import re
+
+                    # Extract available answers from question (A. choice, B. choice, etc.)
+                    available_answers = []
+                    choice_pattern = r"([A-E])\.\s+(.+?)(?=\n[A-E]\.|$)"
+                    matches = re.findall(choice_pattern, question, re.MULTILINE | re.DOTALL)
+                    for letter, choice_text in matches:
+                        available_answers.append(f"{letter}. {choice_text.strip()}")
+
+                    # Extract steered model's selected letter
+                    steered_selected_letter = "?"
+                    steered_letter_match = re.search(r"\b([A-E])\b", steered_answer.upper())
+                    if steered_letter_match:
+                        steered_selected_letter = steered_letter_match.group(1)
+
+                    # Extract baseline model's selected letter
+                    baseline_selected_letter = "?"
+                    baseline_letter_match = re.search(r"\b([A-E])\b", baseline_answer.upper())
+                    if baseline_letter_match:
+                        baseline_selected_letter = baseline_letter_match.group(1)
+
+                    result_entry["available_answers"] = available_answers
+                    result_entry["correct_choice_letter"] = correct_answer
+                    result_entry["model_selected_letter"] = steered_selected_letter
+                    result_entry["baseline_model_selected_letter"] = baseline_selected_letter
+
+                detailed_results.append(result_entry)
 
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1230,6 +1325,13 @@ class OptimizationPipeline:
         # Setup experiment if not already done
         if self.model is None:
             self._setup_experiment()
+
+        # Create timestamped run directory for evaluation-only mode
+        if not hasattr(self, "run_dir"):
+            self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.run_dir = self.output_dir / f"evaluate_only_{self.run_timestamp}"
+            self.run_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"📁 Evaluation directory: {self.run_dir}")
 
         # Create a complete mock trial with all expected parameters
         from optuna.trial import FixedTrial
@@ -1428,6 +1530,11 @@ class OptimizationPipeline:
 
         except Exception as e:
             self.logger.warning(f"Failed to log final results to WandB: {e}")
+
+    def _should_use_multiple_choice_evaluation(self) -> bool:
+        """Determine if we should use multiple choice evaluation for this dataset."""
+        # Use multiple choice evaluation for TruthfulQA and other MC tasks
+        return self.config.test_dataset.lower() in ["truthfulqa_mc1", "truthfulqa", "mmlu"]
 
 
 def main():
