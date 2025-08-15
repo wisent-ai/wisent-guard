@@ -321,10 +321,10 @@ def main():
 
         def patched_init(self, hf_token, size="7b", use_chat=True, override_model_weights_path=None):
             import torch as t
-            from transformers import AutoTokenizer, AutoModelForCausalLM
+            from llama_wrapper import BlockOutputWrapper
+            from transformers import AutoModelForCausalLM, AutoTokenizer
             from utils.helpers import get_model_path
             from utils.tokenize import ADD_FROM_POS_BASE, ADD_FROM_POS_CHAT
-            from llama_wrapper import BlockOutputWrapper
 
             self.device = "cuda" if t.cuda.is_available() else "cpu"
             self.use_chat = use_chat
