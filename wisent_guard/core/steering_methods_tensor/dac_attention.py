@@ -99,6 +99,34 @@ class DAC(SteeringMethodTensor):
 
         logger.info(f"Model loaded on device: {next(self._model.parameters()).device}")
 
+    def load_model_with_reference(self, model, tokenizer):
+        """
+        Inject external model and tokenizer references.
+
+        This allows the Optuna pipeline to provide already-loaded models
+        instead of DAC loading them internally, avoiding duplicate model loading.
+
+        Args:
+            model: Pre-loaded language model
+            tokenizer: Pre-loaded tokenizer
+        """
+        self._model = model
+        self._tokenizer = tokenizer
+
+        # Update model configuration from the injected model
+        if hasattr(model, "config"):
+            config = model.config
+            self.model_config = {
+                "n_layers": getattr(config, "num_hidden_layers", 32),
+                "n_heads": getattr(config, "num_attention_heads", 32),
+                "d_model": getattr(config, "hidden_size", 4096),
+                "d_head": getattr(config, "hidden_size", 4096) // getattr(config, "num_attention_heads", 32),
+            }
+
+        logger.info(f"Model reference injected: {type(model).__name__}")
+        logger.info(f"Model device: {next(model.parameters()).device}")
+        logger.info(f"Model config updated: {self.model_config}")
+
     def _split_activation(self, activations: List[torch.Tensor]) -> torch.Tensor:
         """
         Split the residual stream (d_model) into n_heads activations for each layer.
@@ -984,8 +1012,8 @@ class DAC(SteeringMethodTensor):
         alpha_history = {prop_name: [] for prop_name in property_weights}
         kl_history = {prop_name: [] for prop_name in property_weights}
 
-        logger.info(f"Starting dynamic steering generation with {len(property_tensors)} properties")
-        logger.info(f"Dynamic config: {config}")
+        logger.debug(f"Starting dynamic steering generation with {len(property_tensors)} properties")
+        logger.debug(f"Dynamic config: {config}")
 
         for step in range(max_new_tokens):
             # Generate next token with dynamic steering
@@ -1363,15 +1391,9 @@ class DAC(SteeringMethodTensor):
         else:
             self._debug_kl_count = 1
 
-        if self._debug_kl_count <= 10:  # Log first 10 transformations
-            print(f"DEBUG KL->Alpha: KL={kl_divergence:.6f}")
-
         # Direct transformation: alpha = clamp(kl, [min, max])
         # This matches the original DAC implementation
         alpha = max(min(kl_divergence, max_alpha), min_alpha)
-
-        if self._debug_kl_count <= 10:
-            print(f"DEBUG KL->Alpha: KL={kl_divergence:.6f} -> Alpha={alpha:.6f}")
 
         return alpha
 

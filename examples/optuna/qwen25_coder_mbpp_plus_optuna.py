@@ -14,16 +14,17 @@ RECOMMENDED BATCH SIZES:
 STEERING METHODS INVESTIGATED:
 1. CAA (Contrastive Activation Addition) - Classic vector steering
 2. DAC (Dynamic Activation Control) - Adaptive steering with entropy thresholds
+3. DAC_TENSOR (Tensor-based DAC) - Multi-dimensional steering with attention heads
 
 DATASETS (CODING FOCUS):
 - Training: mbpp_plus (Extended Python programming problems)
-- Validation: mbpp_plus (same dataset for consistency)  
+- Validation: mbpp_plus (same dataset for consistency)
 - Test: mbpp_plus (same dataset for testing)
 
 CONTRASTIVE PAIRS GENERATION:
 Uses specialized MBPP Plus extractors that create "obscured correct answer" pairs:
 - Correct: Original working code solution
-- Incorrect: Syntactically corrupted code (missing tokens, wrong syntax) 
+- Incorrect: Syntactically corrupted code (missing tokens, wrong syntax)
   that "obscures" the correct answer
 
 USAGE:
@@ -69,6 +70,9 @@ import torch
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from wisent_guard.core.optuna.optuna_pipeline import OptimizationConfig, OptimizationPipeline
+from wisent_guard.core.steering_methods_tensor.dac_attention import DAC as TensorDAC
+from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
+from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
 
 def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:
@@ -80,9 +84,9 @@ def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:
         "layer_search_range": (16, 24),  # Qwen has 32 layers (0-31), middle-to-late layers work well for code
         "train_limit": 150,  # Good balance for MBPP Plus
         "contrastive_pairs_limit": 75,  # Bounded by train_limit
-        "val_limit": 75,
+        "val_limit": 50,
         "test_limit": 150,
-        "n_trials": 50,  # More trials for better optimization
+        "n_trials": 30,  # More trials for better optimization
         "n_startup_trials": 10,  # More random exploration
     }
 
@@ -97,30 +101,24 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         # Model configuration - Qwen2.5-Coder-7B specialized for coding
         model_name=args.model_path or defaults["model_name"],
         device="cuda" if torch.cuda.is_available() else "cpu",
-        
         # Dataset configuration - Coding focus with MBPP Plus
         train_dataset="mbpp_plus",  # Extended Python programming problems
-        val_dataset="mbpp_plus",    # Same dataset for consistency
-        test_dataset="mbpp_plus",   # Same dataset for testing
-        
+        val_dataset="mbpp_plus",  # Same dataset for consistency
+        test_dataset="mbpp",  # Same dataset for testing
         # Training configuration
         train_limit=args.train_limit or defaults["train_limit"],
         contrastive_pairs_limit=args.contrastive_pairs_limit or defaults["contrastive_pairs_limit"],
-        
         # Evaluation configuration
         val_limit=args.val_limit or defaults["val_limit"],
         test_limit=args.test_limit or defaults["test_limit"],
-        
         # Layer search configuration - Qwen has 32 layers (0-31)
         # Middle-to-late layers (16-24) typically capture code semantics well
         layer_search_range=args.layer_range or defaults["layer_search_range"],
-        
         # Probe type - Fixed to logistic regression
         probe_type="logistic_regression",
-        
         # Steering methods - Currently implemented methods
-        steering_methods=["caa", "dac"],
-        
+        # steering_methods=["caa", "dac", "dac_tensor"],
+        steering_methods=["dac_tensor"],
         # Optuna study configuration
         study_name=args.study_name or "qwen25_coder_mbpp_plus_optimization",
         db_url=f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/optuna_studies.db",
@@ -128,25 +126,20 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         n_startup_trials=args.n_startup_trials or defaults["n_startup_trials"],
         sampler="TPE",  # Tree-structured Parzen Estimator
         pruner="MedianPruner",  # Aggressive pruning for efficiency
-        
         # WandB configuration
         wandb_project=args.wandb_project or "qwen25-coder-mbpp-plus-optimization",
         use_wandb=args.use_wandb,
-        
         # Generation configuration - Optimized for coding tasks
         batch_size=args.batch_size or defaults["batch_size"],
         max_length=1024,  # Longer for complex coding problems
         max_new_tokens=defaults["max_new_tokens"],
         temperature=0.1,  # Lower temperature for more deterministic code generation
         do_sample=True,
-        
         # Performance optimization
         seed=42,
-        
         # Output configuration
         output_dir="outputs/qwen25_coder_mbpp_plus_optimization",
         cache_dir="cache/qwen25_coder_mbpp_plus_optimization",
-        
         # Search space constraints
         max_layers_to_search=9,  # Search more layers for better coverage
         early_stopping_patience=15,  # More patience for specialized model
@@ -176,7 +169,10 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
             if steering_method == "caa":
                 # CAA hyperparameters - adjusted for coding-specialized model
                 steering_alpha = trial.suggest_float(  # maps to `strength`
-                    "steering_alpha", 0.05, 1.5, step=0.05  # Moderate range for specialized model
+                    "steering_alpha",
+                    0.05,
+                    1.5,
+                    step=0.05,  # Moderate range for specialized model
                 )
 
                 normalization_method = trial.suggest_categorical("normalization_method", ["none", "l2_unit"])
@@ -194,10 +190,19 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
             elif steering_method == "dac":
                 # DAC: Dynamic control with entropy-based adaptation
                 steering_params = {
-                    "base_strength": trial.suggest_float("base_strength", 0.3, 1.2, step=0.05),  # Moderate for coding model
+                    "base_strength": trial.suggest_float(
+                        "base_strength", 0.3, 1.2, step=0.05
+                    ),  # Moderate for coding model
                     "ptop": trial.suggest_float("ptop", 0.25, 0.55, step=0.05),
                     "max_alpha": trial.suggest_float("max_alpha", 0.8, 2.5, step=0.1),  # Reasonable max for coding
                     "entropy_threshold": trial.suggest_float("entropy_threshold", 1.8, 3.5, step=0.1),
+                }
+
+            elif steering_method == "dac_tensor":
+                # DAC_TENSOR: Tensor-based steering with attention heads
+                steering_params = {
+                    "steering_alpha": trial.suggest_float("steering_alpha", 0.0, 1.5, step=0.05),  # Steering strength
+                    "icl_examples": trial.suggest_int("icl_examples", 0, 4),  # In-context learning examples
                 }
 
             else:
@@ -208,19 +213,29 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
                 if steering_params.get("steering_alpha") is not None
                 else "N/A"
             )
-            self.logger.info(f"🎯 Trial {trial.number}: {steering_method.upper()} with α={alpha_str} (Layer {layer_id})")
+            self.logger.info(
+                f"🎯 Trial {trial.number}: {steering_method.upper()} with α={alpha_str} (Layer {layer_id})"
+            )
 
             # Step 1: Train and evaluate probe
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
             self.logger.info(f"📊 Trial {trial.number}: Probe {probe_type} AUC = {probe_score:.4f}")
 
             # Step 2: Train steering method
-            steering_instance = self._train_steering_method(trial, steering_method, layer_id, steering_params)
+            if steering_method == "dac_tensor":
+                steering_instance = self._train_tensor_dac(trial, layer_id, steering_params)
+            else:
+                steering_instance = self._train_steering_method(trial, steering_method, layer_id, steering_params)
 
             # Step 3: Evaluate steering on validation set
-            validation_accuracy = self._evaluate_steering_on_validation(
-                steering_instance, steering_method, layer_id, steering_params
-            )
+            if steering_method == "dac_tensor":
+                validation_accuracy = self._evaluate_tensor_dac_on_validation(
+                    steering_instance, steering_params, layer_id, trial
+                )
+            else:
+                validation_accuracy = self._evaluate_steering_on_validation(
+                    steering_instance, steering_method, layer_id, steering_params, trial.number, trial
+                )
 
             self.logger.info(f"🎯 Trial {trial.number}: Validation MBPP Plus accuracy = {validation_accuracy:.4f}")
             trial.report(validation_accuracy, step=1)
@@ -242,8 +257,147 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
         except Exception as e:
             self.logger.error(f"❌ Trial {trial.number} failed: {e}")
             import traceback
+
             traceback.print_exc()
             return 0.0
+
+    def _train_tensor_dac(self, trial, layer_id: int, hyperparams: dict) -> TensorDAC:
+        """Train tensor-based DAC using standard pattern like CAA."""
+        self.logger.info(f"🧪 Training Tensor DAC for layer {layer_id}")
+
+        # Initialize tensor DAC (no internal model loading!)
+        tensor_dac = TensorDAC(
+            device=self.device,
+            max_new_tokens=hyperparams.get("max_new_tokens", 384),
+            icl_examples=hyperparams.get("icl_examples", 2),
+            legacy_behavior=hyperparams.get("legacy_behavior", False),
+        )
+
+        # Inject model reference to avoid duplicate loading
+        tensor_dac.load_model_with_reference(self.model, self.tokenizer)
+
+        # Use standard contrastive pair creation (reuses existing pipeline method)
+        contrastive_limit = min(self.config.contrastive_pairs_limit, len(self.train_samples))
+        contrastive_pairs = self._create_contrastive_pairs(
+            self.train_samples, layer_id, self.config.train_dataset, limit=contrastive_limit
+        )
+
+        # Train using property-based interface (restored DAC method)
+        import time
+
+        training_start = time.time()
+        property_name = f"coding_capability_layer_{layer_id}"
+        training_stats = tensor_dac.train_property(property_name, contrastive_pairs)
+        training_time = time.time() - training_start
+
+        self.logger.info(f"   ✅ Tensor DAC training completed in {training_time:.1f}s")
+        steering_tensor = tensor_dac.get_steering_tensor()
+        self.logger.info(f"   Tensor shape: {steering_tensor.shape}")
+
+        return tensor_dac
+
+    def _evaluate_tensor_dac_on_validation(
+        self, tensor_dac: TensorDAC, hyperparams: dict, layer_id: int, trial=None
+    ) -> float:
+        """Evaluate tensor DAC on validation set."""
+        from wisent_guard.core.task_interface import get_task
+        from wisent_guard.core.optuna import metrics
+
+        if tensor_dac is None:
+            return 0.0
+
+        # Check if trained (but don't fail if attribute doesn't exist)
+        if hasattr(tensor_dac, "is_trained") and not tensor_dac.is_trained:
+            return 0.0
+
+        self.logger.info(f"🎯 Evaluating Tensor DAC on validation set")
+
+        # Get validation task
+        task = get_task(self.config.val_dataset)
+        extractor = task.get_extractor()
+
+        # Collect validation questions and task docs
+        questions = []
+        ground_truths = []
+        valid_samples = []  # Keep track of samples for task_docs (needed for BigCode evaluation)
+
+        for sample in self.val_samples:
+            qa_pair = extractor.extract_qa_pair(sample, task)
+            if not qa_pair:
+                continue
+
+            questions.append(qa_pair["formatted_question"])
+            ground_truths.append(qa_pair["correct_answer"])
+            valid_samples.append(sample)  # Store original sample for BigCode evaluation
+
+        if not questions:
+            return 0.0
+
+        # Generate predictions with tensor DAC
+        predictions = []
+        steering_strength = hyperparams.get("steering_alpha", 1.0)
+
+        # Construct property weights for dynamic steering
+        property_name = f"coding_capability_layer_{layer_id}"
+        property_weights = {property_name: 1.0}  # Use full weight for the trained property
+
+        self.logger.debug(f"   Generating {len(questions)} predictions with α={steering_strength:.3f}")
+        self.logger.debug(f"   Using dynamic strategy with property: {property_name}")
+
+        for i, question in enumerate(questions):
+            try:
+                # Generate with tensor DAC steering
+                generated_text = tensor_dac.generate_with_steering(
+                    prompt=question,
+                    property_weights=property_weights,
+                    max_new_tokens=hyperparams.get("max_new_tokens", 384),
+                    steering_strength=steering_strength,
+                    timing_strategy="dynamic",
+                )
+
+                # For coding tasks, don't try to extract - let BigCode handle it
+                # Just clean up the response
+                prediction = generated_text.strip()
+                predictions.append(prediction)
+
+            except Exception as e:
+                self.logger.warning(f"Generation failed for question {i}: {e}")
+                predictions.append("")  # Empty prediction for failed generation
+
+        # Log sample predictions for debugging (like parent class)
+        for i, (pred, gt) in enumerate(zip(predictions[:3], ground_truths[:3])):
+            self.logger.debug(f"DAC_TENSOR Sample {i} - Model: ...{pred[-50:] if pred else 'None'}")
+            self.logger.debug(f"DAC_TENSOR Sample {i} - Ground truth: {gt}")
+
+        # Save detailed validation results (like parent class)
+        trial_number = trial.number if trial and hasattr(trial, "number") else 0
+        self._save_detailed_validation_results(
+            questions,
+            ground_truths,
+            predictions,
+            trial_number,
+            trial=trial,
+            steering_method="dac_tensor",
+            layer_id=layer_id,
+            hyperparams=hyperparams,
+        )
+
+        # Prepare task docs for BigCode evaluation (critical for MBPP Plus)
+        task_docs = valid_samples[: len(predictions)] if valid_samples else []
+
+        # Use proper benchmark evaluation (same as parent class)
+        benchmark_metrics = metrics.evaluate_benchmark_performance(
+            predictions, ground_truths, self.config.val_dataset, task_docs=task_docs
+        )
+        accuracy = benchmark_metrics.get("accuracy", 0.0)
+
+        self.logger.info(f"   Validation accuracy: {accuracy:.4f}")
+
+        # Report to Optuna for pruning if trial is available
+        if trial and hasattr(trial, "report"):
+            trial.report(accuracy, step=1)
+
+        return accuracy
 
     def _log_enhanced_results(self, study, final_results):
         """Log enhanced results with MBPP Plus-specific analysis."""
@@ -253,12 +407,21 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
 
         best_trial = study.best_trial
         best_method = best_trial.params.get("steering_method", "unknown")
-        best_alpha = best_trial.params.get("steering_alpha", 0.0)
         best_layer = best_trial.params.get("layer_id", -1)
+
+        # Get the appropriate alpha/strength parameter based on method
+        if best_method == "dac_tensor":
+            best_alpha = best_trial.params.get("steering_alpha", 0.0)
+        elif best_method == "caa":
+            best_alpha = best_trial.params.get("steering_alpha", 0.0)
+        elif best_method == "dac":
+            best_alpha = best_trial.params.get("base_strength", 0.0)
+        else:
+            best_alpha = 0.0
 
         self.logger.info(f"🥇 Best Method: {best_method.upper()}")
         self.logger.info(f"📊 Best Layer: {best_layer}")
-        self.logger.info(f"⚡ Best Alpha: {best_alpha:.4f}")
+        self.logger.info(f"⚡ Best Alpha/Strength: {best_alpha:.4f}")
         self.logger.info(f"🎯 Best Validation Accuracy: {study.best_value:.4f}")
 
         baseline_acc = final_results["baseline_benchmark_metrics"]["accuracy"]
@@ -276,7 +439,9 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
         self.logger.info(f"   - Training: MBPP Plus (Extended Python problems)")
         self.logger.info(f"   - Testing: MBPP Plus (same dataset)")
         self.logger.info(f"   - More challenging than standard MBPP")
-        self.logger.info(f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing")
+        self.logger.info(
+            f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing"
+        )
 
         # Performance context
         if baseline_acc > 0.6:
@@ -295,7 +460,15 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
                 self.logger.info(f"   Trials: {len(method_values)}")
                 self.logger.info(f"   Mean: {sum(method_values) / len(method_values):.4f}")
                 self.logger.info(f"   Best: {max(method_values):.4f}")
-                self.logger.info(f"   Std: {(sum((x - sum(method_values)/len(method_values))**2 for x in method_values) / len(method_values))**0.5:.4f}")
+                self.logger.info(
+                    f"   Std: {(sum((x - sum(method_values) / len(method_values)) ** 2 for x in method_values) / len(method_values)) ** 0.5:.4f}"
+                )
+
+                # Additional info for tensor DAC
+                if best_method == "dac_tensor":
+                    self.logger.info(f"   ICL Examples: {best_trial.params.get('icl_examples', 'N/A')}")
+                    self.logger.info(f"   Max Examples: {best_trial.params.get('max_examples', 'N/A')}")
+                    self.logger.info(f"   Legacy Format: {best_trial.params.get('legacy_behavior', 'N/A')}")
 
         self.logger.info("=" * 80)
 
@@ -403,7 +576,7 @@ def main():
     if torch.cuda.is_available():
         logger.info(f"🔥 GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.device_count()} devices)")
         logger.info(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB")
-        
+
         # Memory warning for Qwen2.5-Coder-7B
         vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         if vram_gb < 20:
@@ -450,6 +623,7 @@ def main():
     except Exception as e:
         logger.error(f"❌ Optimization failed: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 

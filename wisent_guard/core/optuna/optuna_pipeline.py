@@ -453,7 +453,7 @@ class OptimizationPipeline:
             steering_method_instance = self._train_steering_method(trial, steering_method, layer_id, locals())
 
             validation_accuracy = self._evaluate_steering_on_validation(
-                steering_method_instance, steering_method, layer_id, locals(), trial.number
+                steering_method_instance, steering_method, layer_id, locals(), trial.number, trial
             )
 
             trial.report(validation_accuracy, step=1)
@@ -642,6 +642,7 @@ class OptimizationPipeline:
         layer_id: int,
         hyperparams: dict[str, Any],
         trial_number: int = 0,
+        trial=None,
     ) -> float:
         """Evaluate steering method on validation data by re-running forward passes."""
         if steering_instance is None:
@@ -697,7 +698,16 @@ class OptimizationPipeline:
             return 0.0
 
         # Save detailed validation results to JSON
-        self._save_detailed_validation_results(questions, ground_truths, predictions, trial_number)
+        self._save_detailed_validation_results(
+            questions,
+            ground_truths,
+            predictions,
+            trial_number,
+            trial=trial,
+            steering_method=method_name,
+            layer_id=layer_id,
+            hyperparams=hyperparams,
+        )
 
         # Prepare task docs for BigCode evaluation (if coding task)
         task_docs = valid_samples[: len(predictions)] if valid_samples else []
@@ -944,7 +954,14 @@ class OptimizationPipeline:
         # Save detailed test results to JSON
         if test_questions and test_ground_truths and baseline_predictions and steered_predictions:
             self._save_detailed_test_results(
-                test_questions, test_ground_truths, baseline_predictions, steered_predictions
+                test_questions,
+                test_ground_truths,
+                baseline_predictions,
+                steered_predictions,
+                best_trial=best_trial,
+                best_params=best_params,
+                layer_id=layer_id,
+                steering_method=method_name,
             )
 
         # Calculate benchmark metrics (with real task docs for coding tasks)
@@ -1049,10 +1066,85 @@ class OptimizationPipeline:
             "auc": roc_auc_score(y_test, y_pred_proba) if len(np.unique(y_test)) > 1 else 0.5,
         }
 
-    def _save_detailed_validation_results(
-        self, questions: list[str], ground_truths: list[str], predictions: list[str], trial_number: int
+    def _create_experiment_metadata(
+        self, trial=None, steering_method: str = None, layer_id: int = None, hyperparams: dict = None
     ):
-        """Save detailed validation results to JSON file."""
+        """Create comprehensive experiment metadata for detailed results."""
+        from datetime import datetime
+        import platform
+
+        metadata = {
+            "trial_info": {
+                "trial_number": trial.number if trial else None,
+                "trial_params": dict(trial.params) if trial else {},
+                "trial_state": str(getattr(trial, "state", "RUNNING")) if trial else None,
+            },
+            "model_config": {
+                "model_name": self.config.model_name,
+                "device": self.config.device,
+                "is_coding_task": self.is_coding_task,
+            },
+            "dataset_config": {
+                "train_dataset": self.config.train_dataset,
+                "val_dataset": self.config.val_dataset,
+                "test_dataset": self.config.test_dataset,
+                "train_limit": self.config.train_limit,
+                "val_limit": self.config.val_limit,
+                "test_limit": self.config.test_limit,
+                "contrastive_pairs_limit": self.config.contrastive_pairs_limit,
+            },
+            "steering_config": {
+                "steering_method": steering_method,
+                "layer_id": layer_id,
+                "hyperparams": hyperparams or {},
+                "layer_search_range": self.config.layer_search_range,
+                "probe_type": self.config.probe_type,
+                "available_steering_methods": self.config.steering_methods,
+            },
+            "optimization_config": {
+                "study_name": self.config.study_name,
+                "sampler": self.config.sampler,
+                "pruner": self.config.pruner,
+                "n_trials": self.config.n_trials,
+                "n_startup_trials": self.config.n_startup_trials,
+            },
+            "generation_config": {
+                "batch_size": self.config.batch_size,
+                "max_length": self.config.max_length,
+                "max_new_tokens": self.config.max_new_tokens,
+                "temperature": self.config.temperature,
+                "do_sample": self.config.do_sample,
+            },
+            "run_info": {
+                "timestamp": datetime.now().isoformat(),
+                "run_dir": str(self.run_dir),
+                "output_dir": self.config.output_dir,
+                "cache_dir": self.config.cache_dir,
+                "platform": platform.platform(),
+                "python_version": platform.python_version(),
+            },
+            "wandb_config": {
+                "use_wandb": self.config.use_wandb,
+                "wandb_project": self.config.wandb_project,
+            }
+            if hasattr(self.config, "use_wandb")
+            else {},
+        }
+
+        return metadata
+
+    def _save_detailed_validation_results(
+        self,
+        questions: list[str],
+        ground_truths: list[str],
+        predictions: list[str],
+        trial_number: int,
+        trial=None,
+        steering_method: str = None,
+        layer_id: int = None,
+        hyperparams: dict = None,
+    ):
+        """Save detailed validation results to JSON file with experiment metadata."""
         detailed_results = []
 
         # For coding tasks, use the same BigCode evaluation as accuracy calculation
@@ -1124,13 +1216,19 @@ class OptimizationPipeline:
 
                 detailed_results.append(result_entry)
 
+        # Create experiment metadata
+        experiment_metadata = self._create_experiment_metadata(trial, steering_method, layer_id, hyperparams)
+
+        # Create final results structure with metadata
+        final_results = {"experiment_metadata": experiment_metadata, "results": detailed_results}
+
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"validation_detailed_results_trial_{trial_number:03d}_{timestamp}.json"
         filepath = self.run_dir / filename
 
         with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(detailed_results, f, indent=2, ensure_ascii=False)
+            json.dump(final_results, f, indent=2, ensure_ascii=False)
 
         self.logger.info(f"💾 Saved detailed validation results to: {filename}")
 
@@ -1140,8 +1238,12 @@ class OptimizationPipeline:
         ground_truths: list[str],
         baseline_predictions: list[str],
         steered_predictions: list[str],
+        best_trial=None,
+        best_params: dict = None,
+        layer_id: int = None,
+        steering_method: str = None,
     ):
-        """Save detailed test results to JSON file with both baseline and steered answers."""
+        """Save detailed test results to JSON file with both baseline and steered answers and experiment metadata."""
         detailed_results = []
 
         # For coding tasks, use BigCode evaluation consistently
@@ -1245,13 +1347,24 @@ class OptimizationPipeline:
 
                 detailed_results.append(result_entry)
 
+        # Create experiment metadata for test results
+        experiment_metadata = self._create_experiment_metadata(
+            trial=best_trial,
+            steering_method=steering_method or best_params.get("steering_method") if best_params else None,
+            layer_id=layer_id,
+            hyperparams=best_params,
+        )
+
+        # Create final results structure with metadata
+        final_results = {"experiment_metadata": experiment_metadata, "results": detailed_results}
+
         # Save to JSON file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"test_detailed_results_{timestamp}.json"
         filepath = self.run_dir / filename
 
         with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(detailed_results, f, indent=2, ensure_ascii=False)
+            json.dump(final_results, f, indent=2, ensure_ascii=False)
 
         self.logger.info(f"💾 Saved detailed test results to: {filename}")
         return filename
