@@ -516,7 +516,7 @@ if __name__ == "__main__":
             return code  # Names already match
 
         logger.debug(f"🔧 Function name mismatch detected: {actual_name} → {expected_name}")
-        logger.debug(f"   Adding wrapper function for compatibility")
+        logger.debug("   Adding wrapper function for compatibility")
 
         # Add wrapper function to bridge the name gap
         wrapper = f"""

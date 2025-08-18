@@ -102,10 +102,10 @@ def generate_benchmark_predictions(
     preserve_task_docs: bool = False,
 ) -> Tuple[List[str], List[str], List[Dict]]:
     """Generate model predictions for benchmark evaluation using task extractor with batching.
-    
+
     Args:
         preserve_task_docs: If True, returns original task documents alongside predictions
-        
+
     Returns:
         Tuple of (predictions, ground_truths, task_docs) if preserve_task_docs=True
         Tuple of (predictions, ground_truths, []) if preserve_task_docs=False
@@ -123,7 +123,7 @@ def generate_benchmark_predictions(
     answers = []
 
     valid_samples = []  # Keep track of samples that produce valid QA pairs
-    
+
     for sample in samples:
         qa_pair = extractor.extract_qa_pair(sample, task)
         if not qa_pair:
@@ -131,7 +131,7 @@ def generate_benchmark_predictions(
             continue
         questions.append(qa_pair["formatted_question"])
         answers.append(qa_pair["correct_answer"])
-        
+
         if preserve_task_docs:
             valid_samples.append(sample)
 
@@ -162,8 +162,8 @@ def generate_benchmark_predictions(
 
     # Add task docs if requested
     if preserve_task_docs:
-        task_docs = valid_samples[:len(predictions)]  # Ensure same length as predictions
-    
+        task_docs = valid_samples[: len(predictions)]  # Ensure same length as predictions
+
     return predictions, ground_truths, task_docs
 
 

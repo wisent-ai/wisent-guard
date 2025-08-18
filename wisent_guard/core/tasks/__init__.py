@@ -13,8 +13,8 @@ from .livemathbench_task import LiveMathBenchTask
 from .lm_eval_task import (
     AppsTask,
     CodexglueCodeToTextGoTask,
-    CodexglueCodeToTextJavaTask,
     CodexglueCodeToTextJavascriptTask,
+    CodexglueCodeToTextJavaTask,
     CodexglueCodeToTextPhpTask,
     CodexglueCodeToTextPythonTask,
     CodexglueCodeToTextRubyTask,
@@ -27,8 +27,8 @@ from .lm_eval_task import (
     InstructHumanEvalTask,
     MBPPPlusTask,
     MBPPTask,
-    MMLUTask,
     MercuryTask,
+    MMLUTask,
     MultipleCppTask,
     MultipleGoTask,
     MultipleJavaTask,
@@ -36,9 +36,9 @@ from .lm_eval_task import (
     MultiplePyTask,
     MultipleRsTask,
     RecodeTask,
+    Squad2Task,
     TruthfulQATask,
 )
-from .lm_eval_task import GSM8KTask, MBPPTask, MMLUTask, Squad2Task, TruthfulQATask
 from .math500_task import Math500Task
 from .polymath_task import PolyMathTask
 from .supergpqa_task import SuperGPQABiologyTask, SuperGPQAChemistryTask, SuperGPQAPhysicsTask, SuperGPQATask

@@ -221,8 +221,8 @@ class OptimizationPipeline:
     @property
     def is_coding_task(self) -> bool:
         """Check if the current task requires code execution evaluation."""
-        from ..bigcode_integration import is_bigcode_task
         from ...parameters.task_config import CODING_TASKS
+        from ..bigcode_integration import is_bigcode_task
 
         val_dataset = getattr(self.config, "val_dataset", None)
         if not val_dataset:
@@ -1070,8 +1070,8 @@ class OptimizationPipeline:
         self, trial=None, steering_method: str = None, layer_id: int = None, hyperparams: dict = None
     ):
         """Create comprehensive experiment metadata for detailed results."""
-        from datetime import datetime
         import platform
+        from datetime import datetime
 
         metadata = {
             "trial_info": {
