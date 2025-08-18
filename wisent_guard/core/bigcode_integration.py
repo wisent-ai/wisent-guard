@@ -349,10 +349,10 @@ class BigCodeEvaluator:
                 if proc.returncode == 0:
                     result["passed"] = True
                     result["output"] = proc.stdout
-                    logger.info(f"✅ Code execution PASSED. Output: {proc.stdout[:200]}")
+                    logger.debug(f"✅ Code execution PASSED. Output: {proc.stdout[:200]}")
                 else:
                     result["error"] = proc.stderr or proc.stdout
-                    logger.info(f"❌ Code execution FAILED. Error: {result['error'][:500]}")
+                    logger.debug(f"❌ Code execution FAILED. Error: {result['error'][:500]}")
 
             finally:
                 # Clean up
@@ -377,7 +377,7 @@ class BigCodeEvaluator:
             # Default format
             script = self._create_humaneval_test_script(sample, generation)
 
-        logger.info(f"📝 Test script for {task_name}:\n{script}\n")
+        logger.debug(f"📝 Test script for {task_name}:\n{script}\n")
         return script
 
     def _create_humaneval_test_script(self, sample: Dict, generation: str) -> str:
@@ -515,8 +515,8 @@ if __name__ == "__main__":
         if actual_name == expected_name:
             return code  # Names already match
 
-        logger.info(f"🔧 Function name mismatch detected: {actual_name} → {expected_name}")
-        logger.info(f"   Adding wrapper function for compatibility")
+        logger.debug(f"🔧 Function name mismatch detected: {actual_name} → {expected_name}")
+        logger.debug(f"   Adding wrapper function for compatibility")
 
         # Add wrapper function to bridge the name gap
         wrapper = f"""

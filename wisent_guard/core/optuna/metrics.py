@@ -136,7 +136,7 @@ def evaluate_benchmark_performance(
                     "incorrect": accuracy_metrics["incorrect"],
                     "evaluation_method": "bigcode_execution",
                     "task_name": task_name,
-                    "evaluation_details": evaluation_details[:5],  # Include first 5 for debugging
+                    "evaluation_details": evaluation_details,
                     "pass_count": accuracy_metrics.get("pass_count", 0),
                     "fail_count": accuracy_metrics.get("fail_count", 0),
                     "error_count": accuracy_metrics.get("error_count", 0),
