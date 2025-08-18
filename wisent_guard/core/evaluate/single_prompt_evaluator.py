@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from ..model import Model
 
@@ -176,8 +175,8 @@ class SinglePromptEvaluator:
 
             # Load appropriate steering method (CAA and DAC supported)
             if method == "CAA":
-                from ..steering_methods.caa import CAA
                 from ..aggregation import ControlVectorAggregationMethod
+                from ..steering_methods.caa import CAA
 
                 steering_method = CAA(device=self.device)
 
@@ -200,7 +199,7 @@ class SinglePromptEvaluator:
                     if self.verbose:
                         vector_shape = steering_method.get_steering_vector().shape
                         vector_norm = torch.norm(steering_method.get_steering_vector()).item()
-                        print(f"  ✓ CAA method loaded successfully")
+                        print("  ✓ CAA method loaded successfully")
                         print(f"  Vector shape: {vector_shape}")
                         print(f"  Vector norm: {vector_norm:.4f}")
                         print(f"  Layer index: {layer_index}")
@@ -231,7 +230,7 @@ class SinglePromptEvaluator:
                     if self.verbose:
                         vector_shape = steering_method.steering_vector.shape
                         vector_norm = torch.norm(steering_method.steering_vector).item()
-                        print(f"  ✓ DAC method loaded successfully")
+                        print("  ✓ DAC method loaded successfully")
                         print(f"  Vector shape: {vector_shape}")
                         print(f"  Vector norm: {vector_norm:.4f}")
                         print(f"  Layer index: {layer_index}")

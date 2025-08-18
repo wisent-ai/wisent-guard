@@ -5,7 +5,6 @@ This module routes CLI commands to appropriate submodules.
 """
 
 import sys
-import argparse
 
 
 def main():

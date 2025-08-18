@@ -6868,6 +6868,7 @@ def handle_evaluate_command(args):
     """Handle the evaluate command for single-prompt evaluation."""
     try:
         import json
+
         from .core.evaluate import SinglePromptEvaluator, is_answer_above_thresholds
 
         print("🎯 Single-Prompt Evaluation")
@@ -6875,7 +6876,7 @@ def handle_evaluate_command(args):
 
         # Initialize evaluator
         if args.verbose:
-            print(f"\n📦 Initializing evaluator...")
+            print("\n📦 Initializing evaluator...")
             print(f"   Model: {args.model} (used for both generation and evaluation)")
             print(f"   Device: {args.device or 'auto-detect'}")
 
@@ -6893,7 +6894,7 @@ def handle_evaluate_command(args):
 
         # Run evaluation
         if args.verbose:
-            print(f"\n🚀 Running evaluation...")
+            print("\n🚀 Running evaluation...")
             print(f"   Prompt: '{args.prompt}'")
             print(f"   Trait: {args.trait}")
             print(f"   Layer: {layer_index}")
@@ -6933,13 +6934,13 @@ def handle_evaluate_command(args):
             print(f"Trait Quality:      {result.trait_quality:+.3f} (-1 to 1 scale)")
             print(f"Answer Quality:     {result.answer_quality:.3f} (0 to 1 scale)")
             print(f"Similarity:         {result.steered_vs_unsteered_similarity:.3f} (0 to 1 scale)")
-            print(f"\nGenerated Responses:")
+            print("\nGenerated Responses:")
             print(f'Unsteered: "{result.unsteered_response}"')
             print(f'Steered:   "{result.response}"')
 
             # Show threshold evaluation if provided
             if args.trait_threshold is not None and args.answer_threshold is not None:
-                print(f"\n📏 Threshold Evaluation:")
+                print("\n📏 Threshold Evaluation:")
                 trait_pass = result.trait_quality >= args.trait_threshold
                 answer_pass = result.answer_quality >= args.answer_threshold
                 overall_pass = trait_pass and answer_pass
