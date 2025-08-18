@@ -174,7 +174,7 @@ class SinglePromptEvaluator:
             if self.verbose:
                 print(f"✓ Loading steering method: {method} from {vector_path}")
 
-            # Load appropriate steering method (for now, only CAA)
+            # Load appropriate steering method (CAA and DAC supported)
             if method == "CAA":
                 from ..steering_methods.caa import CAA
                 from ..aggregation import ControlVectorAggregationMethod
@@ -209,8 +209,42 @@ class SinglePromptEvaluator:
 
                 except Exception as e:
                     raise RuntimeError(f"Failed to manually load CAA steering data: {e}")
+
+            elif method == "DAC":
+                from ..steering_methods.dac import DAC
+
+                # Create DAC instance with default parameters
+                steering_method = DAC(
+                    device=self.device,
+                    dynamic_control=data.get("dynamic_control", True),
+                    entropy_threshold=data.get("entropy_threshold", 1.0),
+                )
+
+                # Manual loading for DAC
+                try:
+                    # Set the required fields manually
+                    steering_method.steering_vector = data["steering_vector"].to(self.device)
+                    steering_method.layer_index = data.get("layer_index")
+                    steering_method.training_stats = data.get("training_stats", {})
+                    steering_method.is_trained = True
+
+                    if self.verbose:
+                        vector_shape = steering_method.steering_vector.shape
+                        vector_norm = torch.norm(steering_method.steering_vector).item()
+                        print(f"  ✓ DAC method loaded successfully")
+                        print(f"  Vector shape: {vector_shape}")
+                        print(f"  Vector norm: {vector_norm:.4f}")
+                        print(f"  Layer index: {layer_index}")
+                        print(f"  Dynamic control: {steering_method.dynamic_control}")
+                        print(f"  Entropy threshold: {steering_method.entropy_threshold}")
+
+                    return steering_method, layer_index
+
+                except Exception as e:
+                    raise RuntimeError(f"Failed to manually load DAC steering data: {e}")
+
             else:
-                raise ValueError(f"Unsupported steering method: {method}. Currently only CAA is supported.")
+                raise ValueError(f"Unsupported steering method: {method}. Currently CAA and DAC are supported.")
 
         except Exception as e:
             raise RuntimeError(f"Failed to load steering method from {vector_path}: {e}")
