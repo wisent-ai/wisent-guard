@@ -102,6 +102,28 @@ class MBPPTask(LMEvalTask):
         )
 
 
+class HumanEvalTask(LMEvalTask):
+    """HumanEval task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="humaneval",
+            description="HumanEval: Human Evaluation of Python coding problems",
+            categories=["coding", "reasoning", "python"],
+        )
+
+
+class MBPPPlusTask(LMEvalTask):
+    """MBPP Plus task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="mbpp_plus",
+            description="MBPP Plus: Extended version of MBPP with additional test cases",
+            categories=["coding", "reasoning", "python"],
+        )
+
+
 class GSM8KTask(LMEvalTask):
     """GSM8K task implementation."""
 
@@ -164,6 +186,229 @@ class MMLUTask(LMEvalTask):
             task_name="mmlu",
             description="MMLU: Massive Multitask Language Understanding",
             categories=["general-knowledge", "science", "reasoning"],
+        )
+
+
+# === CODING TASKS ===
+
+
+class InstructHumanEvalTask(LMEvalTask):
+    """InstructHumanEval task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="instructhumaneval",
+            description="InstructHumanEval: Instruction-following HumanEval benchmark",
+            categories=["coding", "reasoning", "python", "instruction-following"],
+        )
+
+
+class HumanEvalPlusTask(LMEvalTask):
+    """HumanEval Plus task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="humaneval_plus",
+            description="HumanEval Plus: Extended HumanEval with more tests",
+            categories=["coding", "reasoning", "python"],
+        )
+
+
+class ConalaTask(LMEvalTask):
+    """Conala task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="conala",
+            description="Conala: Code generation from natural language",
+            categories=["coding", "reasoning", "python", "nl2code"],
+        )
+
+
+class ConcodeTask(LMEvalTask):
+    """Concode task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="concode",
+            description="Concode: Code completion benchmark",
+            categories=["coding", "reasoning", "completion"],
+        )
+
+
+class MercuryTask(LMEvalTask):
+    """Mercury task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="mercury",
+            description="Mercury: Code generation benchmark",
+            categories=["coding", "reasoning"],
+        )
+
+
+class AppsTask(LMEvalTask):
+    """APPS task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="apps",
+            description="APPS: Automated Programming Problems Synthesis",
+            categories=["coding", "reasoning", "python", "competitive"],
+        )
+
+
+class DS1000Task(LMEvalTask):
+    """DS1000 task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="ds1000",
+            description="DS1000: Data Science coding tasks",
+            categories=["coding", "reasoning", "python", "data-science"],
+        )
+
+
+class MultiplePyTask(LMEvalTask):
+    """Multiple-Py task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="multiple_py",
+            description="Multiple-Py: Multi-language Python tasks",
+            categories=["coding", "reasoning", "python", "multi-language"],
+        )
+
+
+class MultipleJsTask(LMEvalTask):
+    """Multiple-JS task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="multiple_js",
+            description="Multiple-JS: Multi-language JavaScript tasks",
+            categories=["coding", "reasoning", "javascript", "multi-language"],
+        )
+
+
+class MultipleJavaTask(LMEvalTask):
+    """Multiple-Java task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="multiple_java",
+            description="Multiple-Java: Multi-language Java tasks",
+            categories=["coding", "reasoning", "java", "multi-language"],
+        )
+
+
+class MultipleCppTask(LMEvalTask):
+    """Multiple-Cpp task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="multiple_cpp",
+            description="Multiple-Cpp: Multi-language C++ tasks",
+            categories=["coding", "reasoning", "cpp", "multi-language"],
+        )
+
+
+class MultipleRsTask(LMEvalTask):
+    """Multiple-Rs task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="multiple_rs",
+            description="Multiple-Rs: Multi-language Rust tasks",
+            categories=["coding", "reasoning", "rust", "multi-language"],
+        )
+
+
+class MultipleGoTask(LMEvalTask):
+    """Multiple-Go task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="multiple_go",
+            description="Multiple-Go: Multi-language Go tasks",
+            categories=["coding", "reasoning", "go", "multi-language"],
+        )
+
+
+class CodexglueCodeToTextPythonTask(LMEvalTask):
+    """CodexGlue Code-to-Text Python task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="codexglue_code_to_text_python",
+            description="CodexGlue Code-to-Text Python: Python code summarization",
+            categories=["coding", "reasoning", "python", "code-to-text"],
+        )
+
+
+class CodexglueCodeToTextGoTask(LMEvalTask):
+    """CodexGlue Code-to-Text Go task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="codexglue_code_to_text_go",
+            description="CodexGlue Code-to-Text Go: Go code summarization",
+            categories=["coding", "reasoning", "go", "code-to-text"],
+        )
+
+
+class CodexglueCodeToTextRubyTask(LMEvalTask):
+    """CodexGlue Code-to-Text Ruby task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="codexglue_code_to_text_ruby",
+            description="CodexGlue Code-to-Text Ruby: Ruby code summarization",
+            categories=["coding", "reasoning", "ruby", "code-to-text"],
+        )
+
+
+class CodexglueCodeToTextJavaTask(LMEvalTask):
+    """CodexGlue Code-to-Text Java task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="codexglue_code_to_text_java",
+            description="CodexGlue Code-to-Text Java: Java code summarization",
+            categories=["coding", "reasoning", "java", "code-to-text"],
+        )
+
+
+class CodexglueCodeToTextJavascriptTask(LMEvalTask):
+    """CodexGlue Code-to-Text JavaScript task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="codexglue_code_to_text_javascript",
+            description="CodexGlue Code-to-Text JavaScript: JavaScript code summarization",
+            categories=["coding", "reasoning", "javascript", "code-to-text"],
+        )
+
+
+class CodexglueCodeToTextPhpTask(LMEvalTask):
+    """CodexGlue Code-to-Text PHP task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="codexglue_code_to_text_php",
+            description="CodexGlue Code-to-Text PHP: PHP code summarization",
+            categories=["coding", "reasoning", "php", "code-to-text"],
+        )
+
+
+class RecodeTask(LMEvalTask):
+    """Recode task implementation."""
+
+    def __init__(self):
+        super().__init__(
+            task_name="recode",
+            description="Recode: Perturbed HumanEval natural generation",
+            categories=["coding", "reasoning", "python", "perturbation"],
         )
 
 
