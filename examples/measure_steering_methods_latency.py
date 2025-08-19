@@ -12,6 +12,22 @@ Usage:
     python examples/measure_steering_methods_latency.py
 
 Results are saved to 'steering_inference_benchmark.json' in the current directory.
+
+Last results:
+================================================================================
+STEERING METHODS INFERENCE BENCHMARK SUMMARY
+================================================================================
+Baseline (no steering): 1432.88ms
+--------------------------------------------------------------------------------
+CAA                 : 1460.25ms (+  1.9%) | Training:    25.7ms
+DAC                 : 1494.97ms (+  4.3%) | Training:     0.6ms
+HPR                 : 1488.76ms (+  3.9%) | Training:   160.5ms
+BiPO                : 1467.65ms (+  2.4%) | Training:   170.5ms
+KSteering           : 1506.31ms (+  5.1%) | Training:    38.7ms
+TokenSteered        : 1485.21ms (+  3.7%) | Training:     0.5ms
+ControlVectorSteering: 1426.05ms (+ -0.5%) | Training:     0.4ms
+DACAttention        : 10508.34ms (+ 622.0%)
+================================================================================
 """
 
 import json
@@ -131,13 +147,13 @@ class SteeringBenchmark:
         methods = {}
 
         # Standard steering methods
-        methods["CAA"] = CAA(device=str(self.device))
-        methods["DAC"] = DAC(device=str(self.device))
-        methods["HPR"] = HPR(device=str(self.device), epochs=10)
-        methods["BiPO"] = BiPO(device=str(self.device), num_epochs=10, batch_size=2)
-        methods["KSteering"] = KSteering(device=str(self.device), num_labels=1, classifier_epochs=20)
-        methods["TokenSteered"] = TokenSteeringWrapper(CAA(device=str(self.device)))
-        methods["ControlVectorSteering"] = ControlVectorSteering(device=str(self.device))
+        # methods["CAA"] = CAA(device=str(self.device))
+        # methods["DAC"] = DAC(device=str(self.device))
+        # methods["HPR"] = HPR(device=str(self.device), epochs=10)
+        # methods["BiPO"] = BiPO(device=str(self.device), num_epochs=10, batch_size=2)
+        # methods["KSteering"] = KSteering(device=str(self.device), num_labels=1, classifier_epochs=20)
+        # methods["TokenSteered"] = TokenSteeringWrapper(CAA(device=str(self.device)))
+        # methods["ControlVectorSteering"] = ControlVectorSteering(device=str(self.device))
 
         # # Tensor-based methods
         methods["DACAttention"] = DACAttention(device=str(self.device))
@@ -301,7 +317,7 @@ class SteeringBenchmark:
             "max_time_ms": max(times),
         }
 
-    def run_benchmark(self, contrastive_pairs_path: str, output_path: str = "steering_inference_benchmark.json"):
+    def run_benchmark(self, contrastive_pairs_path: str, output_path: str = "steering_inference_benchmark_dac.json"):
         """Run the complete benchmark."""
         logger.info("Starting steering inference benchmark...")
 

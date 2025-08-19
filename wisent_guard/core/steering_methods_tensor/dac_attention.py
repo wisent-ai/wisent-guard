@@ -1598,7 +1598,10 @@ class DAC(SteeringMethodTensor):
             # Add contribution for each previous step + current step
             for i in range(step + 1):
                 alpha_to_use = prop_alpha_history[i] if i < len(prop_alpha_history) else current_alpha
-                composed[i, :, :, :] += alpha_to_use * prop_tensor[i, :, :, :]
+                # Use bounds checking to prevent index errors
+                tensor_step = min(i, prop_tensor.shape[0] - 1)
+                composed_step = min(i, composed.shape[0] - 1)
+                composed[composed_step, :, :, :] += alpha_to_use * prop_tensor[tensor_step, :, :, :]
 
         return composed
 
