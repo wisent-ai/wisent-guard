@@ -31,28 +31,22 @@ DACAttention        : 10508.34ms (+ 622.0%)
 """
 
 import json
-import time
 import logging
 import statistics
-from pathlib import Path
-from typing import Dict, List, Any, Tuple
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import time
+from typing import Any, Dict, List, Tuple
 
-# Import all steering methods
-from wisent_guard.core.steering_methods.caa import CAA
-from wisent_guard.core.steering_methods.dac import DAC
-from wisent_guard.core.steering_methods.hpr import HPR
-from wisent_guard.core.steering_methods.bipo import BiPO
-from wisent_guard.core.steering_methods.k_steering import KSteering
-from wisent_guard.core.steering_methods.token_steered import TokenSteeringWrapper
-from wisent_guard.core.steering_methods.control_vector_steering import ControlVectorSteering
-from wisent_guard.core.steering_methods_tensor.dac_attention import DAC as DACAttention
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
 
 # Import core classes
 from wisent_guard.core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
-from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
+from wisent_guard.core.response import NegativeResponse, PositiveResponse
+
+# Import all steering methods
+from wisent_guard.core.steering_methods_tensor.dac_attention import DAC as DACAttention
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -92,7 +86,7 @@ class SteeringBenchmark:
         """Load contrastive pairs from JSON file and extract test prompts."""
         logger.info(f"Loading contrastive pairs from {json_path}")
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         pair_set = ContrastivePairSet(name=data["name"])
