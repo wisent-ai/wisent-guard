@@ -36,8 +36,14 @@ class DAC(SteeringMethodTensor):
     Dynamic Activation Composition (DAC) steering method.
 
     Uses tensor-based steering with shape [steps, n_layers, n_heads, d_head]
-    instead of single vectors per layer. This matches the original DAC
-    implementation behavior.
+    and dynamic steering by default. Features:
+
+    - Dynamic steering with KL divergence computation and adaptive alpha values
+    - Multi-property composition with historical tracking
+    - Real-time adaptation based on steering impact
+    - Multiple forward passes per token for precise control
+
+    For static tensor steering, explicitly set timing_strategy="normal".
     """
 
     def __init__(
@@ -870,11 +876,11 @@ class DAC(SteeringMethodTensor):
         max_new_tokens: Optional[int] = None,
         steering_strength: float = 1.0,
         composition_strategy: str = "linear",
-        timing_strategy: str = "normal",
+        timing_strategy: str = "dynamic",
         dynamic_config: Optional[Dict] = None,
     ) -> str:
         """
-        Generate text with DAC steering applied.
+        Generate text with DAC dynamic steering applied.
 
         Args:
             prompt: Input text prompt
@@ -883,11 +889,15 @@ class DAC(SteeringMethodTensor):
             max_new_tokens: Maximum tokens to generate (defaults to class setting)
             steering_strength: Overall strength multiplier for steering
             composition_strategy: How to combine properties ("linear", "normalized")
-            timing_strategy: When to apply steering ("normal", "start_only", "diminishing", "dynamic")
-            dynamic_config: Configuration for dynamic steering (only used if timing_strategy="dynamic")
+            timing_strategy: When to apply steering ("dynamic" default, "normal", "start_only", "diminishing")
+            dynamic_config: Configuration for dynamic steering (used by default with "dynamic")
 
         Returns:
-            Generated text with steering applied
+            Generated text with dynamic steering applied
+
+        Note:
+            Default behavior uses dynamic steering with KL divergence computation and adaptive alpha values.
+            For static steering, explicitly set timing_strategy="normal".
         """
         if not self.is_trained:
             raise ValueError("DAC must be trained before generating with steering")
@@ -1588,7 +1598,10 @@ class DAC(SteeringMethodTensor):
             # Add contribution for each previous step + current step
             for i in range(step + 1):
                 alpha_to_use = prop_alpha_history[i] if i < len(prop_alpha_history) else current_alpha
-                composed[i, :, :, :] += alpha_to_use * prop_tensor[i, :, :, :]
+                # Use bounds checking to prevent index errors
+                tensor_step = min(i, prop_tensor.shape[0] - 1)
+                composed_step = min(i, composed.shape[0] - 1)
+                composed[composed_step, :, :, :] += alpha_to_use * prop_tensor[tensor_step, :, :, :]
 
         return composed
 
