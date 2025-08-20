@@ -80,6 +80,7 @@ Thumbs.db
 !/wisent_guard.egg-info/
 !/scripts/
 !/tests/
+!/huggingface_qwen25-7b-coder-caa
 
 # Don't ignore these files in the root directory
 !/.gitignore
