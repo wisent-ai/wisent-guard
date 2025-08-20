@@ -5,12 +5,11 @@ This model automatically applies CAA steering during generation without requirin
 The steering parameters are optimized using Optuna and stored in the model configuration.
 """
 
-from typing import Optional, Tuple, Union, List
+from typing import List, Optional, Tuple, Union
+
 import torch
-import torch.nn as nn
-from transformers import Qwen2ForCausalLM, Qwen2Config
+from transformers import Qwen2Config, Qwen2ForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
-from transformers.cache_utils import Cache
 
 
 class WisentQwen2Config(Qwen2Config):
@@ -150,8 +149,7 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
         # Return modified output
         if isinstance(output, tuple):
             return (hidden_states,) + output[1:]
-        else:
-            return hidden_states
+        return hidden_states
 
     def forward(
         self,
@@ -254,7 +252,7 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
 
         if not has_weights and local_path.exists() and (local_path / "config.json").exists():
             # We have config but no weights - load from base model
-            print(f"Loading weights from base model: Qwen/Qwen2.5-Coder-7B-Instruct")
+            print("Loading weights from base model: Qwen/Qwen2.5-Coder-7B-Instruct")
 
             # First, load config from local path
             from transformers import AutoConfig
@@ -301,7 +299,7 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
 
 
 # Register the model
-from transformers import AutoModelForCausalLM, AutoConfig
+from transformers import AutoConfig, AutoModelForCausalLM
 
 AutoConfig.register("wisent_qwen2", WisentQwen2Config)
 AutoModelForCausalLM.register(WisentQwen2Config, WisentQwen2ForCausalLM)
