@@ -4039,6 +4039,8 @@ def main():
         handle_generate_vector_command(args)
     elif args.command == "multi-steer":
         handle_multi_steer_command(args)
+    elif args.command == "evaluate":
+        handle_evaluate_command(args)
     else:
         print(f"Unknown command: {args.command}")
         sys.exit(1)
@@ -6860,6 +6862,106 @@ def get_actual_task_name(benchmark_name: str) -> str:
     if benchmark_name in AVAILABLE_BENCHMARKS:
         return AVAILABLE_BENCHMARKS[benchmark_name].get("task", benchmark_name)
     return benchmark_name
+
+
+def handle_evaluate_command(args):
+    """Handle the evaluate command for single-prompt evaluation."""
+    try:
+        import json
+
+        from .core.evaluate import SinglePromptEvaluator, is_answer_above_thresholds
+
+        print("🎯 Single-Prompt Evaluation")
+        print("=" * 60)
+
+        # Initialize evaluator
+        if args.verbose:
+            print("\n📦 Initializing evaluator...")
+            print(f"   Model: {args.model} (used for both generation and evaluation)")
+            print(f"   Device: {args.device or 'auto-detect'}")
+
+        evaluator = SinglePromptEvaluator(
+            model_name=args.model,
+            device=args.device,
+            verbose=args.verbose,
+        )
+
+        # Load steering vector
+        if args.verbose:
+            print(f"\n🔄 Loading steering vector from: {args.vector}")
+
+        steering_method, layer_index = evaluator.load_steering_vector(args.vector)
+
+        # Run evaluation
+        if args.verbose:
+            print("\n🚀 Running evaluation...")
+            print(f"   Prompt: '{args.prompt}'")
+            print(f"   Trait: {args.trait}")
+            print(f"   Layer: {layer_index}")
+            print(f"   Steering strength: {args.steering_strength}")
+
+        result = evaluator.generate_and_evaluate(
+            prompt=args.prompt,
+            steering_method=steering_method,
+            layer=layer_index,
+            trait_name=args.trait,
+            steering_strength=args.steering_strength,
+            trait_description=args.trait_description,
+            max_new_tokens=args.max_new_tokens,
+        )
+
+        # Display results
+        print("\n" + "=" * 60)
+        print("📊 EVALUATION RESULTS")
+        print("=" * 60)
+
+        if args.json:
+            # JSON output
+            output = result.to_dict()
+
+            # Add threshold evaluation if provided
+            if args.trait_threshold is not None and args.answer_threshold is not None:
+                acceptable = is_answer_above_thresholds(result, args.trait_threshold, args.answer_threshold)
+                output["thresholds"] = {
+                    "trait_threshold": args.trait_threshold,
+                    "answer_threshold": args.answer_threshold,
+                    "acceptable": acceptable,
+                }
+
+            print(json.dumps(output, indent=2))
+        else:
+            # Human-readable output
+            print(f"Trait Quality:      {result.trait_quality:+.3f} (-1 to 1 scale)")
+            print(f"Answer Quality:     {result.answer_quality:.3f} (0 to 1 scale)")
+            print(f"Similarity:         {result.steered_vs_unsteered_similarity:.3f} (0 to 1 scale)")
+            print("\nGenerated Responses:")
+            print(f'Unsteered: "{result.unsteered_response}"')
+            print(f'Steered:   "{result.response}"')
+
+            # Show threshold evaluation if provided
+            if args.trait_threshold is not None and args.answer_threshold is not None:
+                print("\n📏 Threshold Evaluation:")
+                trait_pass = result.trait_quality >= args.trait_threshold
+                answer_pass = result.answer_quality >= args.answer_threshold
+                overall_pass = trait_pass and answer_pass
+
+                print(
+                    f"   Trait Quality:  {result.trait_quality:+.3f} >= {args.trait_threshold:+.3f} {'✓' if trait_pass else '✗'}"
+                )
+                print(
+                    f"   Answer Quality: {result.answer_quality:.3f} >= {args.answer_threshold:.3f} {'✓' if answer_pass else '✗'}"
+                )
+                print(f"   Overall Result: {'ACCEPTABLE' if overall_pass else 'REGENERATE RECOMMENDED'}")
+
+        print("\n✅ Evaluation completed successfully!")
+
+    except Exception as e:
+        print(f"\n❌ Error in evaluation: {e}")
+        import traceback
+
+        if args.verbose:
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

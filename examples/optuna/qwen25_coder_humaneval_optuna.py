@@ -389,7 +389,7 @@ def main():
     logger.info(f"   Batch Size: {args.batch_size or get_recommended_config_for_qwen25_coder()['batch_size']}")
     logger.info(f"   Trials: {args.n_trials or get_recommended_config_for_qwen25_coder()['n_trials']}")
     logger.info(f"   Train/Val/Test: {args.train_limit or 80}/{args.val_limit or 40}/{args.test_limit or 80}")
-    logger.info(f"   Datasets: HumanEval (train/val/test) - Python programming problems from OpenAI")
+    logger.info("   Datasets: HumanEval (train/val/test) - Python programming problems from OpenAI")
     logger.info(f"   WandB: {'Enabled' if args.use_wandb else 'Disabled'}")
 
     if torch.cuda.is_available():

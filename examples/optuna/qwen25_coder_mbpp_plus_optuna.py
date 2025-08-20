@@ -71,8 +71,6 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from wisent_guard.core.optuna.optuna_pipeline import OptimizationConfig, OptimizationPipeline
 from wisent_guard.core.steering_methods_tensor.dac_attention import DAC as TensorDAC
-from wisent_guard.core.contrastive_pairs import ContrastivePair, ContrastivePairSet
-from wisent_guard.core.response import PositiveResponse, NegativeResponse
 
 
 def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:
@@ -293,8 +291,8 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
         self, tensor_dac: TensorDAC, hyperparams: dict, layer_id: int, trial=None
     ) -> float:
         """Evaluate tensor DAC on validation set."""
-        from wisent_guard.core.task_interface import get_task
         from wisent_guard.core.optuna import metrics
+        from wisent_guard.core.task_interface import get_task
 
         if tensor_dac is None:
             return 0.0
@@ -303,7 +301,7 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
         if hasattr(tensor_dac, "is_trained") and not tensor_dac.is_trained:
             return 0.0
 
-        self.logger.info(f"🎯 Evaluating Tensor DAC on validation set")
+        self.logger.info("🎯 Evaluating Tensor DAC on validation set")
 
         # Get validation task
         task = get_task(self.config.val_dataset)
@@ -403,9 +401,7 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
         best_layer = best_trial.params.get("layer_id", -1)
 
         # Get the appropriate alpha/strength parameter based on method
-        if best_method == "dac_tensor":
-            best_alpha = best_trial.params.get("steering_alpha", 0.0)
-        elif best_method == "caa":
+        if best_method == "dac_tensor" or best_method == "caa":
             best_alpha = best_trial.params.get("steering_alpha", 0.0)
         elif best_method == "dac":
             best_alpha = best_trial.params.get("base_strength", 0.0)
@@ -428,10 +424,10 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
 
         # Coding-specific insights
         self.logger.info("🔧 MBPP Plus Task Insights:")
-        self.logger.info(f"   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
-        self.logger.info(f"   - Training: MBPP Plus (Extended Python problems)")
-        self.logger.info(f"   - Testing: MBPP Plus (same dataset)")
-        self.logger.info(f"   - More challenging than standard MBPP")
+        self.logger.info("   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
+        self.logger.info("   - Training: MBPP Plus (Extended Python problems)")
+        self.logger.info("   - Testing: MBPP Plus (same dataset)")
+        self.logger.info("   - More challenging than standard MBPP")
         self.logger.info(
             f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing"
         )
@@ -563,7 +559,7 @@ def main():
     logger.info(f"   Batch Size: {args.batch_size or get_recommended_config_for_qwen25_coder()['batch_size']}")
     logger.info(f"   Trials: {args.n_trials or get_recommended_config_for_qwen25_coder()['n_trials']}")
     logger.info(f"   Train/Val/Test: {args.train_limit or 150}/{args.val_limit or 75}/{args.test_limit or 150}")
-    logger.info(f"   Datasets: MBPP Plus (train/val/test) - Extended Python programming problems")
+    logger.info("   Datasets: MBPP Plus (train/val/test) - Extended Python programming problems")
     logger.info(f"   WandB: {'Enabled' if args.use_wandb else 'Disabled'}")
 
     if torch.cuda.is_available():

@@ -260,10 +260,11 @@ class Qwen25CoderPipeline(OptimizationPipeline):
 
         # Coding-specific insights
         self.logger.info("🔧 Coding Task Insights:")
-        self.logger.info(f"   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
-        self.logger.info(f"   - Training: MBPP (Python programming)")
-        self.logger.info(f"   - Testing: MBPP (same dataset)")
-        self.logger.info(f"   - Contrastive pairs use 'obscured correct answers'")
+
+        self.logger.info("   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
+        self.logger.info("   - Training: MBPP (Python programming)")
+        self.logger.info("   - Testing: MBPP (same dataset)")
+        self.logger.info("   - Contrastive pairs use 'obscured correct answers'")
         self.logger.info(
             f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing"
         )
@@ -389,7 +390,7 @@ def main():
     logger.info(f"   Batch Size: {args.batch_size or get_recommended_config_for_qwen25_coder()['batch_size']}")
     logger.info(f"   Trials: {args.n_trials or get_recommended_config_for_qwen25_coder()['n_trials']}")
     logger.info(f"   Train/Val/Test: {args.train_limit or 100}/{args.val_limit or 50}/{args.test_limit or 100}")
-    logger.info(f"   Datasets: MBPP (train/val/test) - Python programming problems")
+    logger.info("   Datasets: MBPP (train/val/test) - Python programming problems")
     logger.info(f"   WandB: {'Enabled' if args.use_wandb else 'Disabled'}")
 
     if torch.cuda.is_available():
