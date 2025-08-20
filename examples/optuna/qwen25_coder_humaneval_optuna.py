@@ -260,10 +260,10 @@ class Qwen25CoderHumanEvalPipeline(OptimizationPipeline):
 
         # Coding-specific insights
         self.logger.info("🔧 HumanEval Task Insights:")
-        self.logger.info(f"   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
-        self.logger.info(f"   - Training: HumanEval (OpenAI Python problems)")
-        self.logger.info(f"   - Testing: HumanEval (same dataset)")
-        self.logger.info(f"   - Industry-standard benchmark for code generation")
+        self.logger.info("   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
+        self.logger.info("   - Training: HumanEval (OpenAI Python problems)")
+        self.logger.info("   - Testing: HumanEval (same dataset)")
+        self.logger.info("   - Industry-standard benchmark for code generation")
         self.logger.info(
             f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing"
         )

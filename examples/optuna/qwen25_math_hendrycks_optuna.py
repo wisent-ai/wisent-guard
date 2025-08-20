@@ -243,10 +243,10 @@ class Qwen25MathPipeline(OptimizationPipeline):
 
         # Mathematics-specific insights
         self.logger.info("🧮 MATH Dataset Task Insights:")
-        self.logger.info(f"   - Model: Qwen2.5-Math-7B (28 layers, specialized for mathematics)")
-        self.logger.info(f"   - Dataset: MATH (Competition mathematics with step-by-step solutions)")
+        self.logger.info("   - Model: Qwen2.5-Math-7B (28 layers, specialized for mathematics)")
+        self.logger.info("   - Dataset: MATH (Competition mathematics with step-by-step solutions)")
         self.logger.info(f"   - Reasoning: Chain-of-Thought with {self.config.max_new_tokens} max tokens")
-        self.logger.info(f"   - Generation: Deterministic (temperature=0.0) for consistent math")
+        self.logger.info("   - Generation: Deterministic (temperature=0.0) for consistent math")
         self.logger.info(
             f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'deep'} reasoning processing"
         )
@@ -265,7 +265,7 @@ class Qwen25MathPipeline(OptimizationPipeline):
         caa_trials = [t for t in study.trials if t.value is not None]
         if len(caa_trials) > 1:
             caa_values = [t.value for t in caa_trials]
-            self.logger.info(f"📊 CAA Method Statistics:")
+            self.logger.info("📊 CAA Method Statistics:")
             self.logger.info(f"   Trials: {len(caa_values)}")
             self.logger.info(f"   Mean: {sum(caa_values) / len(caa_values):.4f}")
             self.logger.info(f"   Best: {max(caa_values):.4f}")
@@ -381,8 +381,8 @@ def main():
     logger.info(f"   Batch Size: {args.batch_size or get_recommended_config_for_qwen25_math()['batch_size']}")
     logger.info(f"   Trials: {args.n_trials or get_recommended_config_for_qwen25_math()['n_trials']}")
     logger.info(f"   Train/Val/Test: {args.train_limit or 75}/{args.val_limit or 40}/{args.test_limit or 75}")
-    logger.info(f"   Dataset: MATH (Hendrycks) - Competition mathematics with step-by-step reasoning")
-    logger.info(f"   Method: CAA only (optimized for mathematical reasoning)")
+    logger.info("   Dataset: MATH (Hendrycks) - Competition mathematics with step-by-step reasoning")
+    logger.info("   Method: CAA only (optimized for mathematical reasoning)")
     logger.info(f"   WandB: {'Enabled' if args.use_wandb else 'Disabled'}")
 
     if torch.cuda.is_available():
