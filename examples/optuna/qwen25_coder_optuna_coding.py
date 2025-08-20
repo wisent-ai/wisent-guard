@@ -17,13 +17,13 @@ STEERING METHODS INVESTIGATED:
 
 DATASETS (CODING FOCUS):
 - Training: mbpp (Python programming problems)
-- Validation: mbpp (same dataset for consistency)  
+- Validation: mbpp (same dataset for consistency)
 - Test: mbpp (same dataset for testing)
 
 CONTRASTIVE PAIRS GENERATION:
 Uses specialized MBPP extractors that create "obscured correct answer" pairs:
 - Correct: Original working code solution
-- Incorrect: Syntactically corrupted code (missing tokens, wrong syntax) 
+- Incorrect: Syntactically corrupted code (missing tokens, wrong syntax)
   that "obscures" the correct answer
 
 USAGE:
@@ -97,30 +97,23 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         # Model configuration - Qwen2.5-Coder-7B specialized for coding
         model_name=args.model_path or defaults["model_name"],
         device="cuda" if torch.cuda.is_available() else "cpu",
-        
         # Dataset configuration - Coding focus with MBPP
         train_dataset="mbpp",  # Python programming problems
-        val_dataset="mbpp",    # Same dataset for consistency
-        test_dataset="mbpp",   # Same dataset for testing
-        
+        val_dataset="mbpp",  # Same dataset for consistency
+        test_dataset="mbpp",  # Same dataset for testing
         # Training configuration
         train_limit=args.train_limit or defaults["train_limit"],
         contrastive_pairs_limit=args.contrastive_pairs_limit or defaults["contrastive_pairs_limit"],
-        
         # Evaluation configuration
         val_limit=args.val_limit or defaults["val_limit"],
         test_limit=args.test_limit or defaults["test_limit"],
-        
         # Layer search configuration - Qwen has 32 layers (0-31)
         # Middle-to-late layers (16-24) typically capture code semantics well
         layer_search_range=args.layer_range or defaults["layer_search_range"],
-        
         # Probe type - Fixed to logistic regression
         probe_type="logistic_regression",
-        
         # Steering methods - Currently implemented methods
         steering_methods=["caa", "dac"],
-        
         # Optuna study configuration
         study_name=args.study_name or "qwen25_coder_optimization",
         db_url=f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/optuna_studies.db",
@@ -128,25 +121,20 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         n_startup_trials=args.n_startup_trials or defaults["n_startup_trials"],
         sampler="TPE",  # Tree-structured Parzen Estimator
         pruner="MedianPruner",  # Aggressive pruning for efficiency
-        
         # WandB configuration
         wandb_project=args.wandb_project or "qwen25-coder-optimization",
         use_wandb=args.use_wandb,
-        
         # Generation configuration - Optimized for coding tasks
         batch_size=args.batch_size or defaults["batch_size"],
         max_length=1024,  # Longer for complex coding problems
         max_new_tokens=defaults["max_new_tokens"],
         temperature=0.1,  # Lower temperature for more deterministic code generation
         do_sample=True,
-        
         # Performance optimization
         seed=42,
-        
         # Output configuration
         output_dir="outputs/qwen25_coder_optimization",
         cache_dir="cache/qwen25_coder_optimization",
-        
         # Search space constraints
         max_layers_to_search=9,  # Search more layers for better coverage
         early_stopping_patience=15,  # More patience for specialized model
@@ -176,25 +164,22 @@ class Qwen25CoderPipeline(OptimizationPipeline):
             if steering_method == "caa":
                 # CAA hyperparameters - adjusted for coding-specialized model
                 steering_alpha = trial.suggest_float(  # maps to `strength`
-                    "steering_alpha", 0.05, 1.5, step=0.05  # Moderate range for specialized model
+                    "steering_alpha",
+                    0.05,
+                    1.5,
+                    step=0.05,  # Moderate range for specialized model
                 )
-
-                normalization_method = trial.suggest_categorical("normalization_method", ["none", "l2_unit"])
-
-                target_norm = None
-                if normalization_method != "none":
-                    target_norm = trial.suggest_float("target_norm", 0.7, 1.3, step=0.1)
 
                 steering_params = {
                     "steering_alpha": steering_alpha,
-                    "normalization_method": normalization_method,
-                    "target_norm": target_norm,
                 }
 
             elif steering_method == "dac":
                 # DAC: Dynamic control with entropy-based adaptation
                 steering_params = {
-                    "base_strength": trial.suggest_float("base_strength", 0.3, 1.2, step=0.05),  # Moderate for coding model
+                    "base_strength": trial.suggest_float(
+                        "base_strength", 0.3, 1.2, step=0.05
+                    ),  # Moderate for coding model
                     "ptop": trial.suggest_float("ptop", 0.25, 0.55, step=0.05),
                     "max_alpha": trial.suggest_float("max_alpha", 0.8, 2.5, step=0.1),  # Reasonable max for coding
                     "entropy_threshold": trial.suggest_float("entropy_threshold", 1.8, 3.5, step=0.1),
@@ -208,7 +193,9 @@ class Qwen25CoderPipeline(OptimizationPipeline):
                 if steering_params.get("steering_alpha") is not None
                 else "N/A"
             )
-            self.logger.info(f"🎯 Trial {trial.number}: {steering_method.upper()} with α={alpha_str} (Layer {layer_id})")
+            self.logger.info(
+                f"🎯 Trial {trial.number}: {steering_method.upper()} with α={alpha_str} (Layer {layer_id})"
+            )
 
             # Step 1: Train and evaluate probe
             probe_score = self._train_and_evaluate_probe(trial, layer_id, probe_type, probe_c)
@@ -242,6 +229,7 @@ class Qwen25CoderPipeline(OptimizationPipeline):
         except Exception as e:
             self.logger.error(f"❌ Trial {trial.number} failed: {e}")
             import traceback
+
             traceback.print_exc()
             return 0.0
 
@@ -276,7 +264,9 @@ class Qwen25CoderPipeline(OptimizationPipeline):
         self.logger.info(f"   - Training: MBPP (Python programming)")
         self.logger.info(f"   - Testing: MBPP (same dataset)")
         self.logger.info(f"   - Contrastive pairs use 'obscured correct answers'")
-        self.logger.info(f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing")
+        self.logger.info(
+            f"   - Best layer {best_layer} suggests {'early' if best_layer < 11 else 'middle' if best_layer < 22 else 'late'} processing"
+        )
 
         # Performance context
         if baseline_acc > 0.6:
@@ -295,7 +285,9 @@ class Qwen25CoderPipeline(OptimizationPipeline):
                 self.logger.info(f"   Trials: {len(method_values)}")
                 self.logger.info(f"   Mean: {sum(method_values) / len(method_values):.4f}")
                 self.logger.info(f"   Best: {max(method_values):.4f}")
-                self.logger.info(f"   Std: {(sum((x - sum(method_values)/len(method_values))**2 for x in method_values) / len(method_values))**0.5:.4f}")
+                self.logger.info(
+                    f"   Std: {(sum((x - sum(method_values) / len(method_values)) ** 2 for x in method_values) / len(method_values)) ** 0.5:.4f}"
+                )
 
         self.logger.info("=" * 80)
 
@@ -403,7 +395,7 @@ def main():
     if torch.cuda.is_available():
         logger.info(f"🔥 GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.device_count()} devices)")
         logger.info(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB")
-        
+
         # Memory warning for Qwen2.5-Coder-7B
         vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         if vram_gb < 20:
@@ -450,6 +442,7 @@ def main():
     except Exception as e:
         logger.error(f"❌ Optimization failed: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
