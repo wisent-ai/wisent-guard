@@ -170,16 +170,8 @@ class Qwen25CoderPipeline(OptimizationPipeline):
                     step=0.05,  # Moderate range for specialized model
                 )
 
-                normalization_method = trial.suggest_categorical("normalization_method", ["none", "l2_unit"])
-
-                target_norm = None
-                if normalization_method != "none":
-                    target_norm = trial.suggest_float("target_norm", 0.7, 1.3, step=0.1)
-
                 steering_params = {
                     "steering_alpha": steering_alpha,
-                    "normalization_method": normalization_method,
-                    "target_norm": target_norm,
                 }
 
             elif steering_method == "dac":
@@ -268,6 +260,7 @@ class Qwen25CoderPipeline(OptimizationPipeline):
 
         # Coding-specific insights
         self.logger.info("🔧 Coding Task Insights:")
+
         self.logger.info("   - Model: Qwen2.5-Coder-7B (32 layers, specialized for coding)")
         self.logger.info("   - Training: MBPP (Python programming)")
         self.logger.info("   - Testing: MBPP (same dataset)")

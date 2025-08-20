@@ -185,16 +185,8 @@ class QwenSteeringPipeline(OptimizationPipeline):
                     "steering_alpha", 0.10, 1.80, step=0.05
                 )
 
-                normalization_method = trial.suggest_categorical("normalization_method", ["none", "l2_unit"])
-
-                target_norm = None  # ask only if relevant
-                if normalization_method != "none":
-                    target_norm = trial.suggest_float("target_norm", 0.8, 1.5, step=0.1)
-
                 steering_params = {
                     "steering_alpha": steering_alpha,
-                    "normalization_method": normalization_method,
-                    "target_norm": target_norm,
                 }
 
             elif steering_method == "dac":

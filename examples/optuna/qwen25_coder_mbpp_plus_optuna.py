@@ -77,12 +77,12 @@ def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:
     """Get recommended configuration values for Qwen2.5-Coder-7B MBPP Plus optimization."""
     return {
         "model_name": "Qwen/Qwen2.5-Coder-7B-Instruct",  # Qwen2.5-Coder specialized for coding
-        "batch_size": 2,  # Conservative for 7B model
+        "batch_size": 32,  # Conservative for 7B model
         "max_new_tokens": 512,  # Longer for coding tasks - Qwen can handle complex code
         "layer_search_range": (16, 24),  # Qwen has 32 layers (0-31), middle-to-late layers work well for code
-        "train_limit": 150,  # Good balance for MBPP Plus
-        "contrastive_pairs_limit": 75,  # Bounded by train_limit
-        "val_limit": 50,
+        "train_limit": 378,  # Good balance for MBPP Plus
+        "contrastive_pairs_limit": 378,  # Bounded by train_limit
+        "val_limit": 378,
         "test_limit": 150,
         "n_trials": 30,  # More trials for better optimization
         "n_startup_trials": 10,  # More random exploration
@@ -116,7 +116,8 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         probe_type="logistic_regression",
         # Steering methods - Currently implemented methods
         # steering_methods=["caa", "dac", "dac_tensor"],
-        steering_methods=["dac_tensor"],
+        # steering_methods=["caa", "dac_tensor"],
+        steering_methods=["caa"],
         # Optuna study configuration
         study_name=args.study_name or "qwen25_coder_mbpp_plus_optimization",
         db_url=f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/optuna_studies.db",
@@ -173,16 +174,8 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
                     step=0.05,  # Moderate range for specialized model
                 )
 
-                normalization_method = trial.suggest_categorical("normalization_method", ["none", "l2_unit"])
-
-                target_norm = None
-                if normalization_method != "none":
-                    target_norm = trial.suggest_float("target_norm", 0.7, 1.3, step=0.1)
-
                 steering_params = {
                     "steering_alpha": steering_alpha,
-                    "normalization_method": normalization_method,
-                    "target_norm": target_norm,
                 }
 
             elif steering_method == "dac":
