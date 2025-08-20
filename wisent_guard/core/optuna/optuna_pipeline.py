@@ -450,10 +450,25 @@ class OptimizationPipeline:
 
             # Don't prune based on probe score - focus optimization on steering parameters
 
-            steering_method_instance = self._train_steering_method(trial, steering_method, layer_id, locals())
+            # Build clean hyperparameters dictionary
+            if steering_method == "dac":
+                hyperparams = {
+                    "steering_alpha": steering_alpha,
+                    "entropy_threshold": entropy_threshold,
+                    "ptop": ptop,
+                    "max_alpha": max_alpha,
+                }
+            elif steering_method == "caa":
+                hyperparams = {
+                    "steering_alpha": steering_alpha,
+                }
+            else:
+                raise ValueError(f"Unsupported steering method: {steering_method}")
+
+            steering_method_instance = self._train_steering_method(trial, steering_method, layer_id, hyperparams)
 
             validation_accuracy = self._evaluate_steering_on_validation(
-                steering_method_instance, steering_method, layer_id, locals(), trial.number, trial
+                steering_method_instance, steering_method, layer_id, hyperparams, trial.number, trial
             )
 
             trial.report(validation_accuracy, step=1)
