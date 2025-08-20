@@ -29,6 +29,7 @@ import optuna
 import torch
 from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
 from optuna.samplers import TPESampler
+from tqdm import tqdm
 
 # Optional WandB integration
 try:
@@ -676,7 +677,9 @@ class OptimizationPipeline:
         ground_truths = []
         valid_samples = []  # Keep track of samples that produce valid QA pairs
 
-        for sample in self.val_samples:  # Use all validation samples for reliable evaluation
+        for sample in tqdm(
+            self.val_samples, desc="Extracting validation QA pairs", leave=False
+        ):  # Use all validation samples for reliable evaluation
             qa_pair = extractor.extract_qa_pair(sample, task)
             if not qa_pair:
                 continue
@@ -815,7 +818,7 @@ class OptimizationPipeline:
         all_responses = []
 
         # Process questions in batches
-        for i in range(0, len(questions), batch_size):
+        for i in tqdm(range(0, len(questions), batch_size), desc="Generating baseline predictions", leave=False):
             batch_questions = questions[i : i + batch_size]
 
             # Batch tokenization with padding
@@ -855,7 +858,7 @@ class OptimizationPipeline:
         all_responses = []
 
         # Process questions in batches
-        for i in range(0, len(questions), batch_size):
+        for i in tqdm(range(0, len(questions), batch_size), desc="Generating steered predictions", leave=False):
             batch_questions = questions[i : i + batch_size]
 
             # Batch tokenization with padding

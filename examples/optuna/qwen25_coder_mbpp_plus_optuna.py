@@ -77,14 +77,14 @@ def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:
     """Get recommended configuration values for Qwen2.5-Coder-7B MBPP Plus optimization."""
     return {
         "model_name": "Qwen/Qwen2.5-Coder-7B-Instruct",  # Qwen2.5-Coder specialized for coding
-        "batch_size": 32,  # Conservative for 7B model
+        "batch_size": 32,  # RTX 4090 24 GB
         "max_new_tokens": 512,  # Longer for coding tasks - Qwen can handle complex code
         "layer_search_range": (16, 24),  # Qwen has 32 layers (0-31), middle-to-late layers work well for code
         "train_limit": 378,  # Good balance for MBPP Plus
         "contrastive_pairs_limit": 378,  # Bounded by train_limit
         "val_limit": 378,
         "test_limit": 150,
-        "n_trials": 30,  # More trials for better optimization
+        "n_trials": 50,  # More trials for better optimization
         "n_startup_trials": 10,  # More random exploration
     }
 
