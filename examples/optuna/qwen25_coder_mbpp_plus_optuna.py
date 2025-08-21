@@ -79,7 +79,7 @@ def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:
         "model_name": "Qwen/Qwen2.5-Coder-7B-Instruct",  # Qwen2.5-Coder specialized for coding
         "batch_size": 32,  # RTX 4090 24 GB
         "max_new_tokens": 512,  # Longer for coding tasks - Qwen can handle complex code
-        "layer_search_range": (16, 24),  # Qwen has 32 layers (0-31), middle-to-late layers work well for code
+        "layer_search_range": (16, 28),  # Qwen has 32 layers (0-31), middle-to-late layers work well for code
         "train_limit": 378,  # Good balance for MBPP Plus
         "contrastive_pairs_limit": 378,  # Bounded by train_limit
         "val_limit": 378,
@@ -488,31 +488,25 @@ def main():
     )
 
     # Dataset configuration
-    parser.add_argument(
-        "--train-limit", type=int, default=None, help="Number of training samples to load (default: 150)"
-    )
+    parser.add_argument("--train-limit", type=int, default=None, help="Number of training samples to load")
     parser.add_argument(
         "--contrastive-pairs-limit",
         type=int,
         default=None,
         help="Number of contrastive pairs for steering training (default: 75, bounded by train-limit)",
     )
-    parser.add_argument(
-        "--val-limit", type=int, default=None, help="Number of validation samples to load (default: 75)"
-    )
-    parser.add_argument("--test-limit", type=int, default=None, help="Number of test samples to load (default: 150)")
+    parser.add_argument("--val-limit", type=int, default=None, help="Number of validation samples to load")
+    parser.add_argument("--test-limit", type=int, default=None, help="Number of test samples to load")
 
     # Optimization configuration
     parser.add_argument(
         "--study-name", type=str, default=None, help="Optuna study name (default: qwen25_coder_mbpp_plus_optimization)"
     )
-    parser.add_argument("--n-trials", type=int, default=None, help="Number of optimization trials (default: 50)")
+    parser.add_argument("--n-trials", type=int, default=None, help="Number of optimization trials")
     parser.add_argument(
-        "--n-startup-trials", type=int, default=None, help="Random exploration trials before TPE kicks in (default: 10)"
+        "--n-startup-trials", type=int, default=None, help="Random exploration trials before TPE kicks in"
     )
-    parser.add_argument(
-        "--layer-range", type=int, nargs=2, default=None, help="Layer search range as two integers (default: 16 24)"
-    )
+    parser.add_argument("--layer-range", type=int, nargs=2, default=None, help="Layer search range as two integers")
 
     # WandB configuration
     parser.add_argument(
@@ -521,9 +515,7 @@ def main():
     parser.add_argument("--wandb-project", type=str, default=None, help="WandB project name")
 
     # Utility options
-    parser.add_argument(
-        "--quick-test", action="store_true", help="Quick test run (10 trials, 30 train, 20 val samples)"
-    )
+    parser.add_argument("--quick-test", action="store_true", help="Quick test run")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--log-file", type=str, default=None, help="Log output to file (in addition to console)")
 
@@ -551,14 +543,14 @@ def main():
         args.test_limit = 30
         logger.info("🚀 Quick test mode enabled")
 
+    run_config = get_recommended_config_for_qwen25_coder()
     # Display configuration
     logger.info("🤖 QWEN2.5-CODER-7B MBPP PLUS OPTIMIZATION")
     logger.info("=" * 80)
     logger.info("🔧 CONFIGURATION:")
-    logger.info(f"   Model: {args.model_path or get_recommended_config_for_qwen25_coder()['model_name']}")
-    logger.info(f"   Batch Size: {args.batch_size or get_recommended_config_for_qwen25_coder()['batch_size']}")
-    logger.info(f"   Trials: {args.n_trials or get_recommended_config_for_qwen25_coder()['n_trials']}")
-    logger.info(f"   Train/Val/Test: {args.train_limit or 150}/{args.val_limit or 75}/{args.test_limit or 150}")
+    logger.info(f"   Model: {args.model_path or run_config['model_name']}")
+    logger.info(f"   Batch Size: {args.batch_size or run_config['batch_size']}")
+    logger.info(f"   Trials: {args.n_trials or run_config['n_trials']}")
     logger.info("   Datasets: MBPP Plus (train/val/test) - Extended Python programming problems")
     logger.info(f"   WandB: {'Enabled' if args.use_wandb else 'Disabled'}")
 

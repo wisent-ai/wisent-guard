@@ -53,70 +53,80 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
         self.caa_alpha = config.caa_alpha
         self.steering_method = config.steering_method
 
-        # Load steering vector from file
+        # Steering vector will be loaded in from_pretrained method
         self.steering_vector = None
-        if self.caa_enabled:
-            self._load_steering_vector_from_file(config.steering_vector_path)
 
         # Hook handle for cleanup
         self._steering_hook_handle = None
 
-    def _load_steering_vector_from_file(self, path: str):
-        """Load the CAA steering vector from safetensors or pytorch file."""
+    def _load_steering_vector(self, model_path: str, vector_path: str):
+        """Load the CAA steering vector from safetensors or pytorch file.
+
+        Args:
+            model_path: Path to the model directory (for relative path resolution)
+            vector_path: Path to the steering vector file (from config)
+
+        Raises:
+            FileNotFoundError: If steering vector cannot be found
+            ImportError: If safetensors is required but not installed
+        """
         import os
 
-        try:
-            # Try relative path first
-            if os.path.exists(path):
-                vector_path = path
-            # Try path relative to model directory
-            elif os.path.exists(os.path.join(os.path.dirname(__file__), path)):
-                vector_path = os.path.join(os.path.dirname(__file__), path)
-            else:
-                print(f"Warning: Steering vector not found at {path}, CAA disabled")
-                self.caa_enabled = False
-                return
+        # Try model-relative path first (most reliable)
+        model_relative_path = os.path.join(model_path, vector_path)
 
-            # Load based on file extension
-            if vector_path.endswith(".safetensors"):
-                # Load from safetensors format (preferred)
-                try:
-                    from safetensors.torch import load_file
+        # Try absolute path if vector_path is already absolute
+        absolute_path = vector_path if os.path.isabs(vector_path) else None
 
-                    steering_data = load_file(vector_path)
+        # Determine which path exists
+        if os.path.exists(model_relative_path):
+            final_path = model_relative_path
+        elif absolute_path and os.path.exists(absolute_path):
+            final_path = absolute_path
+        else:
+            # Fail fast with clear error message
+            error_msg = "CAA is enabled but steering vector not found. Tried:\n"
+            error_msg += f"  1. Model-relative: {model_relative_path}\n"
+            if absolute_path:
+                error_msg += f"  2. Absolute: {absolute_path}\n"
+            error_msg += "Ensure steering vector exists at one of these locations."
+            raise FileNotFoundError(error_msg)
+
+        # Load the steering vector
+        if final_path.endswith(".safetensors"):
+            # Load from safetensors format (preferred)
+            try:
+                from safetensors.torch import load_file
+
+                steering_data = load_file(final_path)
+                self.steering_vector = steering_data["steering_vector"]
+            except ImportError:
+                raise ImportError(
+                    "safetensors is required for .safetensors files. Install with: pip install safetensors"
+                )
+        else:
+            # Load from pytorch format (fallback)
+            steering_data = torch.load(final_path, map_location="cpu")
+
+            # Handle different storage formats
+            if isinstance(steering_data, dict):
+                if "vector" in steering_data:
+                    self.steering_vector = steering_data["vector"]
+                elif "steering_vector" in steering_data:
                     self.steering_vector = steering_data["steering_vector"]
-                except ImportError:
-                    print("Warning: safetensors not installed, install with: pip install safetensors")
-                    self.caa_enabled = False
-                    return
-            else:
-                # Load from pytorch format (fallback)
-                steering_data = torch.load(vector_path, map_location="cpu")
-
-                # Handle different storage formats
-                if isinstance(steering_data, dict):
-                    if "vector" in steering_data:
-                        self.steering_vector = steering_data["vector"]
-                    elif "steering_vector" in steering_data:
-                        self.steering_vector = steering_data["steering_vector"]
-                    else:
-                        # Assume the dict values are the vectors
-                        self.steering_vector = next(iter(steering_data.values()))
                 else:
-                    self.steering_vector = steering_data
+                    # Assume the dict values are the vectors
+                    self.steering_vector = next(iter(steering_data.values()))
+            else:
+                self.steering_vector = steering_data
 
-            # Ensure it's a tensor
-            if not isinstance(self.steering_vector, torch.Tensor):
-                self.steering_vector = torch.tensor(self.steering_vector)
+        # Ensure it's a tensor
+        if not isinstance(self.steering_vector, torch.Tensor):
+            self.steering_vector = torch.tensor(self.steering_vector)
 
-            print(
-                f"✅ Loaded CAA steering vector from {vector_path}: shape {self.steering_vector.shape}, norm {torch.norm(self.steering_vector).item():.4f}"
-            )
-
-        except Exception as e:
-            print(f"Warning: Failed to load steering vector: {e}, CAA disabled")
-            self.caa_enabled = False
-            self.steering_vector = None
+        print(
+            f"✅ Loaded CAA steering vector from {final_path}: shape {self.steering_vector.shape}, norm {torch.norm(self.steering_vector).item():.4f}"
+        )
 
     def _apply_caa_steering(self, module, input, output):
         """
@@ -235,7 +245,6 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
         This method ensures the steering vector is loaded from the embedded config.
         If no weights are found locally, it loads from the base Qwen model.
         """
-        import os
         from pathlib import Path
 
         # Check if we have local weights
@@ -278,22 +287,16 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
             model.steering_method = config.steering_method
             model._steering_hook_handle = None
 
-            # Load steering vector from config
+            # Load steering vector from config (fail fast if CAA enabled but vector missing)
             if model.caa_enabled:
-                vector_path = config.steering_vector_path
-                if not os.path.isabs(vector_path):
-                    vector_path = os.path.join(pretrained_model_name_or_path, vector_path)
-                model._load_steering_vector_from_file(vector_path)
+                model._load_steering_vector(pretrained_model_name_or_path, config.steering_vector_path)
         else:
             # Standard loading path
             model = super().from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-            # Load steering vector from config if not already loaded
+            # Load steering vector from config (fail fast if CAA enabled but vector missing)
             if model.caa_enabled and model.steering_vector is None:
-                vector_path = model.config.steering_vector_path
-                if not os.path.isabs(vector_path):
-                    vector_path = os.path.join(pretrained_model_name_or_path, vector_path)
-                model._load_steering_vector_from_file(vector_path)
+                model._load_steering_vector(pretrained_model_name_or_path, model.config.steering_vector_path)
 
         return model
 
