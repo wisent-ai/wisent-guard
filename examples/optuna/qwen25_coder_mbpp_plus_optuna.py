@@ -551,7 +551,7 @@ def main():
     logger.info(f"   Model: {args.model_path or run_config['model_name']}")
     logger.info(f"   Batch Size: {args.batch_size or run_config['batch_size']}")
     logger.info(f"   Trials: {args.n_trials or run_config['n_trials']}")
-    logger.info(f"   Datasets: MBPP Plus (train/val/test) - Extended Python programming problems")
+    logger.info("   Datasets: MBPP Plus (train/val/test) - Extended Python programming problems")
     logger.info(f"   WandB: {'Enabled' if args.use_wandb else 'Disabled'}")
 
     if torch.cuda.is_available():

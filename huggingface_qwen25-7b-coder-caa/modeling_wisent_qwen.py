@@ -85,11 +85,11 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
             final_path = absolute_path
         else:
             # Fail fast with clear error message
-            error_msg = f"CAA is enabled but steering vector not found. Tried:\n"
+            error_msg = "CAA is enabled but steering vector not found. Tried:\n"
             error_msg += f"  1. Model-relative: {model_relative_path}\n"
             if absolute_path:
                 error_msg += f"  2. Absolute: {absolute_path}\n"
-            error_msg += f"Ensure steering vector exists at one of these locations."
+            error_msg += "Ensure steering vector exists at one of these locations."
             raise FileNotFoundError(error_msg)
 
         # Load the steering vector
@@ -245,7 +245,6 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
         This method ensures the steering vector is loaded from the embedded config.
         If no weights are found locally, it loads from the base Qwen model.
         """
-        import os
         from pathlib import Path
 
         # Check if we have local weights

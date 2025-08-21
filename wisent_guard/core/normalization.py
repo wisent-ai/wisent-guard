@@ -12,12 +12,12 @@ behaviors have the same vector magnitude per layer for fair comparison and
 consistent steering strength across different behaviors.
 """
 
-import torch
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any, Union
-from enum import Enum
-from pathlib import Path
 import os
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import torch
 
 
 class VectorNormalizationMethod(Enum):
