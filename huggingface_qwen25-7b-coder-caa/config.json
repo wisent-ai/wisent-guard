@@ -119,8 +119,7 @@
   "caa_alpha": 1.4,
   "steering_method": "caa",
   "wisent_optimization": {
-    "best_value": 0.64,
-    "timestamp": "20250818_221712",
+    "best_value": 0.5211640211640212,
     "commit_hash": "a2181df6155f0d5d20170f307b61d10e74d31889"
   },
   "steering_vector_path": "./vectors/mbpp_plus/steering_vector.safetensors"
