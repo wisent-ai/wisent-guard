@@ -31,6 +31,8 @@ from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
 from optuna.samplers import TPESampler
 from tqdm import tqdm
 
+from safetensors.torch import save_file as safetensors_save
+
 # Optional WandB integration
 try:
     import wandb
@@ -424,6 +426,31 @@ class OptimizationPipeline:
         self.logger.info(f"Study created/loaded with {len(study.trials)} existing trials")
 
         return study
+
+    def _save_steering_vector_dual_format(self, steering_instance, pt_path: Path, safetensors_path: Path) -> bool:
+        """Save steering vector in both .pt and safetensors formats."""
+        # Save in original .pt format first (preserves all metadata)
+        if not steering_instance.save_steering_vector(str(pt_path)):
+            self.logger.warning("Failed to save steering vector - method may not be trained")
+            return False
+
+        self.logger.info(f"💾 Saved best steering vector to: {pt_path.name}")
+
+        # Also save in safetensors format for HuggingFace compatibility
+        try:
+            # Load the .pt file and extract steering vector
+            data = torch.load(str(pt_path), map_location="cpu", weights_only=False)
+            if isinstance(data, dict) and "steering_vector" in data:
+                # Save just the steering vector in safetensors format
+                safetensors_save({"steering_vector": data["steering_vector"]}, str(safetensors_path))
+                self.logger.info(f"💾 Also saved as safetensors: {safetensors_path.name}")
+                return True
+            else:
+                self.logger.warning("Unexpected .pt file structure, safetensors conversion skipped")
+                return True  # .pt save was successful
+        except Exception as e:
+            self.logger.warning(f"Could not create safetensors version: {e}")
+            return True  # .pt save was successful
 
     def _objective_function(self, trial: optuna.Trial) -> float:
         """Optuna objective function for hyperparameter optimization."""
@@ -947,6 +974,12 @@ class OptimizationPipeline:
             best_trial, best_params["steering_method"], layer_id, best_params
         )
 
+        # Save the best steering vector in both formats
+        if steering_instance and hasattr(steering_instance, "save_steering_vector"):
+            pt_path = self.run_dir / "best_steering_vector.pt"
+            safetensors_path = self.run_dir / "best_steering_vector.safetensors"
+            self._save_steering_vector_dual_format(steering_instance, pt_path, safetensors_path)
+
         # Generate baseline predictions (no steering)
         self.logger.info("Generating baseline predictions...")
         baseline_predictions, test_ground_truths, test_questions, test_task_docs = self._generate_test_predictions(
@@ -1428,6 +1461,15 @@ class OptimizationPipeline:
         self.logger.info(f"⚙️ Configuration: {config_path}")
         self.logger.info(f"🏆 Results: {results_path}")
         self.logger.info(f"🎯 Best config: {best_config_path}")
+
+        # Log steering vector if it exists (prefer safetensors format)
+        safetensors_path = self.run_dir / "best_steering_vector.safetensors"
+        pt_path = self.run_dir / "best_steering_vector.pt"
+
+        if safetensors_path.exists():
+            self.logger.info(f"🧭 Steering vector: {safetensors_path.name}")
+        elif pt_path.exists():
+            self.logger.info(f"🧭 Steering vector: {pt_path.name}")
 
     def _get_git_commit_hash(self) -> Optional[str]:
         """Get current git commit hash for reproducibility."""
