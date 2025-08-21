@@ -11,7 +11,7 @@ tags:
 - wisent
 library_name: transformers
 datasets:
-- mbpp
+- evalplus/mbppplus
 metrics:
 - pass@1
 base_model: Qwen/Qwen2.5-Coder-7B-Instruct
@@ -22,11 +22,10 @@ model-index:
       type: code-generation
       name: Code Generation
     dataset:
-      type: mbpp
+      type: mbppplus
       name: MBPP Plus
     metrics:
     - type: pass@1
-      value: 0.67
       name: Pass@1
 ---
 
@@ -123,7 +122,7 @@ The model uses a trait-based organization for steering vectors:
 
 ```
 vectors/
-├── coding/         # Current: Optimized for code generation
+├── mbpp_plus/      # Current: Optimized for MBPP Plus benchmark
 ├── safety/         # Future: Safety-aligned behavior
 ├── creativity/     # Future: Enhanced creative outputs  
 ├── helpfulness/    # Future: Improved helpfulness
@@ -147,7 +146,7 @@ To switch traits, simply update the configuration:
 - **Steering Strength (α)**: 0.9
 - **Vector Format**: Safetensors format for efficient loading and HuggingFace compatibility
 - **Vector Dimension**: 3584 (pre-normalized during training)
-- **Storage Path**: `./vectors/coding/steering_vector.safetensors`
+- **Storage Path**: `./vectors/mbpp_plus/steering_vector.safetensors`
 
 ### How It Works
 
@@ -164,7 +163,7 @@ The CAA parameters were optimized using:
 - **Framework**: Optuna with TPE sampler
 - **Search Space**: Layers 15-28, α ∈ [0.1, 5.0]
 - **Objective**: Maximize accuracy on MBPP Plus validation set
-- **Best Validation Score**: 64% accuracy
+- **Validation Results**: Optimized for improved performance on MBPP Plus tasks
 
 ## Model Architecture
 
@@ -172,7 +171,7 @@ The CAA parameters were optimized using:
 WisentQwen2ForCausalLM
 ├── Base: Qwen2.5-Coder-7B-Instruct
 ├── CAA Integration: Layer 24
-├── Steering Vector: ./vectors/coding/steering_vector.safetensors
+├── Steering Vector: ./vectors/mbpp_plus/steering_vector.safetensors
 └── Auto-applied during generation
 ```
 
@@ -185,15 +184,15 @@ huggingface_qwen25-7b-coder-caa/
 ├── tokenizer files               # Standard Qwen tokenizer
 ├── wisent_config.json            # Optimization results
 └── vectors/                       # Trait-based steering vectors
-    └── coding/
-        └── steering_vector.safetensors  # Optimized coding steering vector
+    └── mbpp_plus/
+        └── steering_vector.safetensors  # MBPP Plus optimized steering vector
 ```
 
 ## Evaluation
 
 ### MBPP Plus Benchmark
 
-The model should be evaluated on the complete MBPP Plus dataset (378 problems) to measure improvement over the baseline. Expected improvements based on validation results.
+The model has been optimized using Optuna on MBPP Plus tasks. For reliable performance metrics, evaluation should be conducted on the complete MBPP Plus dataset (378 problems) using the [evalplus/mbppplus](https://huggingface.co/datasets/evalplus/mbppplus) dataset.
 
 ### Running Evaluation
 

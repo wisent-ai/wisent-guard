@@ -123,5 +123,5 @@
     "timestamp": "20250818_221712",
     "commit_hash": "a2181df6155f0d5d20170f307b61d10e74d31889"
   },
-  "steering_vector_path": "./vectors/coding/steering_vector.safetensors"
+  "steering_vector_path": "./vectors/mbpp_plus/steering_vector.safetensors"
 }
