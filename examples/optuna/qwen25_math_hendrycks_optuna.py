@@ -78,14 +78,14 @@ def get_recommended_config_for_qwen25_math() -> Dict[str, Any]:
     """Get recommended configuration values for Qwen2.5-Math-7B MATH optimization."""
     return {
         "model_name": "Qwen/Qwen2.5-Math-7B-Instruct",  # Qwen2.5-Math specialized for mathematics
-        "batch_size": 8,
+        "batch_size": 8,  # RTX 4090 24 GB
         "max_new_tokens": 1024,  # Higher for COT mathematical reasoning
         "layer_search_range": (18, 27),  # Qwen2.5-Math has 28 layers (0-27), deeper layers for complex reasoning
-        "train_limit": 75,  # Reasonable for MATH dataset
-        "contrastive_pairs_limit": 50,  # Bounded by train_limit
-        "val_limit": 40,
+        "train_limit": 500,  # Reasonable for MATH dataset
+        "contrastive_pairs_limit": 500,  # Bounded by train_limit
+        "val_limit": 500,
         "test_limit": 75,
-        "n_trials": 25,  # Focused optimization for CAA only
+        "n_trials": 50,  # Focused optimization for CAA only
         "n_startup_trials": 8,  # Some random exploration
     }
 
