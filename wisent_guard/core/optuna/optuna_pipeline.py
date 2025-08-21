@@ -29,9 +29,8 @@ import optuna
 import torch
 from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
 from optuna.samplers import TPESampler
-from tqdm import tqdm
-
 from safetensors.torch import save_file as safetensors_save
+from tqdm import tqdm
 
 # Optional WandB integration
 try:
@@ -445,9 +444,8 @@ class OptimizationPipeline:
                 safetensors_save({"steering_vector": data["steering_vector"]}, str(safetensors_path))
                 self.logger.info(f"💾 Also saved as safetensors: {safetensors_path.name}")
                 return True
-            else:
-                self.logger.warning("Unexpected .pt file structure, safetensors conversion skipped")
-                return True  # .pt save was successful
+            self.logger.warning("Unexpected .pt file structure, safetensors conversion skipped")
+            return True  # .pt save was successful
         except Exception as e:
             self.logger.warning(f"Could not create safetensors version: {e}")
             return True  # .pt save was successful
