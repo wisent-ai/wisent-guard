@@ -116,7 +116,7 @@
   },
   "caa_enabled": true,
   "caa_layer_id": 24,
-  "caa_alpha": 0.9,
+  "caa_alpha": 1.4,
   "steering_method": "caa",
   "wisent_optimization": {
     "best_value": 0.64,

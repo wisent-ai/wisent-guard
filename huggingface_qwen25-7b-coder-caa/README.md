@@ -26,6 +26,7 @@ model-index:
       name: MBPP Plus
     metrics:
     - type: pass@1
+      value: 0.521
       name: Pass@1
 ---
 
@@ -38,7 +39,7 @@ This is an enhanced version of Qwen2.5-Coder-7B-Instruct that integrates **Contr
 ### Key Features
 
 - 🚀 **Automatic CAA Steering**: No manual hook management required
-- 🎯 **Optimized Parameters**: Layer 24, α=0.9
+- 🎯 **Optimized Parameters**: Layer 24, α=1.4
 - 🗂️ **Trait-Based Organization**: Steering vectors organized by traits
 - 🔧 **Runtime Configurable**: Adjust or disable steering on the fly
 - 🤗 **HuggingFace Compatible**: Works with standard transformers API
@@ -143,7 +144,7 @@ To switch traits, simply update the configuration:
 
 - **Steering Method**: Contrastive Activation Addition (CAA)
 - **Optimal Layer**: 24 (out of 28 transformer layers)
-- **Steering Strength (α)**: 0.9
+- **Steering Strength (α)**: 1.4
 - **Vector Format**: Safetensors format for efficient loading and HuggingFace compatibility
 - **Vector Dimension**: 3584 (pre-normalized during training)
 - **Storage Path**: `./vectors/mbpp_plus/steering_vector.safetensors`
@@ -163,7 +164,7 @@ The CAA parameters were optimized using:
 - **Framework**: Optuna with TPE sampler
 - **Search Space**: Layers 15-28, α ∈ [0.1, 5.0]
 - **Objective**: Maximize accuracy on MBPP Plus validation set
-- **Validation Results**: Optimized for improved performance on MBPP Plus tasks
+- **Best Performance**: 52.1% accuracy on MBPP Plus (378 problems)
 
 ## Model Architecture
 
