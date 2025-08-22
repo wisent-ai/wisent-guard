@@ -264,7 +264,7 @@ class WisentQwen2ForCausalLM(Qwen2ForCausalLM):
             # First, read the base model name from config.json before AutoConfig overwrites it
             import json
 
-            with open(local_path / "config.json", "r") as f:
+            with open(local_path / "config.json") as f:
                 config_dict = json.load(f)
             base_model_name = config_dict.get("_name_or_path", "Qwen/Qwen2.5-Math-7B-Instruct")
 
