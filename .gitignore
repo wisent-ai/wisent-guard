@@ -81,6 +81,7 @@ Thumbs.db
 !/scripts/
 !/tests/
 !/huggingface_qwen25-7b-coder-caa
+!/huggingface_qwen25-7b-math-caa
 
 # Don't ignore these files in the root directory
 !/.gitignore
