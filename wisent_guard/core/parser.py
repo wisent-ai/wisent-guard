@@ -1563,6 +1563,22 @@ def setup_generate_vector_parser(parser):
     )
     parser.add_argument("--beta", type=float, default=1.0, help="Beta parameter for HPR method (default: 1.0)")
 
+    # Activation extraction configuration
+    parser.add_argument(
+        "--prompt-construction",
+        type=str,
+        default="multiple_choice",
+        choices=["multiple_choice", "role_playing", "direct_completion", "instruction_following"],
+        help="Strategy for constructing prompts from question-answer pairs (default: multiple_choice)",
+    )
+    parser.add_argument(
+        "--token-targeting",
+        type=str,
+        default="choice_token",
+        choices=["choice_token", "continuation_token", "last_token", "first_token", "mean_pooling", "max_pooling"],
+        help="Strategy for targeting tokens in activation extraction (default: choice_token)",
+    )
+
     # General options
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 

@@ -6321,6 +6321,8 @@ def handle_generate_vector_command(args):
 
         print(f"   📊 Model: {args.model}")
         print(f"   🎯 Method: {args.method}")
+        print(f"   🔧 Prompt construction: {args.prompt_construction}")
+        print(f"   🎯 Token targeting: {args.token_targeting}")
         if not args.multi_property:
             print(f"   📍 Layer: {args.layer}")
         print(f"   💾 Output: {args.output}")
@@ -6329,6 +6331,20 @@ def handle_generate_vector_command(args):
         from .core.model import Model
 
         model = Model(name=args.model, device=args.device)
+        
+        # Import activation collection logic
+        from .core.activation_collection_method import (
+            ActivationCollectionLogic,
+            PromptConstructionStrategy,
+            TokenTargetingStrategy,
+        )
+        
+        # Create activation collection logic instance
+        activation_logic = ActivationCollectionLogic(model)
+        
+        # Parse strategies from args
+        prompt_strategy = PromptConstructionStrategy(args.prompt_construction)
+        token_strategy = TokenTargetingStrategy(args.token_targeting)
 
         # Handle multi-property mode
         if args.multi_property:
@@ -6421,7 +6437,41 @@ def handle_generate_vector_command(args):
                     print(f"   ✅ Generated {len(pairs.pairs)} pairs for {prop_name}")
                     property_pairs[prop_name] = (pairs, layer)
 
-            # Train each property using the new tensor-based DAC API
+            # Extract activations for all properties
+            print("\n🔍 Extracting activations for all properties...")
+            for prop_name, (pairs, layer) in property_pairs.items():
+                print(f"   Processing {prop_name} (layer {layer})...")
+                print(f"   Using {prompt_strategy.value} prompt construction and {token_strategy.value} token targeting")
+                
+                # Convert pairs to the format expected by activation collection
+                qa_pairs = []
+                for pair in pairs.pairs:
+                    qa_pair = {
+                        "question": pair.prompt,
+                        "correct_answer": pair.positive_response.text,
+                        "incorrect_answer": pair.negative_response.text,
+                    }
+                    qa_pairs.append(qa_pair)
+                
+                # Create contrastive pairs with proper prompt construction
+                constructed_pairs = activation_logic.create_batch_contrastive_pairs(
+                    qa_pairs, prompt_strategy=prompt_strategy
+                )
+                
+                # Collect activations with proper token targeting
+                processed_pairs = activation_logic.collect_activations_batch(
+                    constructed_pairs,
+                    layer_index=layer,
+                    device=args.device if args.device else "cuda",
+                    token_targeting_strategy=token_strategy,
+                )
+                
+                # Copy activations back to original pairs
+                for orig_pair, proc_pair in zip(pairs.pairs, processed_pairs):
+                    orig_pair.positive_response.activations = proc_pair.positive_activations
+                    orig_pair.negative_response.activations = proc_pair.negative_activations
+
+            # Train multi-property DAC using the new tensor-based API
             print("\n🎯 Training multi-property DAC...")
             all_stats = {}
 
@@ -6514,21 +6564,39 @@ def handle_generate_vector_command(args):
 
         # Extract activations
         print("\n🔍 Extracting activations...")
+        print(f"   Using {prompt_strategy.value} prompt construction")
+        print(f"   Using {token_strategy.value} token targeting")
         from .core.layer import Layer
 
         layer = Layer(args.layer)
+        
+        # Convert pairs to the format expected by activation collection
+        qa_pairs = []
         for pair in pairs.pairs:
-            # Extract positive activations
-            positive_activations = model.extract_activations(
-                pair.prompt + " " + pair.positive_response.text, layer=layer
-            )
-            pair.positive_response.activations = positive_activations
-
-            # Extract negative activations
-            negative_activations = model.extract_activations(
-                pair.prompt + " " + pair.negative_response.text, layer=layer
-            )
-            pair.negative_response.activations = negative_activations
+            qa_pair = {
+                "question": pair.prompt,
+                "correct_answer": pair.positive_response.text,
+                "incorrect_answer": pair.negative_response.text,
+            }
+            qa_pairs.append(qa_pair)
+        
+        # Create contrastive pairs with proper prompt construction
+        constructed_pairs = activation_logic.create_batch_contrastive_pairs(
+            qa_pairs, prompt_strategy=prompt_strategy
+        )
+        
+        # Collect activations with proper token targeting
+        processed_pairs = activation_logic.collect_activations_batch(
+            constructed_pairs,
+            layer_index=args.layer,
+            device=args.device if args.device else "cuda",
+            token_targeting_strategy=token_strategy,
+        )
+        
+        # Copy activations back to original pairs
+        for orig_pair, proc_pair in zip(pairs.pairs, processed_pairs):
+            orig_pair.positive_response.activations = proc_pair.positive_activations
+            orig_pair.negative_response.activations = proc_pair.negative_activations
 
         # Create and train steering method
         print(f"\n🎯 Training {args.method} steering vector...")
@@ -6582,14 +6650,19 @@ def handle_generate_vector_command(args):
         os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
 
         # Save using method-specific save logic
-        if args.method == "DAC":
-            # Use the new tensor-based save method for DAC
+        if args.method == "DAC" and hasattr(method, 'save_steering_tensor'):
+            # Use the new tensor-based save method for DAC if available
+            # But first add our metadata
+            if hasattr(method, 'metadata'):
+                method.metadata = method.metadata or {}
+                method.metadata["prompt_construction"] = args.prompt_construction
+                method.metadata["token_targeting"] = args.token_targeting
             success = method.save_steering_tensor(args.output)
             if not success:
                 print("❌ Failed to save DAC steering tensor")
                 sys.exit(1)
         else:
-            # Use the old save format for other methods
+            # Use the standard save format for all methods
             save_data = {
                 "method": args.method,
                 "steering_vector": method.steering_vector if hasattr(method, "steering_vector") else None,
@@ -6597,16 +6670,40 @@ def handle_generate_vector_command(args):
                 "trait_description": args.from_description if args.from_description else "loaded from file",
                 "num_pairs": len(pairs.pairs),
                 "model_name": args.model,
+                "prompt_construction": args.prompt_construction,
+                "token_targeting": args.token_targeting,
             }
 
             # Add method-specific data
-            if args.method == "HPR":
+            if args.method == "DAC":
+                save_data["dynamic_control"] = args.dynamic_control
+                save_data["entropy_threshold"] = args.entropy_threshold
+                save_data["aggregation_method"] = "caa"  # Default for DAC
+
+                # Add training stats
+                if hasattr(method, "steering_vector") and method.steering_vector is not None:
+                    vector_norm = torch.norm(method.steering_vector).item()
+                    vector_mean = method.steering_vector.mean().item()
+                    vector_std = method.steering_vector.std().item()
+                    save_data["training_stats"] = {
+                        "num_pairs": len(pairs.pairs),
+                        "vector_norm": vector_norm,
+                        "vector_mean": vector_mean,
+                        "vector_std": vector_std,
+                        "vector_shape": list(method.steering_vector.shape),
+                        "aggregation_method": "caa",
+                    }
+            elif args.method == "HPR":
                 save_data["beta"] = args.beta
                 if hasattr(method, "householder_matrix"):
                     save_data["householder_matrix"] = method.householder_matrix
             elif args.method == "ControlVectorSteering":
                 save_data["vector"] = method.control_vector
                 save_data["layer"] = args.layer
+            elif args.method == "CAA":
+                pass  # CAA specific data already added above
+            elif args.method == "BiPO":
+                pass  # BiPO specific data already added above
 
             torch.save(save_data, args.output)
 
