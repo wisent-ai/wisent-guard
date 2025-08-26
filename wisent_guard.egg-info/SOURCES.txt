@@ -157,6 +157,8 @@ wisent_guard/core/tasks/supergpqa_task.py
 wisent_guard/core/tracking/__init__.py
 wisent_guard/core/tracking/latency.py
 wisent_guard/core/tracking/memory.py
+wisent_guard/parameters/__init__.py
+wisent_guard/parameters/task_config.py
 wisent_guard/utils/__init__.py
 wisent_guard/utils/evaluate_layer_performance.py
 wisent_guard/utils/evaluate_layer_performance_truthfulqa.py

@@ -6805,20 +6805,30 @@ def handle_multi_steer_command(args):
             data = torch.load(path, map_location=args.device)
 
             # Extract vector based on format
-            if "steering_vector" in data:
-                vector = data["steering_vector"]
-            elif "vector" in data:
-                vector = data["vector"]
-            elif "property_vectors" in data:
-                # Handle multi-property files
-                if "default" in data["property_vectors"]:
-                    vector = data["property_vectors"]["default"]["vector"]
+            # Check if data is a dictionary or a raw tensor
+            if isinstance(data, torch.Tensor):
+                # Raw tensor format
+                vector = data
+            elif isinstance(data, dict):
+                # Dictionary format - check for various keys
+                if "steering_vector" in data:
+                    vector = data["steering_vector"]
+                elif "vector" in data:
+                    vector = data["vector"]
+                elif "property_vectors" in data:
+                    # Handle multi-property files
+                    if "default" in data["property_vectors"]:
+                        vector = data["property_vectors"]["default"]["vector"]
+                    else:
+                        # Use first property
+                        first_prop = list(data["property_vectors"].values())[0]
+                        vector = first_prop["vector"]
                 else:
-                    # Use first property
-                    first_prop = list(data["property_vectors"].values())[0]
-                    vector = first_prop["vector"]
+                    print(f"❌ Could not find steering vector in {path}")
+                    print(f"   Available keys: {list(data.keys())}")
+                    sys.exit(1)
             else:
-                print(f"❌ Could not find steering vector in {path}")
+                print(f"❌ Unexpected data format in {path}: {type(data)}")
                 sys.exit(1)
 
             loaded_vectors.append(vector)

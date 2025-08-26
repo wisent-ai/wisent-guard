@@ -23,7 +23,7 @@ from .core import (
     SteeringMethod
 )
 
-__version__ = "0.4.32"
+__version__ = "0.4.34"
 
 __all__ = [
     # Main classes
