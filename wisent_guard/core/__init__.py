@@ -3,7 +3,7 @@ from .activations import Activations, ActivationAggregationMethod
 from .layer import Layer
 from .model import Model
 from .model import PromptFormat, TokenScore, ModelParameterOptimizer, ActivationHooks
-from .classifier import Classifier, ActivationClassifier
+from wisent_guard.core.classifiers.classifier import Classifier, ActivationClassifier
 from .steering import SteeringMethod, SteeringType
 from .secure_code_evaluator import SecureCodeEvaluator, enforce_secure_execution
 
