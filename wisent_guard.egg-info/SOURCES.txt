@@ -143,6 +143,9 @@ wisent_guard/core/steering_methods/hpr.py
 wisent_guard/core/steering_methods/k_steering.py
 wisent_guard/core/steering_methods/steering_evaluation.py
 wisent_guard/core/steering_methods/token_steered.py
+wisent_guard/core/steering_methods_tensor/__init__.py
+wisent_guard/core/steering_methods_tensor/dac_attention.py
+wisent_guard/core/steering_methods_tensor/tensor_base.py
 wisent_guard/core/tasks/__init__.py
 wisent_guard/core/tasks/aime_task.py
 wisent_guard/core/tasks/file_task.py
