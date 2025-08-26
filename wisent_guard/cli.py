@@ -4,8 +4,6 @@ Clean implementation using enhanced core primitives.
 """
 
 import logging
-import os
-import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -42,7 +40,7 @@ from .optimize import (
 
 # Import caching infrastructure
 try:
-    from .core.classifiers.pipeline_steps.download_full_benchmarks import (
+    from wisent_guard.core.download_full_benchmarks import (
         FullBenchmarkDownloader,
     )
 except ImportError:
@@ -54,7 +52,7 @@ try:
 
     # Import UNAVAILABLE_BENCHMARKS from download script
     try:
-        from .core.classifiers.pipeline_steps.download_full_benchmarks import (
+        from wisent_guard.core.download_full_benchmarks import (
             FullBenchmarkDownloader,
         )
 
@@ -6331,17 +6329,17 @@ def handle_generate_vector_command(args):
         from .core.model import Model
 
         model = Model(name=args.model, device=args.device)
-        
+
         # Import activation collection logic
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
             TokenTargetingStrategy,
         )
-        
+
         # Create activation collection logic instance
         activation_logic = ActivationCollectionLogic(model)
-        
+
         # Parse strategies from args
         prompt_strategy = PromptConstructionStrategy(args.prompt_construction)
         token_strategy = TokenTargetingStrategy(args.token_targeting)
@@ -6441,8 +6439,10 @@ def handle_generate_vector_command(args):
             print("\n🔍 Extracting activations for all properties...")
             for prop_name, (pairs, layer) in property_pairs.items():
                 print(f"   Processing {prop_name} (layer {layer})...")
-                print(f"   Using {prompt_strategy.value} prompt construction and {token_strategy.value} token targeting")
-                
+                print(
+                    f"   Using {prompt_strategy.value} prompt construction and {token_strategy.value} token targeting"
+                )
+
                 # Convert pairs to the format expected by activation collection
                 qa_pairs = []
                 for pair in pairs.pairs:
@@ -6452,12 +6452,12 @@ def handle_generate_vector_command(args):
                         "incorrect_answer": pair.negative_response.text,
                     }
                     qa_pairs.append(qa_pair)
-                
+
                 # Create contrastive pairs with proper prompt construction
                 constructed_pairs = activation_logic.create_batch_contrastive_pairs(
                     qa_pairs, prompt_strategy=prompt_strategy
                 )
-                
+
                 # Collect activations with proper token targeting
                 processed_pairs = activation_logic.collect_activations_batch(
                     constructed_pairs,
@@ -6465,7 +6465,7 @@ def handle_generate_vector_command(args):
                     device=args.device if args.device else "cuda",
                     token_targeting_strategy=token_strategy,
                 )
-                
+
                 # Copy activations back to original pairs
                 for orig_pair, proc_pair in zip(pairs.pairs, processed_pairs):
                     orig_pair.positive_response.activations = proc_pair.positive_activations
@@ -6569,7 +6569,7 @@ def handle_generate_vector_command(args):
         from .core.layer import Layer
 
         layer = Layer(args.layer)
-        
+
         # Convert pairs to the format expected by activation collection
         qa_pairs = []
         for pair in pairs.pairs:
@@ -6579,12 +6579,10 @@ def handle_generate_vector_command(args):
                 "incorrect_answer": pair.negative_response.text,
             }
             qa_pairs.append(qa_pair)
-        
+
         # Create contrastive pairs with proper prompt construction
-        constructed_pairs = activation_logic.create_batch_contrastive_pairs(
-            qa_pairs, prompt_strategy=prompt_strategy
-        )
-        
+        constructed_pairs = activation_logic.create_batch_contrastive_pairs(qa_pairs, prompt_strategy=prompt_strategy)
+
         # Collect activations with proper token targeting
         processed_pairs = activation_logic.collect_activations_batch(
             constructed_pairs,
@@ -6592,7 +6590,7 @@ def handle_generate_vector_command(args):
             device=args.device if args.device else "cuda",
             token_targeting_strategy=token_strategy,
         )
-        
+
         # Copy activations back to original pairs
         for orig_pair, proc_pair in zip(pairs.pairs, processed_pairs):
             orig_pair.positive_response.activations = proc_pair.positive_activations
@@ -6650,10 +6648,10 @@ def handle_generate_vector_command(args):
         os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
 
         # Save using method-specific save logic
-        if args.method == "DAC" and hasattr(method, 'save_steering_tensor'):
+        if args.method == "DAC" and hasattr(method, "save_steering_tensor"):
             # Use the new tensor-based save method for DAC if available
             # But first add our metadata
-            if hasattr(method, 'metadata'):
+            if hasattr(method, "metadata"):
                 method.metadata = method.metadata or {}
                 method.metadata["prompt_construction"] = args.prompt_construction
                 method.metadata["token_targeting"] = args.token_targeting
