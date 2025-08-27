@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import torch
 
 from .core import ContrastivePairSet, Layer, Model, SteeringMethod, SteeringType
-from .utils.activation_monitor import TestActivationCache
+from wisent_guard.cli_workflows.activation_monitor import TestActivationCache
 from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
@@ -33,7 +33,7 @@ from .inference import (
     generate_with_classification_and_handling,
     generate_with_multi_layer_classification_and_handling,
 )
-from .optimize import (
+from wisent_guard.cli_workflows.optimize import (
     run_interactive_optimization,
     run_smart_optimization,
 )
@@ -5284,7 +5284,7 @@ def handle_classification_optimization_command(args):
                     return
 
         # Import and initialize classification optimizer
-        from .core.classification_optimizer import run_classification_optimization
+        from wisent_guard.cli_workflows.classification_optimizer import run_classification_optimization
 
         # Run the optimization
         summary = run_classification_optimization(
@@ -5732,7 +5732,7 @@ def handle_full_optimization_command(args):
                 elif status == "started":
                     print(f"   🔄 [{task_idx + 1}/{len(tasks)}] Optimizing {task_name}...")
 
-            from .core.classification_optimizer import run_classification_optimization
+            from wisent_guard.cli_workflows.classification_optimizer import run_classification_optimization
 
             classification_results = run_classification_optimization(
                 model_name=args.model,
