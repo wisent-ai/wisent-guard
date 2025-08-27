@@ -6759,10 +6759,10 @@ def handle_multi_steer_command(args):
 
         # Check weight normalization
         if args.normalize_weights:
-            # Normalizing weights
+            pass  # Normalizing weights
         elif args.target_norm is not None:
             # If target norm is specified, we don't need to worry about weight normalization
-            # Target norm specified
+            pass  # Target norm specified
         elif not args.allow_unnormalized and abs(total_weight - 1.0) > 0.01:
             sys.stderr.write(f"Warning: Weights sum to {total_weight:.2f} (not 1.0)\n")
             sys.stderr.write(
@@ -6915,7 +6915,8 @@ def handle_multi_steer_command(args):
             )
 
             # Output only the actual response
-            print(response)
+            # Flush immediately for streaming
+            print(response, flush=True)
 
             if args.verbose:
                 # Verbose mode - combination details suppressed for stdout clarity
