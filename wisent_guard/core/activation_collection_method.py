@@ -19,8 +19,8 @@ from typing import Dict, List, Tuple
 
 import torch
 
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
 from .activations import ActivationAggregationMethod, Activations
-from .contrastive_pairs import ContrastivePair
 from .layer import Layer
 
 try:
@@ -36,17 +36,6 @@ class PromptConstructionStrategy(Enum):
     ROLE_PLAYING = "role_playing"  # "Behave like person who would answer Q with good_resp" -> "I"
     DIRECT_COMPLETION = "direct_completion"  # "Q" -> "good_resp"/"bad_resp"
     INSTRUCTION_FOLLOWING = "instruction_following"  # "[INST] Q [/INST]" -> "good_resp"/"bad_resp"
-
-
-class TokenTargetingStrategy(Enum):
-    """Different strategies for targeting tokens in activation extraction."""
-
-    CHOICE_TOKEN = "choice_token"  # Target A/B choice tokens (for multiple choice)
-    CONTINUATION_TOKEN = "continuation_token"  # Target first token of continuation ("I", etc.)
-    LAST_TOKEN = "last_token"  # Always use last token
-    FIRST_TOKEN = "first_token"  # Always use first token
-    MEAN_POOLING = "mean_pooling"  # Use mean of all tokens
-    MAX_POOLING = "max_pooling"  # Use max pooling across tokens
 
 
 class PromptPair:

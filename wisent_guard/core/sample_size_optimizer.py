@@ -13,6 +13,7 @@ from datetime import datetime
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
 from .model import Model
 from wisent_guard.core.classifiers.classifier import Classifier
 from .contrastive_pairs import ContrastivePairSet
@@ -169,7 +170,7 @@ class SampleSizeOptimizer:
         logger.info(f"Extracted {len(qa_pairs)} QA pairs")
 
         # Create contrastive pairs from QA pairs
-        from .activation_collection_method import ActivationCollectionLogic, TokenTargetingStrategy
+        from .activation_collection_method import ActivationCollectionLogic
 
         collector = ActivationCollectionLogic(model=self.model)
 

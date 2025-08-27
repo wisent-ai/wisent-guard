@@ -1614,8 +1614,8 @@ def run_task_pipeline(
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
-            TokenTargetingStrategy,
         )
+        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
         from .core.activations import ActivationAggregationMethod, Activations
 
         # Convert strings to enums
@@ -6334,8 +6334,8 @@ def handle_generate_vector_command(args):
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
-            TokenTargetingStrategy,
         )
+        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
 
         # Create activation collection logic instance
         activation_logic = ActivationCollectionLogic(model)

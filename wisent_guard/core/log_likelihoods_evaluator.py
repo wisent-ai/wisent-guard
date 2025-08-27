@@ -101,7 +101,8 @@ class LogLikelihoodsEvaluator:
             logger.info(f"Created {len(contrastive_pairs)} contrastive pairs")
 
             # Use existing activation extraction infrastructure
-            from .activation_collection_method import TokenTargetingStrategy
+            # TODO REFACTOR
+            from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
 
             # Map token aggregation to token targeting strategy for evaluation
             targeting_strategy_mapping = {
