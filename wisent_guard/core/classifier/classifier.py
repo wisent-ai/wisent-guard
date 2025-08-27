@@ -543,8 +543,19 @@ class ActivationClassifier:
             raise ValueError("Classifier must be trained before prediction")
 
         features = activations.extract_features_for_classifier()
-        prediction = self.classifier.predict([features])[0]
-        probability = self.classifier.predict_proba([features])[0]
+        prediction_result = self.classifier.predict([features])
+        probability_result = self.classifier.predict_proba([features])
+
+        # Handle scalar vs array returns
+        if hasattr(prediction_result, "__len__") and len(prediction_result) > 0:
+            prediction = prediction_result[0]
+        else:
+            prediction = prediction_result
+
+        if hasattr(probability_result, "__len__") and len(probability_result) > 0:
+            probability = probability_result[0]
+        else:
+            probability = probability_result
 
         return {
             "is_harmful": bool(prediction),
