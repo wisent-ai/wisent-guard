@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 import torch
 import torch.nn.functional as F
 
-from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.activations.activations import Activations
 from wisent_guard.core.classifiers.classifier import Classifier
 
 from .contrastive_pairs import ContrastivePairSet

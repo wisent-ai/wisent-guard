@@ -861,7 +861,7 @@ def run_interactive_optimization(
     """
     from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
     from .core.hyperparameter_optimizer import detect_model_layers
-    from .core.activation_collection_method import ActivationCollectionLogic
+    from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
 
     # Detect all available layers
     total_layers = detect_model_layers(model)

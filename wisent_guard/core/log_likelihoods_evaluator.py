@@ -11,7 +11,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
-from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.activations.activations import Activations
 from wisent_guard.core.layer import Layer
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,10 @@ class LogLikelihoodsEvaluator:
             logger.info(f"Extracted {len(qa_pairs)} QA pairs from {task_name}")
 
             # Use existing contrastive pair creation infrastructure
-            from .activation_collection_method import ActivationCollectionLogic, PromptConstructionStrategy
+            from wisent_guard.core.activations.activation_collection_method import (
+                ActivationCollectionLogic,
+                PromptConstructionStrategy,
+            )
 
             collector = ActivationCollectionLogic(model=evaluation_model)
 

@@ -1612,9 +1612,9 @@ def run_task_pipeline(
 
         # Create contrastive pairs using proper activation collection logic
         from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
-        from wisent_guard.core.activations_old import Activations
+        from wisent_guard.core.activations.activations import Activations
 
-        from .core.activation_collection_method import (
+        from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
         )
@@ -5982,7 +5982,7 @@ def handle_full_optimization_command(args):
                             continue
 
                         # Create contrastive pairs
-                        from .core.activation_collection_method import (
+                        from wisent_guard.core.activations.activation_collection_method import (
                             ActivationCollectionLogic,
                             PromptConstructionStrategy,
                         )
@@ -6327,7 +6327,7 @@ def handle_generate_vector_command(args):
         # Import activation collection logic
         from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 
-        from .core.activation_collection_method import (
+        from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
         )

@@ -20,14 +20,10 @@ from typing import Dict, List, Tuple
 import torch
 
 from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
-from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.activations.activations import Activations
 
-from .layer import Layer
-
-try:
-    from .contrastive_pairs import ContrastivePair
-except ImportError:
-    from contrastive_pairs import ContrastivePair
+from wisent_guard.core.layer import Layer
+from wisent_guard.core.contrastive_pairs import ContrastivePair
 
 
 class PromptConstructionStrategy(Enum):

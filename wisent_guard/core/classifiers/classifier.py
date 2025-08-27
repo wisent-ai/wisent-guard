@@ -7,8 +7,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
-from wisent_guard.core.activations_old import Activations
-
 logger = logging.getLogger(__name__)
 
 

@@ -170,7 +170,7 @@ class SampleSizeOptimizer:
         logger.info(f"Extracted {len(qa_pairs)} QA pairs")
 
         # Create contrastive pairs from QA pairs
-        from .activation_collection_method import ActivationCollectionLogic
+        from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
 
         collector = ActivationCollectionLogic(model=self.model)
 

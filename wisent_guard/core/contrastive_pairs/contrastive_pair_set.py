@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 
 from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
-from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.activations.activations import Activations
 
 from ..response import NegativeResponse, PositiveResponse
 from .contrastive_pair import ContrastivePair
