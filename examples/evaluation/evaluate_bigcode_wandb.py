@@ -29,37 +29,68 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import torch
 import wandb
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Model configuration
-UNSTEERED_MODEL_PATH = "Qwen/Qwen2.5-Coder-7B-Instruct"
-CAA_MODEL_PATH = "./huggingface_qwen25-7b-coder-caa"
-MODEL_BASE_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"
+# Configuration Dataclasses
+@dataclass
+class ModelConfig:
+    """Model configuration settings."""
+    unsteered_path: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
+    caa_path: str = "/workspace/wisent-guard/huggingface_qwen25-7b-coder-caa"
+    base_name: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
 
-# Default parameters
-DEFAULT_TEMPERATURE = 0.2
-DEFAULT_BATCH_SIZE = 16
-DEFAULT_N_SAMPLES = 1
-DEFAULT_TOP_P = 0.95
-DEFAULT_PRECISION = "fp16"
-DEFAULT_SEED = 0
-DEFAULT_PROJECT = "qwen2.5_coder_bigcode"
+@dataclass
+class EvaluationDefaults:
+    """Default evaluation parameters."""
+    temperature: float = 0.2
+    batch_size: int = 16
+    n_samples: int = 1
+    top_p: float = 0.95
+    precision: str = "fp16"
+    seed: int = 0
+    project: str = "qwen2.5_coder_bigcode"
+
+# Initialize configurations
+MODEL_CONFIG = ModelConfig()
+EVAL_DEFAULTS = EvaluationDefaults()
 
 # Supported choices
 SUPPORTED_METHODS = ["unsteered", "caa"]
-SUPPORTED_DATASETS = ["mbpp", "mbppplus", "humaneval"]
 SUPPORTED_DEVICES = [0, 1, 2, 3]
 SUPPORTED_PRECISIONS = ["fp32", "fp16", "bf16"]
 SUPPORTED_DO_SAMPLE = ["True", "False"]
 
+# Dataset configurations
+INSTRUCTION_DATASETS = ["instruct-humaneval", "instruct-humaneval-nocontext"]
+
+RECODE_DATASETS = {
+    "perturbed-humaneval-format-num_seeds_5",
+    "perturbed-humaneval-func_name-num_seeds_5",
+    "perturbed-humaneval-natgen-num_seeds_5",
+    "perturbed-humaneval-nlaugmenter-num_seeds_5"
+}
+
+SUPPORTED_DATASETS = [
+    "mbpp", "mbppplus",
+    "humaneval", "humanevalplus",
+    "multiple-js",
+    *INSTRUCTION_DATASETS,
+    *RECODE_DATASETS
+]
+
+# Special tokens for instruction-following datasets
+QWEN_INSTRUCTION_TOKENS = "<|im_start|>user\n,<|im_end|>\n,<|im_start|>assistant\n"
+
 # Directory paths
 EVALUATION_RESULTS_DIR = "evaluation_results"
-BIGCODE_HARNESS_DIR = "./bigcode-evaluation-harness"
+BIGCODE_HARNESS_DIR = "/workspace/wisent-guard/bigcode-evaluation-harness"
 
 
 def parse_arguments():
@@ -88,14 +119,14 @@ def parse_arguments():
         "--limit", type=int, default=None, help="Number of samples to evaluate (default: all samples in dataset)"
     )
 
-    parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE, help=f"Generation temperature (default: {DEFAULT_TEMPERATURE})")
+    parser.add_argument("--temperature", type=float, default=EVAL_DEFAULTS.temperature, help=f"Generation temperature (default: {EVAL_DEFAULTS.temperature})")
 
-    parser.add_argument("--batch_size", type=int, default=DEFAULT_BATCH_SIZE, help=f"Batch size for evaluation (default: {DEFAULT_BATCH_SIZE})")
+    parser.add_argument("--batch_size", type=int, default=EVAL_DEFAULTS.batch_size, help=f"Batch size for evaluation (default: {EVAL_DEFAULTS.batch_size})")
 
-    parser.add_argument("--n_samples", type=int, default=DEFAULT_N_SAMPLES, help=f"Number of completions to generate per problem (default: {DEFAULT_N_SAMPLES})")
+    parser.add_argument("--n_samples", type=int, default=EVAL_DEFAULTS.n_samples, help=f"Number of completions to generate per problem (default: {EVAL_DEFAULTS.n_samples})")
 
     parser.add_argument(
-        "--project", default=DEFAULT_PROJECT, help=f"WandB project name (default: {DEFAULT_PROJECT})"
+        "--project", default=EVAL_DEFAULTS.project, help=f"WandB project name (default: {EVAL_DEFAULTS.project})"
     )
 
     parser.add_argument(
@@ -110,11 +141,11 @@ def parse_arguments():
         "--precision",
         type=str,
         choices=SUPPORTED_PRECISIONS,
-        default=DEFAULT_PRECISION,
-        help=f"Model precision (default: {DEFAULT_PRECISION})",
+        default=EVAL_DEFAULTS.precision,
+        help=f"Model precision (default: {EVAL_DEFAULTS.precision})",
     )
 
-    parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help=f"Random seed for reproducible generation (default: {DEFAULT_SEED})")
+    parser.add_argument("--seed", type=int, default=EVAL_DEFAULTS.seed, help=f"Random seed for reproducible generation (default: {EVAL_DEFAULTS.seed})")
 
     # Memory management parameters
     parser.add_argument(
@@ -131,7 +162,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def load_caa_params_from_config(model_path):
+def load_caa_params_from_config(model_path: str) -> Optional[Dict[str, Any]]:
     """Load CAA parameters from model's config.json file."""
     try:
         config_path = Path(model_path) / "config.json"
@@ -151,12 +182,12 @@ def load_caa_params_from_config(model_path):
         return None
 
 
-def initialize_wandb(args, timestamp):
+def initialize_wandb(args: argparse.Namespace, timestamp: str):
     """Initialize WandB with appropriate configuration."""
 
     # Method-specific configuration
     if args.method == "caa":
-        method_params = load_caa_params_from_config(CAA_MODEL_PATH)
+        method_params = load_caa_params_from_config(MODEL_CONFIG.caa_path)
     else:
         method_params = None
 
@@ -167,7 +198,7 @@ def initialize_wandb(args, timestamp):
         "dataset_size": args.limit,
         "method": args.method,
         "method_parameters": method_params,
-        "model_base": MODEL_BASE_NAME,
+        "model_base": MODEL_CONFIG.base_name,
         "evaluation_framework": "bigcode-evaluation-harness",
         "generation_parameters": {
             "temperature": args.temperature,
@@ -175,7 +206,7 @@ def initialize_wandb(args, timestamp):
             "do_sample": args.do_sample,
             "precision": args.precision,
             "seed": args.seed,
-            "top_p": DEFAULT_TOP_P,
+            "top_p": EVAL_DEFAULTS.top_p,
             "load_in_8bit": args.load_in_8bit,
             "device": args.device,
         },
@@ -192,16 +223,16 @@ def initialize_wandb(args, timestamp):
     return run
 
 
-def load_model(method):
+def load_model(method: str) -> str:
     """Load the appropriate model based on the method."""
 
     if method == "unsteered":
         print("Loading baseline Qwen2.5-Coder-7B-Instruct...")
-        model_path = UNSTEERED_MODEL_PATH
+        model_path = MODEL_CONFIG.unsteered_path
 
     elif method == "caa":
         print("Loading CAA-steered Wisent model...")
-        model_path = CAA_MODEL_PATH
+        model_path = MODEL_CONFIG.caa_path
 
         # Verify the CAA model exists
         if not Path(model_path).exists():
@@ -238,7 +269,7 @@ def load_model(method):
         raise
 
 
-def run_bigcode_evaluation(model_path, args, timestamp):
+def run_bigcode_evaluation(model_path: str, args: argparse.Namespace, timestamp: str) -> Tuple[Dict[str, Any], Path, float, Dict[str, Any]]:
     """Run bigcode-evaluation-harness evaluation."""
 
     print("\\n🚀 Running BigCode evaluation...")
@@ -277,7 +308,7 @@ def run_bigcode_evaluation(model_path, args, timestamp):
         "--do_sample",
         args.do_sample,
         "--top_p",
-        str(DEFAULT_TOP_P),
+        str(EVAL_DEFAULTS.top_p),
         "--precision",
         args.precision,
         "--seed",
@@ -304,6 +335,15 @@ def run_bigcode_evaluation(model_path, args, timestamp):
     # Add memory management parameters
     if args.load_in_8bit:
         cmd.append("--load_in_8bit")
+    
+    # Add instruction tokens for instruct-humaneval datasets
+    if args.dataset in INSTRUCTION_DATASETS:
+        cmd.extend(["--instruction_tokens", QWEN_INSTRUCTION_TOKENS])
+        print(f"📝 Using instruction tokens for {args.dataset}")
+    
+    # Log if this is a Recode dataset (parameters should be set by shell script)
+    if args.dataset in RECODE_DATASETS:
+        print(f"📊 Evaluating Recode dataset: {args.dataset}")
 
     print("\\n🔧 BigCode command:")
     print(" ".join(cmd))
@@ -317,7 +357,7 @@ def run_bigcode_evaluation(model_path, args, timestamp):
     env["CUDA_VISIBLE_DEVICES"] = str(args.device)
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BIGCODE_HARNESS_DIR, env=env)
+        subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=BIGCODE_HARNESS_DIR, env=env)
 
         duration = time.time() - start_time
 
@@ -359,7 +399,7 @@ def run_bigcode_evaluation(model_path, args, timestamp):
         raise
 
 
-def extract_detailed_results(output_dir, dataset, timestamp, args):
+def extract_detailed_results(output_dir: Path, dataset: str, timestamp: str, args: argparse.Namespace) -> Dict[str, Any]:
     """Load BigCode evaluation outputs for WandB logging."""
     print("\\n🔍 Loading BigCode evaluation results...")
     
@@ -480,7 +520,7 @@ def extract_detailed_results(output_dir, dataset, timestamp, args):
         return {}
 
 
-def log_results_to_wandb(metrics, args, duration, output_dir, detailed_results=None):
+def log_results_to_wandb(metrics: Dict[str, Any], args: argparse.Namespace, duration: float, output_dir: Path, detailed_results: Optional[Dict[str, Any]] = None) -> None:
     """Log final results to WandB."""
 
     print("\\n📈 Logging results to WandB...")
@@ -588,7 +628,7 @@ def log_results_to_wandb(metrics, args, duration, output_dir, detailed_results=N
     print("✅ Results logged to WandB successfully!")
 
 
-def main():
+def main() -> bool:
     """Main evaluation function."""
 
     # Parse arguments
@@ -610,9 +650,9 @@ def main():
 
         # Set model path (BigCode harness will handle loading to save memory)
         if args.method == "unsteered":
-            model_path = UNSTEERED_MODEL_PATH
+            model_path = MODEL_CONFIG.unsteered_path
         elif args.method == "caa":
-            model_path = CAA_MODEL_PATH
+            model_path = MODEL_CONFIG.caa_path
 
         # Run BigCode evaluation
         metrics, output_dir, duration, detailed_results = run_bigcode_evaluation(model_path, args, timestamp)
