@@ -1611,12 +1611,10 @@ def run_task_pipeline(
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
 
         # Create contrastive pairs using proper activation collection logic
-        from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
-        from wisent_guard.core.activations.activations import Activations
+        from wisent_guard.core.activations import ActivationAggregationStrategy, Activations, PromptConstructionStrategy
 
         from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
-            PromptConstructionStrategy,
         )
 
         # Convert strings to enums
@@ -5984,8 +5982,8 @@ def handle_full_optimization_command(args):
                         # Create contrastive pairs
                         from wisent_guard.core.activations.activation_collection_method import (
                             ActivationCollectionLogic,
-                            PromptConstructionStrategy,
                         )
+                        from wisent_guard.core.activations.prompts import PromptConstructionStrategy
 
                         collector = ActivationCollectionLogic(model=model)
                         prompt_strategy = PromptConstructionStrategy.MULTIPLE_CHOICE
@@ -6325,12 +6323,12 @@ def handle_generate_vector_command(args):
         model = Model(name=args.model, device=args.device)
 
         # Import activation collection logic
-        from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
+        from wisent_guard.core.activations.core import ActivationAggregationStrategy
 
         from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
-            PromptConstructionStrategy,
         )
+        from wisent_guard.core.activations.prompts import PromptConstructionStrategy
 
         # Create activation collection logic instance
         activation_logic = ActivationCollectionLogic(model)

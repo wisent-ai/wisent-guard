@@ -1,6 +1,6 @@
 from wisent_guard.core.classifiers.classifier import ActivationClassifier, Classifier
 
-from wisent_guard.core.activations.activations import Activations
+from wisent_guard.core.activations import Activations
 from .contrastive_pairs import ContrastivePairSet
 from .layer import Layer
 from .model import ActivationHooks, Model, ModelParameterOptimizer, PromptFormat, TokenScore

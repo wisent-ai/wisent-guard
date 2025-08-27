@@ -13,7 +13,7 @@ from datetime import datetime
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
+from .activations import ActivationAggregationStrategy
 from .model import Model
 from wisent_guard.core.classifiers.classifier import Classifier
 from .contrastive_pairs import ContrastivePairSet

@@ -3,8 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 
-from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
-from wisent_guard.core.activations.activations import Activations
+from wisent_guard.core.activations import Activations, ActivationAggregationStrategy
 from wisent_guard.core.layer import Layer
 
 from .core import Model, SteeringMethod, SteeringType
