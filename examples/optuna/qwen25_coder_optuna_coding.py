@@ -68,7 +68,7 @@ import torch
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from wisent_guard.core.optuna.optuna_pipeline import OptimizationConfig, OptimizationPipeline
+from wisent_guard.core.optuna.steering.optuna_pipeline import OptimizationConfig, OptimizationPipeline
 
 
 def get_recommended_config_for_qwen25_coder() -> Dict[str, Any]:

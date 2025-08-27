@@ -3,7 +3,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["-v", "--tb=short", "--ignore=evaluation", "-m", "not heavy and not docker and not bigcode_required"]
+addopts = ["-v", "--tb=short", "--ignore=evaluation", "-m", "not slow and not heavy and not docker and not bigcode_required"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "heavy: marks tests as very resource-intensive with large model downloads (deselect with '-m \"not heavy\"')",

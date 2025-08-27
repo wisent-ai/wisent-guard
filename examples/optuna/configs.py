@@ -9,7 +9,7 @@ This module provides pre-configured settings for common use cases:
 
 import torch
 
-from wisent_guard.core.optuna.optuna_pipeline import OptimizationConfig
+from wisent_guard.core.optuna.steering.optuna_pipeline import OptimizationConfig
 
 
 def create_minimal_config() -> OptimizationConfig:

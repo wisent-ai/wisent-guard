@@ -41,7 +41,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from configs import EXAMPLE_BEST_PARAMS, create_evaluation_config
 
-from wisent_guard.core.optuna.optuna_pipeline import OptimizationPipeline
+from wisent_guard.core.optuna.steering.optuna_pipeline import OptimizationPipeline
 
 
 def evaluate_single_params(params: dict[str, Any], config_name: str = "default") -> dict[str, Any]:

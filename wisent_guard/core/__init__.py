@@ -1,26 +1,25 @@
+from wisent_guard.core.activations import Activations
+from wisent_guard.core.classifier.classifier import ActivationClassifier, Classifier
+
 from .contrastive_pairs import ContrastivePairSet
-from .activations import Activations, ActivationAggregationMethod
 from .layer import Layer
-from .model import Model
-from .model import PromptFormat, TokenScore, ModelParameterOptimizer, ActivationHooks
-from .classifier import Classifier, ActivationClassifier
-from .steering import SteeringMethod, SteeringType
+from .model import ActivationHooks, Model, ModelParameterOptimizer, PromptFormat, TokenScore
 from .secure_code_evaluator import SecureCodeEvaluator, enforce_secure_execution
+from .steering import SteeringMethod, SteeringType
 
 __all__ = [
-    "Model",
-    "PromptFormat",
-    "TokenScore",
-    "ModelParameterOptimizer",
+    "ActivationClassifier",
     "ActivationHooks",
     "Activations",
-    "ActivationAggregationMethod",
-    "Layer",
-    "ContrastivePairSet",
     "Classifier",
-    "ActivationClassifier",
+    "ContrastivePairSet",
+    "Layer",
+    "Model",
+    "ModelParameterOptimizer",
+    "PromptFormat",
+    "SecureCodeEvaluator",
     "SteeringMethod",
     "SteeringType",
-    "SecureCodeEvaluator",
+    "TokenScore",
     "enforce_secure_execution",
 ]
