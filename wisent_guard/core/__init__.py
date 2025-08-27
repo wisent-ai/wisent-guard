@@ -1,5 +1,5 @@
 from .contrastive_pairs import ContrastivePairSet
-from .activations import Activations, ActivationAggregationMethod
+from .activations_old import Activations, ActivationAggregationMethod
 from .layer import Layer
 from .model import Model
 from .model import PromptFormat, TokenScore, ModelParameterOptimizer, ActivationHooks
