@@ -1,6 +1,9 @@
 from typing import Dict, Optional, Any, List
 
 from .core import ActivationAggregationStrategy, Activations
+import torch
+
+from wisent_guard.core.layer import Layer
 
 
 class ActivationMonitor:
@@ -106,9 +109,6 @@ class ActivationMonitor:
 
     def load_activations(self, filepath: str) -> Dict[int, Activations]:
         """Load activations from file."""
-        import torch
-
-        from .layer import Layer
 
         loaded_data = torch.load(filepath)
         activations = {}
@@ -176,7 +176,7 @@ class TestActivationCache:
         """Load cached activations from file."""
         import torch
 
-        from .layer import Layer
+        from wisent_guard.core.layer import Layer
 
         loaded_data = torch.load(filepath, map_location="cpu")
         cache = cls()

@@ -659,13 +659,13 @@ class LMEvalHarnessGroundTruth:
         """Map token aggregation string to activation method."""
 
         mapping = {  # TODO This should be refactor, why we use strings as Token aggregation?
-            "average": ActivationAggregationStrategy.MEAN,
-            "mean": ActivationAggregationStrategy.MEAN,
+            "average": ActivationAggregationStrategy.MEAN_POOLING,
+            "mean": ActivationAggregationStrategy.MEAN_POOLING,
             "last": ActivationAggregationStrategy.LAST_TOKEN,
-            "max": ActivationAggregationStrategy.MAX,
+            "max": ActivationAggregationStrategy.MAX_POOLING,
         }
 
-        return mapping.get(token_aggregation.lower(), ActivationAggregationStrategy.MEAN)
+        return mapping.get(token_aggregation.lower(), ActivationAggregationStrategy.MEAN_POOLING)
 
     def _is_task_interface_task(self, task_name: str) -> bool:
         """Check if this is a TaskInterface task (not an lm-eval task)."""

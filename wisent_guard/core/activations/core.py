@@ -44,7 +44,7 @@ class Activations:
                 return self.tensor[-1, :]  # Take last token
             return self.tensor  # Already aggregated
 
-        if self.aggregation_method == ActivationAggregationStrategy.MEAN:
+        if self.aggregation_method == ActivationAggregationStrategy.MEAN_POOLING:
             # Return mean across sequence dimension
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0].mean(dim=0)  # Mean across sequence length
@@ -52,7 +52,7 @@ class Activations:
                 return self.tensor.mean(dim=0)  # Mean across sequence length
             return self.tensor
 
-        if self.aggregation_method == ActivationAggregationStrategy.MAX:
+        if self.aggregation_method == ActivationAggregationStrategy.MAX_POOLING:
             # Return max across sequence dimension
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0].max(dim=0)[0]  # Max across sequence length
