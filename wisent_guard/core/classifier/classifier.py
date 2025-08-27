@@ -15,10 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class Classifier:
-    def __init__(self, model_type="logistic", device=None, threshold=0.5, model_path=None):
+    def __init__(self, model_type="logistic", device=None, threshold=0.5, model_path=None, dtype=torch.float32):
         self.model_type = model_type
         self.threshold = threshold
         self.model_path = model_path
+        self.dtype = dtype
 
         # Determine device
         if device is None:
@@ -38,19 +39,20 @@ class Classifier:
             self.load_model(model_path)
 
     def _extract_features(self, activation_tensor: torch.Tensor) -> torch.Tensor:
-        """Extract features from activation tensor."""
+        """Extract features from activation tensor (for individual samples only)."""
         # Convert to PyTorch tensor if not already
         if not isinstance(activation_tensor, torch.Tensor):
-            activation_tensor = torch.tensor(activation_tensor, dtype=torch.float32, device=self.device)
+            activation_tensor = torch.tensor(activation_tensor, dtype=self.dtype, device=self.device)
         else:
             # If it's already a tensor, ensure it's the right type for MPS compatibility
-            if self.device == "mps" and activation_tensor.dtype != torch.float32:
-                activation_tensor = activation_tensor.to(dtype=torch.float32)
+            if self.device == "mps" and activation_tensor.dtype != self.dtype:
+                activation_tensor = activation_tensor.to(dtype=self.dtype)
 
             # Move to the correct device if needed
-            activation_tensor = activation_tensor.to(device=self.device, dtype=torch.float32)
+            activation_tensor = activation_tensor.to(device=self.device, dtype=self.dtype)
 
-        # Flatten if needed
+        # Flatten only for individual samples - NOT for batched data
+        # This method should only be used for list inputs, not batch tensors
         if len(activation_tensor.shape) > 1:
             activation_tensor = activation_tensor.flatten()
 
@@ -87,16 +89,24 @@ class Classifier:
         # Set random seed for reproducibility
         torch.manual_seed(random_state)
 
-        # Process inputs
+        # Process inputs - now expecting tensors directly
         if isinstance(X, list):
             X = torch.stack([self._extract_features(x) for x in X])
+        elif isinstance(X, torch.Tensor):
+            # Tensor input - ensure correct device and dtype
+            X = X.to(device=self.device, dtype=self.dtype)
         else:
-            X = self._extract_features(X)
+            # Fallback for other types (shouldn't happen in tensor pipeline)
+            X = torch.tensor(X, dtype=self.dtype, device=self.device)
 
         if isinstance(y, list):
-            y = torch.tensor(y, dtype=torch.float32, device=self.device)
+            y = torch.tensor(y, dtype=self.dtype, device=self.device)
+        elif isinstance(y, torch.Tensor):
+            # Tensor input - ensure correct device and dtype
+            y = y.to(device=self.device, dtype=self.dtype)
         else:
-            y = y.to(device=self.device, dtype=torch.float32)
+            # Fallback for other types (shouldn't happen in tensor pipeline)
+            y = torch.tensor(y, dtype=self.dtype, device=self.device)
 
         # Get input dimension
         input_dim = X.shape[1] if len(X.shape) > 1 else X.shape[0]
@@ -315,7 +325,11 @@ class Classifier:
         # Process input
         if isinstance(X, list):
             X = torch.stack([self._extract_features(x) for x in X])
+        elif isinstance(X, torch.Tensor) and len(X.shape) == 2:
+            # Batch tensor - ensure correct device and dtype without flattening
+            X = X.to(device=self.device, dtype=self.dtype)
         else:
+            # Single sample - use extract_features (with flattening)
             X = self._extract_features(X)
 
         # Reshape for model if needed
@@ -347,7 +361,11 @@ class Classifier:
         # Process input
         if isinstance(X, list):
             X = torch.stack([self._extract_features(x) for x in X])
+        elif isinstance(X, torch.Tensor) and len(X.shape) == 2:
+            # Batch tensor - ensure correct device and dtype without flattening
+            X = X.to(device=self.device, dtype=self.dtype)
         else:
+            # Single sample - use extract_features (with flattening)
             X = self._extract_features(X)
 
         # Reshape for model if needed

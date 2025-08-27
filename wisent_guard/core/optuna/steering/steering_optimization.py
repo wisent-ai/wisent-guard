@@ -8,7 +8,7 @@ improve model performance on benchmarks by steering internal activations.
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 import torch
 from tqdm import tqdm
@@ -19,6 +19,8 @@ from wisent_guard.core.response import Response
 from wisent_guard.core.steering_methods.dac import DAC
 
 from wisent_guard.core.optuna.steering import data_utils, metrics
+from wisent_guard.core.optuna.classifier.classifier_cache import ClassifierCache, CacheConfig
+from wisent_guard.core.classifier.classifier import Classifier
 
 logger = logging.getLogger(__name__)
 
@@ -349,9 +351,14 @@ class SteeringOptimizer:
     4. Test final steering method on test data
     """
 
-    def __init__(self):
+    def __init__(self, cache_config: Optional[CacheConfig] = None):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.trainers = {"dac": DACTrainer()}
+
+        # Initialize classifier cache for reusing trained classifiers
+        if cache_config is None:
+            cache_config = CacheConfig(cache_dir="./steering_classifier_cache")
+        self.classifier_cache = ClassifierCache(cache_config)
 
     def register_trainer(self, method_name: str, trainer: SteeringMethodTrainer):
         """Register a new steering method trainer."""
@@ -533,3 +540,152 @@ class SteeringOptimizer:
                     combinations.append((layer, strength, {}))
 
         return combinations
+
+    def load_or_find_best_classifier(
+        self,
+        model_name: str,
+        task_name: str,
+        layer: int,
+        aggregation: str = "average",
+        model_type: str = "logistic",
+        threshold: float = 0.5,
+        fallback_training_data: Optional[Tuple[Any, Any]] = None,
+    ) -> Optional[Classifier]:
+        """
+        Load a pre-trained classifier for the given configuration or find the best similar one.
+
+        This method replaces the probe_optimization.py functionality by leveraging
+        the classifier cache system to avoid retraining classifiers in each trial.
+
+        Args:
+            model_name: Name of the base model
+            task_name: Task name (e.g., "gsm8k", "math")
+            layer: Layer index to use
+            aggregation: Token aggregation method
+            model_type: Classifier type ("logistic" or "mlp")
+            threshold: Classification threshold
+            fallback_training_data: Optional (X, y) data to train if no cached model found
+
+        Returns:
+            Trained classifier or None if not found and no fallback data provided
+        """
+        self.logger.info(f"Looking for cached classifier: {model_name}/{task_name} layer_{layer}")
+
+        # First, try to find an exact match
+        hyperparameters = {"model_type": model_type}
+        if model_type == "mlp":
+            hyperparameters["hidden_dim"] = 128  # Default hidden dimension
+
+        # We need some training data hash - use placeholder if not provided
+        if fallback_training_data is not None:
+            X, y = fallback_training_data
+            data_hash = self.classifier_cache.compute_data_hash(X, y)
+        else:
+            data_hash = "placeholder_hash"  # Will not match existing cache
+
+        cache_key = self.classifier_cache.get_cache_key(
+            model_name=model_name,
+            task_name=task_name,
+            model_type=model_type,
+            layer=layer,
+            aggregation=aggregation,
+            threshold=threshold,
+            hyperparameters=hyperparameters,
+            data_hash=data_hash,
+        )
+
+        # Try exact match first
+        classifier = self.classifier_cache.load_classifier(cache_key)
+        if classifier is not None:
+            self.logger.info(f"Found exact cached classifier: {cache_key}")
+            return classifier
+
+        # Try to find similar classifiers
+        similar_models = self.classifier_cache.find_similar_models(
+            model_name=model_name, task_name=task_name, model_type=model_type, layer=layer, top_k=3
+        )
+
+        if similar_models:
+            # Use the most similar model
+            best_cache_key, best_metadata, similarity_score = similar_models[0]
+
+            if similarity_score > 0.7:  # High similarity threshold
+                classifier = self.classifier_cache.load_classifier(best_cache_key)
+                if classifier is not None:
+                    # Update threshold to match requested configuration
+                    classifier.set_threshold(threshold)
+                    self.logger.info(
+                        f"Using similar cached classifier: {best_cache_key} (similarity: {similarity_score:.2f})"
+                    )
+                    return classifier
+
+        # If no suitable cached model found and we have training data, train a new one
+        if fallback_training_data is not None:
+            self.logger.info("No suitable cached classifier found, training new one")
+            X, y = fallback_training_data
+
+            try:
+                # Create and train new classifier
+                classifier_kwargs = {"model_type": model_type, "threshold": threshold}
+                if model_type == "mlp":
+                    classifier_kwargs["hidden_dim"] = hyperparameters.get("hidden_dim", 128)
+
+                classifier = Classifier(**classifier_kwargs)
+
+                # Train the classifier
+                training_results = classifier.fit(X, y, test_size=0.2, random_state=42)
+
+                if training_results.get("accuracy", 0) > 0.5:  # Only cache if performance is reasonable
+                    # Save to cache for future use
+                    data_hash = self.classifier_cache.compute_data_hash(X, y)
+                    cache_key = self.classifier_cache.get_cache_key(
+                        model_name=model_name,
+                        task_name=task_name,
+                        model_type=model_type,
+                        layer=layer,
+                        aggregation=aggregation,
+                        threshold=threshold,
+                        hyperparameters=hyperparameters,
+                        data_hash=data_hash,
+                    )
+
+                    performance_metrics = {
+                        "accuracy": training_results.get("accuracy", 0.0),
+                        "f1": training_results.get("f1", 0.0),
+                        "auc": training_results.get("auc", 0.0),
+                    }
+
+                    self.classifier_cache.save_classifier(
+                        cache_key=cache_key,
+                        classifier=classifier,
+                        model_name=model_name,
+                        task_name=task_name,
+                        layer=layer,
+                        aggregation=aggregation,
+                        threshold=threshold,
+                        hyperparameters=hyperparameters,
+                        performance_metrics=performance_metrics,
+                        training_samples=len(X),
+                        data_hash=data_hash,
+                    )
+
+                    self.logger.info(f"Trained and cached new classifier: {cache_key}")
+                    return classifier
+                else:
+                    self.logger.warning(f"Trained classifier performance too low: {training_results}")
+                    return None
+
+            except Exception as e:
+                self.logger.error(f"Failed to train new classifier: {e}")
+                return None
+
+        self.logger.warning(f"No classifier found for {model_name}/{task_name} layer_{layer}")
+        return None
+
+    def get_cache_info(self) -> Dict[str, Any]:
+        """Get information about cached classifiers."""
+        return self.classifier_cache.get_cache_info()
+
+    def clear_classifier_cache(self, keep_recent_hours: float = 24.0) -> int:
+        """Clear old cached classifiers."""
+        return self.classifier_cache.clear_cache(keep_recent_hours=keep_recent_hours)
