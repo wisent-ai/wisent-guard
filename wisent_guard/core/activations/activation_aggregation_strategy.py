@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class TokenTargetingStrategy(Enum):
+class ActivationAggregationStrategy(Enum):
     """Different strategies for targeting tokens in activation extraction."""
 
     CHOICE_TOKEN = "choice_token"  # Target A/B choice tokens (for multiple choice)
@@ -10,9 +10,3 @@ class TokenTargetingStrategy(Enum):
     FIRST_TOKEN = "first_token"  # Always use first token
     MEAN_POOLING = "mean_pooling"  # Use mean of all tokens
     MAX_POOLING = "max_pooling"  # Use max pooling across tokens
-
-
-# class ActivationAggregationMethod(Enum):
-#     LAST_TOKEN = "last_token"
-#     MEAN = "mean"
-#     MAX = "max"

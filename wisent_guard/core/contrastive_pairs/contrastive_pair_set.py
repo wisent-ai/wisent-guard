@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import torch
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 
 from ..response import NegativeResponse, PositiveResponse
@@ -264,7 +264,7 @@ class ContrastivePairSet:
                 pos_activations = Activations(
                     tensor=pair.positive_response.activations,
                     layer=layer,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
                 activations_list.append(pos_activations)
                 labels_list.append(0)  # 0 for positive/harmless
@@ -274,7 +274,7 @@ class ContrastivePairSet:
                 neg_activations = Activations(
                     tensor=pair.negative_response.activations,
                     layer=layer,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
                 activations_list.append(neg_activations)
                 labels_list.append(1)  # 1 for negative/harmful
@@ -300,7 +300,7 @@ class ContrastivePairSet:
                 pos_activations = Activations(
                     tensor=pair.positive_response.activations,
                     layer=layer,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
                 positive_activations.append(pos_activations.get_aggregated())
 
@@ -308,7 +308,7 @@ class ContrastivePairSet:
                 neg_activations = Activations(
                     tensor=pair.negative_response.activations,
                     layer=layer,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
                 negative_activations.append(neg_activations.get_aggregated())
 
@@ -385,7 +385,7 @@ class ContrastivePairSet:
                     pos_activations = Activations(
                         tensor=pair.positive_response.activations,
                         layer=layer,
-                        aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                        aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                     )
                     pos_similarity = pos_activations.calculate_similarity(vector)
                     pos_predicted_harmful = pos_similarity >= threshold
@@ -401,7 +401,7 @@ class ContrastivePairSet:
                     neg_activations = Activations(
                         tensor=pair.negative_response.activations,
                         layer=layer,
-                        aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                        aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                     )
                     neg_similarity = neg_activations.calculate_similarity(vector)
                     neg_predicted_harmful = neg_similarity >= threshold

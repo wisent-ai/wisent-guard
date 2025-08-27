@@ -1611,7 +1611,7 @@ def run_task_pipeline(
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
 
         # Create contrastive pairs using proper activation collection logic
-        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+        from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
         from wisent_guard.core.activations_old import Activations
 
         from .core.activation_collection_method import (
@@ -1631,15 +1631,15 @@ def run_task_pipeline(
         )
 
         targeting_strategy_mapping = {
-            "choice_token": TokenTargetingStrategy.CHOICE_TOKEN,
-            "continuation_token": TokenTargetingStrategy.CONTINUATION_TOKEN,
-            "last_token": TokenTargetingStrategy.LAST_TOKEN,
-            "first_token": TokenTargetingStrategy.FIRST_TOKEN,
-            "mean_pooling": TokenTargetingStrategy.MEAN_POOLING,
-            "max_pooling": TokenTargetingStrategy.MAX_POOLING,
+            "choice_token": ActivationAggregationStrategy.CHOICE_TOKEN,
+            "continuation_token": ActivationAggregationStrategy.CONTINUATION_TOKEN,
+            "last_token": ActivationAggregationStrategy.LAST_TOKEN,
+            "first_token": ActivationAggregationStrategy.FIRST_TOKEN,
+            "mean_pooling": ActivationAggregationStrategy.MEAN_POOLING,
+            "max_pooling": ActivationAggregationStrategy.MAX_POOLING,
         }
         targeting_strategy = targeting_strategy_mapping.get(
-            token_targeting_strategy, TokenTargetingStrategy.CHOICE_TOKEN
+            token_targeting_strategy, ActivationAggregationStrategy.CHOICE_TOKEN
         )
 
         if verbose:
@@ -3394,7 +3394,7 @@ The task will be skipped in optimization."""
                                         activations_obj = Activations(
                                             tensor=layer_activations,
                                             layer=layer_obj,
-                                            aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                                            aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                                         )
 
                                         # Add to cache
@@ -6325,7 +6325,7 @@ def handle_generate_vector_command(args):
         model = Model(name=args.model, device=args.device)
 
         # Import activation collection logic
-        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+        from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
@@ -6337,7 +6337,7 @@ def handle_generate_vector_command(args):
 
         # Parse strategies from args
         prompt_strategy = PromptConstructionStrategy(args.prompt_construction)
-        token_strategy = TokenTargetingStrategy(args.token_targeting)
+        token_strategy = ActivationAggregationStrategy(args.token_targeting)
 
         # Handle multi-property mode
         if args.multi_property:

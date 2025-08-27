@@ -7,7 +7,7 @@ This module provides ground truth evaluation using the lm-eval-harness framework
 import logging
 from typing import Any, Dict
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 from wisent_guard.core.layer import Layer
 
@@ -214,7 +214,7 @@ class LMEvalHarnessGroundTruth:
                     activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
 
                     activation_obj = Activations(
-                        tensor=activation_tensor, layer=layer_obj, aggregation_method=activation_method
+                        tensor=activation_tensor, layer=layer_obj, aggregation_strategy=activation_method
                     )
 
                     # Get classifier prediction
@@ -357,7 +357,7 @@ class LMEvalHarnessGroundTruth:
                             activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
 
                             activation_obj = Activations(
-                                tensor=activation_tensor, layer=layer_obj, aggregation_method=activation_method
+                                tensor=activation_tensor, layer=layer_obj, aggregation_strategy=activation_method
                             )
 
                             # Get classifier prediction (only if classifier is provided)
@@ -483,7 +483,7 @@ class LMEvalHarnessGroundTruth:
                             activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
 
                             activation_obj = Activations(
-                                tensor=activation_tensor, layer=layer_obj, aggregation_method=activation_method
+                                tensor=activation_tensor, layer=layer_obj, aggregation_strategy=activation_method
                             )
 
                             # Get classifier prediction
@@ -660,13 +660,13 @@ class LMEvalHarnessGroundTruth:
         """Map token aggregation string to activation method."""
 
         mapping = {  # TODO This should be refactor, why we use strings as Token aggregation?
-            "average": TokenTargetingStrategy.MEAN,
-            "mean": TokenTargetingStrategy.MEAN,
-            "last": TokenTargetingStrategy.LAST_TOKEN,
-            "max": TokenTargetingStrategy.MAX,
+            "average": ActivationAggregationStrategy.MEAN,
+            "mean": ActivationAggregationStrategy.MEAN,
+            "last": ActivationAggregationStrategy.LAST_TOKEN,
+            "max": ActivationAggregationStrategy.MAX,
         }
 
-        return mapping.get(token_aggregation.lower(), TokenTargetingStrategy.MEAN)
+        return mapping.get(token_aggregation.lower(), ActivationAggregationStrategy.MEAN)
 
     def _is_task_interface_task(self, task_name: str) -> bool:
         """Check if this is a TaskInterface task (not an lm-eval task)."""
@@ -1320,7 +1320,7 @@ class LMEvalHarnessGroundTruth:
                     activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
 
                     activation_obj = Activations(
-                        tensor=activation_tensor, layer=layer_obj, aggregation_method=activation_method
+                        tensor=activation_tensor, layer=layer_obj, aggregation_strategy=activation_method
                     )
 
                     # Get classifier prediction

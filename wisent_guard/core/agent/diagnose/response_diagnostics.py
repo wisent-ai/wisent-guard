@@ -11,7 +11,7 @@ This module handles:
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 from wisent_guard.core.classifiers.classifier import Classifier
 
@@ -127,7 +127,7 @@ class ResponseDiagnostics:
             activations = Activations(
                 tensor=activations_tensor,
                 layer=classifier_config["layer"],
-                aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
             )
 
             # Get features for classifier
@@ -173,7 +173,7 @@ class ResponseDiagnostics:
             activations = Activations(
                 tensor=activations_tensor,
                 layer=classifier_config["layer"],
-                aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
             )
 
             # Get features

@@ -19,7 +19,7 @@ from typing import Dict, List, Tuple
 
 import torch
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 
 from .layer import Layer
@@ -281,7 +281,7 @@ class ActivationCollectionLogic:
         return 0
 
     def _get_activation_with_strategy(
-        self, hidden_states: torch.Tensor, tokens: List[str], target_token: str, strategy: TokenTargetingStrategy
+        self, hidden_states: torch.Tensor, tokens: List[str], target_token: str, strategy: ActivationAggregationStrategy
     ) -> torch.Tensor:
         """
         Get activation based on the specified targeting strategy.
@@ -300,36 +300,36 @@ class ActivationCollectionLogic:
         logging.debug(f"Target token: {target_token}")
         logging.debug(f"Tokens: {tokens[:5]}..." if len(tokens) > 5 else f"Tokens: {tokens}")
         logging.debug(f"Hidden states shape: {hidden_states.shape}")
-        if strategy == TokenTargetingStrategy.CHOICE_TOKEN:
+        if strategy == ActivationAggregationStrategy.CHOICE_TOKEN:
             # Look for A/B choice tokens (backward search)
             position = self._get_token_position_choice_token(tokens, target_token)
             logging.debug(f"CHOICE_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
 
-        if strategy == TokenTargetingStrategy.CONTINUATION_TOKEN:
+        if strategy == ActivationAggregationStrategy.CONTINUATION_TOKEN:
             # Look for continuation tokens like "I" (forward search)
             position = self._get_token_position_continuation_token(tokens, target_token)
             logging.debug(f"CONTINUATION_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
 
-        if strategy == TokenTargetingStrategy.LAST_TOKEN:
+        if strategy == ActivationAggregationStrategy.LAST_TOKEN:
             # Always use last token
             position = self._get_token_position_last_token(tokens, target_token)
             logging.debug(f"LAST_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
 
-        if strategy == TokenTargetingStrategy.FIRST_TOKEN:
+        if strategy == ActivationAggregationStrategy.FIRST_TOKEN:
             # Always use first token
             position = self._get_token_position_first_token(tokens, target_token)
             logging.debug(f"FIRST_TOKEN: Using position {position}")
             return hidden_states[0, position, :]
 
-        if strategy == TokenTargetingStrategy.MEAN_POOLING:
+        if strategy == ActivationAggregationStrategy.MEAN_POOLING:
             # Use mean pooling across all tokens
             logging.debug(f"MEAN_POOLING: Using mean across all {hidden_states.shape[1]} tokens")
             return hidden_states[0].mean(dim=0)  # [hidden_dim]
 
-        if strategy == TokenTargetingStrategy.MAX_POOLING:
+        if strategy == ActivationAggregationStrategy.MAX_POOLING:
             # Use max pooling across all tokens
             logging.debug(f"MAX_POOLING: Using max across all {hidden_states.shape[1]} tokens")
             return hidden_states[0].max(dim=0)[0]  # [hidden_dim]
@@ -344,7 +344,7 @@ class ActivationCollectionLogic:
         pair: ContrastivePair,
         layer_index: int,
         device: str = "cuda",
-        token_targeting_strategy: TokenTargetingStrategy = TokenTargetingStrategy.CHOICE_TOKEN,
+        token_targeting_strategy: ActivationAggregationStrategy = ActivationAggregationStrategy.CHOICE_TOKEN,
     ) -> ContrastivePair:
         """
         Extract activations from a contrastive pair using the appropriate prompt format and targeting strategy.
@@ -435,7 +435,7 @@ class ActivationCollectionLogic:
         pairs: List[ContrastivePair],
         layer_index: int,
         device: str = "cuda",
-        token_targeting_strategy: TokenTargetingStrategy = TokenTargetingStrategy.CHOICE_TOKEN,
+        token_targeting_strategy: ActivationAggregationStrategy = ActivationAggregationStrategy.CHOICE_TOKEN,
     ) -> List[ContrastivePair]:
         """
         Collect activations from multiple contrastive pairs.
@@ -511,7 +511,7 @@ class ActivationCollectionLogic:
                 pos_act = Activations(
                     tensor=pair.positive_activations,
                     layer=layer,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
                 positive_activations.append(pos_act)
 
@@ -519,7 +519,7 @@ class ActivationCollectionLogic:
                 neg_act = Activations(
                     tensor=pair.negative_activations,
                     layer=layer,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
                 negative_activations.append(neg_act)
 

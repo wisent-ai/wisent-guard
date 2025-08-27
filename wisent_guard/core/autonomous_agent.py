@@ -12,7 +12,7 @@ A model that can autonomously use wisent-guard capabilities on itself:
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 
 from .agent.diagnose import AgentClassifierDecisionSystem, AnalysisResult, ClassifierMarketplace, ResponseDiagnostics
@@ -415,7 +415,7 @@ class AutonomousAgent:
         activations = Activations(
             tensor=activations_tensor,
             layer=Layer(index=classifier_params.optimal_layer, type="transformer"),
-            aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+            aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
         )
 
         features = activations.extract_features_for_classifier()

@@ -10,7 +10,7 @@ directly on each choice to evaluate performance against known ground truth.
 import logging
 from typing import Any, Dict, Optional
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 from wisent_guard.core.layer import Layer
 
@@ -106,14 +106,16 @@ class LogLikelihoodsEvaluator:
 
             # Map token aggregation to token targeting strategy for evaluation
             targeting_strategy_mapping = {  # TODO Refactor - we should stay with one standard
-                "average": TokenTargetingStrategy.MEAN_POOLING,
-                "final": TokenTargetingStrategy.LAST_TOKEN,
-                "first": TokenTargetingStrategy.FIRST_TOKEN,
-                "max": TokenTargetingStrategy.MAX_POOLING,
-                "min": TokenTargetingStrategy.MEAN_POOLING,  # Fallback to mean
+                "average": ActivationAggregationStrategy.MEAN_POOLING,
+                "final": ActivationAggregationStrategy.LAST_TOKEN,
+                "first": ActivationAggregationStrategy.FIRST_TOKEN,
+                "max": ActivationAggregationStrategy.MAX_POOLING,
+                "min": ActivationAggregationStrategy.MEAN_POOLING,  # Fallback to mean
             }
 
-            targeting_strategy = targeting_strategy_mapping.get(token_aggregation, TokenTargetingStrategy.MEAN_POOLING)
+            targeting_strategy = targeting_strategy_mapping.get(
+                token_aggregation, ActivationAggregationStrategy.MEAN_POOLING
+            )
 
             logger.info(
                 f"🔍 EVALUATION MODE: Using {targeting_strategy.value} targeting strategy (from token_aggregation: {token_aggregation})"
@@ -252,7 +254,7 @@ class LogLikelihoodsEvaluator:
 
             # Process positive (correct) choice using CLI token aggregation method
             positive_act = Activations(
-                tensor=positive_activations, layer=layer_obj, aggregation_method=activation_method
+                tensor=positive_activations, layer=layer_obj, aggregation_strategy=activation_method
             )
             positive_features = positive_act.extract_features_for_classifier()
             positive_prediction = classifier.predict_proba([positive_features.cpu().numpy()])
@@ -261,7 +263,7 @@ class LogLikelihoodsEvaluator:
 
             # Process negative (incorrect) choice using CLI token aggregation method
             negative_act = Activations(
-                tensor=negative_activations, layer=layer_obj, aggregation_method=activation_method
+                tensor=negative_activations, layer=layer_obj, aggregation_strategy=activation_method
             )
             negative_features = negative_act.extract_features_for_classifier()
             negative_prediction = classifier.predict_proba([negative_features.cpu().numpy()])

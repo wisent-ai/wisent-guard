@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.activations_old import Activations
 from wisent_guard.core.layer import Layer
 
@@ -168,7 +168,7 @@ class SafeInference:
                     activation_obj = Activations(
                         tensor=token_activation.unsqueeze(0),
                         layer=layer_obj,
-                        aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                        aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                     )
 
                     # Get feature vector for classifier
@@ -451,7 +451,7 @@ def generate_with_classification(
                 activation_obj = Activations(
                     tensor=token_activation.unsqueeze(0),  # Add batch dimension
                     layer=layer_obj,
-                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                    aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                 )
 
                 # Get feature vector for classifier
@@ -591,7 +591,7 @@ def generate_with_multi_layer_classification(
                     activation_obj = Activations(
                         tensor=token_activation.unsqueeze(0),
                         layer=layer_obj,
-                        aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
+                        aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                     )
 
                     # Get feature vector for classifier

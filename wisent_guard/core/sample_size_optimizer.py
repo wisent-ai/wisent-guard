@@ -13,7 +13,7 @@ from datetime import datetime
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from .model import Model
 from wisent_guard.core.classifiers.classifier import Classifier
 from .contrastive_pairs import ContrastivePairSet
@@ -216,7 +216,7 @@ class SampleSizeOptimizer:
             all_pairs,
             layer_index=self.layer,
             device=self.device,
-            token_targeting_strategy=TokenTargetingStrategy.CHOICE_TOKEN,
+            token_targeting_strategy=ActivationAggregationStrategy.CHOICE_TOKEN,
         )
 
         # Filter out any pairs without activations

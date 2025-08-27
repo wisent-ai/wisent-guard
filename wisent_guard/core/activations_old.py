@@ -3,15 +3,20 @@ from typing import Any, Dict, List, Optional
 import torch
 import torch.nn.functional as F
 
-from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations.activation_aggregation_strategy import ActivationAggregationStrategy
 from wisent_guard.core.layer import Layer
 
 
 class Activations:
-    def __init__(self, tensor, layer, aggregation_method: TokenTargetingStrategy = TokenTargetingStrategy.LAST_TOKEN):
+    def __init__(
+        self,
+        tensor,
+        layer,
+        aggregation_strategy: ActivationAggregationStrategy = ActivationAggregationStrategy.LAST_TOKEN,
+    ):
         self.tensor = tensor
         self.layer = layer
-        self.aggregation_method = aggregation_method
+        self.aggregation_method = aggregation_strategy
 
     def get_aggregated(self):
         """
@@ -20,7 +25,7 @@ class Activations:
         Returns:
             torch.Tensor: Aggregated activation tensor
         """
-        if self.aggregation_method == TokenTargetingStrategy.LAST_TOKEN:
+        if self.aggregation_method == ActivationAggregationStrategy.LAST_TOKEN:
             # Return the last token's activations
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0, -1, :]  # Take last token of first batch
@@ -28,7 +33,7 @@ class Activations:
                 return self.tensor[-1, :]  # Take last token
             return self.tensor  # Already aggregated
 
-        if self.aggregation_method == TokenTargetingStrategy.MEAN:
+        if self.aggregation_method == ActivationAggregationStrategy.MEAN:
             # Return mean across sequence dimension
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0].mean(dim=0)  # Mean across sequence length
@@ -36,7 +41,7 @@ class Activations:
                 return self.tensor.mean(dim=0)  # Mean across sequence length
             return self.tensor
 
-        if self.aggregation_method == TokenTargetingStrategy.MAX:
+        if self.aggregation_method == ActivationAggregationStrategy.MAX:
             # Return max across sequence dimension
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0].max(dim=0)[0]  # Max across sequence length
@@ -155,7 +160,7 @@ class Activations:
             New Activations object on the target device
         """
         new_tensor = self.tensor.to(device)
-        return Activations(tensor=new_tensor, layer=self.layer, aggregation_method=self.aggregation_method)
+        return Activations(tensor=new_tensor, layer=self.layer, aggregation_strategy=self.aggregation_method)
 
     def normalize(self) -> "Activations":
         """
@@ -170,7 +175,7 @@ class Activations:
         norm = torch.norm(aggregated, p=2, dim=-1, keepdim=True)
         normalized = aggregated / (norm + 1e-8)  # Add small epsilon to avoid division by zero
 
-        return Activations(tensor=normalized, layer=self.layer, aggregation_method=self.aggregation_method)
+        return Activations(tensor=normalized, layer=self.layer, aggregation_strategy=self.aggregation_method)
 
     def get_statistics(self) -> Dict[str, float]:
         """
@@ -212,7 +217,7 @@ class Activations:
             if layer.index + 1 < len(hidden_states):
                 layer_hidden_state = hidden_states[layer.index + 1]
 
-                return cls(tensor=layer_hidden_state, layer=layer, aggregation_method=aggregation_method)
+                return cls(tensor=layer_hidden_state, layer=layer, aggregation_strategy=aggregation_method)
             raise ValueError(f"Layer {layer.index} not found in model with {len(hidden_states)} layers")
         raise ValueError("Model outputs don't contain hidden_states")
 
@@ -241,7 +246,7 @@ class Activations:
         else:
             raise ValueError(f"No activation tensor found for layer {layer.index} in dictionary")
 
-        return cls(tensor=tensor, layer=layer, aggregation_method=aggregation_method)
+        return cls(tensor=tensor, layer=layer, aggregation_strategy=aggregation_method)
 
     def __repr__(self) -> str:
         """String representation of the Activations object."""
@@ -449,14 +454,16 @@ class TestActivationCache:
 
             # Reconstruct aggregation method
 
-            agg_method = TokenTargetingStrategy.LAST_TOKEN  # default
+            agg_method = ActivationAggregationStrategy.LAST_TOKEN  # default
             try:
                 if item.get("aggregation_method"):
-                    agg_method = TokenTargetingStrategy(item["aggregation_method"])
+                    agg_method = ActivationAggregationStrategy(item["aggregation_method"])
             except:
                 pass
 
-            activations = Activations(tensor=item["activation_tensor"], layer=layer_obj, aggregation_method=agg_method)
+            activations = Activations(
+                tensor=item["activation_tensor"], layer=layer_obj, aggregation_strategy=agg_method
+            )
 
             cache.add_activation(
                 question=item["question"], response=item["response"], activations=activations, layer=item["layer"]
