@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 
 from wisent_guard.core.activations import Activations
-from wisent_guard.core.classifiers.classifier import Classifier
+from wisent_guard.core.classifier.classifier import Classifier
 
 from .contrastive_pairs import ContrastivePairSet
 from .steering_method import CAA

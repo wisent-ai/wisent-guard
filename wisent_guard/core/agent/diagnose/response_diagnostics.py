@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from wisent_guard.core.activations import Activations, ActivationAggregationStrategy
-from wisent_guard.core.classifiers.classifier import Classifier
+from wisent_guard.core.classifier.classifier import Classifier
 
 from ...layer import Layer
 from ...model import Model

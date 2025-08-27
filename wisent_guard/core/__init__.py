@@ -1,4 +1,4 @@
-from wisent_guard.core.classifiers.classifier import ActivationClassifier, Classifier
+from wisent_guard.core.classifier.classifier import ActivationClassifier, Classifier
 
 from wisent_guard.core.activations import Activations
 from .contrastive_pairs import ContrastivePairSet

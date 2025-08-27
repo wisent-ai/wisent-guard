@@ -15,7 +15,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from .activations import ActivationAggregationStrategy
 from .model import Model
-from wisent_guard.core.classifiers.classifier import Classifier
+from wisent_guard.core.classifier.classifier import Classifier
 from .contrastive_pairs import ContrastivePairSet
 from .model_config_manager import ModelConfigManager
 

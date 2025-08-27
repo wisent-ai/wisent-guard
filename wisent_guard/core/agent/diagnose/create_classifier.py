@@ -13,7 +13,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 
 from ...model import Model
-from wisent_guard.core.classifiers.classifier import Classifier, ActivationClassifier
+from wisent_guard.core.classifier.classifier import Classifier, ActivationClassifier
 from ...activations import Activations
 from ...layer import Layer
 from ...model_persistence import ModelPersistence, create_classifier_metadata

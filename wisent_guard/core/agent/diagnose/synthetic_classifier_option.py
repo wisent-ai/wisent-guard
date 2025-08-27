@@ -12,7 +12,7 @@ from typing import List, Tuple
 from dataclasses import dataclass
 
 from ....core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
-from wisent_guard.core.classifiers.classifier import ActivationClassifier
+from wisent_guard.core.classifier.classifier import ActivationClassifier
 from ....core.agent.budget import calculate_max_tasks_for_time_budget, get_budget_manager, ResourceType
 
 

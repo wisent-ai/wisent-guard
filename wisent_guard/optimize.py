@@ -82,7 +82,7 @@ def optimize_layers_on_contrastive_pairs(
         Dict mapping layer_idx -> {'classifier': classifier, 'train_accuracy': float}
     """
     from .core.hyperparameter_optimizer import detect_model_layers
-    from wisent_guard.core.classifiers.classifier import Classifier
+    from wisent_guard.core.classifier.classifier import Classifier
     from .core.parser import parse_layer_range
 
     total_layers = detect_model_layers(model)
@@ -894,7 +894,7 @@ def run_interactive_optimization(
             )
 
             # Train classifier for this layer using basic Classifier
-            from wisent_guard.core.classifiers.classifier import Classifier
+            from wisent_guard.core.classifier.classifier import Classifier
 
             # Convert processed pairs to training data format
             X = []
