@@ -8,11 +8,11 @@ from typing import Any, Dict, List
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 
-from ...parameters.task_config import CODING_TASKS
-from ..bigcode_extractors import MBPPExtractor
+from wisent_guard.parameters.task_config import CODING_TASKS
+from wisent_guard.core.bigcode_extractors import MBPPExtractor
 
 # Import LMEvalHarnessGroundTruth for intelligent evaluation (newer approach used by CLI)
-from ..lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+from wisent_guard.core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 from .bigcode_evaluator_wrapper import OptunaBigCodeEvaluator
 
 logger = logging.getLogger(__name__)

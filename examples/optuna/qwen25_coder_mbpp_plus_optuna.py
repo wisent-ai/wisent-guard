@@ -69,7 +69,7 @@ import torch
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from wisent_guard.core.optuna.optuna_pipeline import OptimizationConfig, OptimizationPipeline
+from wisent_guard.core.optuna.steering.optuna_pipeline import OptimizationConfig, OptimizationPipeline
 from wisent_guard.core.steering_methods_tensor.dac_attention import DAC as TensorDAC
 
 
@@ -291,7 +291,7 @@ class Qwen25CoderMBPPPlusPipeline(OptimizationPipeline):
         self, tensor_dac: TensorDAC, hyperparams: dict, layer_id: int, trial=None
     ) -> float:
         """Evaluate tensor DAC on validation set."""
-        from wisent_guard.core.optuna import metrics
+        from wisent_guard.core.optuna.steering import metrics
         from wisent_guard.core.task_interface import get_task
 
         if tensor_dac is None:

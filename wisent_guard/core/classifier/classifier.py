@@ -8,8 +8,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
 from .models.logistic import LogisticModel
-from .classifiers.models.mlp import MLPModel
-from .classifiers.utils import calculate_roc_auc
+from .models.mlp import MLPModel
+from .utils import calculate_roc_auc
 
 logger = logging.getLogger(__name__)
 

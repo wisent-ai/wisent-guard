@@ -11,10 +11,10 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Import LMEvalHarnessGroundTruth for intelligent evaluation (same approach as CLI)
-from ..lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+from wisent_guard.core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 
 # Import task interface for dynamic task loading
-from ..task_interface import get_task
+from wisent_guard.core.task_interface import get_task
 
 logger = logging.getLogger(__name__)
 

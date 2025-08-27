@@ -41,7 +41,7 @@ except ImportError:
     WANDB_AVAILABLE = False
 from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
 from wisent_guard.core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
-from wisent_guard.core.optuna import data_utils, metrics
+from wisent_guard.core.optuna.steering import data_utils, metrics
 from wisent_guard.core.response import Response
 from wisent_guard.core.steering_methods.dac import DAC
 from wisent_guard.core.task_interface import get_task

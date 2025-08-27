@@ -18,7 +18,7 @@ from wisent_guard.core.contrastive_pairs.contrastive_pair_set import Contrastive
 from wisent_guard.core.response import Response
 from wisent_guard.core.steering_methods.dac import DAC
 
-from . import data_utils, metrics
+from wisent_guard.core.optuna.steering import data_utils, metrics
 
 logger = logging.getLogger(__name__)
 

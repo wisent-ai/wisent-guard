@@ -14,7 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from tqdm import tqdm
 
-from . import data_utils
+from wisent_guard.core.optuna.steering import data_utils
 
 logger = logging.getLogger(__name__)
 
