@@ -9,7 +9,7 @@ from .activation_generator import ActivationGenerator, GenerationConfig, Activat
 
 from .classifier_cache import ClassifierCache, CacheConfig, CacheMetadata
 
-from .optuna_classifier_optimizer import OptunaClassifierOptimizer, OptimizationConfig, OptimizationResult
+from .optuna_classifier_optimizer import OptunaClassifierOptimizer, ClassifierOptimizationConfig, OptimizationResult
 
 __all__ = [
     # Activation generation
@@ -22,6 +22,6 @@ __all__ = [
     "CacheMetadata",
     # Optuna optimization
     "OptunaClassifierOptimizer",
-    "OptimizationConfig",
+    "ClassifierOptimizationConfig",
     "OptimizationResult",
 ]

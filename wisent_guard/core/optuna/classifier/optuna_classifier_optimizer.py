@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class OptimizationConfig:
+class ClassifierOptimizationConfig:
     """Configuration for Optuna classifier optimization."""
 
     # Model configuration
@@ -154,7 +154,10 @@ class OptunaClassifierOptimizer:
     """
 
     def __init__(
-        self, optimization_config: OptimizationConfig, generation_config: GenerationConfig, cache_config: CacheConfig
+        self,
+        optimization_config: ClassifierOptimizationConfig,
+        generation_config: GenerationConfig,
+        cache_config: CacheConfig,
     ):
         self.opt_config = optimization_config
         self.gen_config = generation_config

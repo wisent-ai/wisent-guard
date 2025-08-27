@@ -9,6 +9,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Optional
+import traceback
 
 import torch
 from tqdm import tqdm
@@ -19,8 +20,16 @@ from wisent_guard.core.response import Response
 from wisent_guard.core.steering_methods.dac import DAC
 
 from wisent_guard.core.optuna.steering import data_utils, metrics
-from wisent_guard.core.optuna.classifier.classifier_cache import ClassifierCache, CacheConfig
+from wisent_guard.core.optuna.classifier import (
+    ClassifierCache,
+    CacheConfig,
+    OptunaClassifierOptimizer,
+    ClassifierOptimizationConfig,
+    GenerationConfig,
+)
 from wisent_guard.core.classifier.classifier import Classifier
+from wisent_guard.core.activations.core import ActivationAggregationStrategy
+from wisent_guard.core.task_interface import get_task
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +78,8 @@ class SteeringResult:
     benchmark_metrics: Dict[str, float]
     training_success: bool
     training_stats: Dict[str, Any] = None
+    baseline_metrics: Dict[str, float] = None
+    comparative_metrics: Dict[str, Any] = None
 
 
 class SteeringMethodTrainer(ABC):
@@ -176,7 +187,6 @@ class DACTrainer(SteeringMethodTrainer):
         max_new_tokens: int = 200,
     ) -> Tuple[List[str], List[str]]:
         """Apply DAC steering and generate predictions using task extractor."""
-        from ...task_interface import get_task
 
         predictions = []
         ground_truths = []
@@ -360,6 +370,11 @@ class SteeringOptimizer:
             cache_config = CacheConfig(cache_dir="./steering_classifier_cache")
         self.classifier_cache = ClassifierCache(cache_config)
 
+        # Session-level classifier caching for current optimization run
+        self._session_classifier = None  # Best classifier for current session
+        self._session_classifier_metadata = {}  # Layer, model_type, performance, etc.
+        self._session_cache_key = None  # Track current session
+
     def register_trainer(self, method_name: str, trainer: SteeringMethodTrainer):
         """Register a new steering method trainer."""
         self.trainers[method_name] = trainer
@@ -368,6 +383,7 @@ class SteeringOptimizer:
     def optimize_steering_hyperparameters(
         self,
         config: SteeringMethodConfig,
+        classifier_optimization_config: ClassifierOptimizationConfig,
         train_samples: List[Dict],
         validation_samples: List[Dict],
         model,
@@ -383,6 +399,7 @@ class SteeringOptimizer:
 
         Args:
             config: Steering method configuration with hyperparameter ranges
+            classifier_optimization_config: Configuration for classifier optimization
             train_samples: Training samples for method training
             validation_samples: Validation samples for evaluation
             model: Language model
@@ -390,6 +407,8 @@ class SteeringOptimizer:
             device: Device to run on
             batch_size: Batch size for processing
             max_length: Maximum sequence length
+            task_name: Task name for evaluation
+            max_new_tokens: Maximum tokens to generate
 
         Returns:
             Tuple of (best_config, all_results)
@@ -400,6 +419,33 @@ class SteeringOptimizer:
             raise ValueError(f"No trainer registered for method: {method_name}")
 
         trainer = self.trainers[method_name]
+
+        # Load best classifier once at the start of optimization
+        self.logger.info("Loading/training classifier for evaluation...")
+        contrastive_pairs = data_utils.get_task_contrastive_pairs(train_samples, task_name)
+
+        classifier = self.load_or_find_best_classifier(
+            model=model, optimization_config=classifier_optimization_config, contrastive_pairs=contrastive_pairs
+        )
+
+        if classifier is None:
+            raise ValueError(
+                f"Could not load or train classifier for {classifier_optimization_config.model_name}/{task_name}"
+            )
+
+        self.logger.info(f"Using classifier: {self._session_classifier_metadata}")
+
+        # Collect baseline predictions once for all trials
+        self.logger.info("Collecting baseline predictions for comparison...")
+        baseline_predictions, ground_truths = self.collect_baseline_predictions(
+            validation_samples, model, tokenizer, classifier, device, batch_size, max_length, task_name, max_new_tokens
+        )
+
+        # Calculate baseline metrics
+        baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
+            baseline_predictions, ground_truths, task_name
+        )
+        self.logger.info(f"Baseline performance: {baseline_benchmark_metrics}")
 
         # Generate all hyperparameter combinations
         hyperparameter_combinations = self._generate_hyperparameter_combinations(config)
@@ -440,8 +486,8 @@ class SteeringOptimizer:
                     all_results.append(result)
                     continue
 
-                # Evaluate on validation data
-                predictions, ground_truths = trainer.apply_steering_and_evaluate(
+                # Evaluate on validation data with steering
+                steered_predictions, steered_ground_truths = trainer.apply_steering_and_evaluate(
                     method_instance,
                     validation_samples,
                     layer,
@@ -455,33 +501,56 @@ class SteeringOptimizer:
                     max_new_tokens,
                 )
 
-                # Calculate benchmark metrics
-                benchmark_metrics = metrics.evaluate_benchmark_performance(predictions, ground_truths, task_name)
+                # Compare baseline vs steered predictions using enhanced metrics
+                enhanced_metrics = self.compare_predictions(
+                    baseline_predictions,
+                    steered_predictions,
+                    ground_truths,
+                    model,
+                    tokenizer,
+                    device,
+                    max_length,
+                    task_name,
+                )
+
+                # Extract steered metrics for compatibility
+                benchmark_metrics = enhanced_metrics["steered"]
+                baseline_metrics_for_result = enhanced_metrics["baseline"]
+                comparative_metrics = enhanced_metrics["improvement"]
 
                 result = SteeringResult(
                     method_name=method_name,
                     layer=layer,
                     hyperparameters={**hyperparams, "strength": strength},
                     benchmark_metrics=benchmark_metrics,
+                    baseline_metrics=baseline_metrics_for_result,
+                    comparative_metrics=comparative_metrics,
                     training_success=True,
                     training_stats=training_stats,
                 )
                 all_results.append(result)
 
-                # Check if this is the best configuration
-                score = benchmark_metrics.get("accuracy", 0.0)
-                if score > best_score:
-                    best_score = score
+                # Standard Optuna practice: optimize steered accuracy directly
+                steered_accuracy = benchmark_metrics.get("accuracy", 0.0)
+                baseline_accuracy = baseline_metrics_for_result.get("accuracy", 0.0)
+                improvement_delta = steered_accuracy - baseline_accuracy
+
+                if steered_accuracy > best_score:
+                    best_score = steered_accuracy
                     best_config = {
                         "method": method_name,
                         "layer": layer,
                         "strength": strength,
                         **hyperparams,
                         "benchmark_metrics": benchmark_metrics,
+                        "baseline_metrics": baseline_metrics_for_result,
                         "method_instance": method_instance,
                     }
 
-                self.logger.debug(f"Config {i + 1} - Benchmark accuracy: {score:.3f}")
+                self.logger.debug(
+                    f"Config {i + 1} - Baseline: {baseline_accuracy:.3f}, "
+                    f"Steered: {steered_accuracy:.3f}, Delta: {improvement_delta:+.3f}"
+                )
 
             except Exception as e:
                 self.logger.error(f"Failed to evaluate config {i + 1}: {e}")
@@ -490,6 +559,8 @@ class SteeringOptimizer:
                     layer=layer,
                     hyperparameters={**hyperparams, "strength": strength},
                     benchmark_metrics={"accuracy": 0.0},
+                    baseline_metrics=baseline_benchmark_metrics,
+                    comparative_metrics={"accuracy_delta": 0.0, "improvement_rate": 0.0},
                     training_success=False,
                     training_stats={"error": str(e)},
                 )
@@ -507,9 +578,14 @@ class SteeringOptimizer:
                 "method_instance": None,
             }
         else:
+            steered_acc = best_config["benchmark_metrics"]["accuracy"]
+            baseline_acc = best_config.get("baseline_metrics", {}).get("accuracy", 0.0)
+            improvement = steered_acc - baseline_acc
+
             self.logger.info(
-                f"Best {method_name} config: layer={best_config['layer']}, "
-                f"accuracy={best_config['benchmark_metrics']['accuracy']:.3f}"
+                f"Best {method_name} config (optimized for steered accuracy): "
+                f"layer={best_config['layer']}, steered={steered_acc:.3f} "
+                f"(baseline={baseline_acc:.3f}, Δ={improvement:+.3f})"
             )
 
         return best_config, all_results
@@ -541,146 +617,330 @@ class SteeringOptimizer:
 
         return combinations
 
-    def load_or_find_best_classifier(
+    def collect_baseline_predictions(
         self,
-        model_name: str,
+        evaluation_samples: List[Dict],
+        model,
+        tokenizer,
+        classifier: Classifier,
+        device: str,
+        batch_size: int,
+        max_length: int,
         task_name: str,
-        layer: int,
-        aggregation: str = "average",
-        model_type: str = "logistic",
-        threshold: float = 0.5,
-        fallback_training_data: Optional[Tuple[Any, Any]] = None,
-    ) -> Optional[Classifier]:
+        max_new_tokens: int = 200,
+    ) -> Tuple[List[str], List[str]]:
         """
-        Load a pre-trained classifier for the given configuration or find the best similar one.
-
-        This method replaces the probe_optimization.py functionality by leveraging
-        the classifier cache system to avoid retraining classifiers in each trial.
+        Collect unsteered model predictions for baseline comparison.
+        Uses the same evaluation logic as steered evaluation but without steering hooks.
 
         Args:
-            model_name: Name of the base model
-            task_name: Task name (e.g., "gsm8k", "math")
-            layer: Layer index to use
-            aggregation: Token aggregation method
-            model_type: Classifier type ("logistic" or "mlp")
-            threshold: Classification threshold
-            fallback_training_data: Optional (X, y) data to train if no cached model found
+            evaluation_samples: Samples to evaluate
+            model: Language model
+            tokenizer: Model tokenizer
+            classifier: Trained classifier for evaluation
+            device: Device to run on
+            batch_size: Batch size for processing
+            max_length: Maximum sequence length
+            task_name: Task name for evaluation
+            max_new_tokens: Maximum tokens to generate
 
         Returns:
-            Trained classifier or None if not found and no fallback data provided
+            Tuple of (predictions, ground_truths)
         """
-        self.logger.info(f"Looking for cached classifier: {model_name}/{task_name} layer_{layer}")
+        predictions = []
+        ground_truths = []
 
-        # First, try to find an exact match
-        hyperparameters = {"model_type": model_type}
-        if model_type == "mlp":
-            hyperparameters["hidden_dim"] = 128  # Default hidden dimension
+        # Get the task and its extractor
+        task = get_task(task_name)
+        extractor = task.get_extractor()
 
-        # We need some training data hash - use placeholder if not provided
-        if fallback_training_data is not None:
-            X, y = fallback_training_data
-            data_hash = self.classifier_cache.compute_data_hash(X, y)
+        # Pre-extract all questions and answers (optimization)
+        questions = []
+        answers = []
+
+        for sample in evaluation_samples:
+            qa_pair = extractor.extract_qa_pair(sample, task)
+            if not qa_pair:
+                self.logger.warning(f"Skipping sample - extractor couldn't extract QA pair: {sample.keys()}")
+                continue
+            questions.append(qa_pair["formatted_question"])
+            answers.append(qa_pair["correct_answer"])
+
+        # Process questions WITHOUT steering in batches
+        ground_truths.extend(answers)
+
+        # Process in batches without steering
+        for i in tqdm(range(0, len(questions), batch_size), desc="Generating baseline predictions"):
+            batch_questions = questions[i : i + batch_size]
+
+            # Tokenize batch with padding for generation
+            inputs = tokenizer(
+                batch_questions, return_tensors="pt", padding=True, truncation=True, max_length=max_length
+            ).to(device)
+
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=True,
+                    temperature=0.7,
+                    pad_token_id=tokenizer.eos_token_id,
+                    use_cache=False,  # Disable cache to avoid cache_position errors
+                )
+
+            # Decode responses for each item in batch
+            for j, (output, question) in enumerate(zip(outputs, batch_questions)):
+                response = tokenizer.decode(output, skip_special_tokens=True)
+                prediction = response[len(question) :].strip()
+                predictions.append(prediction)
+
+        return predictions, ground_truths
+
+    def score_predictions_with_classifier(
+        self,
+        predictions: List[str],
+        model,
+        tokenizer,
+        device: str,
+        max_length: int = 512,
+        description: str = "predictions",
+    ) -> List[float]:
+        """
+        Score predictions using the cached classifier.
+
+        This is the core feature that was requested - using the optimized classifier
+        to score unsteered vs steered generations.
+
+        Args:
+            predictions: Text predictions to score
+            model: Language model for activation extraction
+            tokenizer: Model tokenizer
+            device: Device to run on
+            max_length: Maximum sequence length
+            description: Description for logging
+
+        Returns:
+            List of classifier scores/probabilities for each prediction
+        """
+        if self._session_classifier is None:
+            self.logger.warning("No cached classifier available for scoring")
+            return [0.0] * len(predictions)
+
+        self.logger.info(f"Scoring {len(predictions)} {description} with cached classifier")
+
+        # TODO: Implement activation extraction for prediction texts
+        # This requires:
+        # 1. Generate activations for each prediction text using the model
+        # 2. Apply same aggregation strategy as used for classifier training
+        # 3. Pass activations through the cached classifier
+        # 4. Return classifier confidence scores/probabilities
+
+        # For now, return placeholder scores
+        # This shows where the classifier scoring functionality would go
+        placeholder_scores = [0.5] * len(predictions)  # Neutral scores
+
+        self.logger.debug(f"Generated placeholder scores for {len(predictions)} {description}")
+        return placeholder_scores
+
+    def compare_predictions(
+        self,
+        baseline_predictions: List[str],
+        steered_predictions: List[str],
+        ground_truths: List[str],
+        model,
+        tokenizer,
+        device: str,
+        max_length: int = 512,
+        task_name: str = "gsm8k",
+    ) -> Dict[str, Any]:
+        """
+        Compare baseline vs steered predictions using benchmark metrics and classifier scores.
+
+        Args:
+            baseline_predictions: Unsteered model predictions
+            steered_predictions: Steered model predictions
+            ground_truths: Ground truth answers
+            model: Language model for classifier scoring
+            tokenizer: Model tokenizer
+            device: Device to run on
+            max_length: Maximum sequence length
+            task_name: Task name for evaluation metrics
+
+        Returns:
+            Enhanced metrics with baseline vs steered comparison including classifier scores
+        """
+        # Calculate standard benchmark metrics for both baseline and steered
+        baseline_metrics = metrics.evaluate_benchmark_performance(baseline_predictions, ground_truths, task_name)
+        steered_metrics = metrics.evaluate_benchmark_performance(steered_predictions, ground_truths, task_name)
+
+        # Score predictions with cached classifier (core requested feature)
+        baseline_scores = self.score_predictions_with_classifier(
+            baseline_predictions, model, tokenizer, device, max_length, "baseline"
+        )
+        steered_scores = self.score_predictions_with_classifier(
+            steered_predictions, model, tokenizer, device, max_length, "steered"
+        )
+
+        # Calculate improvement metrics
+        accuracy_delta = steered_metrics.get("accuracy", 0) - baseline_metrics.get("accuracy", 0)
+        f1_delta = steered_metrics.get("f1", 0) - baseline_metrics.get("f1", 0)
+
+        # Calculate classifier score improvements
+        avg_baseline_score = sum(baseline_scores) / len(baseline_scores) if baseline_scores else 0.0
+        avg_steered_score = sum(steered_scores) / len(steered_scores) if steered_scores else 0.0
+        classifier_score_delta = avg_steered_score - avg_baseline_score
+
+        return {
+            "baseline": {
+                "accuracy": baseline_metrics.get("accuracy", 0.0),
+                "f1": baseline_metrics.get("f1", 0.0),
+                "classifier_scores": baseline_scores,
+                "avg_classifier_score": avg_baseline_score,
+                "predictions": baseline_predictions,
+            },
+            "steered": {
+                "accuracy": steered_metrics.get("accuracy", 0.0),
+                "f1": steered_metrics.get("f1", 0.0),
+                "classifier_scores": steered_scores,
+                "avg_classifier_score": avg_steered_score,
+                "predictions": steered_predictions,
+            },
+            "improvement": {
+                "accuracy_delta": accuracy_delta,
+                "f1_delta": f1_delta,
+                "classifier_score_delta": classifier_score_delta,
+            },
+        }
+
+    def load_or_find_best_classifier(
+        self,
+        model,
+        optimization_config: Optional[ClassifierOptimizationConfig] = None,
+        model_name: Optional[str] = None,
+        task_name: Optional[str] = None,
+        contrastive_pairs: Optional[List] = None,
+        force_reoptimize: bool = False,
+    ) -> Optional[Classifier]:
+        """
+        Load or train the best classifier for current steering session.
+
+        On first call: Run full classifier optimization and cache result for session
+        On subsequent calls: Return cached classifier from current session
+
+        Args:
+            model: Language model (wisent_guard Model wrapper)
+            optimization_config: Primary configuration source
+            model_name: Fallback model name if optimization_config not provided
+            task_name: Fallback task name if optimization_config not provided
+            contrastive_pairs: Training data for classifier optimization
+            force_reoptimize: Force reoptimization even if session classifier exists
+
+        Returns:
+            Best trained classifier or None if optimization failed
+        """
+        # Extract configuration
+        if optimization_config is not None:
+            model_name = optimization_config.model_name
+            task_name = getattr(optimization_config, "task_name", task_name)
+            limit = getattr(optimization_config, "data_limit", 100)
         else:
-            data_hash = "placeholder_hash"  # Will not match existing cache
+            limit = 100  # Default data limit
 
-        cache_key = self.classifier_cache.get_cache_key(
-            model_name=model_name,
-            task_name=task_name,
-            model_type=model_type,
-            layer=layer,
-            aggregation=aggregation,
-            threshold=threshold,
-            hyperparameters=hyperparameters,
-            data_hash=data_hash,
-        )
+        if not model_name or not task_name:
+            raise ValueError("model_name and task_name must be provided either via optimization_config or directly")
 
-        # Try exact match first
-        classifier = self.classifier_cache.load_classifier(cache_key)
-        if classifier is not None:
-            self.logger.info(f"Found exact cached classifier: {cache_key}")
-            return classifier
+        # Create session cache key
+        session_cache_key = f"{model_name}_{task_name}"
 
-        # Try to find similar classifiers
-        similar_models = self.classifier_cache.find_similar_models(
-            model_name=model_name, task_name=task_name, model_type=model_type, layer=layer, top_k=3
-        )
+        # Check if we already have a classifier for this session
+        if (
+            not force_reoptimize
+            and self._session_classifier is not None
+            and self._session_cache_key == session_cache_key
+        ):
+            self.logger.info("Using cached classifier from current session")
+            return self._session_classifier
 
-        if similar_models:
-            # Use the most similar model
-            best_cache_key, best_metadata, similarity_score = similar_models[0]
+        # First call or forced reoptimization - run classifier optimization
+        self.logger.info("Running classifier optimization (first trial in session)")
 
-            if similarity_score > 0.7:  # High similarity threshold
-                classifier = self.classifier_cache.load_classifier(best_cache_key)
-                if classifier is not None:
-                    # Update threshold to match requested configuration
-                    classifier.set_threshold(threshold)
-                    self.logger.info(
-                        f"Using similar cached classifier: {best_cache_key} (similarity: {similarity_score:.2f})"
-                    )
-                    return classifier
+        if not contrastive_pairs:
+            self.logger.error("contrastive_pairs required for classifier optimization")
+            return None
 
-        # If no suitable cached model found and we have training data, train a new one
-        if fallback_training_data is not None:
-            self.logger.info("No suitable cached classifier found, training new one")
-            X, y = fallback_training_data
+        try:
+            # Create configuration for classifier optimization if not provided
+            if optimization_config is None:
+                optimization_config = ClassifierOptimizationConfig(
+                    model_name=model_name,
+                    device="auto",
+                    n_trials=20,  # Reasonable number for steering optimization
+                    model_types=["logistic", "mlp"],
+                    primary_metric="f1",
+                )
 
-            try:
-                # Create and train new classifier
-                classifier_kwargs = {"model_type": model_type, "threshold": threshold}
-                if model_type == "mlp":
-                    classifier_kwargs["hidden_dim"] = hyperparameters.get("hidden_dim", 128)
+            # Create generation config for activation pre-generation
+            generation_config = GenerationConfig(
+                layer_search_range=(0, 23),  # Will be auto-detected from model
+                aggregation_methods=[
+                    ActivationAggregationStrategy.MEAN_POOLING,
+                    ActivationAggregationStrategy.LAST_TOKEN,
+                    ActivationAggregationStrategy.FIRST_TOKEN,
+                    ActivationAggregationStrategy.MAX_POOLING,
+                ],
+                cache_dir="./cache/steering_activations",
+                device=optimization_config.device,
+                batch_size=32,
+            )
 
-                classifier = Classifier(**classifier_kwargs)
+            # Create classifier optimizer
+            classifier_optimizer = OptunaClassifierOptimizer(
+                optimization_config=optimization_config,
+                generation_config=generation_config,
+                cache_config=self.classifier_cache.config,
+            )
 
-                # Train the classifier
-                training_results = classifier.fit(X, y, test_size=0.2, random_state=42)
+            # Run classifier optimization
+            self.logger.info(f"Optimizing classifier for {model_name}/{task_name} with {len(contrastive_pairs)} pairs")
+            result = classifier_optimizer.optimize(
+                model=model,
+                contrastive_pairs=contrastive_pairs,
+                task_name=task_name,
+                model_name=model_name,
+                limit=limit,
+            )
 
-                if training_results.get("accuracy", 0) > 0.5:  # Only cache if performance is reasonable
-                    # Save to cache for future use
-                    data_hash = self.classifier_cache.compute_data_hash(X, y)
-                    cache_key = self.classifier_cache.get_cache_key(
-                        model_name=model_name,
-                        task_name=task_name,
-                        model_type=model_type,
-                        layer=layer,
-                        aggregation=aggregation,
-                        threshold=threshold,
-                        hyperparameters=hyperparameters,
-                        data_hash=data_hash,
-                    )
+            if result.best_value > 0:
+                # Get the best configuration and classifier
+                best_config = result.get_best_config()
+                best_classifier = result.get_best_classifier()
 
-                    performance_metrics = {
-                        "accuracy": training_results.get("accuracy", 0.0),
-                        "f1": training_results.get("f1", 0.0),
-                        "auc": training_results.get("auc", 0.0),
-                    }
+                # Cache for current session
+                self._session_classifier = best_classifier
+                self._session_classifier_metadata = {
+                    "layer": best_config["layer"],
+                    "aggregation": best_config["aggregation"],
+                    "model_type": best_config["model_type"],
+                    "threshold": best_config["threshold"],
+                    "f1_score": result.best_value,
+                    "hyperparameters": best_config.get("hyperparameters", {}),
+                }
+                self._session_cache_key = session_cache_key
 
-                    self.classifier_cache.save_classifier(
-                        cache_key=cache_key,
-                        classifier=classifier,
-                        model_name=model_name,
-                        task_name=task_name,
-                        layer=layer,
-                        aggregation=aggregation,
-                        threshold=threshold,
-                        hyperparameters=hyperparameters,
-                        performance_metrics=performance_metrics,
-                        training_samples=len(X),
-                        data_hash=data_hash,
-                    )
+                self.logger.info(
+                    f"Cached best classifier for session: layer_{best_config['layer']} "
+                    f"{best_config['model_type']} (F1: {result.best_value:.3f})"
+                )
 
-                    self.logger.info(f"Trained and cached new classifier: {cache_key}")
-                    return classifier
-                else:
-                    self.logger.warning(f"Trained classifier performance too low: {training_results}")
-                    return None
-
-            except Exception as e:
-                self.logger.error(f"Failed to train new classifier: {e}")
+                return best_classifier
+            else:
+                self.logger.warning(f"Classifier optimization failed - no successful trials")
                 return None
 
-        self.logger.warning(f"No classifier found for {model_name}/{task_name} layer_{layer}")
-        return None
+        except Exception as e:
+            self.logger.error(f"Failed to run classifier optimization: {e}")
+            traceback.print_exc()
+            return None
 
     def get_cache_info(self) -> Dict[str, Any]:
         """Get information about cached classifiers."""

@@ -31,7 +31,7 @@ from wisent_guard.core.optuna.steering.optuna_pipeline import OptimizationConfig
 # Classifier optimization components
 from wisent_guard.core.optuna.classifier import (
     OptunaClassifierOptimizer,
-    OptimizationConfig as ClassifierOptimizationConfig,
+    ClassifierOptimizationConfig as ClassifierOptimizationConfig,
     GenerationConfig,
     CacheConfig,
     ActivationGenerator,
