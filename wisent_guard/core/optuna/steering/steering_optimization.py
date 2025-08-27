@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Optional
 import traceback
 
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -441,9 +442,12 @@ class SteeringOptimizer:
             validation_samples, model, tokenizer, classifier, device, batch_size, max_length, task_name, max_new_tokens
         )
 
-        # Calculate baseline metrics
+        # Calculate baseline metrics with integrated classifier scoring
+        classifier_scorer = lambda predictions, description: self.score_predictions_with_classifier(
+            predictions, model, tokenizer, device, max_length, description
+        )
         baseline_benchmark_metrics = metrics.evaluate_benchmark_performance(
-            baseline_predictions, ground_truths, task_name
+            baseline_predictions, ground_truths, task_name, classifier_scorer=classifier_scorer
         )
         self.logger.info(f"Baseline performance: {baseline_benchmark_metrics}")
 
@@ -696,6 +700,91 @@ class SteeringOptimizer:
 
         return predictions, ground_truths
 
+    def _extract_activation_for_text(
+        self,
+        text: str,
+        layer_index: int,
+        aggregation_strategy: str,
+        model,
+        tokenizer,
+        device: str,
+        max_length: int = 512,
+    ) -> torch.Tensor:
+        """
+        Extract activation from text at specified layer with aggregation.
+
+        Args:
+            text: Input text to extract activation from
+            layer_index: Layer index to extract from
+            aggregation_strategy: Aggregation strategy string (e.g., "mean_pooling")
+            model: Language model
+            tokenizer: Model tokenizer
+            device: Device to run on
+            max_length: Maximum sequence length
+
+        Returns:
+            Aggregated activation tensor
+        """
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length).to(device)
+        activations = []
+
+        def hook(module, input, output):
+            # Extract hidden states from the layer
+            hidden_states = output[0] if isinstance(output, tuple) else output
+            activations.append(hidden_states.detach().cpu())
+
+        # Handle different model architectures
+        if hasattr(model, "model") and hasattr(model.model, "layers"):
+            # LLaMA-style models
+            layer_module = model.model.layers[layer_index]
+        elif hasattr(model, "transformer") and hasattr(model.transformer, "h"):
+            # GPT2-style models
+            layer_module = model.transformer.h[layer_index]
+        else:
+            raise ValueError("Unsupported model architecture for activation extraction")
+
+        # Register hook and run forward pass
+        handle = layer_module.register_forward_hook(hook)
+        try:
+            with torch.no_grad():
+                _ = model(**inputs)
+        finally:
+            handle.remove()
+
+        if not activations:
+            raise ValueError("No activations extracted")
+
+        # Get the activation tensor [1, seq_len, hidden_dim]
+        activation_tensor = activations[0]
+
+        # Apply aggregation strategy
+        if (
+            aggregation_strategy == "mean_pooling"
+            or aggregation_strategy == ActivationAggregationStrategy.MEAN_POOLING.value
+        ):
+            aggregated = torch.mean(activation_tensor, dim=1)  # [1, hidden_dim]
+        elif (
+            aggregation_strategy == "last_token"
+            or aggregation_strategy == ActivationAggregationStrategy.LAST_TOKEN.value
+        ):
+            aggregated = activation_tensor[:, -1, :]  # [1, hidden_dim]
+        elif (
+            aggregation_strategy == "first_token"
+            or aggregation_strategy == ActivationAggregationStrategy.FIRST_TOKEN.value
+        ):
+            aggregated = activation_tensor[:, 0, :]  # [1, hidden_dim]
+        elif (
+            aggregation_strategy == "max_pooling"
+            or aggregation_strategy == ActivationAggregationStrategy.MAX_POOLING.value
+        ):
+            aggregated = torch.max(activation_tensor, dim=1)[0]  # [1, hidden_dim]
+        else:
+            # Default to mean pooling if unknown
+            self.logger.warning(f"Unknown aggregation strategy {aggregation_strategy}, using mean pooling")
+            aggregated = torch.mean(activation_tensor, dim=1)
+
+        return aggregated.squeeze(0)  # Return [hidden_dim] tensor
+
     def score_predictions_with_classifier(
         self,
         predictions: List[str],
@@ -724,23 +813,88 @@ class SteeringOptimizer:
         """
         if self._session_classifier is None:
             self.logger.warning("No cached classifier available for scoring")
-            return [0.0] * len(predictions)
+            return [0.5] * len(predictions)  # Return neutral scores
 
-        self.logger.info(f"Scoring {len(predictions)} {description} with cached classifier")
+        if not predictions:
+            self.logger.debug("No predictions to score")
+            return []
 
-        # TODO: Implement activation extraction for prediction texts
-        # This requires:
-        # 1. Generate activations for each prediction text using the model
-        # 2. Apply same aggregation strategy as used for classifier training
-        # 3. Pass activations through the cached classifier
-        # 4. Return classifier confidence scores/probabilities
+        # Get classifier metadata
+        layer = self._session_classifier_metadata.get("layer", 12)
+        aggregation = self._session_classifier_metadata.get("aggregation", "mean_pooling")
 
-        # For now, return placeholder scores
-        # This shows where the classifier scoring functionality would go
-        placeholder_scores = [0.5] * len(predictions)  # Neutral scores
+        self.logger.info(
+            f"Scoring {len(predictions)} {description} with cached classifier (layer={layer}, aggregation={aggregation})"
+        )
 
-        self.logger.debug(f"Generated placeholder scores for {len(predictions)} {description}")
-        return placeholder_scores
+        confidence_scores = []
+
+        # Process predictions in batches for efficiency
+        batch_size = 8  # Smaller batch size to avoid OOM
+        for i in range(0, len(predictions), batch_size):
+            batch_predictions = predictions[i : i + batch_size]
+            batch_activations = []
+
+            # Extract activations for each prediction in the batch
+            for pred_text in batch_predictions:
+                try:
+                    # Extract activation for this prediction text
+                    activation = self._extract_activation_for_text(
+                        text=pred_text,
+                        layer_index=layer,
+                        aggregation_strategy=aggregation,
+                        model=model,
+                        tokenizer=tokenizer,
+                        device=device,
+                        max_length=max_length,
+                    )
+                    batch_activations.append(activation)
+
+                except Exception as e:
+                    self.logger.debug(f"Failed to extract activation for prediction: {e}")
+                    # Use neutral score for failed extractions
+                    confidence_scores.append(0.5)
+                    continue
+
+            if batch_activations:
+                try:
+                    # Stack activations into batch tensor
+                    batch_tensor = torch.stack(batch_activations)
+
+                    # Convert to numpy for sklearn classifier
+                    batch_numpy = batch_tensor.detach().cpu().numpy()
+
+                    # Get prediction probabilities from classifier
+                    probabilities = self._session_classifier.predict_proba(batch_numpy)
+
+                    # Extract confidence scores (probability for positive class)
+                    # Assuming binary classification with class 1 as positive
+                    if probabilities.shape[1] > 1:
+                        batch_scores = probabilities[:, 1].tolist()  # Probability of positive class
+                    else:
+                        batch_scores = probabilities[:, 0].tolist()  # Single class probability
+
+                    confidence_scores.extend(batch_scores)
+
+                except Exception as e:
+                    self.logger.warning(f"Failed to score batch of activations: {e}")
+                    # Add neutral scores for failed batch
+                    confidence_scores.extend([0.5] * len(batch_activations))
+
+        # Ensure we have scores for all predictions
+        while len(confidence_scores) < len(predictions):
+            confidence_scores.append(0.5)  # Pad with neutral scores if needed
+
+        # Truncate if we have too many scores (shouldn't happen)
+        confidence_scores = confidence_scores[: len(predictions)]
+
+        # Log statistics
+        avg_score = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.5
+        self.logger.debug(
+            f"Generated {len(confidence_scores)} classifier confidence scores for {description} (avg={avg_score:.3f})"
+        )
+
+        return confidence_scores
 
     def compare_predictions(
         self,
@@ -769,17 +923,26 @@ class SteeringOptimizer:
         Returns:
             Enhanced metrics with baseline vs steered comparison including classifier scores
         """
-        # Calculate standard benchmark metrics for both baseline and steered
-        baseline_metrics = metrics.evaluate_benchmark_performance(baseline_predictions, ground_truths, task_name)
-        steered_metrics = metrics.evaluate_benchmark_performance(steered_predictions, ground_truths, task_name)
+        # Create classifier scorer function for metrics integration
+        classifier_scorer = lambda predictions, description: self.score_predictions_with_classifier(
+            predictions, model, tokenizer, device, max_length, description
+        )
 
-        # Score predictions with cached classifier (core requested feature)
-        baseline_scores = self.score_predictions_with_classifier(
-            baseline_predictions, model, tokenizer, device, max_length, "baseline"
+        # Calculate standard benchmark metrics with integrated classifier confidence scores
+        baseline_metrics = metrics.evaluate_benchmark_performance(
+            baseline_predictions, ground_truths, task_name, classifier_scorer=classifier_scorer
         )
-        steered_scores = self.score_predictions_with_classifier(
-            steered_predictions, model, tokenizer, device, max_length, "steered"
+        steered_metrics = metrics.evaluate_benchmark_performance(
+            steered_predictions, ground_truths, task_name, classifier_scorer=classifier_scorer
         )
+
+        # Extract classifier scores from integrated metrics
+        baseline_scores = [
+            detail.get("classifier_confidence", 0.5) for detail in baseline_metrics.get("evaluation_details", [])
+        ]
+        steered_scores = [
+            detail.get("classifier_confidence", 0.5) for detail in steered_metrics.get("evaluation_details", [])
+        ]
 
         # Calculate improvement metrics
         accuracy_delta = steered_metrics.get("accuracy", 0) - baseline_metrics.get("accuracy", 0)
@@ -913,7 +1076,7 @@ class SteeringOptimizer:
             if result.best_value > 0:
                 # Get the best configuration and classifier
                 best_config = result.get_best_config()
-                best_classifier = result.get_best_classifier()
+                best_classifier = result.best_classifier
 
                 # Cache for current session
                 self._session_classifier = best_classifier

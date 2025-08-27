@@ -3,7 +3,7 @@ Evaluation metrics for comprehensive evaluation pipeline.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Callable
 
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
@@ -13,6 +13,9 @@ from wisent_guard.core.bigcode_extractors import MBPPExtractor
 
 # Import LMEvalHarnessGroundTruth for intelligent evaluation (newer approach used by CLI)
 from wisent_guard.core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
+from wisent_guard.core.task_interface import get_task
+from wisent_guard.core.tasks.file_task import FileTask
+
 from .bigcode_evaluator_wrapper import OptunaBigCodeEvaluator
 
 logger = logging.getLogger(__name__)
@@ -34,9 +37,6 @@ def evaluate_response_correctness(response: str, expected_answer: str, task_name
     # Check if this is a file-based task (custom dataset loaded from JSON)
     # For file-based tasks, use exact string matching to avoid false positives
     try:
-        from ..task_interface import get_task
-        from ..tasks.file_task import FileTask
-
         task = get_task(task_name, limit=1)
         if isinstance(task, FileTask):
             logger.debug(f"Using exact match for file-based task '{task_name}'")
@@ -70,7 +70,11 @@ def evaluate_response_correctness(response: str, expected_answer: str, task_name
 
 
 def evaluate_benchmark_performance(
-    predictions: List[str], ground_truths: List[str], task_name: str = None, task_docs: List[Dict] = None
+    predictions: List[str],
+    ground_truths: List[str],
+    task_name: str = None,
+    task_docs: List[Dict] = None,
+    classifier_scorer: Optional[Callable[[List[str], str], List[float]]] = None,
 ) -> Dict[str, float]:
     """
     Evaluate benchmark performance using LMEvalHarnessGroundTruth (same approach as CLI).
@@ -81,6 +85,7 @@ def evaluate_benchmark_performance(
         ground_truths: List of correct answers
         task_name: Name of the task for intelligent evaluation
         task_docs: List of original task documents (required for coding tasks)
+        classifier_scorer: Optional function to score predictions with classifier for confidence scores
 
     Returns:
         Dictionary containing benchmark performance metrics
@@ -88,6 +93,17 @@ def evaluate_benchmark_performance(
     if task_name:
         # Check if this is a coding task that requires code execution evaluation
         is_coding_task = task_name.lower() in CODING_TASKS
+
+        # Calculate classifier confidence scores if classifier_scorer provided
+        classifier_confidences = None
+        if classifier_scorer is not None:
+            try:
+                logger.debug(f"Calculating classifier confidence scores for {len(predictions)} predictions")
+                classifier_confidences = classifier_scorer(predictions, f"metrics_evaluation_{task_name}")
+                logger.debug(f"Calculated {len(classifier_confidences)} confidence scores")
+            except Exception as e:
+                logger.warning(f"Failed to calculate classifier confidence scores: {e}")
+                classifier_confidences = None
 
         if is_coding_task:
             # Use BigCode execution-based evaluation for coding tasks
@@ -122,7 +138,9 @@ def evaluate_benchmark_performance(
                         "prediction": result.get("extracted_code", pred),
                         "ground_truth": ground_truths[i] if i < len(ground_truths) else "unknown",
                         "is_correct": result.get("passed", False),
-                        "confidence": 1.0,
+                        "classifier_confidence": classifier_confidences[i]
+                        if classifier_confidences and i < len(classifier_confidences)
+                        else 1.0,
                         "method": "bigcode_execution",
                         "original_prediction": pred,
                         "code_extracted": result.get("extracted_code", "") != pred,
@@ -165,7 +183,7 @@ def evaluate_benchmark_performance(
         correct_predictions = []
         evaluation_details = []
 
-        for orig_pred, extracted_pred, gt in zip(predictions, extracted_predictions, ground_truths):
+        for i, (orig_pred, extracted_pred, gt) in enumerate(zip(predictions, extracted_predictions, ground_truths)):
             try:
                 # Use the extracted prediction for evaluation
                 is_correct = evaluate_response_correctness(extracted_pred, gt, task_name)
@@ -176,7 +194,9 @@ def evaluate_benchmark_performance(
                     "prediction": extracted_pred,
                     "ground_truth": gt,
                     "is_correct": is_correct,
-                    "confidence": 1.0,  # TODO
+                    "classifier_confidence": classifier_confidences[i]
+                    if classifier_confidences and i < len(classifier_confidences)
+                    else 1.0,
                     "method": "lm_eval_harness_ground_truth",
                 }
 
@@ -197,7 +217,9 @@ def evaluate_benchmark_performance(
                     "prediction": extracted_pred,
                     "ground_truth": gt,
                     "is_correct": is_correct,
-                    "confidence": 1.0,
+                    "classifier_confidence": classifier_confidences[i]
+                    if classifier_confidences and i < len(classifier_confidences)
+                    else 1.0,
                     "method": "fallback_exact_match",
                 }
 
