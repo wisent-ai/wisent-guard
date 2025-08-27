@@ -20,6 +20,16 @@ Key components:
 """
 
 # Steering optimization components
+# Classifier optimization components
+from wisent_guard.core.optuna.classifier import (
+    ActivationGenerator,
+    CacheConfig,
+    ClassifierCache,
+    ClassifierOptimizationConfig as ClassifierOptimizationConfig,
+    GenerationConfig,
+    OptimizationResult,
+    OptunaClassifierOptimizer,
+)
 from wisent_guard.core.optuna.steering.metrics import (
     calculate_comprehensive_metrics,
     evaluate_benchmark_performance,
@@ -27,17 +37,6 @@ from wisent_guard.core.optuna.steering.metrics import (
     generate_performance_summary,
 )
 from wisent_guard.core.optuna.steering.optuna_pipeline import OptimizationConfig, OptimizationPipeline
-
-# Classifier optimization components
-from wisent_guard.core.optuna.classifier import (
-    OptunaClassifierOptimizer,
-    ClassifierOptimizationConfig as ClassifierOptimizationConfig,
-    GenerationConfig,
-    CacheConfig,
-    ActivationGenerator,
-    ClassifierCache,
-    OptimizationResult,
-)
 
 __all__ = [
     # Steering optimization

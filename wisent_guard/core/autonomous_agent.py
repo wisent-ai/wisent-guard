@@ -12,7 +12,7 @@ A model that can autonomously use wisent-guard capabilities on itself:
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from wisent_guard.core.activations import Activations, ActivationAggregationStrategy
+from wisent_guard.core.activations import ActivationAggregationStrategy, Activations
 
 from .agent.diagnose import AgentClassifierDecisionSystem, AnalysisResult, ClassifierMarketplace, ResponseDiagnostics
 from .agent.steer import ImprovementResult, ResponseSteering

@@ -9,8 +9,13 @@ from typing import Any, Dict, List, Optional
 
 import torch
 
-from .core import ContrastivePairSet, Layer, Model, SteeringMethod, SteeringType
 from wisent_guard.cli_workflows.activation_monitor import TestActivationCache
+from wisent_guard.cli_workflows.optimize import (
+    run_interactive_optimization,
+    run_smart_optimization,
+)
+
+from .core import ContrastivePairSet, Layer, Model, SteeringMethod, SteeringType
 from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
@@ -32,10 +37,6 @@ from .core.save_results import (
 from .inference import (
     generate_with_classification_and_handling,
     generate_with_multi_layer_classification_and_handling,
-)
-from wisent_guard.cli_workflows.optimize import (
-    run_interactive_optimization,
-    run_smart_optimization,
 )
 
 # Import caching infrastructure
@@ -1612,7 +1613,6 @@ def run_task_pipeline(
 
         # Create contrastive pairs using proper activation collection logic
         from wisent_guard.core.activations import ActivationAggregationStrategy, Activations, PromptConstructionStrategy
-
         from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
         )
@@ -6323,11 +6323,10 @@ def handle_generate_vector_command(args):
         model = Model(name=args.model, device=args.device)
 
         # Import activation collection logic
-        from wisent_guard.core.activations.core import ActivationAggregationStrategy
-
         from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
         )
+        from wisent_guard.core.activations.core import ActivationAggregationStrategy
         from wisent_guard.core.activations.prompts import PromptConstructionStrategy
 
         # Create activation collection logic instance

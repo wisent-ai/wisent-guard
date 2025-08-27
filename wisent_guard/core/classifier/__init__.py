@@ -1,6 +1,6 @@
-from .classifier import Classifier, ActivationClassifier
+from .classifier import ActivationClassifier, Classifier
 
 __all__ = [
-    "Classifier",
     "ActivationClassifier",
+    "Classifier",
 ]

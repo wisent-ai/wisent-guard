@@ -10,11 +10,12 @@ import json
 import logging
 import pickle
 import time
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional, Any
-from dataclasses import dataclass, asdict
+from typing import Any, Optional
 
 import torch
+
 from wisent_guard.core.classifier.classifier import Classifier
 
 logger = logging.getLogger(__name__)
@@ -395,7 +396,7 @@ class ClassifierCache:
             return {}
 
         try:
-            with open(self.metadata_file, "r") as f:
+            with open(self.metadata_file) as f:
                 data = json.load(f)
 
             metadata = {}

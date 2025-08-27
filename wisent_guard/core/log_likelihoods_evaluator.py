@@ -10,7 +10,7 @@ directly on each choice to evaluate performance against known ground truth.
 import logging
 from typing import Any, Dict, Optional
 
-from wisent_guard.core.activations import Activations, ActivationAggregationStrategy
+from wisent_guard.core.activations import ActivationAggregationStrategy, Activations
 from wisent_guard.core.layer import Layer
 
 logger = logging.getLogger(__name__)

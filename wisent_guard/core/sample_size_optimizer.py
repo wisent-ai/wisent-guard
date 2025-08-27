@@ -2,21 +2,22 @@
 Sample Size Optimizer for finding the optimal training sample size for classifiers.
 """
 
-import os
 import json
-import time
 import logging
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Dict, List, Tuple, Optional, Any
+import os
+import time
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+
+from wisent_guard.core.classifier.classifier import Classifier
 
 from .activations import ActivationAggregationStrategy
-from .model import Model
-from wisent_guard.core.classifier.classifier import Classifier
 from .contrastive_pairs import ContrastivePairSet
+from .model import Model
 from .model_config_manager import ModelConfigManager
 
 logger = logging.getLogger(__name__)
@@ -195,7 +196,7 @@ class SampleSizeOptimizer:
 
             # Create contrastive pair
             from .contrastive_pairs import ContrastivePair
-            from .response import PositiveResponse, NegativeResponse
+            from .response import NegativeResponse, PositiveResponse
 
             pair = ContrastivePair(
                 prompt=question,

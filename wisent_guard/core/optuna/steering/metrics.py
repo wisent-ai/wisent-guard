@@ -3,18 +3,18 @@ Evaluation metrics for comprehensive evaluation pipeline.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 
-from wisent_guard.parameters.task_config import CODING_TASKS
 from wisent_guard.core.bigcode_extractors import MBPPExtractor
 
 # Import LMEvalHarnessGroundTruth for intelligent evaluation (newer approach used by CLI)
 from wisent_guard.core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTruth
 from wisent_guard.core.task_interface import get_task
 from wisent_guard.core.tasks.file_task import FileTask
+from wisent_guard.parameters.task_config import CODING_TASKS
 
 from .bigcode_evaluator_wrapper import OptunaBigCodeEvaluator
 

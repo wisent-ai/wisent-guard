@@ -6,14 +6,15 @@ The model analyzes prompts to determine relevant traits for responses, then crea
 The actual response is NEVER analyzed as text - only its activations are classified.
 """
 
-import time
 import logging
-from typing import List, Tuple
+import time
 from dataclasses import dataclass
+from typing import List, Tuple
 
-from ....core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
 from wisent_guard.core.classifier.classifier import ActivationClassifier
-from ....core.agent.budget import calculate_max_tasks_for_time_budget, get_budget_manager, ResourceType
+
+from ....core.agent.budget import ResourceType, calculate_max_tasks_for_time_budget, get_budget_manager
+from ....core.contrastive_pairs.generate_synthetically import SyntheticContrastivePairGenerator
 
 
 @dataclass
@@ -144,7 +145,7 @@ class SyntheticClassifierFactory:
                 logging.debug(f"Processing pair {i + 1}/{len(pair_set.pairs)}...")
                 try:
                     # Get activations for positive response
-                    logging.debug(f"Extracting positive activations for: {repr(pair.positive_response.text[:100])}")
+                    logging.debug(f"Extracting positive activations for: {pair.positive_response.text[:100]!r}")
                     pos_activations = self.model.extract_activations(pair.positive_response.text, layer_obj)
                     logging.debug(
                         f"Positive activations shape: {pos_activations.shape if hasattr(pos_activations, 'shape') else 'N/A'}"
@@ -152,7 +153,7 @@ class SyntheticClassifierFactory:
                     positive_activations.append(pos_activations)
 
                     # Get activations for negative response
-                    logging.debug(f"Extracting negative activations for: {repr(pair.negative_response.text[:100])}")
+                    logging.debug(f"Extracting negative activations for: {pair.negative_response.text[:100]!r}")
                     neg_activations = self.model.extract_activations(pair.negative_response.text, layer_obj)
                     logging.debug(
                         f"Negative activations shape: {neg_activations.shape if hasattr(neg_activations, 'shape') else 'N/A'}"
@@ -169,7 +170,7 @@ class SyntheticClassifierFactory:
                     logging.debug(f"Full error traceback:\n{error_details}")
                     continue
 
-            logging.info(f"ACTIVATION EXTRACTION SUMMARY:")
+            logging.info("ACTIVATION EXTRACTION SUMMARY:")
             logging.info(f"Positive activations collected: {len(positive_activations)}")
             logging.info(f"Negative activations collected: {len(negative_activations)}")
             logging.info(f"Total pairs processed: {len(pair_set.pairs)}")
@@ -185,11 +186,11 @@ class SyntheticClassifierFactory:
                 f"Training classifier on {len(positive_activations)} positive, {len(negative_activations)} negative activations..."
             )
 
-            logging.info(f"Creating ActivationClassifier instance...")
+            logging.info("Creating ActivationClassifier instance...")
             classifier = ActivationClassifier()
-            logging.info(f"ActivationClassifier created")
+            logging.info("ActivationClassifier created")
 
-            logging.info(f"Starting classifier training...")
+            logging.info("Starting classifier training...")
             try:
                 # Convert activations to the format expected by train_on_activations method
                 from wisent_guard.core.activations import Activations
@@ -282,14 +283,14 @@ class SyntheticClassifierSystem:
                 estimate_task_time_direct("classifier_training", 100) / 100
             )  # Per classifier (benchmark is per 100)
 
-            logging.info(f"Cost estimates per unit:")
+            logging.info("Cost estimates per unit:")
             logging.info(f"• Trait discovery: ~{trait_discovery_cost:.0f}s")
             logging.info(f"• Data generation: ~{data_generation_cost:.0f}s per pair")
             logging.info(f"• Classifier training: ~{classifier_training_cost:.0f}s per classifier")
 
         except Exception as e:
             logging.info(f"Could not get benchmark data: {e}")
-            logging.info(f"Using fallback estimates")
+            logging.info("Using fallback estimates")
             # Fallback estimates if benchmarks aren't available
             trait_discovery_cost = 10.0
             data_generation_cost = 30.0  # Per pair
@@ -306,14 +307,14 @@ class SyntheticClassifierSystem:
         if budget_seconds < min_required_time:
             logging.info(f"Budget ({budget_seconds:.0f}s) too small for full classifier training")
             logging.info(f"Minimum required: {min_required_time:.0f}s")
-            logging.info(f"Falling back to simple trait analysis only...")
+            logging.info("Falling back to simple trait analysis only...")
 
             # Just do trait discovery without training classifiers
             discovery_result = self.trait_discovery.discover_relevant_traits(prompt, time_budget_minutes)
             logging.info(
                 f"Discovered {len(discovery_result.traits_discovered)} traits: {discovery_result.traits_discovered}"
             )
-            logging.info(f"Skipping classifier training due to budget constraints")
+            logging.info("Skipping classifier training due to budget constraints")
             return [], discovery_result
 
         # Calculate how many traits we can afford
@@ -321,7 +322,7 @@ class SyntheticClassifierSystem:
         available_for_traits = budget_seconds - trait_discovery_cost
         max_affordable_traits = max(1, int(available_for_traits / cost_per_trait))
 
-        logging.info(f"Budget analysis:")
+        logging.info("Budget analysis:")
         logging.info(f"• Available time: {budget_seconds:.0f}s")
         logging.info(f"• Cost per trait ({pairs_per_trait} pairs): {cost_per_trait:.0f}s")
         logging.info(f"• Max affordable traits: {max_affordable_traits}")
@@ -360,9 +361,8 @@ class SyntheticClassifierSystem:
                 if max_affordable_pairs < 3:
                     logging.info(f"Insufficient budget ({remaining_budget:.0f}s) for training, skipping")
                     continue
-                else:
-                    logging.info(f"Reducing pairs from {pairs_per_trait} to {max_affordable_pairs} to fit budget")
-                    actual_pairs = max_affordable_pairs
+                logging.info(f"Reducing pairs from {pairs_per_trait} to {max_affordable_pairs} to fit budget")
+                actual_pairs = max_affordable_pairs
             else:
                 actual_pairs = pairs_per_trait
 
@@ -566,9 +566,9 @@ def create_classifier_from_trait_description(
 
     for i, pair in enumerate(pair_set.pairs):
         log_and_print(f"\n--- PAIR {i + 1}/{len(pair_set.pairs)} ---")
-        log_and_print(f"Prompt: {repr(pair.prompt)}")
-        log_and_print(f"Positive Response: {repr(pair.positive_response.text)}")
-        log_and_print(f"Negative Response: {repr(pair.negative_response.text)}")
+        log_and_print(f"Prompt: {pair.prompt!r}")
+        log_and_print(f"Positive Response: {pair.positive_response.text!r}")
+        log_and_print(f"Negative Response: {pair.negative_response.text!r}")
         log_and_print(f"Positive Response Type: {type(pair.positive_response)}")
         log_and_print(f"Negative Response Type: {type(pair.negative_response)}")
         log_and_print(
@@ -607,7 +607,7 @@ def create_classifier_from_trait_description(
         log_and_print(f"\n🔍 Processing pair {i + 1}/{len(pair_set.pairs)}...")
         try:
             # Get activations for positive response
-            log_and_print(f"   📊 Extracting positive activations for: {repr(pair.positive_response.text[:100])}")
+            log_and_print(f"   📊 Extracting positive activations for: {pair.positive_response.text[:100]!r}")
             pos_activations = model.extract_activations(pair.positive_response.text, layer_obj)
             log_and_print(
                 f"   ✅ Positive activations shape: {pos_activations.shape if hasattr(pos_activations, 'shape') else 'N/A'}"
@@ -615,7 +615,7 @@ def create_classifier_from_trait_description(
             positive_activations.append(pos_activations)
 
             # Get activations for negative response
-            log_and_print(f"   📊 Extracting negative activations for: {repr(pair.negative_response.text[:100])}")
+            log_and_print(f"   📊 Extracting negative activations for: {pair.negative_response.text[:100]!r}")
             neg_activations = model.extract_activations(pair.negative_response.text, layer_obj)
             log_and_print(
                 f"   ✅ Negative activations shape: {neg_activations.shape if hasattr(neg_activations, 'shape') else 'N/A'}"
@@ -632,7 +632,7 @@ def create_classifier_from_trait_description(
             log_and_print(f"   📜 Full error traceback:\n{error_details}")
             continue
 
-    log_and_print(f"\n📊 ACTIVATION EXTRACTION SUMMARY:")
+    log_and_print("\n📊 ACTIVATION EXTRACTION SUMMARY:")
     log_and_print(f"   Positive activations collected: {len(positive_activations)}")
     log_and_print(f"   Negative activations collected: {len(negative_activations)}")
     log_and_print(f"   Total pairs processed: {len(pair_set.pairs)}")
@@ -697,7 +697,7 @@ def create_classifier_from_trait_description(
     classifier._pairs_count = len(pair_set.pairs)
     log_and_print(f"📝 Stored metadata: trait='{trait_description}', pairs_count={len(pair_set.pairs)}")
 
-    log_and_print(f"🎉 Classifier creation completed successfully!")
+    log_and_print("🎉 Classifier creation completed successfully!")
     log_and_print(f"📁 Debug log saved to: {log_file}")
 
     return classifier

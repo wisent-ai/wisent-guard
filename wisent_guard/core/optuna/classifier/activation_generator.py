@@ -8,15 +8,15 @@ significantly improving optimization performance by avoiding redundant activatio
 import hashlib
 import logging
 import pickle
-from pathlib import Path
-from typing import Optional, Any
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
 
-import torch
 import numpy as np
+import torch
 
 from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
-from wisent_guard.core.activations.core import Activations, ActivationAggregationStrategy
+from wisent_guard.core.activations.core import ActivationAggregationStrategy, Activations
 
 logger = logging.getLogger(__name__)
 
@@ -254,23 +254,21 @@ class ActivationGenerator:
         if len(activations.shape) == 2:
             # Already aggregated at token level, return as-is
             return activations
-        elif len(activations.shape) == 3:
+        if len(activations.shape) == 3:
             # [n_samples, n_tokens, hidden_dim] -> [n_samples, hidden_dim]
             if strategy == ActivationAggregationStrategy.MEAN_POOLING:
                 return torch.mean(activations, dim=1)
-            elif strategy == ActivationAggregationStrategy.LAST_TOKEN:
+            if strategy == ActivationAggregationStrategy.LAST_TOKEN:
                 return activations[:, -1, :]
-            elif strategy == ActivationAggregationStrategy.FIRST_TOKEN:
+            if strategy == ActivationAggregationStrategy.FIRST_TOKEN:
                 return activations[:, 0, :]
-            elif strategy == ActivationAggregationStrategy.MAX_POOLING:
+            if strategy == ActivationAggregationStrategy.MAX_POOLING:
                 return torch.max(activations, dim=1)[0]
-            else:
-                # Default to mean pooling
-                self.logger.warning(f"Unknown aggregation strategy {strategy}, using mean pooling")
-                return torch.mean(activations, dim=1)
-        else:
-            # Flatten to [n_samples, -1] for other shapes
-            return activations.view(activations.shape[0], -1)
+            # Default to mean pooling
+            self.logger.warning(f"Unknown aggregation strategy {strategy}, using mean pooling")
+            return torch.mean(activations, dim=1)
+        # Flatten to [n_samples, -1] for other shapes
+        return activations.view(activations.shape[0], -1)
 
     def _create_cache_key(self, model_name: str, task_name: str, limit: int, data_type: str) -> str:
         """Create a unique cache key for the given parameters."""

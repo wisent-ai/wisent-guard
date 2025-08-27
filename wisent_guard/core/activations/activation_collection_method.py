@@ -18,10 +18,10 @@ from typing import Dict, List, Tuple
 
 import torch
 
-from wisent_guard.core.layer import Layer
 from wisent_guard.core.contrastive_pairs import ContrastivePair
+from wisent_guard.core.layer import Layer
 
-from .core import Activations, ActivationAggregationStrategy
+from .core import ActivationAggregationStrategy, Activations
 from .prompts import PromptConstructionStrategy, PromptPair
 
 

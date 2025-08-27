@@ -32,25 +32,24 @@ import logging
 import sys
 from pathlib import Path
 
-import optuna
 import torch
 
 # Add wisent-guard to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from wisent_guard.core.optuna import (
-    OptunaClassifierOptimizer,
-    ClassifierOptimizationConfig as OptimizationConfig,
-    GenerationConfig,
-    CacheConfig,
-)
-
-# Import data loading utilities from steering system
-from wisent_guard.core.optuna.steering.data_utils import load_dataset_samples, get_task_contrastive_pairs
+from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
 
 # Import Model wrapper and ContrastivePair for proper data conversion
 from wisent_guard.core.model import Model
-from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
+from wisent_guard.core.optuna import (
+    CacheConfig,
+    ClassifierOptimizationConfig as OptimizationConfig,
+    GenerationConfig,
+    OptunaClassifierOptimizer,
+)
+
+# Import data loading utilities from steering system
+from wisent_guard.core.optuna.steering.data_utils import get_task_contrastive_pairs, load_dataset_samples
 
 
 def convert_steering_pairs_to_contrastive_pairs(steering_pairs: list) -> list[ContrastivePair]:
@@ -154,7 +153,7 @@ class TruthfulQAClassifierPipeline:
     def run_optimization(self, model, contrastive_pairs: list, task_name: str, model_name: str, limit: int):
         """Run the TruthfulQA classifier optimization with detailed tracking."""
 
-        self.logger.info(f"Starting TruthfulQA classifier optimization")
+        self.logger.info("Starting TruthfulQA classifier optimization")
         self.logger.info(f"Model: {model_name}")
         self.logger.info(f"Task: {task_name}")
         self.logger.info(f"Contrastive pairs: {len(contrastive_pairs)}")
@@ -363,30 +362,29 @@ def main():
 
                 return results
 
-            else:
-                # Handle case where no trials completed successfully
-                logger.info("\n" + "=" * 80)
-                logger.info("❌ OPTIMIZATION INCOMPLETE")
-                logger.info("=" * 80)
-                if results:
-                    opt_result = results["optimization_result"]
-                    logger.info(f"Optimization Time: {results['optimization_time']:.1f}s")
-                    logger.info(f"Total Trials Attempted: {len(opt_result.study.trials)}")
+            # Handle case where no trials completed successfully
+            logger.info("\n" + "=" * 80)
+            logger.info("❌ OPTIMIZATION INCOMPLETE")
+            logger.info("=" * 80)
+            if results:
+                opt_result = results["optimization_result"]
+                logger.info(f"Optimization Time: {results['optimization_time']:.1f}s")
+                logger.info(f"Total Trials Attempted: {len(opt_result.study.trials)}")
 
-                    # Show what went wrong
-                    trial_states = {}
-                    for trial in opt_result.study.trials:
-                        state = trial.state.name
-                        trial_states[state] = trial_states.get(state, 0) + 1
-                    logger.info(f"Trial Results: {trial_states}")
+                # Show what went wrong
+                trial_states = {}
+                for trial in opt_result.study.trials:
+                    state = trial.state.name
+                    trial_states[state] = trial_states.get(state, 0) + 1
+                logger.info(f"Trial Results: {trial_states}")
 
-                    logger.info("\n💡 Debugging Suggestions:")
-                    logger.info("   - All trials were pruned - likely classifier training issues")
-                    logger.info("   - Check if the activation data is properly formatted")
-                    logger.info("   - Try reducing threshold ranges or increasing data size")
-                    logger.info("   - Consider using different aggregation methods")
+                logger.info("\n💡 Debugging Suggestions:")
+                logger.info("   - All trials were pruned - likely classifier training issues")
+                logger.info("   - Check if the activation data is properly formatted")
+                logger.info("   - Try reducing threshold ranges or increasing data size")
+                logger.info("   - Consider using different aggregation methods")
 
-                return None
+            return None
 
         except Exception as e:
             logger.error(f"Pipeline failed: {e}")

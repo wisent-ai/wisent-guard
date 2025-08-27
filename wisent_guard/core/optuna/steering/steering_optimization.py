@@ -6,30 +6,28 @@ improve model performance on benchmarks by steering internal activations.
 """
 
 import logging
+import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Optional
-import traceback
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import torch
 from tqdm import tqdm
 
+from wisent_guard.core.activations.core import ActivationAggregationStrategy
+from wisent_guard.core.classifier.classifier import Classifier
 from wisent_guard.core.contrastive_pairs.contrastive_pair import ContrastivePair
 from wisent_guard.core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
-from wisent_guard.core.response import Response
-from wisent_guard.core.steering_methods.dac import DAC
-
-from wisent_guard.core.optuna.steering import data_utils, metrics
 from wisent_guard.core.optuna.classifier import (
-    ClassifierCache,
     CacheConfig,
-    OptunaClassifierOptimizer,
+    ClassifierCache,
     ClassifierOptimizationConfig,
     GenerationConfig,
+    OptunaClassifierOptimizer,
 )
-from wisent_guard.core.classifier.classifier import Classifier
-from wisent_guard.core.activations.core import ActivationAggregationStrategy
+from wisent_guard.core.optuna.steering import data_utils, metrics
+from wisent_guard.core.response import Response
+from wisent_guard.core.steering_methods.dac import DAC
 from wisent_guard.core.task_interface import get_task
 
 logger = logging.getLogger(__name__)
@@ -1096,9 +1094,8 @@ class SteeringOptimizer:
                 )
 
                 return best_classifier
-            else:
-                self.logger.warning(f"Classifier optimization failed - no successful trials")
-                return None
+            self.logger.warning("Classifier optimization failed - no successful trials")
+            return None
 
         except Exception as e:
             self.logger.error(f"Failed to run classifier optimization: {e}")

@@ -1,9 +1,9 @@
-from .core import Activations, ActivationAggregationStrategy
+from .core import ActivationAggregationStrategy, Activations
 from .prompts import PromptConstructionStrategy, PromptPair
 
 __all__ = [
-    "Activations",
     "ActivationAggregationStrategy",
+    "Activations",
     "PromptConstructionStrategy",
     "PromptPair",
 ]

@@ -7,18 +7,19 @@ activations once and uses intelligent caching to avoid redundant training.
 
 import logging
 import time
-from typing import Optional, Any
 from dataclasses import dataclass
+from typing import Any, Optional
 
 import numpy as np
-import torch
 import optuna
+import torch
 from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
 
 from wisent_guard.core.classifier.classifier import Classifier
-from .activation_generator import ActivationGenerator, GenerationConfig, ActivationData
-from .classifier_cache import ClassifierCache, CacheConfig
+
+from .activation_generator import ActivationData, ActivationGenerator, GenerationConfig
+from .classifier_cache import CacheConfig, ClassifierCache
 
 
 def get_model_dtype(model) -> torch.dtype:

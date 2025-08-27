@@ -8,9 +8,9 @@ evaluation with the optuna optimization pipeline.
 import logging
 from typing import Any, Dict, List, Tuple
 
-from wisent_guard.parameters.task_config import CODING_TASKS
 from wisent_guard.core.bigcode_extractors import get_bigcode_extractor
 from wisent_guard.core.bigcode_integration import BigCodeEvaluator, is_bigcode_task
+from wisent_guard.parameters.task_config import CODING_TASKS
 
 logger = logging.getLogger(__name__)
 

@@ -9,17 +9,15 @@ Runs comprehensive optimization across all 37 available tasks to find:
 Uses existing hyperparameter optimization logic from the system.
 """
 
-import logging
 import json
+import logging
 import os
 import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
 
 from wisent_guard.core.model_config_manager import ModelConfigManager
-from wisent_guard.core.hyperparameter_optimizer import HyperparameterOptimizer, OptimizationConfig
-from wisent_guard.core.model_persistence import ModelPersistence
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +308,7 @@ class ClassificationOptimizer:
                     {"classifier_save_dir": classifier_save_dir},
                 )
 
-        logger.info(f"🚀 Starting comprehensive classification optimization")
+        logger.info("🚀 Starting comprehensive classification optimization")
         logger.info(f"   📊 Model: {self.model_name}")
         logger.info(f"   📋 Tasks: {len(self.available_tasks)} available tasks")
         logger.info(f"   🔢 Limit per task: {limit}")
@@ -318,11 +316,11 @@ class ClassificationOptimizer:
         if max_time_per_task_minutes is not None:
             logger.info(f"   ⏱️  Max time per task: {max_time_per_task_minutes:.1f} minutes")
         else:
-            logger.info(f"   ⏱️  Max time per task: No limit")
+            logger.info("   ⏱️  Max time per task: No limit")
 
         if detailed_logger:
             detailed_logger.log_global(
-                f"Starting comprehensive classification optimization",
+                "Starting comprehensive classification optimization",
                 "info",
                 {
                     "model": self.model_name,
@@ -397,7 +395,7 @@ class ClassificationOptimizer:
                 if detailed_logger:
                     detailed_logger.log_task(
                         task_name,
-                        f"Task completed successfully",
+                        "Task completed successfully",
                         "info",
                         {
                             "success": True,
@@ -435,13 +433,13 @@ class ClassificationOptimizer:
 
                 print(f"\n⚠️  SKIPPING FAILED TASK: {task_name}")
                 print(f"   Error type: {type(e).__name__}")
-                print(f"   Error message: {str(e)}")
-                print(f"   See failed_benchmarks.json for details\n")
+                print(f"   Error message: {e!s}")
+                print("   See failed_benchmarks.json for details\n")
 
                 if detailed_logger:
                     detailed_logger.log_task(
                         task_name,
-                        f"Task failed (skipped): {str(e)}",
+                        f"Task failed (skipped): {e!s}",
                         "error",
                         {
                             "success": False,
@@ -485,7 +483,7 @@ class ClassificationOptimizer:
             )
 
             detailed_logger.log_global(
-                f"Optimization completed",
+                "Optimization completed",
                 "info",
                 {
                     "successful_tasks": successful_count,
@@ -540,7 +538,7 @@ class ClassificationOptimizer:
         if detailed_logger:
             detailed_logger.log_task(
                 task_name,
-                f"Initializing hyperparameter optimization",
+                "Initializing hyperparameter optimization",
                 "debug",
                 {
                     "layer_range": layer_range or "all",
@@ -652,7 +650,7 @@ class ClassificationOptimizer:
                 if detailed_logger:
                     detailed_logger.log_task(
                         task_name,
-                        f"Optimization completed - classifier handled by pipeline",
+                        "Optimization completed - classifier handled by pipeline",
                         "info",
                         {
                             "best_layer": best_layer,
@@ -669,7 +667,7 @@ class ClassificationOptimizer:
                 logger.warning(f"⚠️ Failed to process classifier metadata for {task_name}: {e}")
                 if detailed_logger:
                     detailed_logger.log_task(
-                        task_name, f"Failed to process classifier metadata: {str(e)}", "warning", {"error": str(e)}
+                        task_name, f"Failed to process classifier metadata: {e!s}", "warning", {"error": str(e)}
                     )
 
         # Create result object
@@ -833,7 +831,7 @@ class ClassificationOptimizer:
         Args:
             summary: Optimization summary with optimal parameters
         """
-        logger.info(f"💾 Saving optimal parameters to model configuration...")
+        logger.info("💾 Saving optimal parameters to model configuration...")
 
         # Create task-specific overrides for tasks that have different optimal parameters
         task_specific_overrides = {}
@@ -904,7 +902,7 @@ class ClassificationOptimizer:
         # Load existing errors if file exists
         if os.path.exists(error_file):
             try:
-                with open(error_file, "r") as f:
+                with open(error_file) as f:
                     errors_data = json.load(f)
             except:
                 errors_data = {"failed_benchmarks": []}
@@ -935,7 +933,7 @@ class ClassificationOptimizer:
             summary: Optimization summary to print
         """
         print(f"\n{'=' * 80}")
-        print(f"🎯 CLASSIFICATION OPTIMIZATION SUMMARY")
+        print("🎯 CLASSIFICATION OPTIMIZATION SUMMARY")
         print(f"{'=' * 80}")
         print(f"🤖 Model: {summary.model_name}")
         print(f"📅 Date: {summary.optimization_date}")
@@ -945,19 +943,19 @@ class ClassificationOptimizer:
         if summary.failed_optimizations > 0:
             print(f"❌ Failed: {summary.failed_optimizations} tasks")
 
-        print(f"\n🎯 OPTIMAL PARAMETERS (Overall Best):")
+        print("\n🎯 OPTIMAL PARAMETERS (Overall Best):")
         print(f"   📊 Classification Layer: {summary.overall_best_layer}")
         print(f"   🔧 Token Aggregation: {summary.overall_best_aggregation}")
         print(f"   📈 Detection Threshold: {summary.overall_best_threshold}")
 
-        print(f"\n📈 PARAMETER FREQUENCY ANALYSIS:")
-        print(f"   🏆 Layer Frequency (top 5):")
+        print("\n📈 PARAMETER FREQUENCY ANALYSIS:")
+        print("   🏆 Layer Frequency (top 5):")
         sorted_layers = sorted(summary.layer_frequency_analysis.items(), key=lambda x: x[1], reverse=True)
         for layer, count in sorted_layers[:5]:
             percentage = (count / summary.successful_optimizations) * 100
             print(f"      Layer {layer}: {count} tasks ({percentage:.1f}%)")
 
-        print(f"   🔧 Aggregation Frequency:")
+        print("   🔧 Aggregation Frequency:")
         sorted_agg = sorted(summary.aggregation_frequency_analysis.items(), key=lambda x: x[1], reverse=True)
         for agg, count in sorted_agg:
             percentage = (count / summary.successful_optimizations) * 100
@@ -966,7 +964,7 @@ class ClassificationOptimizer:
         # Show top performing tasks
         successful_results = [r for r in summary.task_results if r.error_message is None]
         if successful_results:
-            print(f"\n🏆 TOP PERFORMING TASKS (by F1 score):")
+            print("\n🏆 TOP PERFORMING TASKS (by F1 score):")
             top_tasks = sorted(successful_results, key=lambda x: x.best_f1, reverse=True)[:5]
             for result in top_tasks:
                 print(
@@ -976,23 +974,23 @@ class ClassificationOptimizer:
         # Show failed tasks if any
         failed_results = [r for r in summary.task_results if r.error_message is not None]
         if failed_results:
-            print(f"\n❌ FAILED TASKS:")
+            print("\n❌ FAILED TASKS:")
             for result in failed_results:
                 print(f"   {result.task_name}: {result.error_message}")
 
         # Show classifier saving information
         saved_classifiers = [r for r in summary.task_results if r.classifier_save_path is not None]
         if saved_classifiers:
-            print(f"\n💾 SAVED CLASSIFIERS:")
+            print("\n💾 SAVED CLASSIFIERS:")
             print(f"   📁 Total classifiers saved: {len(saved_classifiers)}")
             if saved_classifiers:
                 # Show the directory where classifiers are saved
                 first_saved_path = saved_classifiers[0].classifier_save_path
                 classifier_dir = os.path.dirname(first_saved_path)
                 print(f"   📂 Directory: {classifier_dir}")
-                print(f"   🔍 Classifiers can be auto-discovered by the agent system")
+                print("   🔍 Classifiers can be auto-discovered by the agent system")
 
-        print(f"\n✅ Configuration saved to model config with task-specific overrides")
+        print("\n✅ Configuration saved to model config with task-specific overrides")
         print(f"{'=' * 80}")
 
 
@@ -1042,12 +1040,12 @@ def run_classification_optimization(
             while True:
                 response = input("\n   Do you want to continue? (y/n): ").strip().lower()
                 if response == "y" or response == "yes":
-                    print(f"\n✅ Continuing with optimization...")
+                    print("\n✅ Continuing with optimization...")
                     break
-                elif response == "n" or response == "no":
-                    print(f"\n❌ Optimization cancelled by user.")
+                if response == "n" or response == "no":
+                    print("\n❌ Optimization cancelled by user.")
                     sys.exit(0)
                 else:
-                    print(f"   Please enter 'y' for yes or 'n' for no.")
+                    print("   Please enter 'y' for yes or 'n' for no.")
 
     return optimizer.run_comprehensive_optimization(limit=limit, **kwargs)

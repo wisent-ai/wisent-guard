@@ -9,13 +9,14 @@ This module handles:
 """
 
 import time
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
-from ...model import Model
-from wisent_guard.core.classifier.classifier import Classifier, ActivationClassifier
+from wisent_guard.core.classifier.classifier import ActivationClassifier, Classifier
+
 from ...activations import Activations
 from ...layer import Layer
+from ...model import Model
 from ...model_persistence import ModelPersistence, create_classifier_metadata
 
 
@@ -478,14 +479,13 @@ class ClassifierCreator:
         if relevant_benchmarks:
             print(f"   🎯 Found {len(relevant_benchmarks)} relevant benchmarks: {relevant_benchmarks[:3]}...")
             return self._load_benchmark_data(relevant_benchmarks, num_samples)
-        else:
-            print(f"   🤖 No specific benchmarks found, using synthetic generation...")
-            return self._generate_synthetic_training_data(issue_type, num_samples)
+        print("   🤖 No specific benchmarks found, using synthetic generation...")
+        return self._generate_synthetic_training_data(issue_type, num_samples)
 
     def _find_relevant_benchmarks(self, issue_type: str, time_budget_minutes: float = 5.0) -> List[str]:
         """Find relevant benchmarks for the given issue type based on time budget with priority-aware selection."""
-        from .tasks.task_relevance import find_relevant_tasks
         from ..budget import calculate_max_tasks_for_time_budget
+        from .tasks.task_relevance import find_relevant_tasks
 
         try:
             # Calculate max tasks using budget system
@@ -498,8 +498,8 @@ class ClassifierCreator:
             # Use priority-aware intelligent benchmark selection
             try:
                 # Import priority-aware selection function
-                import sys
                 import os
+                import sys
 
                 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lm-harness-integration"))
                 from only_benchmarks import find_most_relevant_benchmarks
@@ -530,7 +530,7 @@ class ClassifierCreator:
 
             except Exception as priority_error:
                 print(f"   ⚠️ Priority-aware selection failed: {priority_error}")
-                print(f"   🔄 Falling back to legacy task relevance...")
+                print("   🔄 Falling back to legacy task relevance...")
 
                 # Fallback to legacy system
                 relevant_task_results = find_relevant_tasks(
@@ -563,7 +563,7 @@ class ClassifierCreator:
 
         except Exception as e:
             print(f"   ⚠️ Error finding relevant benchmarks: {e}")
-            print(f"   ⚠️ Using fallback tasks")
+            print("   ⚠️ Using fallback tasks")
             # Minimal fallback to high priority fast benchmarks
             return ["mmlu", "truthfulqa_mc1", "hellaswag"]
 
@@ -945,7 +945,7 @@ class ClassifierCreator:
                 continue
 
         if not training_data:
-            print(f"   ❌ Failed to load from any benchmarks, falling back to synthetic...")
+            print("   ❌ Failed to load from any benchmarks, falling back to synthetic...")
             return self._generate_synthetic_training_data("unknown", num_samples)
 
         print(
@@ -1148,8 +1148,7 @@ def create_classifier_on_demand(
             )
 
         return result
-    else:
-        # Use specified layer
-        config = TrainingConfig(issue_type=issue_type, layer=layer, save_path=save_path, model_name=model.name)
+    # Use specified layer
+    config = TrainingConfig(issue_type=issue_type, layer=layer, save_path=save_path, model_name=model.name)
 
-        return creator.create_classifier_for_issue_type(issue_type, layer, config)
+    return creator.create_classifier_for_issue_type(issue_type, layer, config)

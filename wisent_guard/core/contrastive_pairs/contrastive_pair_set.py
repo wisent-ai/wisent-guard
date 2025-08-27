@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import torch
 
-from wisent_guard.core.activations import Activations, ActivationAggregationStrategy
+from wisent_guard.core.activations import ActivationAggregationStrategy, Activations
 
 from ..response import NegativeResponse, PositiveResponse
 from .contrastive_pair import ContrastivePair

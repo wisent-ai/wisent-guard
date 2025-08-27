@@ -7,10 +7,10 @@ This module handles:
 3. Caching of results to avoid recomputation
 """
 
-import json
 import hashlib
-from typing import Dict, List, Any, Optional
+import json
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 
 def get_cache_key(model_name: str, task_name: str, limit: int, ground_truth_method: str) -> str:
@@ -31,7 +31,7 @@ def load_cached_results(cache_key: str) -> Optional[Dict[str, Any]]:
     cache_path = get_cache_path(cache_key)
     if cache_path.exists():
         try:
-            with open(cache_path, "r") as f:
+            with open(cache_path) as f:
                 cached_data = json.load(f)
 
             # Validate that cached results have valid (non-None) values
@@ -81,8 +81,9 @@ def optimize_layers_on_contrastive_pairs(
     Returns:
         Dict mapping layer_idx -> {'classifier': classifier, 'train_accuracy': float}
     """
-    from .core.hyperparameter_optimizer import detect_model_layers
     from wisent_guard.core.classifier.classifier import Classifier
+
+    from .core.hyperparameter_optimizer import detect_model_layers
     from .core.parser import parse_layer_range
 
     total_layers = detect_model_layers(model)
@@ -96,7 +97,7 @@ def optimize_layers_on_contrastive_pairs(
             candidate_layers = list(range(total_layers))
 
     if verbose:
-        print(f"🔬 LAYER OPTIMIZATION ON CONTRASTIVE PAIRS:")
+        print("🔬 LAYER OPTIMIZATION ON CONTRASTIVE PAIRS:")
         print(f"   • Total layers: {total_layers}")
         print(f"   • Testing candidate layers: {candidate_layers}")
 
@@ -170,8 +171,8 @@ def optimize_aggregation_on_ground_truth(
 
     This is the validation phase - no training data used here.
     """
+    from .core import ContrastivePairSet, SteeringMethod, SteeringType
     from .core.ground_truth_evaluator import GroundTruthEvaluator
-    from .core import SteeringMethod, SteeringType, ContrastivePairSet
 
     # Set defaults
     if classifier_types is None:
@@ -182,7 +183,7 @@ def optimize_aggregation_on_ground_truth(
     aggregation_methods = ["average", "final", "first", "max", "min"]
 
     if verbose:
-        print(f"\n🎯 HYPERPARAMETER OPTIMIZATION ON GROUND TRUTH:")
+        print("\n🎯 HYPERPARAMETER OPTIMIZATION ON GROUND TRUTH:")
         print(f"   • Testing layers: {list(layer_results.keys())}")
         print(f"   • Testing aggregations: {aggregation_methods}")
         print(f"   • Testing classifier types: {classifier_types}")
@@ -195,8 +196,8 @@ def optimize_aggregation_on_ground_truth(
         if len(test_qa_pairs) > 0:
             print(f"   • First test question: {test_qa_pairs[0].get('formatted_question', 'N/A')[:100]}...")
         else:
-            print(f"   ❌ CRITICAL: NO TEST QA PAIRS! Cannot perform ground truth optimization.")
-            print(f"      This means test data loading failed completely.")
+            print("   ❌ CRITICAL: NO TEST QA PAIRS! Cannot perform ground truth optimization.")
+            print("      This means test data loading failed completely.")
 
     # 🚨 HARD ERROR CHECK: No test data
     if len(test_qa_pairs) == 0:
@@ -210,7 +211,7 @@ def optimize_aggregation_on_ground_truth(
     evaluator = GroundTruthEvaluator.from_string(ground_truth_method, task_name=task_name)
     if verbose:
         print(f"   • Ground truth evaluator: {evaluator.method.value}")
-        print(f"   • Evaluator initialized successfully")
+        print("   • Evaluator initialized successfully")
 
     best_combination = {
         "layer": None,
@@ -225,7 +226,7 @@ def optimize_aggregation_on_ground_truth(
     combination_results = {}
 
     # For each layer, we need to retrain classifiers with different types
-    for layer_idx in layer_results.keys():
+    for layer_idx in layer_results:
         if verbose:
             print(f"   • Testing layer {layer_idx}...")
 
@@ -331,15 +332,15 @@ def optimize_aggregation_on_ground_truth(
 
                     # 🚨 HARD STOP: Ground truth evaluation failed
                     if ground_truth_label == "UNKNOWN":
-                        print(f"\n💥💥💥 HARD STOP - GROUND TRUTH EVALUATION FAILED 💥💥💥")
+                        print("\n💥💥💥 HARD STOP - GROUND TRUTH EVALUATION FAILED 💥💥💥")
                         print(f"Question: {question[:200]}...")
                         print(f"Response: {response_text[:200]}...")
                         print(f"Expected Answer: {qa_pair.get('correct_answer', 'N/A')}")
                         print(f"Ground Truth Method: {ground_truth_method}")
                         print(f"Evaluator Details: {gt_result}")
-                        print(f"💡 Ground truth evaluation returned UNKNOWN instead of TRUTHFUL/HALLUCINATION")
-                        print(f"🛠️  This means the ground truth method cannot evaluate this type of response")
-                        print(f"💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
+                        print("💡 Ground truth evaluation returned UNKNOWN instead of TRUTHFUL/HALLUCINATION")
+                        print("🛠️  This means the ground truth method cannot evaluate this type of response")
+                        print("💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
 
                         # HARD STOP - crash the entire process immediately
                         raise ValueError(
@@ -356,7 +357,7 @@ def optimize_aggregation_on_ground_truth(
 
                     # 🚨 HARD STOP: Ground truth evaluation didn't return expected values
                     if ground_truth_label not in ["TRUTHFUL", "HALLUCINATION"]:
-                        print(f"\n💥💥💥 HARD STOP - UNEXPECTED GROUND TRUTH LABEL 💥💥💥")
+                        print("\n💥💥💥 HARD STOP - UNEXPECTED GROUND TRUTH LABEL 💥💥💥")
                         print(f"Question: {question[:200]}...")
                         print(f"Response: {response_text[:200]}...")
                         print(f"Expected Answer: {qa_pair.get('correct_answer', 'N/A')}")
@@ -366,8 +367,8 @@ def optimize_aggregation_on_ground_truth(
                         print(
                             f"💡 Ground truth evaluation returned '{ground_truth_label}' but optimization needs TRUTHFUL or HALLUCINATION"
                         )
-                        print(f"🛠️  This means the ground truth method is not compatible with optimization")
-                        print(f"💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
+                        print("🛠️  This means the ground truth method is not compatible with optimization")
+                        print("💥💥💥 STOPPING OPTIMIZATION IMMEDIATELY 💥💥💥\n")
 
                         # HARD STOP - crash the entire process immediately
                         raise ValueError(
@@ -392,7 +393,7 @@ def optimize_aggregation_on_ground_truth(
                             }
                         )
                         if verbose:
-                            print(f"       ✅ Added to question_results")
+                            print("       ✅ Added to question_results")
                     else:
                         if verbose:
                             print(f"       ⚠️ Skipping - ground truth not TRUTHFUL/HALLUCINATION: {ground_truth_label}")
@@ -501,7 +502,7 @@ def optimize_aggregation_on_ground_truth(
         )
 
     if verbose:
-        print(f"\n   🏆 BEST COMBINATION:")
+        print("\n   🏆 BEST COMBINATION:")
         print(f"     • Layer: {best_combination['layer']}")
         print(f"     • Aggregation: {best_combination['aggregation']}")
         print(f"     • Classifier: {best_combination['classifier_type']}")
@@ -568,7 +569,7 @@ def run_smart_optimization(
     cache_key = hashlib.md5("_".join(cache_key_parts).encode()).hexdigest()
 
     if verbose:
-        print(f"🔍 SMART HYPERPARAMETER OPTIMIZATION:")
+        print("🔍 SMART HYPERPARAMETER OPTIMIZATION:")
         print(f"   • Cache key: {cache_key}")
         print(f"   • Classifier types: {classifier_types}")
         print(f"   • Thresholds: {thresholds}")
@@ -583,7 +584,7 @@ def run_smart_optimization(
         return cached_results
 
     if verbose:
-        print(f"   🆕 No cached results found, running optimization...")
+        print("   🆕 No cached results found, running optimization...")
 
     # Step 1: Optimize layers using contrastive pairs (training data)
     layer_results = optimize_layers_on_contrastive_pairs(
@@ -651,7 +652,7 @@ def run_smart_optimization(
     save_cached_results(cache_key, optimization_results)
 
     if verbose:
-        print(f"\n   🏆 OPTIMAL COMBINATION FOUND:")
+        print("\n   🏆 OPTIMAL COMBINATION FOUND:")
         print(f"      • Best layer: {best_combo['layer']}")
         print(f"      • Best aggregation: {best_combo['aggregation']}")
         print(f"      • Best classifier: {best_combo['classifier_type']}")
@@ -659,7 +660,7 @@ def run_smart_optimization(
         print(
             f"      • Ground truth accuracy: {best_combo['accuracy']:.3f} ({best_combo['correct']}/{best_combo['total']})"
         )
-        print(f"      • Results cached for future runs")
+        print("      • Results cached for future runs")
 
     return optimization_results
 
@@ -859,17 +860,18 @@ def run_interactive_optimization(
     Returns:
         Dictionary with optimization results including best parameters
     """
+    from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
+
     from .core.ground_truth_evaluator import GroundTruthEvaluator, GroundTruthMethod
     from .core.hyperparameter_optimizer import detect_model_layers
-    from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
 
     # Detect all available layers
     total_layers = detect_model_layers(model)
-    layer_range = list(range(0, min(total_layers, 32)))  # Test up to 32 layers
+    layer_range = list(range(min(total_layers, 32)))  # Test up to 32 layers
     aggregation_methods = ["average", "final", "first", "max", "min"]
 
     if verbose:
-        print(f"\n🎯 INTERACTIVE HYPERPARAMETER OPTIMIZATION:")
+        print("\n🎯 INTERACTIVE HYPERPARAMETER OPTIMIZATION:")
         print(f"   • Will train {len(layer_range)} classifiers (one per layer)")
         print(f"   • Will test {len(aggregation_methods)} aggregation methods")
         print(f"   • Total combinations: {len(layer_range) * len(aggregation_methods)}")
@@ -877,7 +879,7 @@ def run_interactive_optimization(
 
     # Step 1: Train one classifier per layer
     if verbose:
-        print(f"\n🏋️ TRAINING CLASSIFIERS:")
+        print("\n🏋️ TRAINING CLASSIFIERS:")
         print(f"   • Training {len(layer_range)} classifiers using {len(training_pairs)} training pairs")
 
     layer_classifiers = {}
@@ -934,7 +936,7 @@ def run_interactive_optimization(
     test_responses_data = []
 
     print(f"\n{'=' * 80}")
-    print(f"🔬 GENERATING TEST RESPONSES AND COLLECTING USER FEEDBACK")
+    print("🔬 GENERATING TEST RESPONSES AND COLLECTING USER FEEDBACK")
     print(f"{'=' * 80}")
 
     for q_idx, question in enumerate(questions):
@@ -974,7 +976,7 @@ def run_interactive_optimization(
 
     # Step 3: Use trained classifiers to get prediction scores for each layer
     if verbose:
-        print(f"\n🔮 GENERATING PREDICTIONS:")
+        print("\n🔮 GENERATING PREDICTIONS:")
         print(f"   • Using {len(layer_classifiers)} trained classifiers")
 
     # For each test response, get prediction scores from each layer's classifier
@@ -1026,9 +1028,7 @@ def run_interactive_optimization(
                     final_score = min(prediction_score * 1.1, 1.0)  # Slight boost for max
                 elif agg_method == "min":
                     final_score = max(prediction_score * 0.9, 0.0)  # Slight reduction for min
-                elif agg_method == "first":
-                    final_score = prediction_score
-                elif agg_method == "final":
+                elif agg_method == "first" or agg_method == "final":
                     final_score = prediction_score
                 else:
                     final_score = prediction_score
@@ -1056,12 +1056,12 @@ def run_interactive_optimization(
         best_accuracy = 0.0
 
     if verbose:
-        print(f"\n🏆 OPTIMIZATION RESULTS:")
+        print("\n🏆 OPTIMIZATION RESULTS:")
         print(f"   • Layer: {best_combo[0][0]}")
         print(f"   • Aggregation: {best_combo[0][1]}")
         print(f"   • Accuracy: {best_accuracy:.1%}")
 
-        print(f"\n📋 Top 5 combinations:")
+        print("\n📋 Top 5 combinations:")
         sorted_combos = sorted(
             combination_performance.items(), key=lambda x: x[1]["correct"] / x[1]["total"], reverse=True
         )
