@@ -77,6 +77,9 @@ class DAC(SteeringMethodTensor):
 
         # Training statistics
         self.training_stats = {}
+        
+        # For compatibility with multi-steer command
+        self.property_vectors = {}
 
     def _load_model(self):
         """Load model and tokenizer for activation extraction."""
@@ -1766,3 +1769,63 @@ class DAC(SteeringMethodTensor):
         }
 
         return stats
+
+    @staticmethod
+    def combine_steering_vectors(
+        vectors: List[torch.Tensor], weights: List[float], normalize_weights: bool = True
+    ) -> torch.Tensor:
+        """
+        Combine multiple steering vectors using weighted arithmetic.
+
+        This implements the DAC reference approach: comp_vector = alpha_1 * diff1 + alpha_2 * diff2
+
+        Args:
+            vectors: List of steering vectors to combine
+            weights: List of weights for each vector
+            normalize_weights: Whether to normalize weights to sum to 1.0
+
+        Returns:
+            Combined steering vector
+        """
+        if len(vectors) != len(weights):
+            raise ValueError(f"Number of vectors ({len(vectors)}) must match number of weights ({len(weights)})")
+
+        if len(vectors) == 0:
+            raise ValueError("Must provide at least one vector")
+
+        # Normalize weights if requested
+        if normalize_weights:
+            weight_sum = sum(weights)
+            if weight_sum == 0:
+                raise ValueError("Weights sum to zero")
+            weights = [w / weight_sum for w in weights]
+
+        # Ensure all vectors are on the same device
+        device = vectors[0].device if hasattr(vectors[0], 'device') else 'cpu'
+        if device == 'cpu':
+            # If no device attribute, vectors are likely numpy arrays or lists
+            vectors = [torch.tensor(v) if not isinstance(v, torch.Tensor) else v for v in vectors]
+            device = vectors[0].device
+        vectors = [v.to(device) if hasattr(v, 'to') else torch.tensor(v).to(device) for v in vectors]
+
+        # Combine vectors using weighted sum
+        combined = torch.zeros_like(vectors[0])
+        for vector, weight in zip(vectors, weights):
+            combined = combined + weight * vector
+
+        return combined
+    
+    def apply_steering(self, hidden_states, strength=1.0, active_properties=None):
+        """Apply steering to hidden states (compatibility method for multi-steer)."""
+        if self.steering_vector is None:
+            return hidden_states
+        
+        # Apply the steering vector
+        steering = self.steering_vector.to(hidden_states.device)
+        
+        # Reshape if needed
+        if len(steering.shape) == 1:
+            steering = steering.unsqueeze(0)
+        
+        # Apply steering
+        return hidden_states + strength * steering

@@ -14,6 +14,7 @@ examples/detect_scheming.py
 examples/evaluate_personal.py
 examples/just_inference.py
 examples/livecodebench_evaluation_example.py
+examples/measure_steering_methods_latency.py
 examples/synthetic_steering_optimization.py
 examples/test_llama_steering.py
 examples/test_multi_property.py
@@ -113,6 +114,7 @@ wisent_guard/core/data_loaders/version_manager.py
 wisent_guard/core/docker/__init__.py
 wisent_guard/core/docker/optimized_docker_executor.py
 wisent_guard/core/evaluate/__init__.py
+wisent_guard/core/evaluate/single_prompt_evaluator.py
 wisent_guard/core/evaluate/stop_nonsense.py
 wisent_guard/core/evaluation/__init__.py
 wisent_guard/core/evaluation/benchmarks.py
@@ -120,6 +122,7 @@ wisent_guard/core/evaluation/exporters.py
 wisent_guard/core/models/__init__.py
 wisent_guard/core/models/steering_compatible_model.py
 wisent_guard/core/optuna/__init__.py
+wisent_guard/core/optuna/bigcode_evaluator_wrapper.py
 wisent_guard/core/optuna/data_utils.py
 wisent_guard/core/optuna/metrics.py
 wisent_guard/core/optuna/optuna_pipeline.py
@@ -140,6 +143,9 @@ wisent_guard/core/steering_methods/hpr.py
 wisent_guard/core/steering_methods/k_steering.py
 wisent_guard/core/steering_methods/steering_evaluation.py
 wisent_guard/core/steering_methods/token_steered.py
+wisent_guard/core/steering_methods_tensor/__init__.py
+wisent_guard/core/steering_methods_tensor/dac_attention.py
+wisent_guard/core/steering_methods_tensor/tensor_base.py
 wisent_guard/core/tasks/__init__.py
 wisent_guard/core/tasks/aime_task.py
 wisent_guard/core/tasks/file_task.py
@@ -154,6 +160,8 @@ wisent_guard/core/tasks/supergpqa_task.py
 wisent_guard/core/tracking/__init__.py
 wisent_guard/core/tracking/latency.py
 wisent_guard/core/tracking/memory.py
+wisent_guard/parameters/__init__.py
+wisent_guard/parameters/task_config.py
 wisent_guard/utils/__init__.py
 wisent_guard/utils/evaluate_layer_performance.py
 wisent_guard/utils/evaluate_layer_performance_truthfulqa.py
