@@ -223,9 +223,11 @@ class Model:
                 template_kwargs = {
                     "tokenize": False,
                     "add_generation_prompt": (response is None),  # Add generation prompt only if no response
+                    "enable_thinking": False,  # ALWAYS disable thinking by default
                 }
                 
                 # Add any kwargs passed to format_prompt (e.g., enable_thinking)
+                # But allow override if explicitly set to True
                 template_kwargs.update(kwargs)
                 
                 formatted = self.tokenizer.apply_chat_template(
@@ -470,7 +472,7 @@ class Model:
         if self.hf_model is None:
             raise ValueError("No model loaded")
 
-        # Format prompt
+        # Format prompt (thinking is disabled by default in format_prompt)
         formatted_prompt = self.format_prompt(prompt)
 
         # Track regeneration attempts for nonsense detection

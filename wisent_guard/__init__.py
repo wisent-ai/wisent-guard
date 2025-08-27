@@ -21,7 +21,7 @@ from .guard import WisentGuard
 from .inference import SafeInference
 from .vectors import ContrastiveVectors
 
-__version__ = "0.4.31"
+__version__ = "0.4.38"
 
 __all__ = [
     # Main classes

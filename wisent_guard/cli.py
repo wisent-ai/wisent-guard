@@ -6732,54 +6732,52 @@ def handle_generate_vector_command(args):
 def handle_multi_steer_command(args):
     """Handle the multi-steer command for dynamic vector combination."""
     try:
-        print("🎯 Multi-Vector Steering")
-        print("=" * 60)
+        # Removed all print statements that pollute stdout
 
         # Parse vector-weight pairs
         vectors_info = []
         total_weight = 0.0
 
-        print("\n📊 Loading steering vectors:")
+        # Loading steering vectors
         for vector_spec in args.vector:
             parts = vector_spec.split(":")
             if len(parts) != 2:
-                print(f"❌ Invalid vector specification: {vector_spec}")
-                print("   Expected format: path/to/vector.pt:weight")
+                sys.stderr.write(f"Error: Invalid vector specification: {vector_spec}\n")
+                sys.stderr.write("Expected format: path/to/vector.pt:weight\n")
                 sys.exit(1)
 
             path, weight_str = parts
             try:
                 weight = float(weight_str)
             except ValueError:
-                print(f"❌ Invalid weight: {weight_str}")
+                sys.stderr.write(f"Error: Invalid weight: {weight_str}\n")
                 sys.exit(1)
 
             vectors_info.append((path, weight))
             total_weight += weight
-            print(f"   • {path}: weight={weight}")
+            # Vector loaded: {path}: weight={weight}
 
         # Check weight normalization
         if args.normalize_weights:
-            print(f"\n📏 Normalizing weights (sum={total_weight:.2f} → 1.0)")
+            # Normalizing weights
         elif args.target_norm is not None:
             # If target norm is specified, we don't need to worry about weight normalization
-            print(f"\n🎯 Target norm specified: {args.target_norm:.2f}")
-            print(f"   Current weight sum: {total_weight:.2f}")
+            # Target norm specified
         elif not args.allow_unnormalized and abs(total_weight - 1.0) > 0.01:
-            print(f"\n⚠️  Warning: Weights sum to {total_weight:.2f} (not 1.0)")
-            print(
-                "   Use --normalize-weights to normalize, --target-norm to set a specific norm, or --allow-unnormalized to proceed"
+            sys.stderr.write(f"Warning: Weights sum to {total_weight:.2f} (not 1.0)\n")
+            sys.stderr.write(
+                "Use --normalize-weights to normalize, --target-norm to set a specific norm, or --allow-unnormalized to proceed\n"
             )
             sys.exit(1)
 
         # Load model
-        print(f"\n📦 Loading model: {args.model}")
+        # Loading model
         from .core.model import Model
 
         model = Model(name=args.model, device=args.device)
 
         # Load and combine vectors
-        print("\n🔄 Loading and combining vectors...")
+        # Loading and combining vectors
         from .core.layer import Layer
         from .core.steering_methods_tensor.dac_attention import DAC
 
@@ -6791,7 +6789,7 @@ def handle_multi_steer_command(args):
         weights = []
 
         for path, weight in vectors_info:
-            print(f"   Loading {path}...")
+            # Loading vector file
             data = torch.load(path, map_location=args.device)
 
             # Extract vector based on format
@@ -6814,11 +6812,11 @@ def handle_multi_steer_command(args):
                         first_prop = list(data["property_vectors"].values())[0]
                         vector = first_prop["vector"]
                 else:
-                    print(f"❌ Could not find steering vector in {path}")
-                    print(f"   Available keys: {list(data.keys())}")
+                    sys.stderr.write(f"Error: Could not find steering vector in {path}\n")
+                    sys.stderr.write(f"Available keys: {list(data.keys())}\n")
                     sys.exit(1)
             else:
-                print(f"❌ Unexpected data format in {path}: {type(data)}")
+                sys.stderr.write(f"Error: Unexpected data format in {path}: {type(data)}\n")
                 sys.exit(1)
 
             loaded_vectors.append(vector)
@@ -6829,10 +6827,8 @@ def handle_multi_steer_command(args):
             loaded_vectors, weights, normalize_weights=args.normalize_weights
         )
 
-        print(f"\n✅ Combined {len(loaded_vectors)} vectors")
-        print(f"   📏 Combined vector shape: {combined_vector.shape}")
+        # Combined vectors
         original_norm = torch.norm(combined_vector).item()
-        print(f"   📊 Combined vector norm: {original_norm:.4f}")
 
         # Scale to target norm if specified
         if args.target_norm is not None:
@@ -6841,13 +6837,13 @@ def handle_multi_steer_command(args):
                 scale_factor = args.target_norm / current_norm
                 combined_vector = combined_vector * scale_factor
                 new_norm = torch.norm(combined_vector).item()
-                print(f"   🎯 Scaled to target norm: {new_norm:.4f} (scale factor: {scale_factor:.4f})")
+                # Scaled to target norm
             else:
-                print("   ⚠️  Cannot scale zero vector to target norm")
+                sys.stderr.write("Warning: Cannot scale zero vector to target norm\n")
 
         # Save combined vector if requested
         if args.save_combined:
-            print(f"\n💾 Saving combined vector to: {args.save_combined}")
+            # Saving combined vector
             save_data = {
                 "method": "DAC",
                 "steering_vector": combined_vector,
@@ -6862,10 +6858,7 @@ def handle_multi_steer_command(args):
             torch.save(save_data, args.save_combined)
 
         # Apply combined steering and generate
-        print("\n🚀 Generating with combined steering...")
-        print(f"   📝 Prompt: {args.prompt}")
-        print(f"   📍 Layer: {args.layer}")
-        print(f"   🔢 Max tokens: {args.max_new_tokens}")
+        # Generating with combined steering
 
         # Create a temporary DAC instance with the combined vector
         layer = Layer(args.layer)
@@ -6907,38 +6900,36 @@ def handle_multi_steer_command(args):
         elif hasattr(model.hf_model, "transformer") and hasattr(model.hf_model.transformer, "h"):
             layer_module = model.hf_model.transformer.h[args.layer]
         else:
-            print("❌ Could not find model layers")
+            sys.stderr.write("Error: Could not find model layers\n")
             sys.exit(1)
 
         handle = layer_module.register_forward_hook(steering_hook)
         hooks.append(handle)
 
         try:
-            # Generate
-            response, _ = model.generate(args.prompt, layer_index=args.layer, max_new_tokens=args.max_new_tokens)
+            # Generate (thinking is disabled by default)
+            response, _ = model.generate(
+                args.prompt, 
+                layer_index=args.layer, 
+                max_new_tokens=args.max_new_tokens
+            )
 
-            print("\n" + "=" * 60)
-            print("📝 Generated Response:")
-            print("=" * 60)
+            # Output only the actual response
             print(response)
 
             if args.verbose:
-                print("\n📊 Combination Details:")
-                for i, (path, weight) in enumerate(vectors_info):
-                    norm_weight = weights[i] if args.normalize_weights else weight
-                    print(f"   • Vector {i + 1}: {path}")
-                    print(f"     Weight: {weight} → {norm_weight:.4f}")
-                    print(f"     Contribution: {norm_weight * torch.norm(loaded_vectors[i]).item():.4f}")
+                # Verbose mode - combination details suppressed for stdout clarity
+                pass
 
         finally:
             # Remove hooks
             for hook in hooks:
                 hook.remove()
 
-        print("\n✅ Multi-vector steering completed successfully!")
+        # Multi-vector steering completed
 
     except Exception as e:
-        print(f"\n❌ Error in multi-vector steering: {e}")
+        sys.stderr.write(f"Error in multi-vector steering: {e}\n")
         import traceback
 
         if args.verbose:
