@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import torch
 
 from .core import ContrastivePairSet, Layer, Model, SteeringMethod, SteeringType
-from .core.activations import TestActivationCache
+from .utils.activation_monitor import TestActivationCache
 from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
