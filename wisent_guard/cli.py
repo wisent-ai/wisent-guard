@@ -1611,12 +1611,13 @@ def run_task_pipeline(
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
 
         # Create contrastive pairs using proper activation collection logic
+        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+        from wisent_guard.core.activations_old import Activations
+
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
         )
-        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
-        from .core.activations import ActivationAggregationMethod, Activations
 
         # Convert strings to enums
         prompt_strategy_mapping = {
@@ -3389,18 +3390,11 @@ The task will be skipped in optimization."""
                                         layer_activations = outputs.hidden_states[
                                             layers[0] + 1
                                         ]  # +1 because hidden_states[0] is embeddings
-
-                                        # Create Activations object
-                                        from .core.activations import (
-                                            ActivationAggregationMethod,
-                                            Activations,
-                                        )
-
                                         layer_obj = Layer(index=layers[0], type="transformer")
                                         activations_obj = Activations(
                                             tensor=layer_activations,
                                             layer=layer_obj,
-                                            aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                                            aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                                         )
 
                                         # Add to cache
@@ -6331,11 +6325,12 @@ def handle_generate_vector_command(args):
         model = Model(name=args.model, device=args.device)
 
         # Import activation collection logic
+        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+
         from .core.activation_collection_method import (
             ActivationCollectionLogic,
             PromptConstructionStrategy,
         )
-        from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
 
         # Create activation collection logic instance
         activation_logic = ActivationCollectionLogic(model)

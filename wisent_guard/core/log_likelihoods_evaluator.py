@@ -10,6 +10,10 @@ directly on each choice to evaluate performance against known ground truth.
 import logging
 from typing import Any, Dict, Optional
 
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.layer import Layer
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,12 +104,8 @@ class LogLikelihoodsEvaluator:
 
             logger.info(f"Created {len(contrastive_pairs)} contrastive pairs")
 
-            # Use existing activation extraction infrastructure
-            # TODO REFACTOR
-            from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
-
             # Map token aggregation to token targeting strategy for evaluation
-            targeting_strategy_mapping = {
+            targeting_strategy_mapping = {  # TODO Refactor - we should stay with one standard
                 "average": TokenTargetingStrategy.MEAN_POOLING,
                 "final": TokenTargetingStrategy.LAST_TOKEN,
                 "first": TokenTargetingStrategy.FIRST_TOKEN,
@@ -170,7 +170,7 @@ class LogLikelihoodsEvaluator:
                     )
 
             # Map token aggregation to activation method
-            activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
+            activation_method = token_aggregation
             logger.info(
                 f"🎯 Using activation aggregation method: {activation_method.value} (from token_aggregation: {token_aggregation})"
             )
@@ -230,8 +230,7 @@ class LogLikelihoodsEvaluator:
             classifier: The classifier to evaluate
             processed_pair: ContrastivePair with activations already extracted
             qa_pair: Original QA pair data for reference
-            activation_method: ActivationAggregationMethod to use for feature extraction
-
+            activation_method:
         Returns:
             Dict containing evaluation results for this sample
         """
@@ -248,10 +247,6 @@ class LogLikelihoodsEvaluator:
                     "classifier_correct": False,
                     "error": "Missing activations",
                 }
-
-            # Create Activations objects for proper feature extraction
-            from .activations import Activations
-            from .layer import Layer
 
             layer_obj = Layer(index=15, type="transformer")
 
@@ -306,21 +301,6 @@ class LogLikelihoodsEvaluator:
                 "classifier_correct": False,
                 "error": str(e),
             }
-
-    def _map_token_aggregation_to_activation_method(self, token_aggregation: str):
-        """Map CLI token aggregation to ActivationAggregationMethod."""
-        from .activations import ActivationAggregationMethod
-
-        # Map CLI token aggregation to activation aggregation method
-        mapping = {
-            "average": ActivationAggregationMethod.MEAN,
-            "final": ActivationAggregationMethod.LAST_TOKEN,
-            "first": ActivationAggregationMethod.LAST_TOKEN,  # Fallback to last token
-            "max": ActivationAggregationMethod.MAX,
-            "min": ActivationAggregationMethod.MAX,  # Fallback to max
-        }
-
-        return mapping.get(token_aggregation, ActivationAggregationMethod.MEAN)
 
     def _error_result(self, error_msg: str) -> Dict[str, Any]:
         """Return an error result."""

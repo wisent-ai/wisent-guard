@@ -1,27 +1,17 @@
+from typing import Any, Dict, List, Optional
+
 import torch
 import torch.nn.functional as F
-from .layer import Layer
-from enum import Enum
-from typing import Optional, Dict, Any, Union, List, Tuple
 
-try:
-    from .contrastive_pairs import ContrastivePair
-except ImportError:
-    from contrastive_pairs import ContrastivePair
-from .response import PositiveResponse, NegativeResponse
-
-
-class ActivationAggregationMethod(Enum):
-    LAST_TOKEN = "last_token"
-    MEAN = "mean"
-    MAX = "max"
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.layer import Layer
 
 
 class Activations:
-    def __init__(self, tensor, layer, aggregation_method=None):
+    def __init__(self, tensor, layer, aggregation_method: TokenTargetingStrategy = TokenTargetingStrategy.LAST_TOKEN):
         self.tensor = tensor
         self.layer = layer
-        self.aggregation_method = aggregation_method or ActivationAggregationMethod.LAST_TOKEN
+        self.aggregation_method = aggregation_method
 
     def get_aggregated(self):
         """
@@ -30,40 +20,35 @@ class Activations:
         Returns:
             torch.Tensor: Aggregated activation tensor
         """
-        if self.aggregation_method == ActivationAggregationMethod.LAST_TOKEN:
+        if self.aggregation_method == TokenTargetingStrategy.LAST_TOKEN:
             # Return the last token's activations
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0, -1, :]  # Take last token of first batch
-            elif len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
+            if len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
                 return self.tensor[-1, :]  # Take last token
-            else:
-                return self.tensor  # Already aggregated
+            return self.tensor  # Already aggregated
 
-        elif self.aggregation_method == ActivationAggregationMethod.MEAN:
+        if self.aggregation_method == TokenTargetingStrategy.MEAN:
             # Return mean across sequence dimension
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0].mean(dim=0)  # Mean across sequence length
-            elif len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
+            if len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
                 return self.tensor.mean(dim=0)  # Mean across sequence length
-            else:
-                return self.tensor
+            return self.tensor
 
-        elif self.aggregation_method == ActivationAggregationMethod.MAX:
+        if self.aggregation_method == TokenTargetingStrategy.MAX:
             # Return max across sequence dimension
             if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
                 return self.tensor[0].max(dim=0)[0]  # Max across sequence length
-            elif len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
+            if len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
                 return self.tensor.max(dim=0)[0]  # Max across sequence length
-            else:
-                return self.tensor
-        else:
-            # Default to last token
-            if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
-                return self.tensor[0, -1, :]  # Take last token of first batch
-            elif len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
-                return self.tensor[-1, :]  # Take last token
-            else:
-                return self.tensor  # Already aggregated
+            return self.tensor
+        # Default to last token
+        if len(self.tensor.shape) >= 3:  # [batch, seq_len, hidden_dim]
+            return self.tensor[0, -1, :]  # Take last token of first batch
+        if len(self.tensor.shape) == 2:  # [seq_len, hidden_dim]
+            return self.tensor[-1, :]  # Take last token
+        return self.tensor  # Already aggregated
 
     def calculate_similarity(self, other_tensor: torch.Tensor, method: str = "cosine") -> float:
         """
@@ -103,20 +88,19 @@ class Activations:
                 similarity = (cos_sim.item() + 1.0) / 2.0
                 return max(0.0, min(1.0, similarity))
 
-            elif method == "dot":
+            if method == "dot":
                 # Dot product similarity
                 dot_product = torch.dot(activation, other_tensor)
                 return dot_product.item()
 
-            elif method == "euclidean":
+            if method == "euclidean":
                 # Negative euclidean distance (higher = more similar)
                 distance = torch.norm(activation - other_tensor)
                 return -distance.item()
 
-            else:
-                raise ValueError(f"Unknown similarity method: {method}")
+            raise ValueError(f"Unknown similarity method: {method}")
 
-        except Exception as e:
+        except Exception:
             # Return 0 similarity on error
             return 0.0
 
@@ -229,10 +213,8 @@ class Activations:
                 layer_hidden_state = hidden_states[layer.index + 1]
 
                 return cls(tensor=layer_hidden_state, layer=layer, aggregation_method=aggregation_method)
-            else:
-                raise ValueError(f"Layer {layer.index} not found in model with {len(hidden_states)} layers")
-        else:
-            raise ValueError("Model outputs don't contain hidden_states")
+            raise ValueError(f"Layer {layer.index} not found in model with {len(hidden_states)} layers")
+        raise ValueError("Model outputs don't contain hidden_states")
 
     @classmethod
     def from_tensor_dict(
@@ -344,7 +326,7 @@ class ActivationMonitor:
             activations = self.current_activations
 
         if len(self.activation_history) < 2:
-            return {layer_idx: False for layer_idx in activations}
+            return dict.fromkeys(activations, False)
 
         anomalies = {}
         for layer_idx in activations:
@@ -384,6 +366,7 @@ class ActivationMonitor:
     def load_activations(self, filepath: str) -> Dict[int, Activations]:
         """Load activations from file."""
         import torch
+
         from .layer import Layer
 
         loaded_data = torch.load(filepath)
@@ -413,8 +396,8 @@ class TestActivationCache:
 
     def save_to_file(self, filepath: str) -> None:
         """Save cached activations to file."""
+
         import torch
-        import json
 
         if not self.activations:
             raise ValueError("No activations to save")
@@ -451,6 +434,7 @@ class TestActivationCache:
     def load_from_file(cls, filepath: str) -> "TestActivationCache":
         """Load cached activations from file."""
         import torch
+
         from .layer import Layer
 
         loaded_data = torch.load(filepath, map_location="cpu")
@@ -464,12 +448,11 @@ class TestActivationCache:
             layer_obj = Layer(index=item["layer"], type="transformer")
 
             # Reconstruct aggregation method
-            from .activations import ActivationAggregationMethod
 
-            agg_method = ActivationAggregationMethod.LAST_TOKEN  # default
+            agg_method = TokenTargetingStrategy.LAST_TOKEN  # default
             try:
                 if item.get("aggregation_method"):
-                    agg_method = ActivationAggregationMethod(item["aggregation_method"])
+                    agg_method = TokenTargetingStrategy(item["aggregation_method"])
             except:
                 pass
 

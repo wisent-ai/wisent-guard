@@ -1,14 +1,17 @@
-from enum import Enum
-from wisent_guard.core.classifiers.classifier import Classifier
-from .contrastive_pairs import ContrastivePairSet
-from .activations import Activations
-from .steering_method import CAA
-import torch
-import torch.nn.functional as F
+import datetime
 import json
 import os
-import datetime
-from typing import Dict, Any, Optional, List, Union
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+
+import torch
+import torch.nn.functional as F
+
+from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.classifiers.classifier import Classifier
+
+from .contrastive_pairs import ContrastivePairSet
+from .steering_method import CAA
 
 
 class SteeringType(Enum):
@@ -164,8 +167,7 @@ class SteeringMethod:
                 "threshold": self.threshold,
                 "method_type": self.method_type.value,
             }
-        else:
-            return is_harmful
+        return is_harmful
 
     def check_safety(self, text: str, model, layer) -> Dict[str, Any]:
         """
@@ -269,7 +271,7 @@ class SteeringMethod:
 
             # Read existing log entries
             try:
-                with open(self.log_file_path, "r") as f:
+                with open(self.log_file_path) as f:
                     log_entries = json.load(f)
             except (FileNotFoundError, json.JSONDecodeError):
                 log_entries = []
@@ -306,7 +308,7 @@ class SteeringMethod:
                 return []
 
             # Read log entries
-            with open(self.log_file_path, "r") as f:
+            with open(self.log_file_path) as f:
                 log_entries = json.load(f)
 
             # Filter by category if specified

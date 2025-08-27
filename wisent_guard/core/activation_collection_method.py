@@ -20,7 +20,8 @@ from typing import Dict, List, Tuple
 import torch
 
 from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
-from .activations import ActivationAggregationMethod, Activations
+from wisent_guard.core.activations_old import Activations
+
 from .layer import Layer
 
 try:
@@ -510,7 +511,7 @@ class ActivationCollectionLogic:
                 pos_act = Activations(
                     tensor=pair.positive_activations,
                     layer=layer,
-                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                 )
                 positive_activations.append(pos_act)
 
@@ -518,7 +519,7 @@ class ActivationCollectionLogic:
                 neg_act = Activations(
                     tensor=pair.negative_activations,
                     layer=layer,
-                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                 )
                 negative_activations.append(neg_act)
 

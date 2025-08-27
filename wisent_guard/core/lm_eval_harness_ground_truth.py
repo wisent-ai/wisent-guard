@@ -7,6 +7,10 @@ This module provides ground truth evaluation using the lm-eval-harness framework
 import logging
 from typing import Any, Dict
 
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations_old import Activations
+from wisent_guard.core.layer import Layer
+
 logger = logging.getLogger(__name__)
 
 
@@ -203,10 +207,6 @@ class LMEvalHarnessGroundTruth:
             classification_results = []
             for response_data in generated_responses:
                 try:
-                    # Create layer object first
-                    from .activations import Activations
-                    from .layer import Layer
-
                     layer_obj = Layer(index=layer, type="transformer")
 
                     # Extract activations from generated response
@@ -349,9 +349,6 @@ class LMEvalHarnessGroundTruth:
 
                         # Extract activations from the text for classifier
                         try:
-                            from .activations import Activations
-                            from .layer import Layer
-
                             layer_obj = Layer(index=layer, type="transformer")
 
                             # Use a truncated version for activation extraction if text is too long
@@ -479,10 +476,6 @@ class LMEvalHarnessGroundTruth:
                         # Classify the best choice using the classifier
                         classification_score = None
                         try:
-                            # Create layer object first
-                            from .activations import Activations
-                            from .layer import Layer
-
                             layer_obj = Layer(index=layer, type="transformer")
 
                             # Extract activations from the best choice
@@ -665,16 +658,15 @@ class LMEvalHarnessGroundTruth:
 
     def _map_token_aggregation_to_activation_method(self, token_aggregation: str):
         """Map token aggregation string to activation method."""
-        from .activations import ActivationAggregationMethod
 
-        mapping = {
-            "average": ActivationAggregationMethod.MEAN,
-            "mean": ActivationAggregationMethod.MEAN,
-            "last": ActivationAggregationMethod.LAST_TOKEN,
-            "max": ActivationAggregationMethod.MAX,
+        mapping = {  # TODO This should be refactor, why we use strings as Token aggregation?
+            "average": TokenTargetingStrategy.MEAN,
+            "mean": TokenTargetingStrategy.MEAN,
+            "last": TokenTargetingStrategy.LAST_TOKEN,
+            "max": TokenTargetingStrategy.MAX,
         }
 
-        return mapping.get(token_aggregation.lower(), ActivationAggregationMethod.MEAN)
+        return mapping.get(token_aggregation.lower(), TokenTargetingStrategy.MEAN)
 
     def _is_task_interface_task(self, task_name: str) -> bool:
         """Check if this is a TaskInterface task (not an lm-eval task)."""
@@ -1321,10 +1313,6 @@ class LMEvalHarnessGroundTruth:
             classification_results = []
             for i, code in enumerate(generated_codes):
                 try:
-                    # Create layer object
-                    from .activations import Activations
-                    from .layer import Layer
-
                     layer_obj = Layer(index=layer, type="transformer")
 
                     # Extract activations from generated code

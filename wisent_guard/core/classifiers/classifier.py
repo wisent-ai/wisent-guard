@@ -1,10 +1,13 @@
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader, random_split
-from typing import List, Dict, Any, Optional, Union
-import logging
-import os
+from torch.utils.data import DataLoader, TensorDataset, random_split
+
+from wisent_guard.core.activations_old import Activations
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +299,7 @@ class Classifier:
             try:
                 auc = calculate_roc_auc(all_labels, all_probs)
                 metrics["auc"].append(auc)
-            except Exception as e:
+            except Exception:
                 metrics["auc"].append(0.0)
 
             # Print progress
@@ -600,8 +603,6 @@ class ActivationClassifier:
         self, harmful_activations: List["Activations"], harmless_activations: List["Activations"]
     ) -> Dict[str, Any]:
         """Train classifier on activation data."""
-        from .activations import Activations
-
         # Prepare training data
         X = []
         y = []

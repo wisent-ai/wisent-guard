@@ -7,7 +7,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import torch
 
-from ..activations import ActivationAggregationMethod, Activations
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations_old import Activations
+
 from ..response import NegativeResponse, PositiveResponse
 from .contrastive_pair import ContrastivePair
 
@@ -175,7 +177,7 @@ class ContrastivePairSet:
         """Extract activations for all responses using the model."""
         extraction_errors = []
         successful_extractions = 0
-        
+
         for i, pair in enumerate(self.pairs):
             # Extract activations for positive response
             if pair.positive_response.text:
@@ -185,7 +187,7 @@ class ContrastivePairSet:
                     pair.positive_response.activations = activations_tensor
                     successful_extractions += 1
                 except Exception as e:
-                    error_msg = f"Pair {i} positive response: {str(e)}"
+                    error_msg = f"Pair {i} positive response: {e!s}"
                     extraction_errors.append(error_msg)
                     logger.error(f"Error extracting positive activations: {e}")
 
@@ -197,14 +199,14 @@ class ContrastivePairSet:
                     pair.negative_response.activations = activations_tensor
                     successful_extractions += 1
                 except Exception as e:
-                    error_msg = f"Pair {i} negative response: {str(e)}"
+                    error_msg = f"Pair {i} negative response: {e!s}"
                     extraction_errors.append(error_msg)
                     logger.error(f"Error extracting negative activations: {e}")
-        
+
         # Log summary
         total_expected = len(self.pairs) * 2  # positive and negative for each pair
         logger.info(f"Activation extraction completed: {successful_extractions}/{total_expected} successful")
-        
+
         if extraction_errors:
             logger.warning(f"Encountered {len(extraction_errors)} extraction errors")
             if len(extraction_errors) == total_expected:
@@ -262,7 +264,7 @@ class ContrastivePairSet:
                 pos_activations = Activations(
                     tensor=pair.positive_response.activations,
                     layer=layer,
-                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                 )
                 activations_list.append(pos_activations)
                 labels_list.append(0)  # 0 for positive/harmless
@@ -272,7 +274,7 @@ class ContrastivePairSet:
                 neg_activations = Activations(
                     tensor=pair.negative_response.activations,
                     layer=layer,
-                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                 )
                 activations_list.append(neg_activations)
                 labels_list.append(1)  # 1 for negative/harmful
@@ -298,7 +300,7 @@ class ContrastivePairSet:
                 pos_activations = Activations(
                     tensor=pair.positive_response.activations,
                     layer=layer,
-                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                 )
                 positive_activations.append(pos_activations.get_aggregated())
 
@@ -306,7 +308,7 @@ class ContrastivePairSet:
                 neg_activations = Activations(
                     tensor=pair.negative_response.activations,
                     layer=layer,
-                    aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                    aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                 )
                 negative_activations.append(neg_activations.get_aggregated())
 
@@ -383,7 +385,7 @@ class ContrastivePairSet:
                     pos_activations = Activations(
                         tensor=pair.positive_response.activations,
                         layer=layer,
-                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                        aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                     )
                     pos_similarity = pos_activations.calculate_similarity(vector)
                     pos_predicted_harmful = pos_similarity >= threshold
@@ -399,7 +401,7 @@ class ContrastivePairSet:
                     neg_activations = Activations(
                         tensor=pair.negative_response.activations,
                         layer=layer,
-                        aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                        aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
                     )
                     neg_similarity = neg_activations.calculate_similarity(vector)
                     neg_predicted_harmful = neg_similarity >= threshold

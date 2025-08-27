@@ -9,11 +9,14 @@ This module handles:
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+from wisent_guard.core.activations.activation_strategies import TokenTargetingStrategy
+from wisent_guard.core.activations_old import Activations
 from wisent_guard.core.classifiers.classifier import Classifier
-from ..model import Model
+
 from ..layer import Layer
-from ..activations import Activations, ActivationAggregationMethod
+from ..model import Model
 
 
 @dataclass
@@ -112,7 +115,7 @@ class ResponseDiagnostics:
             activations = Activations(
                 tensor=activations_tensor,
                 layer=classifier_config["layer"],
-                aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
             )
 
             # Get features for classifier
@@ -152,7 +155,7 @@ class ResponseDiagnostics:
             activations = Activations(
                 tensor=activations_tensor,
                 layer=classifier_config["layer"],
-                aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                aggregation_method=TokenTargetingStrategy.LAST_TOKEN,
             )
 
             # Get features

@@ -10,3 +10,9 @@ class TokenTargetingStrategy(Enum):
     FIRST_TOKEN = "first_token"  # Always use first token
     MEAN_POOLING = "mean_pooling"  # Use mean of all tokens
     MAX_POOLING = "max_pooling"  # Use max pooling across tokens
+
+
+# class ActivationAggregationMethod(Enum):
+#     LAST_TOKEN = "last_token"
+#     MEAN = "mean"
+#     MAX = "max"
