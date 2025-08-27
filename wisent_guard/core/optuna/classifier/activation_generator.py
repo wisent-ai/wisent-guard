@@ -16,18 +16,19 @@ import torch
 import numpy as np
 
 from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
+from wisent_guard.core.activations.core import Activations, ActivationAggregationStrategy
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ActivationData:
-    """Container for pre-generated activation data."""
+    """Container for pre-generated activation data with Activations wrapper integration."""
 
     activations: torch.Tensor
     labels: torch.Tensor
     layer: int
-    aggregation: str
+    aggregation: ActivationAggregationStrategy
     metadata: dict[str, Any]
 
     def to_numpy(self) -> tuple[np.ndarray, np.ndarray]:
@@ -49,13 +50,57 @@ class ActivationData:
             y = self.labels.to(dtype=target_dtype)
         return X, y
 
+    def to_activations_objects(self) -> list[Activations]:
+        """
+        Convert stored activations to Activations objects for better abstraction.
+
+        Returns:
+            List of Activations objects, one per sample
+        """
+        activations_list = []
+
+        # Create Activations object for each sample using enum directly (no conversion needed!)
+        for i in range(self.activations.shape[0]):
+            sample_tensor = self.activations[i : i + 1]  # Keep batch dimension
+            activation_obj = Activations(
+                tensor=sample_tensor,
+                layer=self.layer,
+                aggregation_strategy=self.aggregation,  # Direct enum usage
+            )
+            activations_list.append(activation_obj)
+
+        return activations_list
+
+    def get_statistics(self) -> dict[str, Any]:
+        """Get statistics about the activation data using Activations primitives."""
+        # Create a representative Activations object for statistics
+        sample_activation = Activations(
+            tensor=self.activations[:1],  # Use first sample
+            layer=self.layer,
+            aggregation_strategy=self.aggregation,  # Direct enum usage
+        )
+
+        # Get core statistics and add our metadata
+        stats = sample_activation.get_statistics()
+        stats.update(
+            {
+                "n_samples": self.activations.shape[0],
+                "n_positive": self.metadata.get("n_positive", "unknown"),
+                "n_negative": self.metadata.get("n_negative", "unknown"),
+                "aggregation_method": self.aggregation.value,  # Display value for readability
+                "layer": self.layer,
+            }
+        )
+
+        return stats
+
 
 @dataclass
 class GenerationConfig:
     """Configuration for activation generation."""
 
     layer_search_range: tuple[int, int]
-    aggregation_methods: list[str]
+    aggregation_methods: Optional[list[ActivationAggregationStrategy]] = None
     cache_dir: Optional[str] = None
     device: Optional[str] = None
     dtype: Optional[torch.dtype] = None  # Auto-detect if None
@@ -65,7 +110,12 @@ class GenerationConfig:
         if self.cache_dir is None:
             self.cache_dir = "./activation_cache"
         if not self.aggregation_methods:
-            self.aggregation_methods = ["average", "final", "first", "max", "min"]
+            self.aggregation_methods = [
+                ActivationAggregationStrategy.MEAN_POOLING,
+                ActivationAggregationStrategy.LAST_TOKEN,
+                ActivationAggregationStrategy.FIRST_TOKEN,
+                ActivationAggregationStrategy.MAX_POOLING,
+            ]
 
 
 class ActivationGenerator:
@@ -143,19 +193,19 @@ class ActivationGenerator:
                 pos_stack = torch.stack(positive_activations)  # [n_samples, hidden_dim]
                 neg_stack = torch.stack(negative_activations)  # [n_samples, hidden_dim]
 
-                # Apply aggregation methods
+                # Apply aggregation methods using core Activations primitives (batch-optimized)
                 for aggregation in self.config.aggregation_methods:
                     try:
-                        # Apply aggregation to activations
-                        pos_aggregated = self._apply_aggregation(pos_stack, aggregation)
-                        neg_aggregated = self._apply_aggregation(neg_stack, aggregation)
+                        # Apply batch aggregation efficiently using core strategy logic
+                        pos_aggregated = self._apply_batch_aggregation(pos_stack, aggregation)
+                        neg_aggregated = self._apply_batch_aggregation(neg_stack, aggregation)
 
                         # Combine positive (label=0) and negative (label=1)
                         X = torch.cat([pos_aggregated, neg_aggregated], dim=0)
                         y = torch.cat([torch.zeros(len(pos_aggregated)), torch.ones(len(neg_aggregated))], dim=0)
 
                         # Create activation data
-                        key = f"layer_{layer}_agg_{aggregation}"
+                        key = f"layer_{layer}_agg_{aggregation.value}"
                         activation_data[key] = ActivationData(
                             activations=X,
                             labels=y,
@@ -170,10 +220,10 @@ class ActivationGenerator:
                             },
                         )
 
-                        self.logger.debug(f"Layer {layer}, aggregation {aggregation}: {X.shape[0]} samples")
+                        self.logger.debug(f"Layer {layer}, aggregation {aggregation.value}: {X.shape[0]} samples")
 
                     except Exception as e:
-                        self.logger.warning(f"Failed to apply aggregation {aggregation} for layer {layer}: {e}")
+                        self.logger.warning(f"Failed to apply aggregation {aggregation.value} for layer {layer}: {e}")
                         continue
 
             except Exception as e:
@@ -186,37 +236,40 @@ class ActivationGenerator:
         self.logger.info(f"Generated activations for {len(activation_data)} layer-aggregation combinations")
         return activation_data
 
-    def _apply_aggregation(self, activations: torch.Tensor, method: str) -> torch.Tensor:
+    def _apply_batch_aggregation(
+        self, activations: torch.Tensor, strategy: ActivationAggregationStrategy
+    ) -> torch.Tensor:
         """
-        Apply aggregation method to activations.
+        Apply aggregation strategy to a batch of activations efficiently.
+
+        Uses the same logic as core Activations primitives but optimized for batch processing.
 
         Args:
             activations: Tensor of shape [n_samples, ...] or [n_samples, n_tokens, hidden_dim]
-            method: Aggregation method
+            strategy: Aggregation strategy from core primitives
 
         Returns:
             Aggregated activations of shape [n_samples, hidden_dim]
         """
         if len(activations.shape) == 2:
-            # Already aggregated, just flatten if needed
+            # Already aggregated at token level, return as-is
             return activations
         elif len(activations.shape) == 3:
             # [n_samples, n_tokens, hidden_dim] -> [n_samples, hidden_dim]
-            if method == "average":
+            if strategy == ActivationAggregationStrategy.MEAN_POOLING:
                 return torch.mean(activations, dim=1)
-            elif method == "final":
+            elif strategy == ActivationAggregationStrategy.LAST_TOKEN:
                 return activations[:, -1, :]
-            elif method == "first":
+            elif strategy == ActivationAggregationStrategy.FIRST_TOKEN:
                 return activations[:, 0, :]
-            elif method == "max":
+            elif strategy == ActivationAggregationStrategy.MAX_POOLING:
                 return torch.max(activations, dim=1)[0]
-            elif method == "min":
-                return torch.min(activations, dim=1)[0]
             else:
-                # Default to average
+                # Default to mean pooling
+                self.logger.warning(f"Unknown aggregation strategy {strategy}, using mean pooling")
                 return torch.mean(activations, dim=1)
         else:
-            # Flatten to [n_samples, -1]
+            # Flatten to [n_samples, -1] for other shapes
             return activations.view(activations.shape[0], -1)
 
     def _create_cache_key(self, model_name: str, task_name: str, limit: int, data_type: str) -> str:
@@ -227,7 +280,7 @@ class ActivationGenerator:
             str(limit),
             data_type,
             f"{self.config.layer_search_range[0]}-{self.config.layer_search_range[1]}",
-            str(sorted(self.config.aggregation_methods)),
+            str(sorted([agg.value for agg in self.config.aggregation_methods])),
         ]
         key_string = "_".join(key_components)
         return hashlib.md5(key_string.encode()).hexdigest()
