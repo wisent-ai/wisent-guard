@@ -161,6 +161,10 @@ class SyntheticContrastivePairGenerator:
         Returns:
             list of question descriptions
         """
+        print(f"🔍 [generate_questions] Starting with trait: {trait_description}, num_questions: {num_questions}")
+        print(f"🔍 [generate_questions] self.model type: {type(self.model)}")
+        print(f"🔍 [generate_questions] self.model.tokenizer type: {type(self.model.tokenizer)}")
+        
         if self.model is None and force_new:
             raise ValueError("No model loaded. Cannot generate new questions.")
             
@@ -198,7 +202,15 @@ class SyntheticContrastivePairGenerator:
                 gap = max(num_questions - available_count, 50)  # At least 50 new questions
                 target_new = gap * 2  # Generate 2x what we need
             
-            generated_questions = self._generate_new_questions_parallel(target_new)
+            print(f"🔍 [generate_questions] About to call _generate_new_questions_parallel")
+            try:
+                generated_questions = self._generate_new_questions_parallel(target_new)
+                print(f"🔍 [generate_questions] _generate_new_questions_parallel returned {len(generated_questions)} questions")
+            except Exception as e:
+                print(f"🔍 [generate_questions] _generate_new_questions_parallel failed with: {e}")
+                import traceback
+                print(f"🔍 [generate_questions] Traceback:\n{traceback.format_exc()}")
+                raise
             
             # Add to bank
             added_count = self.question_bank.add_questions(generated_questions)
@@ -222,6 +234,10 @@ class SyntheticContrastivePairGenerator:
         Returns:
             List of generated questions
         """
+        print(f"🔍 [_generate_new_questions_parallel] Starting with target_count: {target_count}")
+        print(f"🔍 [_generate_new_questions_parallel] self.model type: {type(self.model)}")
+        print(f"🔍 [_generate_new_questions_parallel] self.model.tokenizer type: {type(self.model.tokenizer)}")
+        
         if self.model is None:
             raise ValueError("No model loaded. Cannot generate questions.")
             
@@ -322,8 +338,12 @@ class SyntheticContrastivePairGenerator:
         Returns:
             A list of unique question strings
         """
+        print(f"🔍 [_deduplicate_questions] Starting with {len(questions)} questions")
+        print(f"🔍 [_deduplicate_questions] self.similarity_model: {self.similarity_model}")
+        
         if not self.similarity_model or len(questions) <= 1:
             # Fallback to simple text-based deduplication
+            print(f"🔍 [_deduplicate_questions] Using text-based deduplication")
             return list(set(questions))
 
         # Batch encode all questions at once
@@ -537,6 +557,10 @@ class SyntheticContrastivePairGenerator:
                 return self._response_cache[cache_key]
         
         # Generate response
+        import time
+        start_time = time.time()
+        print(f"🟡 [Generation] Starting generation for prompt (first 100 chars): {prompt[:100]}...")
+        
         # Merge generation_kwargs with config, giving precedence to generation_kwargs
         merged_config = {**config, **self.generation_kwargs}
         
@@ -552,37 +576,51 @@ class SyntheticContrastivePairGenerator:
         else:
             formatted_prompt = self.model.format_prompt(prompt)
         
+        print(f"🟡 [Generation] Formatted prompt, tokenizing...")
         # Generate using the formatted prompt directly
         # Tokenize
         inputs = self.model.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+        print(f"🟡 [Generation] Tokenized, input shape: {inputs['input_ids'].shape}")
+        
         inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        
+        print(f"🟡 [Generation] Starting model.generate() with max_new_tokens: {merged_config.get('max_new_tokens', 150)}")
+        gen_start = time.time()
         
         # Generate
         with torch.no_grad():
-            # Get pad_token_id and eos_token_id safely
-            if hasattr(self.model.tokenizer, 'pad_token_id'):
-                pad_token_id = self.model.tokenizer.pad_token_id
-            elif isinstance(self.model.tokenizer, dict):
-                pad_token_id = self.model.tokenizer.get('pad_token_id', 0)
-            else:
-                pad_token_id = 0
-                
-            if hasattr(self.model.tokenizer, 'eos_token_id'):
-                eos_token_id = self.model.tokenizer.eos_token_id
-            elif isinstance(self.model.tokenizer, dict):
-                eos_token_id = self.model.tokenizer.get('eos_token_id', 0)
-            else:
-                eos_token_id = 0
+            # Import GenerationConfig from transformers
+            from transformers import GenerationConfig
             
-            outputs = self.model.hf_model.generate(
-                **inputs,
-                max_new_tokens=merged_config.get('max_new_tokens', 150),
-                temperature=merged_config.get('temperature', 0.7),
-                top_p=merged_config.get('top_p', 0.9),
-                do_sample=True,
-                pad_token_id=pad_token_id,
-                eos_token_id=eos_token_id,
-            )
+            # Create generation config with proper parameters
+            gen_config_dict = {
+                'max_new_tokens': merged_config.get('max_new_tokens', 150),
+                'temperature': merged_config.get('temperature', 0.7),
+                'top_p': merged_config.get('top_p', 0.9),
+                'do_sample': True,
+                'pad_token_id': self.model.tokenizer.pad_token_id,
+                'eos_token_id': self.model.tokenizer.eos_token_id,
+            }
+            
+            # Remove None values to avoid issues
+            gen_config_dict = {k: v for k, v in gen_config_dict.items() if v is not None}
+            
+            # Create GenerationConfig object
+            try:
+                generation_config = GenerationConfig(**gen_config_dict)
+                outputs = self.model.hf_model.generate(
+                    **inputs,
+                    generation_config=generation_config
+                )
+            except:
+                # Fallback for older transformers versions - use dict directly
+                outputs = self.model.hf_model.generate(
+                    **inputs,
+                    **gen_config_dict
+                )
+        
+        gen_time = time.time() - gen_start
+        print(f"🟡 [Generation] Generation completed in {gen_time:.2f} seconds")
         
         # Decode
         response = self.model.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
