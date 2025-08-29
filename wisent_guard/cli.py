@@ -4,15 +4,18 @@ Clean implementation using enhanced core primitives.
 """
 
 import logging
-import os
-import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import torch
 
+from wisent_guard.cli_workflows.activation_monitor import TestActivationCache
+from wisent_guard.cli_workflows.optimize import (
+    run_interactive_optimization,
+    run_smart_optimization,
+)
+
 from .core import ContrastivePairSet, Layer, Model, SteeringMethod, SteeringType
-from .core.activations import TestActivationCache
 from .core.contrastive_pairs import (
     generate_synthetic_pairs_cli,
     load_synthetic_pairs_cli,
@@ -35,14 +38,10 @@ from .inference import (
     generate_with_classification_and_handling,
     generate_with_multi_layer_classification_and_handling,
 )
-from .optimize import (
-    run_interactive_optimization,
-    run_smart_optimization,
-)
 
 # Import caching infrastructure
 try:
-    from .core.classifiers.pipeline_steps.download_full_benchmarks import (
+    from wisent_guard.core.download_full_benchmarks import (
         FullBenchmarkDownloader,
     )
 except ImportError:
@@ -54,7 +53,7 @@ try:
 
     # Import UNAVAILABLE_BENCHMARKS from download script
     try:
-        from .core.classifiers.pipeline_steps.download_full_benchmarks import (
+        from wisent_guard.core.download_full_benchmarks import (
             FullBenchmarkDownloader,
         )
 
@@ -1613,12 +1612,10 @@ def run_task_pipeline(
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
 
         # Create contrastive pairs using proper activation collection logic
-        from .core.activation_collection_method import (
+        from wisent_guard.core.activations import ActivationAggregationStrategy, Activations, PromptConstructionStrategy
+        from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
-            PromptConstructionStrategy,
-            TokenTargetingStrategy,
         )
-        from .core.activations import ActivationAggregationMethod, Activations
 
         # Convert strings to enums
         prompt_strategy_mapping = {
@@ -1632,15 +1629,15 @@ def run_task_pipeline(
         )
 
         targeting_strategy_mapping = {
-            "choice_token": TokenTargetingStrategy.CHOICE_TOKEN,
-            "continuation_token": TokenTargetingStrategy.CONTINUATION_TOKEN,
-            "last_token": TokenTargetingStrategy.LAST_TOKEN,
-            "first_token": TokenTargetingStrategy.FIRST_TOKEN,
-            "mean_pooling": TokenTargetingStrategy.MEAN_POOLING,
-            "max_pooling": TokenTargetingStrategy.MAX_POOLING,
+            "choice_token": ActivationAggregationStrategy.CHOICE_TOKEN,
+            "continuation_token": ActivationAggregationStrategy.CONTINUATION_TOKEN,
+            "last_token": ActivationAggregationStrategy.LAST_TOKEN,
+            "first_token": ActivationAggregationStrategy.FIRST_TOKEN,
+            "mean_pooling": ActivationAggregationStrategy.MEAN_POOLING,
+            "max_pooling": ActivationAggregationStrategy.MAX_POOLING,
         }
         targeting_strategy = targeting_strategy_mapping.get(
-            token_targeting_strategy, TokenTargetingStrategy.CHOICE_TOKEN
+            token_targeting_strategy, ActivationAggregationStrategy.CHOICE_TOKEN
         )
 
         if verbose:
@@ -3391,18 +3388,11 @@ The task will be skipped in optimization."""
                                         layer_activations = outputs.hidden_states[
                                             layers[0] + 1
                                         ]  # +1 because hidden_states[0] is embeddings
-
-                                        # Create Activations object
-                                        from .core.activations import (
-                                            ActivationAggregationMethod,
-                                            Activations,
-                                        )
-
                                         layer_obj = Layer(index=layers[0], type="transformer")
                                         activations_obj = Activations(
                                             tensor=layer_activations,
                                             layer=layer_obj,
-                                            aggregation_method=ActivationAggregationMethod.LAST_TOKEN,
+                                            aggregation_strategy=ActivationAggregationStrategy.LAST_TOKEN,
                                         )
 
                                         # Add to cache
@@ -5294,7 +5284,7 @@ def handle_classification_optimization_command(args):
                     return
 
         # Import and initialize classification optimizer
-        from .core.classification_optimizer import run_classification_optimization
+        from wisent_guard.cli_workflows.classification_optimizer import run_classification_optimization
 
         # Run the optimization
         summary = run_classification_optimization(
@@ -5742,7 +5732,7 @@ def handle_full_optimization_command(args):
                 elif status == "started":
                     print(f"   🔄 [{task_idx + 1}/{len(tasks)}] Optimizing {task_name}...")
 
-            from .core.classification_optimizer import run_classification_optimization
+            from wisent_guard.cli_workflows.classification_optimizer import run_classification_optimization
 
             classification_results = run_classification_optimization(
                 model_name=args.model,
@@ -5990,10 +5980,10 @@ def handle_full_optimization_command(args):
                             continue
 
                         # Create contrastive pairs
-                        from .core.activation_collection_method import (
+                        from wisent_guard.core.activations.activation_collection_method import (
                             ActivationCollectionLogic,
-                            PromptConstructionStrategy,
                         )
+                        from wisent_guard.core.activations.prompts import PromptConstructionStrategy
 
                         collector = ActivationCollectionLogic(model=model)
                         prompt_strategy = PromptConstructionStrategy.MULTIPLE_CHOICE
@@ -6331,20 +6321,20 @@ def handle_generate_vector_command(args):
         from .core.model import Model
 
         model = Model(name=args.model, device=args.device)
-        
+
         # Import activation collection logic
-        from .core.activation_collection_method import (
+        from wisent_guard.core.activations.activation_collection_method import (
             ActivationCollectionLogic,
-            PromptConstructionStrategy,
-            TokenTargetingStrategy,
         )
-        
+        from wisent_guard.core.activations.core import ActivationAggregationStrategy
+        from wisent_guard.core.activations.prompts import PromptConstructionStrategy
+
         # Create activation collection logic instance
         activation_logic = ActivationCollectionLogic(model)
-        
+
         # Parse strategies from args
         prompt_strategy = PromptConstructionStrategy(args.prompt_construction)
-        token_strategy = TokenTargetingStrategy(args.token_targeting)
+        token_strategy = ActivationAggregationStrategy(args.token_targeting)
 
         # Handle multi-property mode
         if args.multi_property:
@@ -6441,8 +6431,10 @@ def handle_generate_vector_command(args):
             print("\n🔍 Extracting activations for all properties...")
             for prop_name, (pairs, layer) in property_pairs.items():
                 print(f"   Processing {prop_name} (layer {layer})...")
-                print(f"   Using {prompt_strategy.value} prompt construction and {token_strategy.value} token targeting")
-                
+                print(
+                    f"   Using {prompt_strategy.value} prompt construction and {token_strategy.value} token targeting"
+                )
+
                 # Convert pairs to the format expected by activation collection
                 qa_pairs = []
                 for pair in pairs.pairs:
@@ -6452,12 +6444,12 @@ def handle_generate_vector_command(args):
                         "incorrect_answer": pair.negative_response.text,
                     }
                     qa_pairs.append(qa_pair)
-                
+
                 # Create contrastive pairs with proper prompt construction
                 constructed_pairs = activation_logic.create_batch_contrastive_pairs(
                     qa_pairs, prompt_strategy=prompt_strategy
                 )
-                
+
                 # Collect activations with proper token targeting
                 processed_pairs = activation_logic.collect_activations_batch(
                     constructed_pairs,
@@ -6465,7 +6457,7 @@ def handle_generate_vector_command(args):
                     device=args.device if args.device else "cuda",
                     token_targeting_strategy=token_strategy,
                 )
-                
+
                 # Copy activations back to original pairs
                 for orig_pair, proc_pair in zip(pairs.pairs, processed_pairs):
                     orig_pair.positive_response.activations = proc_pair.positive_activations
@@ -6569,7 +6561,7 @@ def handle_generate_vector_command(args):
         from .core.layer import Layer
 
         layer = Layer(args.layer)
-        
+
         # Convert pairs to the format expected by activation collection
         qa_pairs = []
         for pair in pairs.pairs:
@@ -6579,12 +6571,10 @@ def handle_generate_vector_command(args):
                 "incorrect_answer": pair.negative_response.text,
             }
             qa_pairs.append(qa_pair)
-        
+
         # Create contrastive pairs with proper prompt construction
-        constructed_pairs = activation_logic.create_batch_contrastive_pairs(
-            qa_pairs, prompt_strategy=prompt_strategy
-        )
-        
+        constructed_pairs = activation_logic.create_batch_contrastive_pairs(qa_pairs, prompt_strategy=prompt_strategy)
+
         # Collect activations with proper token targeting
         processed_pairs = activation_logic.collect_activations_batch(
             constructed_pairs,
@@ -6592,7 +6582,7 @@ def handle_generate_vector_command(args):
             device=args.device if args.device else "cuda",
             token_targeting_strategy=token_strategy,
         )
-        
+
         # Copy activations back to original pairs
         for orig_pair, proc_pair in zip(pairs.pairs, processed_pairs):
             orig_pair.positive_response.activations = proc_pair.positive_activations
@@ -6650,10 +6640,10 @@ def handle_generate_vector_command(args):
         os.makedirs(os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True)
 
         # Save using method-specific save logic
-        if args.method == "DAC" and hasattr(method, 'save_steering_tensor'):
+        if args.method == "DAC" and hasattr(method, "save_steering_tensor"):
             # Use the new tensor-based save method for DAC if available
             # But first add our metadata
-            if hasattr(method, 'metadata'):
+            if hasattr(method, "metadata"):
                 method.metadata = method.metadata or {}
                 method.metadata["prompt_construction"] = args.prompt_construction
                 method.metadata["token_targeting"] = args.token_targeting
@@ -6742,54 +6732,52 @@ def handle_generate_vector_command(args):
 def handle_multi_steer_command(args):
     """Handle the multi-steer command for dynamic vector combination."""
     try:
-        print("🎯 Multi-Vector Steering")
-        print("=" * 60)
+        # Removed all print statements that pollute stdout
 
         # Parse vector-weight pairs
         vectors_info = []
         total_weight = 0.0
 
-        print("\n📊 Loading steering vectors:")
+        # Loading steering vectors
         for vector_spec in args.vector:
             parts = vector_spec.split(":")
             if len(parts) != 2:
-                print(f"❌ Invalid vector specification: {vector_spec}")
-                print("   Expected format: path/to/vector.pt:weight")
+                sys.stderr.write(f"Error: Invalid vector specification: {vector_spec}\n")
+                sys.stderr.write("Expected format: path/to/vector.pt:weight\n")
                 sys.exit(1)
 
             path, weight_str = parts
             try:
                 weight = float(weight_str)
             except ValueError:
-                print(f"❌ Invalid weight: {weight_str}")
+                sys.stderr.write(f"Error: Invalid weight: {weight_str}\n")
                 sys.exit(1)
 
             vectors_info.append((path, weight))
             total_weight += weight
-            print(f"   • {path}: weight={weight}")
+            # Vector loaded: {path}: weight={weight}
 
         # Check weight normalization
         if args.normalize_weights:
-            print(f"\n📏 Normalizing weights (sum={total_weight:.2f} → 1.0)")
+            pass  # Normalizing weights
         elif args.target_norm is not None:
             # If target norm is specified, we don't need to worry about weight normalization
-            print(f"\n🎯 Target norm specified: {args.target_norm:.2f}")
-            print(f"   Current weight sum: {total_weight:.2f}")
+            pass  # Target norm specified
         elif not args.allow_unnormalized and abs(total_weight - 1.0) > 0.01:
-            print(f"\n⚠️  Warning: Weights sum to {total_weight:.2f} (not 1.0)")
-            print(
-                "   Use --normalize-weights to normalize, --target-norm to set a specific norm, or --allow-unnormalized to proceed"
+            sys.stderr.write(f"Warning: Weights sum to {total_weight:.2f} (not 1.0)\n")
+            sys.stderr.write(
+                "Use --normalize-weights to normalize, --target-norm to set a specific norm, or --allow-unnormalized to proceed\n"
             )
             sys.exit(1)
 
         # Load model
-        print(f"\n📦 Loading model: {args.model}")
+        # Loading model
         from .core.model import Model
 
         model = Model(name=args.model, device=args.device)
 
         # Load and combine vectors
-        print("\n🔄 Loading and combining vectors...")
+        # Loading and combining vectors
         from .core.layer import Layer
         from .core.steering_methods_tensor.dac_attention import DAC
 
@@ -6801,7 +6789,7 @@ def handle_multi_steer_command(args):
         weights = []
 
         for path, weight in vectors_info:
-            print(f"   Loading {path}...")
+            # Loading vector file
             data = torch.load(path, map_location=args.device)
 
             # Extract vector based on format
@@ -6824,11 +6812,11 @@ def handle_multi_steer_command(args):
                         first_prop = list(data["property_vectors"].values())[0]
                         vector = first_prop["vector"]
                 else:
-                    print(f"❌ Could not find steering vector in {path}")
-                    print(f"   Available keys: {list(data.keys())}")
+                    sys.stderr.write(f"Error: Could not find steering vector in {path}\n")
+                    sys.stderr.write(f"Available keys: {list(data.keys())}\n")
                     sys.exit(1)
             else:
-                print(f"❌ Unexpected data format in {path}: {type(data)}")
+                sys.stderr.write(f"Error: Unexpected data format in {path}: {type(data)}\n")
                 sys.exit(1)
 
             loaded_vectors.append(vector)
@@ -6839,10 +6827,8 @@ def handle_multi_steer_command(args):
             loaded_vectors, weights, normalize_weights=args.normalize_weights
         )
 
-        print(f"\n✅ Combined {len(loaded_vectors)} vectors")
-        print(f"   📏 Combined vector shape: {combined_vector.shape}")
+        # Combined vectors
         original_norm = torch.norm(combined_vector).item()
-        print(f"   📊 Combined vector norm: {original_norm:.4f}")
 
         # Scale to target norm if specified
         if args.target_norm is not None:
@@ -6851,13 +6837,13 @@ def handle_multi_steer_command(args):
                 scale_factor = args.target_norm / current_norm
                 combined_vector = combined_vector * scale_factor
                 new_norm = torch.norm(combined_vector).item()
-                print(f"   🎯 Scaled to target norm: {new_norm:.4f} (scale factor: {scale_factor:.4f})")
+                # Scaled to target norm
             else:
-                print("   ⚠️  Cannot scale zero vector to target norm")
+                sys.stderr.write("Warning: Cannot scale zero vector to target norm\n")
 
         # Save combined vector if requested
         if args.save_combined:
-            print(f"\n💾 Saving combined vector to: {args.save_combined}")
+            # Saving combined vector
             save_data = {
                 "method": "DAC",
                 "steering_vector": combined_vector,
@@ -6872,10 +6858,7 @@ def handle_multi_steer_command(args):
             torch.save(save_data, args.save_combined)
 
         # Apply combined steering and generate
-        print("\n🚀 Generating with combined steering...")
-        print(f"   📝 Prompt: {args.prompt}")
-        print(f"   📍 Layer: {args.layer}")
-        print(f"   🔢 Max tokens: {args.max_new_tokens}")
+        # Generating with combined steering
 
         # Create a temporary DAC instance with the combined vector
         layer = Layer(args.layer)
@@ -6917,38 +6900,37 @@ def handle_multi_steer_command(args):
         elif hasattr(model.hf_model, "transformer") and hasattr(model.hf_model.transformer, "h"):
             layer_module = model.hf_model.transformer.h[args.layer]
         else:
-            print("❌ Could not find model layers")
+            sys.stderr.write("Error: Could not find model layers\n")
             sys.exit(1)
 
         handle = layer_module.register_forward_hook(steering_hook)
         hooks.append(handle)
 
         try:
-            # Generate
-            response, _ = model.generate(args.prompt, layer_index=args.layer, max_new_tokens=args.max_new_tokens)
+            # Generate (thinking is disabled by default)
+            response, _ = model.generate(
+                args.prompt, 
+                layer_index=args.layer, 
+                max_new_tokens=args.max_new_tokens
+            )
 
-            print("\n" + "=" * 60)
-            print("📝 Generated Response:")
-            print("=" * 60)
-            print(response)
+            # Output only the actual response
+            # Flush immediately for streaming
+            print(response, flush=True)
 
             if args.verbose:
-                print("\n📊 Combination Details:")
-                for i, (path, weight) in enumerate(vectors_info):
-                    norm_weight = weights[i] if args.normalize_weights else weight
-                    print(f"   • Vector {i + 1}: {path}")
-                    print(f"     Weight: {weight} → {norm_weight:.4f}")
-                    print(f"     Contribution: {norm_weight * torch.norm(loaded_vectors[i]).item():.4f}")
+                # Verbose mode - combination details suppressed for stdout clarity
+                pass
 
         finally:
             # Remove hooks
             for hook in hooks:
                 hook.remove()
 
-        print("\n✅ Multi-vector steering completed successfully!")
+        # Multi-vector steering completed
 
     except Exception as e:
-        print(f"\n❌ Error in multi-vector steering: {e}")
+        sys.stderr.write(f"Error in multi-vector steering: {e}\n")
         import traceback
 
         if args.verbose:

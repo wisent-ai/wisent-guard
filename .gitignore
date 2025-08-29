@@ -111,12 +111,8 @@ models/*_vector*
 # Note: Trained classifiers are now tracked in git (small files ~2-3MB total)
 # wisent_guard/core/classifiers/meta_*
 
-# Downloaded benchmarks (can be large)
-wisent_guard/core/classifiers/benchmarks/
-
 # Full benchmark downloads (complete datasets - very large)
 full_benchmarks/
-wisent_guard/core/classifiers/full_benchmarks/
 
 # Results and evaluation outputs
 results/

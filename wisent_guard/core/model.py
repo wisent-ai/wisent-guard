@@ -223,9 +223,11 @@ class Model:
                 template_kwargs = {
                     "tokenize": False,
                     "add_generation_prompt": (response is None),  # Add generation prompt only if no response
+                    "enable_thinking": False,  # ALWAYS disable thinking by default
                 }
                 
                 # Add any kwargs passed to format_prompt (e.g., enable_thinking)
+                # But allow override if explicitly set to True
                 template_kwargs.update(kwargs)
                 
                 formatted = self.tokenizer.apply_chat_template(
@@ -470,7 +472,7 @@ class Model:
         if self.hf_model is None:
             raise ValueError("No model loaded")
 
-        # Format prompt
+        # Format prompt (thinking is disabled by default in format_prompt)
         formatted_prompt = self.format_prompt(prompt)
 
         # Track regeneration attempts for nonsense detection
@@ -673,6 +675,64 @@ class Model:
             activations = None
 
         return generated_text, activations, token_count
+
+    def generate_stream(
+        self,
+        prompt: str,
+        layer_index: int = None,
+        max_new_tokens: int = 50,
+        **generation_kwargs,
+    ):
+        """Generate text with streaming output - yields tokens as they are generated."""
+        if self.hf_model is None:
+            raise ValueError("No model loaded")
+
+        # Format prompt (thinking is disabled by default)
+        formatted_prompt = self.format_prompt(prompt)
+
+        # Prepare inputs
+        inputs = self.tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(self.hf_model.device) for k, v in inputs.items()}
+
+        # Import TextIteratorStreamer for streaming
+        from transformers import TextIteratorStreamer
+        from threading import Thread
+        import torch
+
+        # Create streamer
+        streamer = TextIteratorStreamer(
+            self.tokenizer, 
+            skip_prompt=True, 
+            skip_special_tokens=True
+        )
+
+        # Prepare generation config
+        gen_config_dict = {
+            "max_new_tokens": max_new_tokens,
+            "do_sample": True,
+            "temperature": 0.7,
+            "pad_token_id": self.tokenizer.pad_token_id,
+            "streamer": streamer,
+            **generation_kwargs,
+        }
+        
+        # Remove None values
+        gen_config_dict = {k: v for k, v in gen_config_dict.items() if v is not None}
+
+        # Start generation in a separate thread with inference mode
+        def generate_fn():
+            with torch.inference_mode():
+                self.hf_model.generate(**inputs, **gen_config_dict)
+        
+        generation_thread = Thread(target=generate_fn)
+        generation_thread.start()
+
+        # Yield tokens as they become available
+        for token in streamer:
+            yield token
+
+        # Wait for generation to complete
+        generation_thread.join()
 
     def extract_activations(self, text: str, layer: "Layer"):
         """Extract activations from the specified layer for given text."""

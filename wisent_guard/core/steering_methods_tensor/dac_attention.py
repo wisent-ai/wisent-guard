@@ -77,6 +77,9 @@ class DAC(SteeringMethodTensor):
 
         # Training statistics
         self.training_stats = {}
+        
+        # For compatibility with multi-steer command
+        self.property_vectors = {}
 
     def _load_model(self):
         """Load model and tokenizer for activation extraction."""
@@ -1811,3 +1814,18 @@ class DAC(SteeringMethodTensor):
             combined = combined + weight * vector
 
         return combined
+    
+    def apply_steering(self, hidden_states, strength=1.0, active_properties=None):
+        """Apply steering to hidden states (compatibility method for multi-steer)."""
+        if self.steering_vector is None:
+            return hidden_states
+        
+        # Apply the steering vector
+        steering = self.steering_vector.to(hidden_states.device)
+        
+        # Reshape if needed
+        if len(steering.shape) == 1:
+            steering = steering.unsqueeze(0)
+        
+        # Apply steering
+        return hidden_states + strength * steering

@@ -10,6 +10,9 @@ directly on each choice to evaluate performance against known ground truth.
 import logging
 from typing import Any, Dict, Optional
 
+from wisent_guard.core.activations import ActivationAggregationStrategy, Activations
+from wisent_guard.core.layer import Layer
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,7 +87,10 @@ class LogLikelihoodsEvaluator:
             logger.info(f"Extracted {len(qa_pairs)} QA pairs from {task_name}")
 
             # Use existing contrastive pair creation infrastructure
-            from .activation_collection_method import ActivationCollectionLogic, PromptConstructionStrategy
+            from wisent_guard.core.activations.activation_collection_method import (
+                ActivationCollectionLogic,
+            )
+            from wisent_guard.core.activations.prompts import PromptConstructionStrategy
 
             collector = ActivationCollectionLogic(model=evaluation_model)
 
@@ -100,19 +106,18 @@ class LogLikelihoodsEvaluator:
 
             logger.info(f"Created {len(contrastive_pairs)} contrastive pairs")
 
-            # Use existing activation extraction infrastructure
-            from .activation_collection_method import TokenTargetingStrategy
-
             # Map token aggregation to token targeting strategy for evaluation
-            targeting_strategy_mapping = {
-                "average": TokenTargetingStrategy.MEAN_POOLING,
-                "final": TokenTargetingStrategy.LAST_TOKEN,
-                "first": TokenTargetingStrategy.FIRST_TOKEN,
-                "max": TokenTargetingStrategy.MAX_POOLING,
-                "min": TokenTargetingStrategy.MEAN_POOLING,  # Fallback to mean
+            targeting_strategy_mapping = {  # TODO Refactor - we should stay with one standard
+                "average": ActivationAggregationStrategy.MEAN_POOLING,
+                "final": ActivationAggregationStrategy.LAST_TOKEN,
+                "first": ActivationAggregationStrategy.FIRST_TOKEN,
+                "max": ActivationAggregationStrategy.MAX_POOLING,
+                "min": ActivationAggregationStrategy.MEAN_POOLING,  # Fallback to mean
             }
 
-            targeting_strategy = targeting_strategy_mapping.get(token_aggregation, TokenTargetingStrategy.MEAN_POOLING)
+            targeting_strategy = targeting_strategy_mapping.get(
+                token_aggregation, ActivationAggregationStrategy.MEAN_POOLING
+            )
 
             logger.info(
                 f"🔍 EVALUATION MODE: Using {targeting_strategy.value} targeting strategy (from token_aggregation: {token_aggregation})"
@@ -169,7 +174,7 @@ class LogLikelihoodsEvaluator:
                     )
 
             # Map token aggregation to activation method
-            activation_method = self._map_token_aggregation_to_activation_method(token_aggregation)
+            activation_method = token_aggregation
             logger.info(
                 f"🎯 Using activation aggregation method: {activation_method.value} (from token_aggregation: {token_aggregation})"
             )
@@ -229,8 +234,7 @@ class LogLikelihoodsEvaluator:
             classifier: The classifier to evaluate
             processed_pair: ContrastivePair with activations already extracted
             qa_pair: Original QA pair data for reference
-            activation_method: ActivationAggregationMethod to use for feature extraction
-
+            activation_method:
         Returns:
             Dict containing evaluation results for this sample
         """
@@ -248,15 +252,11 @@ class LogLikelihoodsEvaluator:
                     "error": "Missing activations",
                 }
 
-            # Create Activations objects for proper feature extraction
-            from .activations import Activations
-            from .layer import Layer
-
             layer_obj = Layer(index=15, type="transformer")
 
             # Process positive (correct) choice using CLI token aggregation method
             positive_act = Activations(
-                tensor=positive_activations, layer=layer_obj, aggregation_method=activation_method
+                tensor=positive_activations, layer=layer_obj, aggregation_strategy=activation_method
             )
             positive_features = positive_act.extract_features_for_classifier()
             positive_prediction = classifier.predict_proba([positive_features.cpu().numpy()])
@@ -265,7 +265,7 @@ class LogLikelihoodsEvaluator:
 
             # Process negative (incorrect) choice using CLI token aggregation method
             negative_act = Activations(
-                tensor=negative_activations, layer=layer_obj, aggregation_method=activation_method
+                tensor=negative_activations, layer=layer_obj, aggregation_strategy=activation_method
             )
             negative_features = negative_act.extract_features_for_classifier()
             negative_prediction = classifier.predict_proba([negative_features.cpu().numpy()])
@@ -305,21 +305,6 @@ class LogLikelihoodsEvaluator:
                 "classifier_correct": False,
                 "error": str(e),
             }
-
-    def _map_token_aggregation_to_activation_method(self, token_aggregation: str):
-        """Map CLI token aggregation to ActivationAggregationMethod."""
-        from .activations import ActivationAggregationMethod
-
-        # Map CLI token aggregation to activation aggregation method
-        mapping = {
-            "average": ActivationAggregationMethod.MEAN,
-            "final": ActivationAggregationMethod.LAST_TOKEN,
-            "first": ActivationAggregationMethod.LAST_TOKEN,  # Fallback to last token
-            "max": ActivationAggregationMethod.MAX,
-            "min": ActivationAggregationMethod.MAX,  # Fallback to max
-        }
-
-        return mapping.get(token_aggregation, ActivationAggregationMethod.MEAN)
 
     def _error_result(self, error_msg: str) -> Dict[str, Any]:
         """Return an error result."""
