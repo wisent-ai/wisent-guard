@@ -968,9 +968,8 @@ class OptimizationPipeline:
         probe.fit(X_train, y_train)
 
         # Train best steering method
-        steering_instance = self._train_steering_method(
-            best_trial, best_params["steering_method"], layer_id, best_params
-        )
+        steering_method = best_params.get("steering_method", "caa")  # Default to CAA if missing
+        steering_instance = self._train_steering_method(best_trial, steering_method, layer_id, best_params)
 
         # Save the best steering vector in both formats
         if steering_instance and hasattr(steering_instance, "save_steering_vector"):
@@ -988,7 +987,7 @@ class OptimizationPipeline:
         self.logger.info("Generating steered predictions...")
 
         # Extract the appropriate strength parameter based on method and available parameters
-        method_name = best_params["steering_method"]
+        method_name = best_params.get("steering_method", "caa")  # Default to CAA if missing
         if method_name == "dac":
             # DAC can use base_strength or steering_alpha, with fallback to 1.0
             strength = best_params.get("base_strength", best_params.get("steering_alpha", 1.0))

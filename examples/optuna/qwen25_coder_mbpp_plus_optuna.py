@@ -27,6 +27,13 @@ Uses specialized MBPP Plus extractors that create "obscured correct answer" pair
 - Incorrect: Syntactically corrupted code (missing tokens, wrong syntax)
   that "obscures" the correct answer
 
+EVALUATION-ONLY MODE:
+    # Run evaluation only with best parameters from existing trials (no new training)
+    HF_ALLOW_CODE_EVAL="1" python qwen25_coder_mbpp_plus_optuna.py --n-trials 0
+
+    # Specify test set size for final evaluation
+    HF_ALLOW_CODE_EVAL="1" python qwen25_coder_mbpp_plus_optuna.py --n-trials 0 --test-limit 100
+
 USAGE:
     # Basic usage with default settings
     HF_ALLOW_CODE_EVAL="1" python qwen25_coder_mbpp_plus_optuna.py
@@ -104,11 +111,13 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         val_dataset="mbpp_plus",  # Same dataset for consistency
         test_dataset="mbpp",  # Same dataset for testing
         # Training configuration
-        train_limit=args.train_limit or defaults["train_limit"],
-        contrastive_pairs_limit=args.contrastive_pairs_limit or defaults["contrastive_pairs_limit"],
+        train_limit=args.train_limit if args.train_limit is not None else defaults["train_limit"],
+        contrastive_pairs_limit=args.contrastive_pairs_limit
+        if args.contrastive_pairs_limit is not None
+        else defaults["contrastive_pairs_limit"],
         # Evaluation configuration
-        val_limit=args.val_limit or defaults["val_limit"],
-        test_limit=args.test_limit or defaults["test_limit"],
+        val_limit=args.val_limit if args.val_limit is not None else defaults["val_limit"],
+        test_limit=args.test_limit if args.test_limit is not None else defaults["test_limit"],
         # Layer search configuration - Qwen has 32 layers (0-31)
         # Middle-to-late layers (16-24) typically capture code semantics well
         layer_search_range=args.layer_range or defaults["layer_search_range"],
@@ -121,8 +130,8 @@ def create_qwen25_coder_config(args) -> OptimizationConfig:
         # Optuna study configuration
         study_name=args.study_name or "qwen25_coder_mbpp_plus_optimization",
         db_url=f"sqlite:///{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/optuna_studies.db",
-        n_trials=args.n_trials or defaults["n_trials"],
-        n_startup_trials=args.n_startup_trials or defaults["n_startup_trials"],
+        n_trials=args.n_trials if args.n_trials is not None else defaults["n_trials"],
+        n_startup_trials=args.n_startup_trials if args.n_startup_trials is not None else defaults["n_startup_trials"],
         sampler="TPE",  # Tree-structured Parzen Estimator
         pruner="MedianPruner",  # Aggressive pruning for efficiency
         # WandB configuration
