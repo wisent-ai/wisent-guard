@@ -32,23 +32,27 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 import wandb
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+
 # Configuration Dataclasses
 @dataclass
 class ModelConfig:
     """Model configuration settings."""
+
     unsteered_path: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
     caa_path: str = "/workspace/wisent-guard/huggingface_qwen25-7b-coder-caa"
     base_name: str = "Qwen/Qwen2.5-Coder-7B-Instruct"
 
+
 @dataclass
 class EvaluationDefaults:
     """Default evaluation parameters."""
+
     temperature: float = 0.2
     batch_size: int = 16
     n_samples: int = 1
@@ -56,6 +60,7 @@ class EvaluationDefaults:
     precision: str = "fp16"
     seed: int = 0
     project: str = "qwen2.5_coder_bigcode"
+
 
 # Initialize configurations
 MODEL_CONFIG = ModelConfig()
@@ -74,15 +79,17 @@ RECODE_DATASETS = {
     "perturbed-humaneval-format-num_seeds_5",
     "perturbed-humaneval-func_name-num_seeds_5",
     "perturbed-humaneval-natgen-num_seeds_5",
-    "perturbed-humaneval-nlaugmenter-num_seeds_5"
+    "perturbed-humaneval-nlaugmenter-num_seeds_5",
 }
 
 SUPPORTED_DATASETS = [
-    "mbpp", "mbppplus",
-    "humaneval", "humanevalplus",
+    "mbpp",
+    "mbppplus",
+    "humaneval",
+    "humanevalplus",
     "multiple-js",
     *INSTRUCTION_DATASETS,
-    *RECODE_DATASETS
+    *RECODE_DATASETS,
 ]
 
 # Special tokens for instruction-following datasets
@@ -119,11 +126,26 @@ def parse_arguments():
         "--limit", type=int, default=None, help="Number of samples to evaluate (default: all samples in dataset)"
     )
 
-    parser.add_argument("--temperature", type=float, default=EVAL_DEFAULTS.temperature, help=f"Generation temperature (default: {EVAL_DEFAULTS.temperature})")
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=EVAL_DEFAULTS.temperature,
+        help=f"Generation temperature (default: {EVAL_DEFAULTS.temperature})",
+    )
 
-    parser.add_argument("--batch_size", type=int, default=EVAL_DEFAULTS.batch_size, help=f"Batch size for evaluation (default: {EVAL_DEFAULTS.batch_size})")
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=EVAL_DEFAULTS.batch_size,
+        help=f"Batch size for evaluation (default: {EVAL_DEFAULTS.batch_size})",
+    )
 
-    parser.add_argument("--n_samples", type=int, default=EVAL_DEFAULTS.n_samples, help=f"Number of completions to generate per problem (default: {EVAL_DEFAULTS.n_samples})")
+    parser.add_argument(
+        "--n_samples",
+        type=int,
+        default=EVAL_DEFAULTS.n_samples,
+        help=f"Number of completions to generate per problem (default: {EVAL_DEFAULTS.n_samples})",
+    )
 
     parser.add_argument(
         "--project", default=EVAL_DEFAULTS.project, help=f"WandB project name (default: {EVAL_DEFAULTS.project})"
@@ -145,7 +167,12 @@ def parse_arguments():
         help=f"Model precision (default: {EVAL_DEFAULTS.precision})",
     )
 
-    parser.add_argument("--seed", type=int, default=EVAL_DEFAULTS.seed, help=f"Random seed for reproducible generation (default: {EVAL_DEFAULTS.seed})")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=EVAL_DEFAULTS.seed,
+        help=f"Random seed for reproducible generation (default: {EVAL_DEFAULTS.seed})",
+    )
 
     # Memory management parameters
     parser.add_argument(
@@ -156,7 +183,11 @@ def parse_arguments():
 
     # Device selection parameter
     parser.add_argument(
-        "--device", type=int, choices=SUPPORTED_DEVICES, default=SUPPORTED_DEVICES[0], help=f"GPU device ID to use for evaluation (default: {SUPPORTED_DEVICES[0]})"
+        "--device",
+        type=int,
+        choices=SUPPORTED_DEVICES,
+        default=SUPPORTED_DEVICES[0],
+        help=f"GPU device ID to use for evaluation (default: {SUPPORTED_DEVICES[0]})",
     )
 
     return parser.parse_args()
@@ -166,16 +197,16 @@ def load_caa_params_from_config(model_path: str) -> Optional[Dict[str, Any]]:
     """Load CAA parameters from model's config.json file."""
     try:
         config_path = Path(model_path) / "config.json"
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             config = json.load(f)
-        
+
         return {
             "layer_id": config.get("caa_layer_id"),
-            "alpha": config.get("caa_alpha"), 
+            "alpha": config.get("caa_alpha"),
             "steering_method": config.get("steering_method"),
             "steering_vector_path": config.get("steering_vector_path"),
             "caa_enabled": config.get("caa_enabled"),
-            "optimization_info": config.get("wisent_optimization", {})
+            "optimization_info": config.get("wisent_optimization", {}),
         }
     except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
         print(f"⚠️ Warning: Could not load CAA config from {config_path}: {e}")
@@ -269,7 +300,9 @@ def load_model(method: str) -> str:
         raise
 
 
-def run_bigcode_evaluation(model_path: str, args: argparse.Namespace, timestamp: str) -> Tuple[Dict[str, Any], Path, float, Dict[str, Any]]:
+def run_bigcode_evaluation(
+    model_path: str, args: argparse.Namespace, timestamp: str
+) -> Tuple[Dict[str, Any], Path, float, Dict[str, Any]]:
     """Run bigcode-evaluation-harness evaluation."""
 
     print("\\n🚀 Running BigCode evaluation...")
@@ -329,18 +362,18 @@ def run_bigcode_evaluation(model_path: str, args: argparse.Namespace, timestamp:
     if args.limit is not None:
         cmd.extend(["--limit", str(args.limit)])
 
-    # Add n_samples parameter  
+    # Add n_samples parameter
     cmd.extend(["--n_samples", str(args.n_samples)])
 
     # Add memory management parameters
     if args.load_in_8bit:
         cmd.append("--load_in_8bit")
-    
+
     # Add instruction tokens for instruct-humaneval datasets
     if args.dataset in INSTRUCTION_DATASETS:
         cmd.extend(["--instruction_tokens", QWEN_INSTRUCTION_TOKENS])
         print(f"📝 Using instruction tokens for {args.dataset}")
-    
+
     # Log if this is a Recode dataset (parameters should be set by shell script)
     if args.dataset in RECODE_DATASETS:
         print(f"📊 Evaluating Recode dataset: {args.dataset}")
@@ -381,7 +414,7 @@ def run_bigcode_evaluation(model_path: str, args: argparse.Namespace, timestamp:
 
             # Extract detailed per-sample results
             detailed_results = extract_detailed_results(output_dir, args.dataset, timestamp, args)
-            
+
             return metrics, output_dir, duration, detailed_results
 
         print(f"⚠️ Metrics file not found at {metrics_path}")
@@ -399,55 +432,59 @@ def run_bigcode_evaluation(model_path: str, args: argparse.Namespace, timestamp:
         raise
 
 
-def extract_detailed_results(output_dir: Path, dataset: str, timestamp: str, args: argparse.Namespace) -> Dict[str, Any]:
+def extract_detailed_results(
+    output_dir: Path, dataset: str, timestamp: str, args: argparse.Namespace
+) -> Dict[str, Any]:
     """Load BigCode evaluation outputs for WandB logging."""
     print("\\n🔍 Loading BigCode evaluation results...")
-    
+
     try:
         # Load metrics file
         metrics_path = output_dir / "metrics.json"
         if not metrics_path.exists():
             print(f"⚠️ Metrics file not found at {metrics_path}")
             return {}
-            
-        with open(metrics_path, 'r') as f:
+
+        with open(metrics_path) as f:
             metrics = json.load(f)
-        
+
         # Load generations file (BigCode saves it as generations_{task_name}.json)
         generations_path = output_dir / f"generations_{dataset}.json"
         if not generations_path.exists():
             generations_path = output_dir / "generations.json"
-        
+
         generations = []
         if generations_path.exists():
-            with open(generations_path, 'r') as f:
+            with open(generations_path) as f:
                 generations = json.load(f)
             print(f"✅ Found generations file with {len(generations)} samples")
-        
+
         # Load references file
         references_path = output_dir / f"references_{dataset}.json"
         if not references_path.exists():
             references_path = output_dir / "references.json"
         if not references_path.exists():
             # Fallback: BigCode harness saves references in its own directory
-            bigcode_references_path = Path("/workspace/wisent-guard/bigcode-evaluation-harness") / f"references_{dataset}.json"
+            bigcode_references_path = (
+                Path("/workspace/wisent-guard/bigcode-evaluation-harness") / f"references_{dataset}.json"
+            )
             if bigcode_references_path.exists():
                 references_path = bigcode_references_path
-        
+
         references = []
         if references_path.exists():
-            with open(references_path, 'r') as f:
+            with open(references_path) as f:
                 references = json.load(f)
             print(f"✅ Found references file with {len(references)} entries")
-        
+
         # Load detailed results if available (from modified BigCode)
         detailed_results_path = output_dir / f"detailed_results_{dataset}.json"
         detailed_results = []
         if detailed_results_path.exists():
-            with open(detailed_results_path, 'r') as f:
+            with open(detailed_results_path) as f:
                 detailed_data = json.load(f)
-            print(f"✅ Found detailed results from BigCode")
-            
+            print("✅ Found detailed results from BigCode")
+
             # Process BigCode's detailed results format
             for task_id, task_results in detailed_data.items():
                 if task_results:
@@ -455,34 +492,36 @@ def extract_detailed_results(output_dir: Path, dataset: str, timestamp: str, arg
                     # task_results is like [[0, {"task_id": 0, "passed": false, ...}], [1, {...}], ...]
                     for completion_data in task_results:
                         completion_id = completion_data[0]  # Completion index
-                        result_dict = completion_data[1]    # The result dictionary
-                        
+                        result_dict = completion_data[1]  # The result dictionary
+
                         # Get the specific generation for this completion
                         task_idx = int(task_id)
                         if task_idx < len(generations) and completion_id < len(generations[task_idx]):
                             generation = generations[task_idx][completion_id]
                         else:
                             generation = ""
-                        
+
                         # Get reference for this task (same for all completions)
                         reference = references[task_idx] if task_idx < len(references) else ""
-                        
-                        detailed_results.append({
-                            "task_id": task_idx,
-                            "completion_id": completion_id,
-                            "generation": generation,
-                            "reference": reference,
-                            "passed": result_dict.get("passed", False),
-                            "result": result_dict.get("result", "unknown")
-                        })
-        
+
+                        detailed_results.append(
+                            {
+                                "task_id": task_idx,
+                                "completion_id": completion_id,
+                                "generation": generation,
+                                "reference": reference,
+                                "passed": result_dict.get("passed", False),
+                                "result": result_dict.get("result", "unknown"),
+                            }
+                        )
+
         # Prepare final results structure
         final_results = {
             "metadata": {
                 "dataset": dataset,
                 "timestamp": timestamp,
                 "method": args.method,
-                "model_path": getattr(args, 'model_path', 'unknown'),
+                "model_path": getattr(args, "model_path", "unknown"),
                 "total_samples": len(generations),
                 "evaluation_parameters": {
                     "temperature": args.temperature,
@@ -491,36 +530,44 @@ def extract_detailed_results(output_dir: Path, dataset: str, timestamp: str, arg
                     "precision": args.precision,
                     "seed": args.seed,
                     "device": args.device,
-                }
+                },
             },
             "metrics": metrics,
             "detailed_results": detailed_results if detailed_results else None,
             "generations_count": len(generations),
-            "references_count": len(references)
+            "references_count": len(references),
         }
-        
+
         # Save consolidated results
         consolidated_path = output_dir / f"consolidated_results_{timestamp}.json"
-        with open(consolidated_path, 'w') as f:
+        with open(consolidated_path, "w") as f:
             json.dump(final_results, f, indent=2, ensure_ascii=False)
-        
+
         print(f"💾 Saved consolidated results to: {consolidated_path}")
-        
+
         # Log detailed results statistics
         if detailed_results:
             total_completions = len(detailed_results)
-            unique_tasks = len(set(r['task_id'] for r in detailed_results))
+            unique_tasks = len(set(r["task_id"] for r in detailed_results))
             avg_completions_per_task = total_completions / unique_tasks if unique_tasks > 0 else 0
-            print(f"📊 Detailed results: {total_completions} completions across {unique_tasks} tasks (avg: {avg_completions_per_task:.1f} per task)")
-        
+            print(
+                f"📊 Detailed results: {total_completions} completions across {unique_tasks} tasks (avg: {avg_completions_per_task:.1f} per task)"
+            )
+
         return final_results
-        
+
     except Exception as e:
         print(f"⚠️ Error loading results: {e}")
         return {}
 
 
-def log_results_to_wandb(metrics: Dict[str, Any], args: argparse.Namespace, duration: float, output_dir: Path, detailed_results: Optional[Dict[str, Any]] = None) -> None:
+def log_results_to_wandb(
+    metrics: Dict[str, Any],
+    args: argparse.Namespace,
+    duration: float,
+    output_dir: Path,
+    detailed_results: Optional[Dict[str, Any]] = None,
+) -> None:
     """Log final results to WandB."""
 
     print("\\n📈 Logging results to WandB...")
@@ -544,8 +591,8 @@ def log_results_to_wandb(metrics: Dict[str, Any], args: argparse.Namespace, dura
         problems_solved = int(pass_at_1 * args.limit) if pass_at_1 > 0 else 0
     else:
         # Try to get from detailed results
-        if detailed_results and 'results' in detailed_results:
-            total_problems = len(detailed_results['results'])
+        if detailed_results and "results" in detailed_results:
+            total_problems = len(detailed_results["results"])
             problems_solved = int(pass_at_1 * total_problems) if pass_at_1 > 0 else 0
         else:
             total_problems = None
@@ -566,20 +613,22 @@ def log_results_to_wandb(metrics: Dict[str, Any], args: argparse.Namespace, dura
         log_dict["avg_time_per_problem"] = duration / total_problems if total_problems > 0 else 0
 
     # Add detailed results summary
-    if detailed_results and 'results' in detailed_results:
-        log_dict["detailed_samples_extracted"] = len(detailed_results['results'])
-        
+    if detailed_results and "results" in detailed_results:
+        log_dict["detailed_samples_extracted"] = len(detailed_results["results"])
+
         # Add execution summary statistics if available
-        if 'summary_statistics' in detailed_results:
-            stats = detailed_results['summary_statistics']
-            log_dict.update({
-                "detailed_correct_samples": stats.get("correct_samples", 0),
-                "detailed_failed_samples": stats.get("failed_samples", 0), 
-                "detailed_timeout_samples": stats.get("timeout_samples", 0),
-                "detailed_error_samples": stats.get("error_samples", 0),
-                "detailed_no_reference_samples": stats.get("no_reference_samples", 0),
-                "detailed_accuracy": stats.get("accuracy", 0.0)
-            })
+        if "summary_statistics" in detailed_results:
+            stats = detailed_results["summary_statistics"]
+            log_dict.update(
+                {
+                    "detailed_correct_samples": stats.get("correct_samples", 0),
+                    "detailed_failed_samples": stats.get("failed_samples", 0),
+                    "detailed_timeout_samples": stats.get("timeout_samples", 0),
+                    "detailed_error_samples": stats.get("error_samples", 0),
+                    "detailed_no_reference_samples": stats.get("no_reference_samples", 0),
+                    "detailed_accuracy": stats.get("accuracy", 0.0),
+                }
+            )
 
     wandb.log(log_dict)
 
@@ -595,20 +644,14 @@ def log_results_to_wandb(metrics: Dict[str, Any], args: argparse.Namespace, dura
             wandb.save(str(output_dir / "metrics.json"), base_path=str(output_dir.parent))
 
         # Upload generations file (with correct BigCode naming)
-        generations_files = [
-            output_dir / f"generations_{args.dataset}.json",
-            output_dir / "generations.json"
-        ]
+        generations_files = [output_dir / f"generations_{args.dataset}.json", output_dir / "generations.json"]
         for gen_file in generations_files:
             if gen_file.exists():
                 wandb.save(str(gen_file), base_path=str(output_dir.parent))
                 break
 
         # Upload references file (with correct BigCode naming)
-        references_files = [
-            output_dir / f"references_{args.dataset}.json",
-            output_dir / "references.json"
-        ]
+        references_files = [output_dir / f"references_{args.dataset}.json", output_dir / "references.json"]
         for ref_file in references_files:
             if ref_file.exists():
                 wandb.save(str(ref_file), base_path=str(output_dir.parent))
