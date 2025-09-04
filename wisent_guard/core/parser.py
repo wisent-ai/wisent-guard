@@ -1599,6 +1599,15 @@ def setup_multi_steer_parser(parser):
     parser.add_argument("--model", type=str, required=True, help="Model name or path")
     parser.add_argument("--layer", type=int, required=True, help="Layer index to apply combined steering")
     parser.add_argument("--device", type=str, default=None, help="Device to run on (default: auto-detect)")
+    
+    # Steering method configuration
+    parser.add_argument(
+        "--method",
+        type=str,
+        default="CAA",
+        choices=["CAA", "DAC"],
+        help="Steering method to use for combination (default: CAA)",
+    )
 
     # Generation configuration
     parser.add_argument("--prompt", type=str, required=True, help="Prompt to generate with combined steering")

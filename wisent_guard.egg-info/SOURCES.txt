@@ -58,6 +58,7 @@ wisent_guard/core/mixed_benchmark_sampler.py
 wisent_guard/core/model.py
 wisent_guard/core/model_config_manager.py
 wisent_guard/core/model_persistence.py
+wisent_guard/core/multi_steering.py
 wisent_guard/core/normalization.py
 wisent_guard/core/parameters.py
 wisent_guard/core/parser.py

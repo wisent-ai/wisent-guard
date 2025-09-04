@@ -6770,171 +6770,44 @@ def handle_multi_steer_command(args):
             )
             sys.exit(1)
 
-        # Load model
-        # Loading model
-        from .core.model import Model
-
-        model = Model(name=args.model, device=args.device)
-
-        # Load and combine vectors
-        # Loading and combining vectors
-        from .core.layer import Layer
-        from .core.steering_methods_tensor.dac_attention import DAC
-
-        # Create DAC instance for vector combination
-        dac = DAC(device=args.device)
-
-        # Load all vectors
-        loaded_vectors = []
-        weights = []
-
-        for path, weight in vectors_info:
-            # Loading vector file
-            data = torch.load(path, map_location=args.device)
-
-            # Extract vector based on format
-            # Check if data is a dictionary or a raw tensor
-            if isinstance(data, torch.Tensor):
-                # Raw tensor format
-                vector = data
-            elif isinstance(data, dict):
-                # Dictionary format - check for various keys
-                if "steering_vector" in data:
-                    vector = data["steering_vector"]
-                elif "vector" in data:
-                    vector = data["vector"]
-                elif "property_vectors" in data:
-                    # Handle multi-property files
-                    if "default" in data["property_vectors"]:
-                        vector = data["property_vectors"]["default"]["vector"]
-                    else:
-                        # Use first property
-                        first_prop = list(data["property_vectors"].values())[0]
-                        vector = first_prop["vector"]
-                else:
-                    sys.stderr.write(f"Error: Could not find steering vector in {path}\n")
-                    sys.stderr.write(f"Available keys: {list(data.keys())}\n")
-                    sys.exit(1)
-            else:
-                sys.stderr.write(f"Error: Unexpected data format in {path}: {type(data)}\n")
-                sys.exit(1)
-
-            loaded_vectors.append(vector)
-            weights.append(weight)
-
-        # Combine vectors
-        combined_vector = DAC.combine_steering_vectors(
-            loaded_vectors, weights, normalize_weights=args.normalize_weights
-        )
-
-        # Combined vectors
-        original_norm = torch.norm(combined_vector).item()
-
-        # Scale to target norm if specified
-        if args.target_norm is not None:
-            current_norm = torch.norm(combined_vector).item()
-            if current_norm > 0:
-                scale_factor = args.target_norm / current_norm
-                combined_vector = combined_vector * scale_factor
-                new_norm = torch.norm(combined_vector).item()
-                # Scaled to target norm
-            else:
-                sys.stderr.write("Warning: Cannot scale zero vector to target norm\n")
-
-        # Save combined vector if requested
-        if args.save_combined:
-            # Saving combined vector
-            save_data = {
-                "method": "DAC",
-                "steering_vector": combined_vector,
-                "layer_index": args.layer,
-                "combination_info": {
-                    "source_vectors": [path for path, _ in vectors_info],
-                    "weights": weights,
-                    "normalized": args.normalize_weights,
-                    "target_norm": args.target_norm,
-                },
-            }
-            torch.save(save_data, args.save_combined)
-
-        # Apply combined steering and generate
-        # Generating with combined steering
-
-        # Create a temporary DAC instance with the combined vector
-        layer = Layer(args.layer)
-        dac.steering_vector = combined_vector
-        dac.layer_index = args.layer
-        dac.is_trained = True
-
-        # Add property vector for compatibility
-        from .core.aggregation import ControlVectorAggregationMethod
-        from .core.steering_methods.dac import PropertyVector
-
-        dac.property_vectors["combined"] = PropertyVector(
-            name="combined",
-            vector=combined_vector,
-            layer_index=args.layer,
-            training_stats={"method": "combined", "weights": weights},
-            aggregation_method=ControlVectorAggregationMethod.CAA,
-        )
-
-        # Generate with combined steering
-        hooks = []
-
-        def steering_hook(module, input, output):
-            if isinstance(output, tuple):
-                hidden_states = output[0]
-            else:
-                hidden_states = output
-
-            # Apply combined steering
-            steered = dac.apply_steering(hidden_states, strength=1.0, active_properties=["combined"])
-
-            if isinstance(output, tuple):
-                return (steered,) + output[1:]
-            return steered
-
-        # Apply hook to the specified layer
-        if hasattr(model.hf_model, "model") and hasattr(model.hf_model.model, "layers"):
-            layer_module = model.hf_model.model.layers[args.layer]
-        elif hasattr(model.hf_model, "transformer") and hasattr(model.hf_model.transformer, "h"):
-            layer_module = model.hf_model.transformer.h[args.layer]
-        else:
-            sys.stderr.write("Error: Could not find model layers\n")
-            sys.exit(1)
-
-        handle = layer_module.register_forward_hook(steering_hook)
-        hooks.append(handle)
-
+        # Use the new multi_steering module
+        from .core.multi_steering import run_multi_steer
+        
+        # Run multi-steering
         try:
-            # Generate (thinking is disabled by default)
-            response, _ = model.generate(
-                args.prompt, 
-                layer_index=args.layer, 
-                max_new_tokens=args.max_new_tokens
+            output = run_multi_steer(
+                vector_specs=args.vector,
+                model_name=args.model,
+                prompt=args.prompt,
+                method=args.method,
+                layer=args.layer,
+                max_new_tokens=args.max_new_tokens,
+                temperature=0.7,  # Could be made configurable
+                top_p=0.9,       # Could be made configurable  
+                device=args.device,
+                verbose=True
             )
-
+            
             # Output only the actual response
             # Flush immediately for streaming
-            print(response, flush=True)
+            print(output, flush=True)
 
             if args.verbose:
                 # Verbose mode - combination details suppressed for stdout clarity
                 pass
 
-        finally:
-            # Remove hooks
-            for hook in hooks:
-                hook.remove()
+        except Exception as e:
+            sys.stderr.write(f"Error in multi-vector steering: {e}\n")
+            import traceback
 
-        # Multi-vector steering completed
-
+            if args.verbose:
+                traceback.print_exc()
+            sys.exit(1)
+    
     except Exception as e:
-        sys.stderr.write(f"Error in multi-vector steering: {e}\n")
+        sys.stderr.write(f"Error in multi-steer command: {e}\n")
         import traceback
-
-        if args.verbose:
-            traceback.print_exc()
+        traceback.print_exc()
         sys.exit(1)
 
 
