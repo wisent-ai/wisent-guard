@@ -23,4 +23,4 @@ Wisent-Guard allows you to control your AI by identifying brain patterns corresp
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.

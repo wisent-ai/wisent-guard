@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>prepare_dataset — Decision Flow</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0b1324; --panel:#0f1a33; --ink:#e8eefc; --muted:#9fb0d6; --line:#233252; --chip:#1a2a4d; --accent:#7cc7ff; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1100px;margin:28px auto 72px;padding:0 16px}
+    h1{margin:0 0 8px}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr}
+    @media(min-width:980px){.grid{grid-template-columns:1.1fr .9fr}}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+    .card h2{margin:0 0 10px;font-size:16px}
+    .hint{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;margin-left:8px;color:var(--ink)}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+    .btn{background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:6px 10px;font-size:12px;cursor:pointer}
+    .btn:hover{border-color:var(--accent)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    /* Diagram viewport (zoomable) */
+    .diagram-viewport{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      height:70vh;
+    }
+    .diagram-scale{ transform-origin: top left; display:inline-block; }
+
+    /* Tree */
+    details{border-left:2px solid var(--line);margin:6px 0 6px 10px;padding-left:12px}
+    details>summary{cursor:pointer;list-style:none}
+    details>summary::-webkit-details-marker{display:none}
+    summary .tag{background:var(--chip);border:1px solid var(--line);color:var(--accent);padding:1px 8px;border-radius:8px;font-size:11px;margin-left:8px}
+
+    /* Zoomable tree viewport */
+    .tree-viewport{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      height:70vh;
+    }
+    .tree-scale{ transform-origin: top left; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>prepare_dataset — Decision Flow</h1>
+
+    <div class="grid">
+      <!-- Diagram (nomnoml) with zoom -->
+      <section class="card">
+        <h2>Flow Diagram <span class="hint">nomnoml</span></h2>
+        <div class="controls">
+          <button class="btn" id="dZoomOut" title="Zoom out">Zoom −</button>
+          <button class="btn" id="dZoomReset" title="Reset zoom">Reset</button>
+          <button class="btn" id="dZoomIn" title="Zoom in">Zoom +</button>
+          <span id="dZoomLabel" class="hint" aria-live="polite">100%</span>
+        </div>
+        <div class="diagram-viewport">
+          <div class="diagram-scale" id="diagramScale">
+            <canvas id="diagram" aria-label="prepare_dataset flow diagram"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Collapsible Tree with Zoom -->
+      <section class="card">
+        <h2>Collapsible Decision Tree <span class="hint">HTML details/summary</span></h2>
+        <div class="controls">
+          <button class="btn" id="expandAll">Expand all</button>
+          <button class="btn" id="collapseAll">Collapse all</button>
+          <span style="flex:1"></span>
+          <button class="btn" id="tZoomOut" title="Zoom out">Zoom −</button>
+          <button class="btn" id="tZoomReset" title="Reset zoom">Reset</button>
+          <button class="btn" id="tZoomIn" title="Zoom in">Zoom +</button>
+          <span id="tZoomLabel" class="hint" aria-live="polite">100%</span>
+        </div>
+
+        <div class="tree-viewport">
+          <div class="tree-scale" id="treeScale">
+            <details open>
+              <summary><strong>prepare_dataset(...)</strong></summary>
+
+              <details open>
+                <summary><strong>Early modes (mutually exclusive)</strong> <span class="tag">guards</span></summary>
+
+                <details>
+                  <summary><strong>Synthetic mode</strong> <span class="tag">from_synthetic &amp;&amp; synthetic_pairs</span></summary>
+                  <ul>
+                    <li>Return: <span class="mono">qa_pairs=[]</span>, <span class="mono">test_source=[]</span>, <span class="mono">group_processed=True</span>, <span class="mono">qa_format=True</span></li>
+                  </ul>
+                </details>
+
+                <details>
+                  <summary><strong>Cross-benchmark mode</strong> <span class="tag">cross_mode &amp;&amp; train/eval pairs</span></summary>
+                  <ul>
+                    <li>Return: empty QA; <span class="mono">skip_qa_display=True</span>; <span class="mono">group_processed=True</span>, <span class="mono">qa_format=True</span></li>
+                  </ul>
+                </details>
+
+                <details>
+                  <summary><strong>Preloaded QA</strong> <span class="tag">preloaded_qa_pairs</span></summary>
+                  <ul>
+                    <li>Return: train=test=preloaded; <span class="mono">group_processed=True</span>, <span class="mono">qa_format=True</span></li>
+                  </ul>
+                </details>
+
+                <details>
+                  <summary><strong>CSV / JSON</strong> <span class="tag">from_csv || from_json</span></summary>
+                  <ul>
+                    <li>Load pairs → map to QA → deterministic split &amp; cap → return QA for both sets</li>
+                  </ul>
+                </details>
+              </details>
+
+              <details open>
+                <summary><strong>Benchmark path</strong> <span class="tag">lm-eval / caches</span></summary>
+
+                <details>
+                  <summary><strong>Cache read</strong> <span class="tag">use_cached &amp;&amp; !force_download &amp;&amp; cached</span></summary>
+                  <ul>
+                    <li>Load cached → convert to QA → split &amp; cap → return QA for both</li>
+                  </ul>
+                </details>
+
+                <details open>
+                  <summary><strong>Group task detection</strong></summary>
+                  <ul>
+                    <li>Skip for {"mbpp","livecodebench"}; else query tasks (timeout 60s)</li>
+                  </ul>
+
+                  <details>
+                    <summary><strong>Group task</strong></summary>
+                    <ul>
+                      <li>For each subtask: load → split docs → extract QA → tag and aggregate → split &amp; cap → return QA for both</li>
+                    </ul>
+                  </details>
+
+                  <details open>
+                    <summary><strong>Single task</strong></summary>
+                    <ul>
+                      <li>Resolve actual name, total_limit; load task_data; get docs via load_data or split_task_data; cap if needed</li>
+                      <li>Build training QA:
+                        <ul>
+                          <li>If <span class="mono">cache_benchmark</span>: try managed cache; else pickle; else extract</li>
+                          <li>Else: extract from train_docs</li>
+                        </ul>
+                      </li>
+                      <li>Set <span class="mono">test_qa_pairs_source = test_docs</span>; maybe save cache</li>
+                    </ul>
+                  </details>
+                </details>
+              </details>
+            </details>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- graphre + nomnoml (per project README) -->
+  <script src="https://unpkg.com/graphre/dist/graphre.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/nomnoml@1.7.0/dist/nomnoml.min.js"></script>
+
+  <script>
+    // --- Diagram (nomnoml) ----------------------------------------------------
+    const nomSrc = `
+#title: prepare_dataset flow
+#direction: down
+#spacing: 40
+#edgeMargin: 20
+#ranker: network-simplex
+#fontSize: 12
+
+[Start] -> [Check early modes]
+[Check early modes] -> [Synthetic mode]
+[Check early modes] -> [Cross-benchmark mode]
+[Check early modes] -> [Preloaded QA]
+[Check early modes] -> [CSV or JSON]
+[Check early modes] -> [Benchmark path]
+
+[Synthetic mode] -> [Return QA both]
+[Cross-benchmark mode] -> [Return QA both and skip_qa_display]
+[Preloaded QA] -> [Return QA both]
+[CSV or JSON] -> [Split and cap] -> [Return QA both]
+
+[Benchmark path] -> [Cache ok?]
+[Cache ok?] -> [Use cached] -> [Split and cap] -> [Return QA both]
+[Cache ok?] -> [Group task detection]
+
+[Group task detection] -> [Group task]
+[Group task detection] -> [Single task]
+
+[Group task] -> [Aggregate subtasks] -> [Split and cap] -> [Return QA both]
+
+[Single task] -> [Load task_data] -> [Get train and test docs] -> [Build training QA] -> [Set test source docs] -> [Maybe save cache] -> [Return QA train and docs test]
+    `;
+    const diagramCanvas = document.getElementById('diagram');
+    // Set a sensible base canvas size (device-pixel-aware for crispness)
+    function sizeCanvasForDPR(canvas, cssW=980, cssH=800){
+      const dpr = window.devicePixelRatio || 1;
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    sizeCanvasForDPR(diagramCanvas);
+    nomnoml.draw(diagramCanvas, nomSrc); // official canvas draw API. :contentReference[oaicite:1]{index=1}
+
+    // Zoom controls for diagram (CSS transform for smooth scaling)
+    const diagramScaleEl = document.getElementById('diagramScale');
+    const dLabel = document.getElementById('dZoomLabel');
+    let dScale = 1.0;
+    const D_MIN = 0.5, D_MAX = 2.0, D_STEP = 0.1;
+
+    function applyDiagramScale(){
+      diagramScaleEl.style.transform = `scale(${dScale})`;
+      dLabel.textContent = Math.round(dScale * 100) + '%';
+    }
+    function clamp(v,min,max){ return Math.min(max, Math.max(min, v)); }
+
+    document.getElementById('dZoomIn').addEventListener('click', () => { dScale = clamp(dScale + D_STEP, D_MIN, D_MAX); applyDiagramScale(); });
+    document.getElementById('dZoomOut').addEventListener('click', () => { dScale = clamp(dScale - D_STEP, D_MIN, D_MAX); applyDiagramScale(); });
+    document.getElementById('dZoomReset').addEventListener('click', () => { dScale = 1.0; applyDiagramScale(); });
+    // Keyboard shortcuts for diagram (Ctrl/Cmd + / - / 0)
+    document.addEventListener('keydown', (e) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (!meta) return;
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); dScale = clamp(dScale + D_STEP, D_MIN, D_MAX); applyDiagramScale(); }
+      if (e.key === '-') { e.preventDefault(); dScale = clamp(dScale - D_STEP, D_MIN, D_MAX); applyDiagramScale(); }
+      if (e.key === '0') { e.preventDefault(); dScale = 1.0; applyDiagramScale(); }
+    });
+    applyDiagramScale();
+
+    // --- Tree expand/collapse + zoom -----------------------------------------
+    const treeScaleEl = document.getElementById('treeScale');
+    const tLabel = document.getElementById('tZoomLabel');
+    let tScale = 1.0;
+    const T_MIN = 0.5, T_MAX = 2.0, T_STEP = 0.1;
+
+    function applyTreeScale(){
+      treeScaleEl.style.transform = `scale(${tScale})`;
+      tLabel.textContent = Math.round(tScale * 100) + '%';
+    }
+
+    document.getElementById('tZoomIn').addEventListener('click', () => { tScale = Math.min(T_MAX, tScale + T_STEP); applyTreeScale(); });
+    document.getElementById('tZoomOut').addEventListener('click', () => { tScale = Math.max(T_MIN, tScale - T_STEP); applyTreeScale(); });
+    document.getElementById('tZoomReset').addEventListener('click', () => { tScale = 1.0; applyTreeScale(); });
+    applyTreeScale();
+
+    // Expand/Collapse controls
+    function allDetails(){ return Array.from(document.querySelectorAll('.tree-scale details')); }
+    document.getElementById('expandAll').addEventListener('click', () => { allDetails().forEach(d => d.open = true); });
+    document.getElementById('collapseAll').addEventListener('click', () => {
+      const nodes = allDetails();
+      if (nodes.length) {
+        const root = nodes[0].closest('details');
+        nodes.forEach(d => d.open = false);
+        if (root) root.open = true;
+      }
+    });
+  </script>
+</body>
+</html>
+
