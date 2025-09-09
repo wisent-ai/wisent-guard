@@ -7,67 +7,7 @@ import os
 
 from wisent_guard.core.contrastive_pairs.contrastive_pair_set import ContrastivePairSet
 
-try:
-    from wisent_guard.core.download_full_benchmarks import FullBenchmarkDownloader  
-except Exception: 
-    FullBenchmarkDownloader = None  
-
-# --- Allowed tasks (must exist; fail fast with a clear error) --------------------
-try:
-    from wisent_guard.parameters.task_config import ALLOWED_TASKS 
-except Exception as exc:  
-    raise ImportError(
-        "Failed to import ALLOWED_TASKS from wisent_guard.parameters.task_config. "
-        "Ensure your project is installed and PYTHONPATH is set correctly."
-    ) from exc
-
-
-
-logger = logging.getLogger(__name__) 
-
-
-# --- Resolvers for CORE_BENCHMARKS and UNAVAILABLE_BENCHMARKS --------------------
-def _resolve_benchmark_catalogs() -> tuple[dict[str, dict[str, Any]], Sequence[str]]:
-    """Resolve CORE_BENCHMARKS and UNAVAILABLE_BENCHMARKS with fallbacks.
-
-    Returns:
-        tuple[dict[str, dict[str, Any]], Sequence[str]]: (CORE_BENCHMARKS, UNAVAILABLE_BENCHMARKS)
-    """
-    # 1) Primary import path
-    try:
-        from wisent_guard.core.lm_harness_integration.only_benchmarks import CORE_BENCHMARKS 
-        try:
-            # Prefer canonical source for unavailable set if available
-            if FullBenchmarkDownloader is not None:
-                UNAVAILABLE_BENCHMARKS = getattr(FullBenchmarkDownloader, "UNAVAILABLE_BENCHMARKS", set())
-            else:
-                UNAVAILABLE_BENCHMARKS = set()
-        except Exception:  
-            UNAVAILABLE_BENCHMARKS = set()
-        return CORE_BENCHMARKS, UNAVAILABLE_BENCHMARKS
-    except Exception:  
-        pass
-
-    # 2) Minimal fallback — keep the pipeline usable without full deps
-    logger.warning(
-        "Could not import CORE_BENCHMARKS; using minimal fallback list (reduced coverage)."
-    )
-    CORE_BENCHMARKS = {
-        "truthfulqa_mc1": {"task": "truthfulqa_mc1", "tags": ["hallucination"], "priority": "high"},
-        "hellaswag": {"task": "hellaswag", "tags": ["reasoning"], "priority": "high"},
-        "mmlu": {"task": "mmlu", "tags": ["knowledge"], "priority": "high"},
-    }
-    UNAVAILABLE_BENCHMARKS = set()
-    return CORE_BENCHMARKS, UNAVAILABLE_BENCHMARKS
-
-
-CORE_BENCHMARKS, UNAVAILABLE_BENCHMARKS = _resolve_benchmark_catalogs()
-
-AVAILABLE_BENCHMARKS: dict[str, dict[str, Any]] = {
-    name: cfg
-    for name, cfg in CORE_BENCHMARKS.items()
-    if name not in UNAVAILABLE_BENCHMARKS and name in ALLOWED_TASKS
-}
+from wisent_guard.cli_utils.cli_datasets import AVAILABLE_BENCHMARKS
 
 DEFAULT_TRAIN_CAP = 1000
 DEFAULT_TEST_CAP = 200
@@ -560,6 +500,33 @@ def prepare_dataset(
     verbose: bool,
 ) -> dict[str, Any]:
     """Prepare training QA pairs plus test source for the pipeline.
+
+    Args:
+        model: An instantiated  model (Model class).
+        task_name: Benchmark/task identifier, like "math_qa" or "truthfulqa_gen".
+        shots: Number of few-shot examples to use. TODO: Not used et all.
+        split_ratio: Fraction of data to use for training and the rest for testing.
+        limit: Optional total maximum number of samples to load before splitting.
+        training_limit: Optional maximum number of training samples after splitting.
+        testing_limit: Optional maximum number of test samples after splitting.
+        seed: Random seed for deterministic shuffling and splitting.
+        from_csv: If True, load data from a CSV file specified by task_name.
+        from_json: If True, load data from a JSON file specified by task_name.
+        question_col: Column name for questions in CSV mode.
+        correct_col: Column name for correct answers in CSV mode.
+        incorrect_col: Column name for incorrect answers in CSV mode.
+        preloaded_qa_pairs: If provided, use these pre-loaded QA pairs directly. TODO: Provide an axample
+        use_cached: If True, attempt to load from local cache if available.
+        force_download: If True, ignore local cache and re-download the benchmark.
+        cache_dir: Directory to use for caching benchmark data.
+        cache_benchmark: If True, save downloaded benchmarks to the cache directory.
+        cross_benchmark_mode: If True, use cross-benchmark evaluation mode with provided pairs. TODO: Provide an example and better explanation
+        train_contrastive_pairs: ContrastivePairSet for training in cross-benchmark mode.
+        eval_contrastive_pairs: ContrastivePairSet for evaluation in cross-benchmark mode.
+        from_synthetic: If True, use synthetic contrastive pairs provided. TODO: Provide an example and better explanation
+        synthetic_contrastive_pairs: ContrastivePairSet with synthetic pairs.
+        livecodebench_version: Version string for livecodebench (if used). TODO: Imporve code, like it should be related to the task_name
+        verbose: If True, emit progress logs.
 
     Returns:
         dict[str, Any]: Keys:

@@ -39,178 +39,19 @@ from .inference import (
     generate_with_multi_layer_classification_and_handling,
 )
 
+from wisent_guard.cli_utils.cli_datasets import AVAILABLE_BENCHMARKS, CORE_BENCHMARKS, UNAVAILABLE_BENCHMARKS
+from wisent_guard.cli_utils.cli_utils_dataset import (
+    validate_and_report_task_name,
+    validate_task_name,
+    suggest_similar_tasks,
+    print_task_info,
+    print_valid_tasks_by_category,
+)
 from wisent_guard.cli_utils.cli_prepare_dataset import prepare_dataset
 
-# Import caching infrastructure
-try:
-    from wisent_guard.core.download_full_benchmarks import (
-        FullBenchmarkDownloader,
-    )
-except ImportError:
-    FullBenchmarkDownloader = None
-
-# Import validated benchmark list and unavailable benchmarks filter
-try:
-    from .core.lm_harness_integration.only_benchmarks import CORE_BENCHMARKS
-
-    # Import UNAVAILABLE_BENCHMARKS from download script
-    try:
-        from wisent_guard.core.download_full_benchmarks import (
-            FullBenchmarkDownloader,
-        )
-
-        UNAVAILABLE_BENCHMARKS = FullBenchmarkDownloader.UNAVAILABLE_BENCHMARKS
-    except ImportError:
-        UNAVAILABLE_BENCHMARKS = set()
-except ImportError:
-    try:
-        # Alternative import path for development/testing
-        import os
-        import sys
-
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        sys.path.insert(0, os.path.join(current_dir, "core", "lm-harness-integration"))
-        from only_benchmarks import CORE_BENCHMARKS
-
-        # Try to import UNAVAILABLE_BENCHMARKS
-        try:
-            sys.path.insert(0, os.path.join(current_dir, "core", "classifiers", "pipeline_steps"))
-            from download_full_benchmarks import FullBenchmarkDownloader
-
-            UNAVAILABLE_BENCHMARKS = FullBenchmarkDownloader.UNAVAILABLE_BENCHMARKS
-        except ImportError:
-            UNAVAILABLE_BENCHMARKS = set()
-    except ImportError:
-        # Fallback - create minimal benchmark list
-        CORE_BENCHMARKS = {
-            "truthfulqa_mc1": {
-                "task": "truthfulqa_mc1",
-                "tags": ["hallucination"],
-                "priority": "high",
-            },
-            "hellaswag": {
-                "task": "hellaswag",
-                "tags": ["reasoning"],
-                "priority": "high",
-            },
-            "mmlu": {"task": "mmlu", "tags": ["knowledge"], "priority": "high"},
-        }
-        UNAVAILABLE_BENCHMARKS = set()
-        print("⚠️  Warning: Could not import CORE_BENCHMARKS, using minimal fallback list")
-
-# Import allowed tasks from centralized configuration
-from .parameters.task_config import ALLOWED_TASKS
-
-# Filter to only available (working) benchmarks - this gives us the validated benchmarks
-AVAILABLE_BENCHMARKS = {
-    name: config
-    for name, config in CORE_BENCHMARKS.items()
-    if name not in UNAVAILABLE_BENCHMARKS and name in ALLOWED_TASKS
-}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-
-def get_valid_task_names() -> List[str]:
-    """Get list of all valid (available) task names from AVAILABLE_BENCHMARKS."""
-    return sorted(list(AVAILABLE_BENCHMARKS.keys()))
-
-
-def validate_task_name(task_name: str) -> bool:
-    """
-    Validate if a task name is in the approved AVAILABLE_BENCHMARKS list (37 working benchmarks).
-
-    Args:
-        task_name: Name of the task to validate
-
-    Returns:
-        True if task is valid, False otherwise
-    """
-    return task_name in AVAILABLE_BENCHMARKS
-
-
-def suggest_similar_tasks(invalid_task: str, max_suggestions: int = 5) -> List[str]:
-    """
-    Suggest similar task names for an invalid task using fuzzy matching.
-
-    Args:
-        invalid_task: The invalid task name
-        max_suggestions: Maximum number of suggestions to return
-
-    Returns:
-        List of suggested task names
-    """
-    from difflib import get_close_matches
-
-    valid_tasks = get_valid_task_names()
-    suggestions = get_close_matches(invalid_task, valid_tasks, n=max_suggestions, cutoff=0.6)
-    return suggestions
-
-
-def print_valid_tasks_by_category():
-    """Print all valid (available) tasks organized by categories/tags."""
-    excluded_count = len(UNAVAILABLE_BENCHMARKS)
-    print(f"\n📋 VALID TASKS ({len(AVAILABLE_BENCHMARKS)} available out of {len(CORE_BENCHMARKS)} total):")
-    if excluded_count > 0:
-        print(f"    🚫 {excluded_count} benchmarks excluded (known unavailable/problematic)")
-    print("=" * 60)
-
-    # Group by priority for better organization
-    by_priority = {"high": [], "medium": [], "low": [], "unknown": []}
-
-    for name, config in AVAILABLE_BENCHMARKS.items():
-        priority = config.get("priority", "unknown")
-        by_priority[priority].append((name, config))
-
-    for priority in ["high", "medium", "low", "unknown"]:
-        if by_priority[priority]:
-            emoji = (
-                "🚀" if priority == "high" else ("⚡" if priority == "medium" else "🐌" if priority == "low" else "❓")
-            )
-            print(f"\n{emoji} {priority.upper()} PRIORITY ({len(by_priority[priority])} tasks):")
-
-            for name, config in sorted(by_priority[priority]):
-                tags = ", ".join(config.get("tags", []))
-                print(f"   • {name:<20} - {tags}")
-
-    print("\n💡 Usage: wisent-guard tasks --task-name <task_name>")
-    print("   Example: wisent-guard tasks --task-name truthfulqa_mc1")
-
-    if excluded_count > 0:
-        print(f"\n🚫 EXCLUDED BENCHMARKS ({excluded_count} total):")
-        excluded_list = sorted(list(UNAVAILABLE_BENCHMARKS))
-        for i in range(0, len(excluded_list), 4):  # Show 4 per line
-            line_items = excluded_list[i : i + 4]
-            print(f"   🚫 {', '.join(line_items)}")
-
-
-def print_task_info(task_name: str):
-    """Print detailed information about a specific task."""
-    if task_name not in AVAILABLE_BENCHMARKS:
-        if task_name in UNAVAILABLE_BENCHMARKS:
-            print(f"❌ Task '{task_name}' is known to be unavailable/problematic")
-            print(f"🚫 This benchmark is excluded from the {len(AVAILABLE_BENCHMARKS)} available benchmarks")
-        else:
-            print(f"❌ Task '{task_name}' not found in available benchmarks")
-        return
-
-    config = AVAILABLE_BENCHMARKS[task_name]
-    print(f"\n📋 TASK INFO: {task_name}")
-    print("=" * 50)
-    print(f"🎯 Task ID: {config.get('task', task_name)}")
-    print(f"🏷️  Tags: {', '.join(config.get('tags', []))}")
-    print(f"⚡ Priority: {config.get('priority', 'unknown')}")
-
-    if config.get("priority") == "high":
-        print("   💡 Fast loading (< 13.5s) - optimal for agentic use")
-    elif config.get("priority") == "medium":
-        print("   💡 Moderate loading (13.5-60s) - acceptable for agentic use")
-    elif config.get("priority") == "low":
-        print("   💡 Slow loading (> 60s) - deprioritized for agentic use")
-
-    if "trust_remote_code" in config:
-        print(f"⚠️  Requires trust_remote_code: {config['trust_remote_code']}")
 
 
 def run_task_pipeline(
@@ -231,7 +72,6 @@ def run_task_pipeline(
     user_labels: List[str] = None,
     optimize: bool = False,
     optimize_layers: str = "all",
-    optimize_metric: str = "f1",
     optimize_max_combinations: int = 100,
     verbose: bool = False,
     from_csv: bool = False,
@@ -239,7 +79,6 @@ def run_task_pipeline(
     question_col: str = "question",
     correct_col: str = "correct_answer",
     incorrect_col: str = "incorrect_answer",
-    allow_small_dataset: bool = False,
     detection_action: str = "pass_through",
     placeholder_message: str = None,
     max_regeneration_attempts: int = 3,
@@ -321,8 +160,6 @@ def run_task_pipeline(
     # Synthetic pair mode
     from_synthetic: bool = False,
     synthetic_contrastive_pairs: Optional[Any] = None,
-    # Security parameter - allow code execution without Docker (UNSAFE)
-    trust_code_execution: bool = False,
     # Model reuse parameter for efficiency
     model_instance: Optional[Any] = None,
     livecodebench_version: str = "release_v1",
@@ -338,35 +175,6 @@ def run_task_pipeline(
     Returns:
         Dictionary containing the results of the task pipeline
     """
-    from pathlib import Path
-
-    # SECURITY: Enforce Docker for code execution tasks
-    from .core import SecureCodeEvaluator, enforce_secure_execution
-
-    if enforce_secure_execution(task_name, trust_code_execution):
-        if verbose:
-            print(f"🔒 Task '{task_name}' requires secure Docker execution")
-            print("   • All code will be executed in isolated Docker containers")
-            print("   • This is mandatory for security - cannot be disabled")
-
-        # Ensure Docker is available for code execution tasks
-        try:
-            # Test if we can create a secure evaluator (will check Docker availability)
-            secure_evaluator = SecureCodeEvaluator()
-            if verbose:
-                executor_info = secure_evaluator.get_executor_info()
-                print(f"   • Docker executor ready: {executor_info['image_name']}")
-        except Exception as e:
-            # FAIL HARD - No fallback execution allowed
-            print("\n❌ FATAL ERROR: Docker is required for code execution tasks")
-            print(f"   • Task '{task_name}' requires secure Docker execution")
-            print(f"   • Docker error: {e}")
-            print("\n📋 To fix this:")
-            print("   1. Install Docker: https://docs.docker.com/get-docker/")
-            print("   2. Start Docker daemon")
-            print("   3. Ensure your user has Docker permissions")
-            print("\n⚠️  Code execution tasks CANNOT run without Docker for security reasons")
-            sys.exit(1)
 
     # AUTOMATICALLY SET LM-EVAL-HARNESS AS DEFAULT FOR TESTED TASKS
     # These tasks have been thoroughly tested and validated to work with lm-eval-harness
@@ -535,86 +343,30 @@ def run_task_pipeline(
     Returns:
         Dictionary with all results
     """
-    # VALIDATE TASK NAME - Only allow validated benchmarks from CORE_BENCHMARKS
-    if not (from_csv or from_json or cross_benchmark_mode or from_synthetic):
-        if not validate_task_name(task_name):
-            error_msg = f"Invalid task name: '{task_name}'"
-            suggestions = suggest_similar_tasks(task_name)
-
-            if verbose:
-                print(f"❌ {error_msg}")
-                print(f"📋 Task '{task_name}' is not in the available benchmarks list.")
-                print(
-                    f"🔍 Only {len(AVAILABLE_BENCHMARKS)} working benchmarks are supported (out of {len(CORE_BENCHMARKS)} total)."
-                )
-
-                # Check if it's an unavailable benchmark
-                if task_name in UNAVAILABLE_BENCHMARKS:
-                    print("🚫 This benchmark is known to be unavailable/problematic.")
-
-                if suggestions:
-                    print("\n💡 Did you mean one of these?")
-                    for i, suggestion in enumerate(suggestions, 1):
-                        config = AVAILABLE_BENCHMARKS[suggestion]
-                        priority = config.get("priority", "unknown")
-                        tags = ", ".join(config.get("tags", []))
-                        print(f"   {i}. {suggestion} ({priority} priority) - {tags}")
-
-                print("\n📖 To see all valid tasks, run:")
-                print("   wisent-guard tasks --list-tasks")
-                print("\n📖 To see task details, run:")
-                print("   wisent-guard tasks --task-info <task_name>")
-
-            return {
-                "task_name": task_name,
-                "error": error_msg,
-                "error_type": "invalid_task",
-                "valid_tasks_count": len(AVAILABLE_BENCHMARKS),
-                "total_benchmarks": len(CORE_BENCHMARKS),
-                "excluded_count": len(UNAVAILABLE_BENCHMARKS),
-                "suggestions": suggestions,
-                "help": "Use --list-tasks to see all valid task names",
-            }
+    # Validate task name early and return an error dict if invalid (excluding file / special modes)
+    validation_error = validate_and_report_task_name(
+        task_name=task_name,
+        verbose=verbose,
+        from_csv=from_csv,
+        from_json=from_json,
+        cross_benchmark_mode=cross_benchmark_mode,
+        from_synthetic=from_synthetic,
+    )
+    if validation_error:
+        return validation_error
 
     logger.info(f"Running pipeline for task: {task_name}")
 
-    # Initialize performance tracking
-    memory_tracker = None
-    latency_tracker = None
-
-    if enable_memory_tracking or enable_latency_tracking:
-        if verbose:
-            print(
-                f"🔍 Performance tracking enabled: memory={enable_memory_tracking}, latency={enable_latency_tracking}"
-            )
-
-        from .core.tracking import (
-            format_memory_usage,
-            get_global_latency_tracker,
-            get_global_memory_tracker,
-            get_memory_info,
-        )
-
-        if enable_memory_tracking:
-            memory_tracker = get_global_memory_tracker()
-            memory_tracker.track_gpu = track_gpu_memory
-            memory_tracker.sampling_interval = memory_sampling_interval
-            memory_tracker.start_monitoring()
-            if verbose:
-                print(f"   • Memory tracking started with {memory_sampling_interval}s interval")
-
-        if enable_latency_tracking:
-            latency_tracker = get_global_latency_tracker()
-            latency_tracker.start_tracking()
-            if verbose:
-                print("   • Latency tracking started")
-
-    # Show current memory usage if requested
-    if show_memory_usage:
-        from .core.tracking import format_memory_usage, get_memory_info
-
-        current_memory = get_memory_info()
-        print(f"\n💾 Current Memory Usage: {format_memory_usage(current_memory)}")
+    # Initialize performance tracking (refactored to helper)
+    from wisent_guard.cli_utils.cli_performance import setup_performance_tracking
+    memory_tracker, latency_tracker = setup_performance_tracking(
+        enable_memory_tracking=enable_memory_tracking,
+        enable_latency_tracking=enable_latency_tracking,
+        track_gpu_memory=track_gpu_memory,
+        memory_sampling_interval=memory_sampling_interval,
+        show_memory_usage=show_memory_usage,
+        verbose=verbose,
+    )
 
     # AUTO-LOAD STEERING CONFIGURATION if steering mode is enabled but no method specified
     if steering_mode and not load_steering_vector:
@@ -882,13 +634,7 @@ def run_task_pipeline(
                 print(f"   • CSV/JSON files should have at least {min_training_samples} rows")
                 print("   • lm-harness tasks may need higher --limit values")
 
-            if not allow_small_dataset:
-                if verbose:
-                    print("   • Use --allow-small-dataset flag to bypass this check (may cause training issues)")
-
-                raise ValueError(
-                    f"{error_msg}. Suggestion: Increase dataset size, --limit parameter, or use --allow-small-dataset flag"
-                )
+           
             if verbose:
                 print("   ⚠️  WARNING: Proceeding with small dataset due to --allow-small-dataset flag")
                 print(f"   • Training may be unstable with only {len(qa_pairs)} samples")
@@ -3997,7 +3743,6 @@ def handle_tasks_command(args):
                 user_labels=args.user_labels,
                 optimize=args.optimize,
                 optimize_layers=args.optimize_layers,
-                optimize_metric=args.optimize_metric,
                 optimize_max_combinations=args.optimize_max_combinations,
                 verbose=args.verbose,
                 from_csv=from_csv,
@@ -4005,7 +3750,6 @@ def handle_tasks_command(args):
                 question_col=args.question_col,
                 correct_col=args.correct_col,
                 incorrect_col=args.incorrect_col,
-                allow_small_dataset=args.allow_small_dataset,
                 detection_action=args.detection_action,
                 placeholder_message=args.placeholder_message,
                 max_regeneration_attempts=args.max_regeneration_attempts,
@@ -4074,8 +3818,6 @@ def handle_tasks_command(args):
                 use_cached=getattr(args, "cache_benchmark", True),  # Use cache_benchmark value
                 force_download=getattr(args, "force_download", False),
                 cache_dir=getattr(args, "cache_dir", "./benchmark_cache"),
-                # Security parameter
-                trust_code_execution=getattr(args, "trust_code_execution", False),
                 # Pass pre-loaded QA pairs for mixed sampling
                 preloaded_qa_pairs=qa_pairs if (source == "MIXED_SAMPLING" and qa_pairs) else None,
                 # Pass cross-benchmark data
