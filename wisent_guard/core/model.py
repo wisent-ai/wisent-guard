@@ -69,13 +69,8 @@ class Model:
         """
         self.name = name
         self.layers = layers if layers is not None else []
-        self.device = device or (
-            "cuda"
-            if torch.cuda.is_available()
-            else "mps"
-            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-            else "cpu"
-        )
+        self.device = device if device is not None else ("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+        
 
         # Prompt formatting settings - will be set based on model type
         self.user_token = None
@@ -118,16 +113,16 @@ class Model:
     def _load_model_and_tokenizer(self):
         """Load model and tokenizer from HuggingFace."""
         if self.device == "mps":
-            torch_dtype = torch.float32
+            dtype = torch.float32
         else:
-            torch_dtype = torch.float16 if self.device != "cpu" else torch.float32
+            dtype = torch.float16 if self.device != "cpu" else torch.float32
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.name)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.hf_model = AutoModelForCausalLM.from_pretrained(
-            self.name, torch_dtype=torch_dtype, device_map=self.device, output_hidden_states=True
+            self.name, dtype=dtype, device_map=self.device, output_hidden_states=True
         )
         self.hf_model.config.output_hidden_states = True
         

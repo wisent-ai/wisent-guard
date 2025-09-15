@@ -451,7 +451,7 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
             print(f"   Steering Strength: {steering_strength}")
             print(f"   Method: {steering_methods[0].__class__.__name__ if steering_methods else 'None'}")
             print(f"   Layer: {layers}")
-            print(f"\n   Question: {baseline_samples[0]['doc']['question'] if baseline_samples else 'N/A'}")
+            # print(f"\n   Question: {baseline_samples[0]['doc']['question'] if baseline_samples else 'N/A'}")
             
             # Get answer choices from the sample
             if baseline_samples:
@@ -566,7 +566,7 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                                     if verbose:
                                         print(f"      ⚠️ Steering hook failed during generation: {e}")
                                     return output
-                                return steering_hook
+                            return steering_hook
                             
                         # Add hooks directly for now (TODO: use model primitive when available)
                         steering_hook_fn = create_steering_hook(steering_methods[0])
