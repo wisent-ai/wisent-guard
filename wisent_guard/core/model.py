@@ -69,7 +69,19 @@ class Model:
         """
         self.name = name
         self.layers = layers if layers is not None else []
-        self.device = device if device is not None else ("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Determine device - for Llama on MPS, we use a hybrid approach
+        if device is not None:
+            self.device = device
+            self.compute_device = device
+        else:
+            self.device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+            # For Llama models on MPS, keep model on CPU but process results on MPS
+            if "llama" in name.lower() and self.device == "mps":
+                self.compute_device = "cpu"  # Model computation on CPU
+                print(f"ℹ️ Using hybrid CPU-MPS mode for {name}: model on CPU, results on MPS")
+            else:
+                self.compute_device = self.device
         
 
         # Prompt formatting settings - will be set based on model type
@@ -112,17 +124,18 @@ class Model:
 
     def _load_model_and_tokenizer(self):
         """Load model and tokenizer from HuggingFace."""
-        if self.device == "mps":
+        # Use compute_device for actual model loading
+        if self.compute_device == "mps":
             dtype = torch.float32
         else:
-            dtype = torch.float16 if self.device != "cpu" else torch.float32
+            dtype = torch.float16 if self.compute_device != "cpu" else torch.float32
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.name)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.hf_model = AutoModelForCausalLM.from_pretrained(
-            self.name, dtype=dtype, device_map=self.device, output_hidden_states=True
+            self.name, dtype=dtype, device_map=self.compute_device, output_hidden_states=True
         )
         self.hf_model.config.output_hidden_states = True
         

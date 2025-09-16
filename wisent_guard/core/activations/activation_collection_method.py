@@ -309,7 +309,18 @@ class ActivationCollectionLogic:
         if strategy == ActivationAggregationStrategy.MAX_POOLING:
             # Use max pooling across all tokens
             logging.debug(f"MAX_POOLING: Using max across all {hidden_states.shape[1]} tokens")
-            return hidden_states[0].max(dim=0)[0]  # [hidden_dim]
+            logging.info(f"DEBUG: hidden_states shape before max pooling: {hidden_states.shape}")
+            logging.info(f"DEBUG: hidden_states[0] shape: {hidden_states[0].shape}")
+            try:
+                result = hidden_states[0].max(dim=0)[0]  # [hidden_dim]
+                logging.info(f"DEBUG: max pooling result shape: {result.shape}")
+                return result
+            except Exception as e:
+                logging.error(f"ERROR in max pooling: {e}")
+                logging.error(f"hidden_states type: {type(hidden_states)}")
+                logging.error(f"hidden_states dtype: {hidden_states.dtype if hasattr(hidden_states, 'dtype') else 'N/A'}")
+                logging.error(f"hidden_states device: {hidden_states.device if hasattr(hidden_states, 'device') else 'N/A'}")
+                raise
 
         # Fallback to choice token strategy
         position = self._get_token_position_choice_token(tokens, target_token)
@@ -338,16 +349,42 @@ class ActivationCollectionLogic:
 
         def get_activation_at_target_token(full_prompt: str, target_token: str) -> torch.Tensor:
             """Get activation at the target token position using the specified strategy."""
-            # Use the model's device instead of forcing a specific device
-            model_device = next(self.model.hf_model.parameters()).device
+            logging.info(f"DEBUG: Starting get_activation_at_target_token")
+            logging.info(f"DEBUG: Prompt length: {len(full_prompt)}")
+            logging.info(f"DEBUG: Target token: {target_token}")
+            
+            # Use the model's compute device for inference, target device for results
+            if hasattr(self.model, 'compute_device'):
+                model_device = self.model.compute_device
+                target_device = self.model.device
+            else:
+                model_device = next(self.model.hf_model.parameters()).device
+                target_device = model_device
+            
+            logging.info(f"DEBUG: Model compute device: {model_device}, target device: {target_device}")
 
             # Tokenize the prompt
+            logging.info(f"DEBUG: About to tokenize prompt")
             inputs = self.model.tokenizer(full_prompt, return_tensors="pt")
-            inputs = {k: v.to(model_device) for k, v in inputs.items()}
+            logging.info(f"DEBUG: Tokenization complete. Input shape: {inputs['input_ids'].shape}")
+            
+            # Move inputs to model's compute device
+            if isinstance(model_device, str):
+                inputs = {k: v.to(model_device) for k, v in inputs.items()}
+            else:
+                inputs = {k: v.to(model_device) for k, v in inputs.items()}
+            logging.info(f"DEBUG: Inputs moved to compute device {model_device}")
 
             # Get model outputs with hidden states
+            logging.info(f"DEBUG: About to run model forward pass")
             with torch.no_grad():
-                outputs = self.model.hf_model(**inputs, output_hidden_states=True)
+                try:
+                    outputs = self.model.hf_model(**inputs, output_hidden_states=True)
+                    logging.info(f"DEBUG: Forward pass complete")
+                except Exception as e:
+                    logging.error(f"ERROR in forward pass: {e}")
+                    logging.error(f"Input shapes: {[(k, v.shape) for k, v in inputs.items()]}")
+                    raise
 
             # Get hidden states from the specified layer (add 1 because hidden_states[0] is embeddings)
             if layer_index + 1 < len(outputs.hidden_states):
@@ -364,7 +401,12 @@ class ActivationCollectionLogic:
                 hidden_states, tokens, target_token, token_targeting_strategy
             )
 
-            return activation.cpu()  # Move to CPU for storage
+            # Move to target device if in hybrid mode, otherwise CPU for storage
+            if hasattr(self.model, 'compute_device') and self.model.compute_device != self.model.device:
+                # In hybrid mode, move to target device (e.g., MPS)
+                return activation.to(target_device)
+            else:
+                return activation.cpu()  # Move to CPU for storage
 
         try:
             # Determine prompts and target tokens based on prompt strategy

@@ -4,6 +4,8 @@ Clean implementation using enhanced core primitives.
 """
 
 import logging
+import os
+import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -4341,6 +4343,7 @@ def handle_tasks_command(args):
                         print(f"   • {suggestion} ({priority} priority) - {tags}")
 
             print("\n📖 To see all valid tasks: wisent-guard tasks --list-tasks")
+            import sys
             sys.exit(1)
 
         task_sources.extend(task_names)
