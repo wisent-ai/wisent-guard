@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "created_at": "2025-09-17T12:45:13.175896",
+  "last_cleanup": "2025-09-17T12:45:13.175899",
+  "tasks": {
+    "math500": {
+      "task_name": "math500",
+      "samples_count": 85,
+      "last_updated": "2025-09-17T13:31:59.905240",
+      "cache_version": "1.0",
+      "chunks": [
+        "samples_1_to_25.json",
+        "samples_26_to_50.json",
+        "samples_51_to_75.json",
+        "samples_76_to_85.json"
+      ]
+    }
+  }
+}
