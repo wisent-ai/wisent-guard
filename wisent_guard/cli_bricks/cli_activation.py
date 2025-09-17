@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Protocol, Sequence
+from collections.abc import Mapping
+from typing import Any, Final, TYPE_CHECKING
 
-from wisent_guard.core.contrastive_pairs import ContrastivePair
+from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
 
 from wisent_guard.core.activations import (
     ActivationAggregationStrategy,
@@ -11,15 +12,17 @@ from wisent_guard.core.activations import (
 from wisent_guard.core.activations.activation_collection_method import (
     ActivationCollectionLogic,
 )
-
 from wisent_guard.core import ContrastivePairSet
 
+if TYPE_CHECKING:
+    from wisent_guard.core.contrastive_pairs import ContrastivePair
+    from wisent_guard.core.model import Model
+    from wisent_guard.cli_bricks.cli_performance import Trackers
 
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
 
 _LOG = setup_logger(__name__)
 
-__all__ = [
+__all__: Final[list[str]] = [
     "make_collector",
     "create_contrastive_pairs",
     "build_pair_set_with_real_activations",
@@ -27,14 +30,14 @@ __all__ = [
 ]
 
 
-_PROMPT_STRATEGY_MAP: Mapping[str, PromptConstructionStrategy] = {
+_PROMPT_STRATEGY_MAP: Final[Mapping[str, PromptConstructionStrategy]] = {
     "multiple_choice": PromptConstructionStrategy.MULTIPLE_CHOICE,
     "role_playing": PromptConstructionStrategy.ROLE_PLAYING,
     "direct_completion": PromptConstructionStrategy.DIRECT_COMPLETION,
     "instruction_following": PromptConstructionStrategy.INSTRUCTION_FOLLOWING,
 }
 
-_TARGETING_STRATEGY_MAP: Mapping[str, ActivationAggregationStrategy] = {
+_TARGETING_STRATEGY_MAP: Final[Mapping[str, ActivationAggregationStrategy]] = {
     "choice_token": ActivationAggregationStrategy.CHOICE_TOKEN,
     "continuation_token": ActivationAggregationStrategy.CONTINUATION_TOKEN,
     "last_token": ActivationAggregationStrategy.LAST_TOKEN,
@@ -44,39 +47,37 @@ _TARGETING_STRATEGY_MAP: Mapping[str, ActivationAggregationStrategy] = {
 }
 
 
-class ProcessedPairLike(Protocol):
-    """
-    Structural type for 'processed_pairs' items consumed by 'build_pair_set_with_real_activations'.
-    """
-    prompt: str
-    positive_response: str
-    negative_response: str
-    positive_activations: Any
-    negative_activations: Any
-
-
 def make_collector(model: Model) -> ActivationCollectionLogic:
     """
     Construct an ActivationCollectionLogic for the given model.
+
     Args:
-        model: A wisent_guard Model instance.
+        model: A wisent_guard-compatible model instance.
+
     Returns:
         An ActivationCollectionLogic instance bound to the model.
     """
     logger = bind(_LOG, subtask="make_collector")
-    logger.info("Creating ActivationCollectionLogic", extra={"model_type": type(model).__name__})
+    logger.info(
+        "Creating ActivationCollectionLogic"
+    )
     return ActivationCollectionLogic(model=model)
 
 
-def _coerce_prompt_strategy(strategy: str | PromptConstructionStrategy) -> PromptConstructionStrategy:
+def _coerce_prompt_strategy(
+    strategy: str | PromptConstructionStrategy,
+) -> PromptConstructionStrategy:
     """
     Accept either a string key or an enum member.
-    Args:
-        strategy: A string key or PromptConstructionStrategy member. For example, "multiple_choice".
+
+    Arguments:
+      - strategy: String name of the prompt construction strategy. For example, "multiple_choice".
+
     Returns:
-        A PromptConstructionStrategy member.
+        - A PromptConstructionStrategy enum value.
+    
     Raises:
-        None. Falls back to MULTIPLE_CHOICE with a warning if the input is unrecognized.
+        - ValueError if the strategy is unknown.
     """
     logger = bind(_LOG, subtask="prompt_strategy")
     if isinstance(strategy, PromptConstructionStrategy):
@@ -91,15 +92,20 @@ def _coerce_prompt_strategy(strategy: str | PromptConstructionStrategy) -> Promp
     return PromptConstructionStrategy.MULTIPLE_CHOICE
 
 
-def _coerce_targeting_strategy(strategy: str | ActivationAggregationStrategy) -> ActivationAggregationStrategy:
+def _coerce_targeting_strategy(
+    strategy: str | ActivationAggregationStrategy,
+) -> ActivationAggregationStrategy:
     """
     Accept either a string key or an enum member.
-    Args:
-        strategy: A string key or ActivationAggregationStrategy member. For example, "choice_token" or "last_token".
+
+    Arguments:
+      - strategy: String name of the token targeting strategy. For example, "choice_token".
+    
     Returns:
-        An ActivationAggregationStrategy member.
+        - An ActivationAggregationStrategy enum value.
+    
     Raises:
-        None. Falls back to CHOICE_TOKEN with a warning if the input is unrecognized.
+        - ValueError if the strategy is unknown.
     """
     logger = bind(_LOG, subtask="targeting_strategy")
     if isinstance(strategy, ActivationAggregationStrategy):
@@ -116,7 +122,7 @@ def _coerce_targeting_strategy(strategy: str | ActivationAggregationStrategy) ->
 
 def create_contrastive_pairs(
     collector: ActivationCollectionLogic,
-    qa_pairs: List[Dict[str, str]],
+    qa_pairs: list[dict[str, str]],
     prompt_construction_strategy: str | PromptConstructionStrategy,
     verbose: bool = False,
 ) -> list[ContrastivePair]:
@@ -125,24 +131,22 @@ def create_contrastive_pairs(
 
     Args:
         collector: ActivationCollectionLogic bound to a model.
-        qa_pairs: List of {'question': ..., 'correct_answer': ..., 'incorrect_answer': ...}.
+        qa_pairs: List of {"question": ..., "correct_answer": ..., "incorrect_answer": ...}.
         prompt_construction_strategy: String key or PromptConstructionStrategy.
         verbose: If True, emits an info log about the number of pairs created.
 
     Returns:
-        A list of contrastive pair objects. Each has prompt, positive_response, negative_response,
-        and placeholders for positive_activations and negative_activations (None initially).
-
-    Raises:
-        ValueError: If no pairs were created.
+        A list of contrastive pairs.
     """
     logger = bind(_LOG, subtask="create_contrastive_pairs")
-    strategy: PromptConstructionStrategy = _coerce_prompt_strategy(prompt_construction_strategy)
+    strategy = _coerce_prompt_strategy(prompt_construction_strategy)
     logger.info(
         "Creating batch contrastive pairs",
         extra={"num_qa_pairs": len(qa_pairs), "prompt_strategy": strategy.name},
     )
-    pairs: list[ContrastivePair] = collector.create_batch_contrastive_pairs(qa_pairs, strategy)
+    pairs: list[ContrastivePair] = collector.create_batch_contrastive_pairs(
+        qa_pairs, strategy
+    )
 
     if verbose:
         logger.info("Created contrastive pairs", extra={"count": len(pairs)})
@@ -154,21 +158,22 @@ def create_contrastive_pairs(
 
 
 def build_pair_set_with_real_activations(
-    processed_pairs: Sequence[ProcessedPairLike],
+    processed_pairs: list[ContrastivePair],
     task_name: str,
     verbose: bool = False,
 ) -> ContrastivePairSet:
     """
     Build a ContrastivePairSet from processed pairs and attach real activations
-    to each response object. 
+    to each response object.
 
-    Args:
-        processed_pairs: Sequence of objects with prompt/resp strings and activations.
-        task_name: A short task name for the resulting pair set.
-        verbose: If True, emits info logs about processing progress.
-
+    Arguments:
+        - processed_pairs: List of ContrastivePair with activations populated.
+        - task_name: Name for the ContrastivePairSet. For example "winogrande_training".
+        - verbose: If True, emits info logs about progress.
+    
     Returns:
-        A ContrastivePairSet with activations assigned to positive/negative responses.
+        - A ContrastivePairSet with real activations attached.
+
     """
     logger = bind(_LOG, subtask="build_pair_set", task_name=task_name)
     if not processed_pairs:
@@ -176,7 +181,7 @@ def build_pair_set_with_real_activations(
         raise ValueError("processed_pairs is empty.")
 
     # 1) Convert processed_pairs -> phrase_pairs (harmless/harmful full strings)
-    phrase_pairs: List[Dict[str, str]] = [
+    phrase_pairs: list[dict[str, str]] = [
         {
             "harmless": f"{pair.prompt}{pair.positive_response}",
             "harmful": f"{pair.prompt}{pair.negative_response}",
@@ -192,7 +197,9 @@ def build_pair_set_with_real_activations(
         phrase_pairs=phrase_pairs,
         task_type="lm_evaluation",
     )
-    logger.info("Constructed ContrastivePairSet", extra={"num_pairs": len(pair_set.pairs)})
+    logger.info(
+        "Constructed ContrastivePairSet", extra={"num_pairs": len(pair_set.pairs)}
+    )
 
     # 3) Attach real activations to the response objects
     mismatches = 0
@@ -207,7 +214,11 @@ def build_pair_set_with_real_activations(
         if pos is None or neg is None:
             logger.warning(
                 "Missing positive or negative response in pair_set; skipping activations",
-                extra={"index": i, "has_positive": pos is not None, "has_negative": neg is not None},
+                extra={
+                    "index": i,
+                    "has_positive": pos is not None,
+                    "has_negative": neg is not None,
+                },
             )
             continue
 
@@ -221,7 +232,9 @@ def build_pair_set_with_real_activations(
         )
 
     if verbose:
-        logger.info("Attached activations to pair_set", extra={"pairs": len(pair_set.pairs)})
+        logger.info(
+            "Attached activations to pair_set", extra={"pairs": len(pair_set.pairs)}
+        )
 
     return pair_set
 
@@ -232,25 +245,23 @@ def extract_activations_for_pairs(
     layer: int,
     device: str,
     token_targeting_strategy: str | ActivationAggregationStrategy,
-    latency_tracker: Any | None = None,
+    latency_tracker: Trackers | None = None,
     verbose: bool = False,
-) -> List[ContrastivePair]:
+) -> list[ContrastivePair]:
     """
     Collect activations for a batch of contrastive pairs.
 
     Args:
         collector: ActivationCollectionLogic bound to a model.
-        contrastive_pairs: list of ContrastivePair objects.
+        contrastive_pairs: list of ContrastivePair.
         layer: Layer index to use.
         device: Device string (e.g., 'cuda:0', 'cpu').
-        token_targeting_strategy: String key or ActivationAggregationStrategy member.
+        token_targeting_strategy: String key or ActivationAggregationStrategy member. For example, "choice_token".
         latency_tracker: Optional context manager with .time_operation(name).
         verbose: If True, emits info logs.
 
     Returns:
         A list of ContrastivePair objects with activations populated.
-    Raises:
-        ValueError: If 'layer' is empty.
     """
     logger = bind(_LOG, subtask="extract_activations")
     if not layer:
@@ -269,7 +280,7 @@ def extract_activations_for_pairs(
             },
         )
 
-    def _run() -> List[ContrastivePair]:
+    def _run() -> list[ContrastivePair]:
         return collector.collect_activations_batch(
             pairs=contrastive_pairs,
             layer_index=layer,
@@ -281,46 +292,3 @@ def extract_activations_for_pairs(
         with latency_tracker.time_operation("activation_extraction"):
             return _run()
     return _run()
-
-
-if __name__ == "__main__":
-    from wisent_guard.core import Model
-    model = Model(name="/home/gg/.cache/huggingface/hub/models--meta-llama--Llama-3.2-1B-Instruct/snapshots/9213176726f574b556790deb65791e0c5aa438b6")
-
-    # simple test
-    collector = make_collector(model)
-    pairs = create_contrastive_pairs(
-        collector,
-        qa_pairs = [
-            {"question": "What is 2+2?", "correct_answer": "4", "incorrect_answer": "3"},
-            {"question": "What is the capital of France?", "correct_answer": "Paris", "incorrect_answer": "London"},
-        ],
-        prompt_construction_strategy="multiple_choice",
-        verbose=True,
-    )
-    for pair in pairs:
-        print(f"\nPrompt: {pair.prompt}")
-        print(f"Positive Response: {pair.positive_response}")
-        print(f"Negative Response: {pair.negative_response}")
-
-    activations = extract_activations_for_pairs(
-        collector,
-        contrastive_pairs=pairs,
-        layer=12,
-        device="cuda",
-        token_targeting_strategy="last_token",
-        verbose=True,
-    )
-    for i, pair in enumerate(pairs):
-        print(f"\nPair {i+1}:")
-        print(f"Positive Activations Shape: {pair.positive_activations.shape if pair.positive_activations is not None else 'None'}")
-        print(f"Negative Activations Shape: {pair.negative_activations.shape if pair.negative_activations is not None else 'None'}")
-
-    
-    build_set = build_pair_set_with_real_activations(
-        processed_pairs=activations,
-        task_name="simple_test",
-        verbose=True,
-    )
-    print(f"\nBuilt ContrastivePairSet with {len(build_set.pairs)} pairs")
-    

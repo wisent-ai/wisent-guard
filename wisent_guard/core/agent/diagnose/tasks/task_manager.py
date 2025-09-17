@@ -1249,33 +1249,25 @@ class TaskManager:
         
         return base_similarity
     
-    def load_task(self, task_name: str, shots: int = 0, limit: Optional[int] = None):
+    def load_task(self, task_name: str, limit: Optional[int] = None):
         """
         Load a task from lm-evaluation-harness with dynamic task name resolution.
         Supports both regular tasks and ConfigurableGroup tasks.
         
         Args:
             task_name: Name of the task
-            shots: Number of few-shot examples  
             limit: Optional limit on number of documents
             
         Returns:
             Task object from lm_eval
         """
-        try:
-            from lm_eval.tasks import get_task_dict
-            from lm_eval.api.registry import TASK_REGISTRY
-        except ImportError as e:
-            raise ImportError(
-                "lm-evaluation-harness is required. Install with: pip install lm-eval"
-            ) from e
         
         # Find the actual task name dynamically
         actual_task_name = self.resolve_task_name(task_name)
         
         try:
             # First try to handle as potentially problematic ConfigurableGroup task
-            task, resolved_name = handle_configurable_group_task(actual_task_name)
+            task, _ = handle_configurable_group_task(actual_task_name)
             task._limit = limit
             return task
             

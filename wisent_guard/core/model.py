@@ -990,13 +990,12 @@ class Model:
         """
         return _is_valid_task(task_name)
 
-    def load_lm_eval_task(self, task_name: str, shots: int = 0, limit: Optional[int] = None):
+    def load_lm_eval_task(self, task_name: str, limit: Optional[int] = None):
         """
         Load a task from lm-evaluation-harness with dynamic task name resolution.
 
         Args:
             task_name: Name of the task
-            shots: Number of few-shot examples
             limit: Optional limit on number of documents
 
         Returns:
@@ -1108,7 +1107,7 @@ class Model:
         if _task_manager is None:
             raise RuntimeError("Task management system not available")
 
-        return _task_manager.load_task(task_name, shots=shots, limit=limit)
+        return _task_manager.load_task(task_name, limit=limit)
 
     def _resolve_task_name(self, task_name: str) -> str:
         """Dynamically resolve a task name to an available task."""

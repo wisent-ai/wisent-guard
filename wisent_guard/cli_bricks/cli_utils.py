@@ -62,10 +62,6 @@ def short_task_name(task_name: str) -> str:
 
 def validate_or_explain(
     task_name: str,
-    from_csv: bool,
-    from_json: bool,
-    cross_benchmark_mode: bool,
-    from_synthetic: bool,
     verbose: bool,
 ) -> Dict[str, Any]:
     """
@@ -73,13 +69,7 @@ def validate_or_explain(
     or special modes (cross-benchmark/synthetic). Returns {} on success,
     or a rich error payload compatible with the old implementation.
     """
-    # Bypass validation when user brings their own data/mode
-    if from_csv or from_json or cross_benchmark_mode or from_synthetic:
-        if verbose:
-            mode = "CSV" if from_csv else "JSON" if from_json else "cross-benchmark" if cross_benchmark_mode else "synthetic"
-            print(f"ℹ️  Skipping benchmark whitelist validation (mode: {mode}).")
-        return {}
-
+   
     if validate_task_name(task_name):
         return {}
 
@@ -122,110 +112,111 @@ def validate_or_explain(
         "help": "Use --list-tasks to see all valid task names",
     }
 
-def maybe_autoload_model_config(
-    model_name: str,
-    task_name: str,
-    layer: str,
-    token_aggregation: str,
-    detection_threshold: float,
-    verbose: bool,
-):
+def _get_steering_bits(model_name: str, task_name: Optional[str]) -> dict[str, int | str | float]:
     """
-    Auto-load saved per-model/task params IFF the caller kept default/sentinel values.
-    Respect explicit CLI overrides. Prefer the manager instance; fallback to module helper.
+    Read method/layer/strength/token_aggregation from steering config.
+    Prefers task-specific, falls back to global 'steering_optimization'.
+    Supports both plain and 'best_*' key variants for robustness.
+
+    Arguments:
+        model_name: Name of the model to load config for.
+        task_name: Optional task name for task-specific steering. For example, "hellaswag".
+    
+    Returns:
+        A dict with any of the keys: method, layer, strength, token_aggregation.
+
+    Examples return value:
+        {
+            "method": "CAA",
+            "layer": 15,
+            "strength": 0.5,
+            "token_aggregation": "average",
+            "token_target": "choice_token"
+        }
     """
-    from wisent_guard.core.model_config_manager import ModelConfigManager, get_optimal_parameters
-
-    # Only autoload if user hasn't overridden defaults
-    load_saved = (layer == "15" and token_aggregation == "average" and detection_threshold == 0.6)
-    overrides = {}
-    if not load_saved:
-        return layer, token_aggregation, detection_threshold, overrides
-
-    mgr = ModelConfigManager()
-
-    # Prefer instance method if available; fallback to module function
     try:
-        optimal = mgr.get_optimal_parameters(model_name, task_name)
-    except AttributeError:
-        optimal = get_optimal_parameters(model_name, task_name)
-
-    if optimal:
-        orig_l, orig_a, orig_t = layer, token_aggregation, detection_threshold
-        if "classification_layer" in optimal and optimal["classification_layer"] is not None:
-            layer = str(optimal["classification_layer"])
-            overrides["layer"] = f"{orig_l} → {layer}"
-        if "token_aggregation" in optimal and optimal["token_aggregation"]:
-            token_aggregation = optimal["token_aggregation"]
-            overrides["token_aggregation"] = f"{orig_a} → {token_aggregation}"
-        if "detection_threshold" in optimal and optimal["detection_threshold"] is not None:
-            detection_threshold = optimal["detection_threshold"]
-            overrides["detection_threshold"] = f"{orig_t} → {detection_threshold}"
-
-        if verbose and overrides:
-            print(f"\n🔧 Auto-loaded saved configuration for model: {model_name}")
-            for k, v in overrides.items():
-                print(f"   • {k}: {v}")
-            print()
-
-    return layer, token_aggregation, detection_threshold, overrides
-
-def maybe_autoload_steering_defaults(
-    steering_mode: bool,
-    model_name: str,
-    task_name: str,
-    steering_method: str,
-    current_layer: str,
-    current_strength: float,
-    verbose: bool,
-    force_autoload: bool = False,   # set True to always override with saved defaults
-) -> tuple[str, str, float]:
-    """
-    If steering_mode is on, optionally auto-load per-(model, task) steering defaults.
-    We only override when:
-      - force_autoload=True, or
-      - the caller kept sentinel defaults (method=='CAA', layer=='15', strength==1.0)
-    Returns: (steering_method, layer, steering_strength)
-    """
-    if not steering_mode:
-        return steering_method, current_layer, current_strength
-
-    try:
-        from wisent_guard.core.steering_optimizer import get_optimal_steering_params
-        opt = get_optimal_steering_params(model_name, task_name) or {}
+        from wisent_guard.core.model_config_manager import ModelConfigManager
+        cfg = (ModelConfigManager().load_model_config(model_name)) or {}
     except Exception:
-        opt = {}
+        return {}
 
-    if not opt:
-        return steering_method, current_layer, current_strength
+    # 1) task-specific steering
+    if task_name and "task_specific_steering" in cfg:
+        t = cfg["task_specific_steering"].get(task_name)
+        if t:
+            return t
 
-    # Decide if we should override each field
-    use_saved_method   = force_autoload or (steering_method == "CAA")
-    use_saved_layer    = force_autoload or (str(current_layer) == "15")   # same sentinel as classifier default
-    use_saved_strength = force_autoload or (float(current_strength) == 1.0)
+    # 2) global best steering
+    s = cfg.get("steering_optimization") or {}
+    if s:
+        return {
+            "method": s.get("method", s.get("best_method")),
+            "layer": s.get("layer", s.get("best_layer")),
+            "strength": s.get("strength", s.get("best_strength")),
+            "token_aggregation": s.get("token_aggregation", s.get("best_token_aggregation")),
+            "token_target": s.get("token_target", s.get("best_token_target")),
+        }
 
-    new_method   = opt.get("method", steering_method)
-    new_layer    = str(opt.get("layer", current_layer))
-    new_strength = float(opt.get("strength", current_strength))
+    return {}
+
+def autoload_steering(
+    model_name: str,
+    task_name: str,
+    layer: int,
+    token_aggregation: str,
+    token_target: str,
+    steering_method: str,
+    steering_strength: float,
+    try_auto_load: bool,
+    verbose: bool = False,
+) -> tuple[int, str, str, float]:
+    """
+    If try_auto_load=True, override any of the four fields (layer, token_aggregation, steering_method, steering_strength) with values found in steering config.
+    Otherwise, return inputs unchanged.
+
+    Arguments:
+        model_name: Name of the model to load config for.
+        task_name: Name of the task to load config for (e.g., "hellaswag").
+        layer: Current layer string (e.g., "15").
+        token_aggregation: Current token aggregation strategy (e.g., "average").
+        token_target: Current token targeting strategy (e.g., "choice_token").
+        steering_method: Current steering method (e.g., "CAA").
+        steering_strength: Current steering strength (e.g., 0.5).
+        try_auto_load: If True, attempt to load and override values.
+        verbose: If True, emits info logs.
+
+    Returns: (layer, token_aggregation, steering_method, steering_strength)
+    """
+    if not try_auto_load:
+        return layer, token_aggregation, steering_method, steering_strength
+
+    opt = _get_steering_bits(model_name, task_name)
+
+    new_layer   = opt["layer"] if opt.get("layer") is not None else layer
+    new_tok     = opt["token_aggregation"] if opt.get("token_aggregation") else token_aggregation
+    new_method  = opt["method"] if opt.get("method") else steering_method
+    new_strength = opt.get("strength") if opt.get("strength") is not None else steering_strength
+    new_target = opt.get("token_target") if opt.get("token_target") else token_target
 
     if verbose:
-        changed = []
-        if use_saved_method and "method" in opt and opt["method"] and opt["method"] != steering_method:
-            changed.append(f"method: {steering_method} → {opt['method']}")
-        if use_saved_layer and "layer" in opt and opt["layer"] is not None and str(opt["layer"]) != str(current_layer):
-            changed.append(f"layer: {current_layer} → {opt['layer']}")
-        if use_saved_strength and "strength" in opt and opt["strength"] is not None and float(opt["strength"]) != float(current_strength):
-            changed.append(f"strength: {current_strength} → {opt['strength']}")
-        if changed:
-            print("\n🔧 Auto-loaded steering defaults")
-            for line in changed:
-                print(f"   • {line}")
+        changes = []
+        if layer != new_layer:                   changes.append(f"layer: {layer} → {new_layer}")
+        if token_aggregation != new_tok and opt.get("token_aggregation") is not None:
+            changes.append(f"token_aggregation: {token_aggregation} → {new_tok}")
+        if steering_method != new_method and opt.get("method") is not None:
+            changes.append(f"steering.method: {steering_method} → {new_method}")
+        if steering_strength != new_strength and opt.get("strength") is not None:
+            changes.append(f"steering.strength: {steering_strength} → {new_strength}")
+        if not opt:
+            changes.append("(no steering config found; kept inputs)")
+        if changes:
+            print(f"\nSteering autoload for model={model_name} task={task_name}")
+            for c in changes:
+                print(f"• {c}")
 
-    return (
-        new_method if use_saved_method else steering_method,
-        new_layer if use_saved_layer else current_layer,
-        new_strength if use_saved_strength else current_strength,
-    )
+    return new_layer, new_tok, new_target, new_method, new_strength
+
+
 
 def build_detection_handler(
     detection_action: str,
