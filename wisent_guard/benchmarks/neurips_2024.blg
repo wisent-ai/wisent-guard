@@ -1,0 +1,64 @@
+This is BibTeX, Version 0.99d (TeX Live 2023/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: neurips_2024.aux
+The style file: plain.bst
+Database file #1: bibliography.bib
+Warning--I didn't find a database entry for ""
+Warning--empty booktitle in arocaouellette2021prost
+Warning--empty journal in chen2021evaluating
+Warning--empty booktitle in conneau2018xnli
+Warning--empty booktitle in cui2020mutual
+Warning--empty booktitle in hartvigsen2022toxigen
+Warning--empty booktitle in jin2019pubmedqa
+Warning--empty booktitle in khashabi2018multirc
+Warning--empty booktitle in levesque2012wsc
+Warning--empty booktitle in nangia2020crows
+Warning--empty booktitle in paperno2016lambada
+Warning--empty booktitle in pilehvar2019wic
+Warning--empty booktitle in ponti2020xcopa
+Warning--empty booktitle in socher2013sst
+Warning--empty booktitle in vilares2019headqa
+Warning--empty booktitle in yang2019pawsx
+Warning--empty booktitle in zhou2019mctaco
+You've used 77 entries,
+            2118 wiz_defined-function locations,
+            1091 strings with 28960 characters,
+and the built_in function-call counts, 33142 in all, are:
+= -- 2758
+> -- 3070
+< -- 6
++ -- 1220
+- -- 1136
+* -- 2746
+:= -- 6063
+add.period$ -- 237
+call.type$ -- 77
+change.case$ -- 797
+chr.to.int$ -- 0
+cite$ -- 93
+duplicate$ -- 903
+empty$ -- 1623
+format.name$ -- 1136
+if$ -- 6289
+int.to.chr$ -- 0
+int.to.str$ -- 77
+missing$ -- 77
+newline$ -- 388
+num.names$ -- 154
+pop$ -- 901
+preamble$ -- 1
+purify$ -- 720
+quote$ -- 0
+skip$ -- 599
+stack$ -- 0
+substring$ -- 588
+swap$ -- 129
+text.length$ -- 6
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 308
+warning$ -- 16
+while$ -- 171
+width$ -- 79
+write$ -- 774
+(There were 17 warnings)

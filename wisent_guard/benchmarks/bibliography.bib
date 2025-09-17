@@ -1,0 +1,878 @@
+% Journals
+
+% First the Full Name is given, then the abbreviation used in the AMS Math
+% Reviews, with an indication if it could not be found there.
+% Note the 2nd overwrites the 1st, so swap them if you want the full name.
+
+ %{AMS}
+ @String{AMSTrans = "American Mathematical Society Translations" }
+ @String{AMSTrans = "Amer. Math. Soc. Transl." }
+ @String{BullAMS = "Bulletin of the American Mathematical Society" }
+ @String{BullAMS = "Bull. Amer. Math. Soc." }
+ @String{ProcAMS = "Proceedings of the American Mathematical Society" }
+ @String{ProcAMS = "Proc. Amer. Math. Soc." }
+ @String{TransAMS = "Transactions of the American Mathematical Society" }
+ @String{TransAMS = "Trans. Amer. Math. Soc." }
+
+ %ACM
+ @String{CACM = "Communications of the {ACM}" }
+ @String{CACM = "Commun. {ACM}" }
+ @String{CompServ = "Comput. Surveys" }
+ @String{JACM = "J. ACM" }
+ @String{ACMMathSoft = "{ACM} Transactions on Mathematical Software" }
+ @String{ACMMathSoft = "{ACM} Trans. Math. Software" }
+ @String{SIGNUM = "{ACM} {SIGNUM} Newsletter" }
+ @String{SIGNUM = "{ACM} {SIGNUM} Newslett." }
+ @String{AmerSocio = "American Journal of Sociology" }
+ @String{AmerStatAssoc = "Journal of the American Statistical Association" }
+ @String{AmerStatAssoc = "J. Amer. Statist. Assoc." }
+ @String{ApplMathComp = "Applied Mathematics and Computation" }
+ @String{ApplMathComp = "Appl. Math. Comput." }
+ @String{AmerMathMonthly = "American Mathematical Monthly" }
+ @String{AmerMathMonthly = "Amer. Math. Monthly" }
+ @String{BIT = "{BIT}" }
+ @String{BritStatPsych = "British Journal of Mathematical and Statistical
+          Psychology" }
+ @String{BritStatPsych = "Brit. J. Math. Statist. Psych." }
+ @String{CanMathBull = "Canadian Mathematical Bulletin" }
+ @String{CanMathBull = "Canad. Math. Bull." }
+ @String{CompApplMath = "Journal of Computational and Applied Mathematics" }
+ @String{CompApplMath = "J. Comput. Appl. Math." }
+ @String{CompPhys = "Journal of Computational Physics" }
+ @String{CompPhys = "J. Comput. Phys." }
+ @String{CompStruct = "Computers and Structures" }
+ @String{CompStruct = "Comput. \& Structures" }
+ @String{CompJour = "The Computer Journal" }
+ @String{CompJour = "Comput. J." }
+ @String{CompSysSci = "Journal of Computer and System Sciences" }
+ @String{CompSysSci = "J. Comput. System Sci." }
+ @String{Computing = "Computing" }
+ @String{ContempMath = "Contemporary Mathematics" }
+ @String{ContempMath = "Contemp. Math." }
+ @String{Crelle = "Crelle's Journal" }
+ @String{GiornaleMath = "Giornale di Mathematiche" }
+ @String{GiornaleMath = "Giorn. Mat." } % didn't find in AMS MR., ibid.
+
+ %IEEE
+ @String{Computer = "{IEEE} Computer" }
+ @String{IEEETransComp = "{IEEE} Transactions on Computers" }
+ @String{IEEETransComp = "{IEEE} Trans. Comput." }
+ @String{IEEETransAC = "{IEEE} Transactions on Automatic Control" }
+ @String{IEEETransAC = "{IEEE} Trans. Automat. Control" }
+ @String{IEEESpec = "{IEEE} Spectrum" } % didn't find in AMS MR
+ @String{ProcIEEE = "Proceedings of the {IEEE}" }
+ @String{ProcIEEE = "Proc. {IEEE}" } % didn't find in AMS MR
+ @String{IEEETransAeroElec = "{IEEE} Transactions on Aerospace and Electronic
+     Systems" }
+ @String{IEEETransAeroElec = "{IEEE} Trans. Aerospace Electron. Systems" }
+
+ @String{IMANumerAna = "{IMA} Journal of Numerical Analysis" }
+ @String{IMANumerAna = "{IMA} J. Numer. Anal." }
+ @String{InfProcLet = "Information Processing Letters" }
+ @String{InfProcLet = "Inform. Process. Lett." }
+ @String{InstMathApp = "Journal of the Institute of Mathematics and
+     its Applications" }
+ @String{InstMathApp = "J. Inst. Math. Appl." }
+ @String{IntControl = "International Journal of Control" }
+ @String{IntControl = "Internat. J. Control" }
+ @String{IntNumerEng = "International Journal for Numerical Methods in
+     Engineering" }
+ @String{IntNumerEng = "Internat. J. Numer. Methods Engrg." }
+ @String{IntSuper = "International Journal of Supercomputing Applications" }
+ @String{IntSuper = "Internat. J. Supercomputing Applic." } % didn't find
+%% in AMS MR
+ @String{Kibernetika = "Kibernetika" }
+ @String{JResNatBurStand = "Journal of Research of the National Bureau
+     of Standards" }
+ @String{JResNatBurStand = "J. Res. Nat. Bur. Standards" }
+ @String{LinAlgApp = "Linear Algebra and its Applications" }
+ @String{LinAlgApp = "Linear Algebra Appl." }
+ @String{MathAnaAppl = "Journal of Mathematical Analysis and Applications" }
+ @String{MathAnaAppl = "J. Math. Anal. Appl." }
+ @String{MathAnnalen = "Mathematische Annalen" }
+ @String{MathAnnalen = "Math. Ann." }
+ @String{MathPhys = "Journal of Mathematical Physics" }
+ @String{MathPhys = "J. Math. Phys." }
+ @String{MathComp = "Mathematics of Computation" }
+ @String{MathComp = "Math. Comp." }
+ @String{MathScand = "Mathematica Scandinavica" }
+ @String{MathScand = "Math. Scand." }
+ @String{TablesAidsComp = "Mathematical Tables and Other Aids to Computation" }
+ @String{TablesAidsComp = "Math. Tables Aids Comput." }
+ @String{NumerMath = "Numerische Mathematik" }
+ @String{NumerMath = "Numer. Math." }
+ @String{PacificMath = "Pacific Journal of Mathematics" }
+ @String{PacificMath = "Pacific J. Math." }
+ @String{ParDistComp = "Journal of Parallel and Distributed Computing" }
+ @String{ParDistComp = "J. Parallel and Distrib. Comput." } % didn't find
+%% in AMS MR
+ @String{ParComputing = "Parallel Computing" }
+ @String{ParComputing = "Parallel Comput." }
+ @String{PhilMag = "Philosophical Magazine" }
+ @String{PhilMag = "Philos. Mag." }
+ @String{ProcNAS = "Proceedings of the National Academy of Sciences
+                    of the USA" }
+ @String{ProcNAS = "Proc. Nat. Acad. Sci. U. S. A." }
+ @String{Psychometrika = "Psychometrika" }
+ @String{QuartMath = "Quarterly Journal of Mathematics, Oxford, Series (2)" }
+ @String{QuartMath = "Quart. J. Math. Oxford Ser. (2)" }
+ @String{QuartApplMath = "Quarterly of Applied Mathematics" }
+ @String{QuartApplMath = "Quart. Appl. Math." }
+ @String{RevueInstStat = "Review of the International Statisical Institute" }
+ @String{RevueInstStat = "Rev. Inst. Internat. Statist." }
+
+ %SIAM
+ @String{JSIAM = "Journal of the Society for Industrial and Applied
+     Mathematics" }
+ @String{JSIAM = "J. Soc. Indust. Appl. Math." }
+ @String{JSIAMB = "Journal of the Society for Industrial and Applied
+     Mathematics, Series B, Numerical Analysis" }
+ @String{JSIAMB = "J. Soc. Indust. Appl. Math. Ser. B Numer. Anal." }
+ @String{SIAMAlgMeth = "{SIAM} Journal on Algebraic and Discrete Methods" }
+ @String{SIAMAlgMeth = "{SIAM} J. Algebraic Discrete Methods" }
+ @String{SIAMAppMath = "{SIAM} Journal on Applied Mathematics" }
+ @String{SIAMAppMath = "{SIAM} J. Appl. Math." }
+ @String{SIAMComp = "{SIAM} Journal on Computing" }
+ @String{SIAMComp = "{SIAM} J. Comput." }
+ @String{SIAMMatrix = "{SIAM} Journal on Matrix Analysis and Applications" }
+ @String{SIAMMatrix = "{SIAM} J. Matrix Anal. Appl." }
+ @String{SIAMNumAnal = "{SIAM} Journal on Numerical Analysis" }
+ @String{SIAMNumAnal = "{SIAM} J. Numer. Anal." }
+ @String{SIAMReview = "{SIAM} Review" }
+ @String{SIAMReview = "{SIAM} Rev." }
+ @String{SIAMSciStat = "{SIAM} Journal on Scientific and Statistical
+     Computing" }
+ @String{SIAMSciStat = "{SIAM} J. Sci. Statist. Comput." }
+
+ @String{SoftPracExp = "Software Practice and Experience" }
+ @String{SoftPracExp = "Software Prac. Experience" } % didn't find in AMS MR
+ @String{StatScience = "Statistical Science" }
+ @String{StatScience = "Statist. Sci." }
+ @String{Techno = "Technometrics" }
+ @String{USSRCompMathPhys = "{USSR} Computational Mathematics and Mathematical
+     Physics" }
+ @String{USSRCompMathPhys = "{U. S. S. R.} Comput. Math. and Math. Phys." }
+ @String{VLSICompSys = "Journal of {VLSI} and Computer Systems" }
+ @String{VLSICompSys = "J. {VLSI} Comput. Syst." }
+ @String{ZAngewMathMech = "Zeitschrift fur Angewandte Mathematik und
+     Mechanik" }
+ @String{ZAngewMathMech = "Z. Angew. Math. Mech." }
+ @String{ZAngewMathPhys = "Zeitschrift fur Angewandte Mathematik und Physik" }
+ @String{ZAngewMathPhys = "Z. Angew. Math. Phys." }
+
+% Publishers % ================================================= |
+
+ @String{Academic = "Academic Press" }
+ @String{ACMPress = "{ACM} Press" }
+ @String{AdamHilger = "Adam Hilger" }
+ @String{AddisonWesley = "Addison-Wesley" }
+ @String{AllynBacon = "Allyn and Bacon" }
+ @String{AMS = "American Mathematical Society" }
+ @String{Birkhauser = "Birkh{\"a}user" }
+ @String{CambridgePress = "Cambridge University Press" }
+ @String{Chelsea = "Chelsea" }
+ @String{ClaredonPress = "Claredon Press" }
+ @String{DoverPub = "Dover Publications" }
+ @String{Eyolles = "Eyolles" }
+ @String{HoltRinehartWinston = "Holt, Rinehart and Winston" }
+ @String{Interscience = "Interscience" }
+ @String{JohnsHopkinsPress = "The Johns Hopkins University Press" }
+ @String{JohnWileySons = "John Wiley and Sons" }
+ @String{Macmillan = "Macmillan" }
+ @String{MathWorks = "The Math Works Inc." }
+ @String{McGrawHill = "McGraw-Hill" }
+ @String{NatBurStd = "National Bureau of Standards" }
+ @String{NorthHolland = "North-Holland" }
+ @String{OxfordPress = "Oxford University Press" } %address Oxford or London?
+ @String{PergamonPress = "Pergamon Press" }
+ @String{PlenumPress = "Plenum Press" }
+ @String{PrenticeHall = "Prentice-Hall" }
+ @String{SIAMPub = "{SIAM} Publications" }
+ @String{Springer = "Springer-Verlag" }
+ @String{TexasPress = "University of Texas Press" }
+ @String{VanNostrand = "Van Nostrand" }
+ @String{WHFreeman = "W. H. Freeman and Co." }
+
+%Entries
+
+
+
+
+@article{dua2019drop,
+  title   = {DROP: A Reading Comprehension Benchmark Requiring Discrete Reasoning Over Paragraphs},
+  author  = {Dua, Dheeru and Wang, Yizhong and Dasigi, Pradeep and Stanovsky, Gabriel and Singh, Sameer and Gardner, Matt},
+  journal = {arXiv preprint arXiv:1903.00161},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1903.00161}
+}
+
+@article{zhang2018record,
+  title   = {ReCoRD: Bridging the Gap between Human and Machine Commonsense Reading Comprehension},
+  author  = {Zhang, Sheng and Liu, Xiaodong and Liu, Jingjing and Gao, Jianfeng and Duh, Kevin and Van Durme, Benjamin},
+  journal = {arXiv preprint arXiv:1810.12885},
+  year    = {2018},
+  url     = {https://arxiv.org/abs/1810.12885}
+}
+
+@article{rajpurkar2018squad2,
+  title   = {Know What You Don't Know: Unanswerable Questions for SQuAD},
+  author  = {Rajpurkar, Pranav and Jia, Robin and Liang, Percy},
+  journal = {arXiv preprint arXiv:1806.03822},
+  year    = {2018},
+  url     = {https://arxiv.org/abs/1806.03822}
+}
+
+@article{Penas2013QA4MRE,
+  title   = {QA4MRE 2011–2013: Overview of Question Answering for Machine Reading Evaluation},
+  author  = {Pe{\~n}as, Anselmo and Hovy, Eduard and Forner, Pamela and Rodrigo, Álvaro and Sutcliffe, Richard and Morante, Roser},
+  journal = {CLEF 2013: Information Access Evaluation. Multilinguality, Multimodality, and Visualization},
+  year    = {2013},
+  url     = {https://link.springer.com/chapter/10.1007/978-3-642-40802-1_29}
+}
+
+@article{dasigi2021qasper,
+  title   = {A Dataset of Information-Seeking Questions and Answers Anchored in Research Papers},
+  author  = {Dasigi, Pradeep and Lo, Kyle and Beltagy, Iz and Cohan, Arman and Smith, Noah A. and Gardner, Matt},
+  journal = {arXiv preprint arXiv:2105.03011},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2105.03011}
+}
+
+@article{choi2018quac,
+  title   = {QuAC: Question Answering in Context},
+  author  = {Choi, Eunsol and He, He and Iyyer, Mohit and Yatskar, Mark and Yih, Wen-tau and Choi, Yejin and Liang, Percy and Zettlemoyer, Luke},
+  journal = {arXiv preprint arXiv:1808.07036},
+  year    = {2018},
+  url     = {https://arxiv.org/abs/1808.07036}
+}
+
+@inproceedings{khashabi2018multirc,
+  title   = {Looking beyond the surface: A challenge set for reading comprehension over multiple sentences},
+  author  = {Khashabi, Daniel and Chaturvedi, Snigdha and Roth, Michael and Upadhyay, Shyam and Roth, Dan},
+  journal = {Proceedings of NAACL-HLT 2018},
+  year    = {2018},
+  url     = {https://aclanthology.org/N18-1023}
+}
+
+@article{liu2020logiqa,
+  title   = {LogiQA: A Challenge Dataset for Machine Reading Comprehension with Logical Reasoning},
+  author  = {Liu, Jian and Cui, Leyang and Liu, Hanmeng and Huang, Dandan and Wang, Yile and Zhang, Yue},
+  journal = {arXiv preprint arXiv:2007.08124},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/2007.08124}
+}
+
+@article{liu2023logiqa2,
+  title   = {LogiQA 2.0—An Improved Dataset for Logical Reasoning in Natural Language Understanding},
+  author  = {Liu, Hanmeng and Liu, Jian and Cui, Leyang and Teng, Zhiyang and Duan, Nan and Zhou, Ming and Zhang, Yue},
+  journal = {IEEE/ACM Transactions on Audio, Speech, and Language Processing},
+  year    = {2023},
+  url     = {https://dl.acm.org/doi/10.1109/TASLP.2023.3293046}
+}
+
+@article{zhong2023agieval,
+  title   = {AGIEval: A Human-Centric Benchmark for Evaluating Foundation Models},
+  author  = {Zhong, Wanjun and Cui, Ruixiang and Guo, Yiduo and Liang, Yaobo and Lu, Shuai and Wang, Yanlin and Saied, Amin and Chen, Weizhu and Duan, Nan},
+  journal = {arXiv preprint arXiv:2304.06364},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2304.06364}
+}
+
+@article{levesque2011wsc,
+  title   = {The Winograd Schema Challenge},
+  author  = {Levesque, Hector J. and Davis, Ernest and Morgenstern, Leora},
+  journal = {arXiv preprint arXiv:1105.4590},
+  year    = {2011},
+  url     = {https://arxiv.org/abs/1105.4590}
+}
+
+@inproceedings{levesque2012wsc,
+  title   = {The Winograd Schema Challenge},
+  author  = {Levesque, Hector J. and Davis, Ernest and Morgenstern, Leora},
+  journal = {Proceedings of KR 2012},
+  year    = {2012},
+  url     = {https://aaai.org/papers/59-4492-the-winograd-schema-challenge/}
+}
+
+@inproceedings{zhou2019mctaco,
+  title   = {“Going on a vacation” takes longer than “Going for a walk”: A Study of Temporal Commonsense Understanding},
+  author  = {Zhou, Ben and Khashabi, Daniel and Ning, Qiang and Roth, Dan},
+  journal = {Proceedings of EMNLP-IJCNLP 2019},
+  year    = {2019},
+  url     = {https://aclanthology.org/D19-1332}
+}
+
+@article{sap2019socialiqa,
+  title   = {Social IQa: Commonsense Reasoning about Social Interactions},
+  author  = {Sap, Maarten and Rashkin, Hannah and Chen, Derek and Le Bras, Ronan and Choi, Yejin},
+  journal = {arXiv preprint arXiv:1904.09728},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1904.09728}
+}
+
+@inproceedings{arocaouellette2021prost,
+  title   = {PROST: Physical Reasoning about Objects through Space and Time},
+  author  = {Aroca-Ouellette, St{\'e}phane and Paik, Cory and Roncone, Alessandro and Kann, Katharina},
+  journal = {Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021},
+  year    = {2021},
+  url     = {https://aclanthology.org/2021.findings-acl.404/}
+}
+
+@inproceedings{jin2019pubmedqa,
+  title   = {PubMedQA: A Dataset for Biomedical Research Question Answering},
+  author  = {Jin, Qiao and Dhingra, Bhuwan and Liu, Zhengping and Cohen, William W. and Lu, Xinghua},
+  journal = {Proceedings of EMNLP-IJCNLP 2019},
+  year    = {2019},
+  url     = {https://aclanthology.org/D19-1259/}
+}
+
+@article{welbl2017sciq,
+  title   = {Crowdsourcing Multiple Choice Science Questions},
+  author  = {Welbl, Johannes and Liu, Nelson F. and Gardner, Matt},
+  journal = {arXiv preprint arXiv:1707.06209},
+  year    = {2017},
+  url     = {https://arxiv.org/abs/1707.06209}
+}
+
+@article{hendrycks2020ethics,
+  title   = {Aligning AI With Shared Human Values},
+  author  = {Hendrycks, Dan and Burns, Collin and Basart, Steven and Critch, Andrew and Li, Jerry and Song, Dawn and Steinhardt, Jacob},
+  journal = {arXiv preprint arXiv:2008.02275},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/2008.02275}
+}
+
+@inproceedings{vilares2019headqa,
+  title   = {HEAD-QA: A Healthcare Dataset for Complex Reasoning},
+  author  = {Vilares, David and G{\'o}mez-Rodr{\'i}guez, Carlos},
+  journal = {Proceedings of ACL 2019},
+  year    = {2019},
+  url     = {https://aclanthology.org/P19-1092/}
+}
+
+@article{jin2020medqa,
+  title   = {What Disease Does This Patient Have? A Large-scale Open Domain Question Answering Dataset from Medical Exams},
+  author  = {Jin, Di and Pan, Eileen and Oufattole, Nassim and Weng, Wei-Hung and Fang, Hanyi and Szolovits, Peter},
+  journal = {arXiv preprint arXiv:2009.13081},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/2009.13081}
+}
+
+@article{dolan2005mrpc,
+  title   = {Automatically Constructing a Corpus of Sentential Paraphrases},
+  author  = {Dolan, William B. and Brockett, Chris},
+  journal = {Proceedings of the Third International Workshop on Paraphrasing (IWP 2005)},
+  year    = {2005},
+  url     = {https://aclanthology.org/I05-5002/}
+}
+
+@inproceedings{socher2013sst,
+  title   = {Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank},
+  author  = {Socher, Richard and Perelygin, Alex and Wu, Jean and Chuang, Jason and Manning, Christopher D. and Ng, Andrew Y. and Potts, Christopher},
+  journal = {Proceedings of EMNLP 2013},
+  year    = {2013},
+  url     = {https://aclanthology.org/D13-1170/}
+}
+
+@inproceedings{pilehvar2019wic,
+  title   = {WiC: the Word-in-Context Dataset for Evaluating Context-Sensitive Meaning Representations},
+  author  = {Pilehvar, Mohammad Taher and Camacho-Collados, Jose},
+  journal = {Proceedings of NAACL-HLT 2019},
+  year    = {2019},
+  url     = {https://aclanthology.org/N19-1128/}
+}
+
+@inproceedings{cui2020mutual,
+  title   = {MuTual: A Dataset for Multi-Turn Dialogue Reasoning},
+  author  = {Cui, Leyang and Wu, Yu and Liu, Shujie and Zhang, Yue and Zhou, Ming},
+  journal = {Proceedings of ACL 2020},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/2004.04494}
+}
+
+@article{nie2020anli,
+  title   = {Adversarial NLI: A New Benchmark for Natural Language Understanding},
+  author  = {Nie, Yixin and Williams, Adina and Dinan, Emily and Bansal, Mohit and Weston, Jason and Kiela, Douwe},
+  journal = {arXiv preprint arXiv:1910.14599},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/1910.14599}
+}
+
+@article{warstadt2020blimp,
+  title   = {BLiMP: The Benchmark of Linguistic Minimal Pairs for English},
+  author  = {Warstadt, Alex and Parrish, Alicia and Liu, Haokun and Mohananey, Anhad and Peng, Wei and Bowman, Samuel R.},
+  journal = {arXiv preprint arXiv:1912.00582},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/1912.00582}
+}
+
+@inproceedings{hartvigsen2022toxigen,
+  title   = {ToxiGen: A Large-Scale Machine-Generated Dataset for Adversarial and Implicit Hate Speech Detection},
+  author  = {Hartvigsen, Thomas and Gabriel, Saadia and Palangi, Hamid and Sap, Maarten and Ray, Dipankar and Kamar, Ece},
+  journal = {Proceedings of ACL 2022},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2203.09509}
+}
+
+@inproceedings{nangia2020crows,
+  title   = {CrowS-Pairs: A Challenge Dataset for Measuring Social Biases in Masked Language Models},
+  author  = {Nangia, Nikita and Vania, Clara and Bhalerao, Rasika and Bowman, Samuel R.},
+  journal = {Proceedings of EMNLP 2020},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/2010.00133}
+}
+
+@inproceedings{yang2019pawsx,
+  title   = {PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification},
+  author  = {Yang, Yinfei and Zhang, Yuan and Tar, Chris and Baldridge, Jason},
+  journal = {Proceedings of EMNLP 2019},
+  year    = {2019},
+  url     = {https://aclanthology.org/D19-1382/}
+}
+
+@inproceedings{paperno2016lambada,
+  title   = {The LAMBADA Dataset: Word Prediction Requiring a Broad Discourse Context},
+  author  = {Paperno, Denis and Kruszewski, Germ{\'a}n and Lazaridou, Angeliki and Pham, Quan and Bernardi, Raffaella and Pezzelle, Sandro and Boleda, Gemma and Baroni, Marco and others},
+  journal = {Proceedings of ACL 2016},
+  year    = {2016},
+  url     = {https://arxiv.org/abs/1606.06031}
+}
+
+@article{bandarkar2023belebele,
+  title   = {The Belebele Benchmark: a Parallel Reading Comprehension Dataset in 122 Language Variants},
+  author  = {Bandarkar, Lucas et al.},
+  journal = {arXiv preprint arXiv:2308.16884},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2308.16884}
+}
+
+@inproceedings{ponti2020xcopa,
+  title   = {XCOPA: A Multilingual Dataset for Causal Commonsense Reasoning},
+  author  = {Ponti, Edoardo Maria and Sap, Maarten and Kirov, Christo and Langedijk, Aksel and Hill, Felix and Shutova, Ekaterina and Clark, Peter and Vuli{\'c}, Ivan and Korhonen, Anna},
+  journal = {Findings of EMNLP 2020},
+  year    = {2020},
+  url     = {https://arxiv.org/abs/2005.00333}
+}
+
+@inproceedings{conneau2018xnli,
+  title   = {XNLI: Evaluating Cross-lingual Sentence Representations},
+  author  = {Conneau, Alexis and Rinott, Ruty and Lample, Guillaume and Williams, Adina and Bowman, Samuel R. and Schwenk, Holger and Stoyanov, Veselin},
+  journal = {Proceedings of EMNLP 2018},
+  year    = {2018},
+  url     = {https://arxiv.org/abs/1809.05053}
+}
+
+@article{lin2021xstorycloze,
+  title   = {Few-shot Learning with Multilingual Language Models},
+  author  = {Lin, Xi Victoria and Mihaylov, Todor and Artetxe, Mikel and Wang, Tianlu and Chen, Shuohui and Simig, Daniel and Ott, Myle and Goyal, Naman and Bhosale, Shruti and Du, Jingfei and Pasunuru, Ramakanth and Shleifer, Sam and Koura, Punit Singh and Chaudhary, Vishrav and O'Horo, Brian and Wang, Jeff and Zettlemoyer, Luke and Kozareva, Zornitsa and Diab, Mona T. and Stoyanov, Veselin and Li, Xian},
+  journal = {arXiv preprint arXiv:2112.10668},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2112.10668}
+}
+
+@article{tikhonov2021xwinograd,
+  title   = {It's All in the Heads: Using Attention Heads as a Baseline for Cross-Lingual Transfer in Commonsense Reasoning},
+  author  = {Tikhonov, Alexey and Ryabinin, Mikhail and Kuratov, Yuri and Wolf, Thomas},
+  journal = {arXiv preprint arXiv:2106.12066},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2106.12066}
+}
+
+@article{srivastava2022bigbench,
+  title   = {Beyond the Imitation Game: Quantifying and extrapolating the capabilities of language models},
+  author  = {Srivastava, Aarohi and Rastogi, Abhinav and Rao, Abhishek and Shoeb, Abu Awal Md and Abid, Abubakar and et al.},
+  journal = {arXiv preprint arXiv:2206.04615},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2206.04615}
+}
+
+
+
+
+
+@article{merity2016pointersentinel,
+  title   = {Pointer Sentinel Mixture Models},
+  author  = {Merity, Stephen and Xiong, Caiming and Bradbury, James and Socher, Richard},
+  journal = {arXiv preprint arXiv:1609.07843},
+  year    = {2016},
+  url     = {https://arxiv.org/abs/1609.07843}
+}
+
+@article{sakaguchi2019winogrande,
+  title   = {WinoGrande: An Adversarial Winograd Schema Challenge at Scale},
+  author  = {Sakaguchi, Keisuke and Le Bras, Ronan and Bhagavatula, Chandra and Choi, Yejin},
+  journal = {arXiv preprint arXiv:1907.10641},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1907.10641}
+}
+
+@inproceedings{berant2013webquestions,
+  title     = {Semantic Parsing on Freebase from Question-Answer Pairs},
+  author    = {Berant, Jonathan and Chou, Andrew and Frostig, Roy and Liang, Percy},
+  booktitle = {Proceedings of the 2013 Conference on Empirical Methods in Natural Language Processing},
+  pages     = {1533--1544},
+  year      = {2013},
+  address   = {Seattle, Washington, USA},
+  publisher = {Association for Computational Linguistics},
+  url       = {https://aclanthology.org/D13-1160/}
+}
+
+@article{clark2018arc,
+  title   = {Think You Have Solved Question Answering? Try ARC, the AI2 Reasoning Challenge},
+  author  = {Clark, Peter and Cowhey, Isaac and Etzioni, Oren and Khot, Tushar and Sabharwal, Ashish and Schoenick, Carissa and Tafjord, Oyvind},
+  journal = {arXiv preprint arXiv:1803.05457},
+  year    = {2018},
+  url     = {https://arxiv.org/abs/1803.05457}
+}
+
+@article{zellers2019hellaswag,
+  title   = {HellaSwag: Can a Machine Really Finish Your Sentence?},
+  author  = {Zellers, Rowan and Holtzman, Ari and Bisk, Yonatan and Farhadi, Ali and Choi, Yejin},
+  journal = {arXiv preprint arXiv:1905.07830},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1905.07830}
+}
+
+@article{lin2021truthfulqa,
+  title   = {TruthfulQA: Measuring How Models Mimic Human Falsehoods},
+  author  = {Lin, Stephanie and Hilton, Jacob and Evans, Owain},
+  journal = {arXiv preprint arXiv:2109.07958},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2109.07958}
+}
+
+@inproceedings{hendrycks2021mmlu,
+  title     = {Measuring Massive Multitask Language Understanding},
+  author    = {Hendrycks, Dan and Burns, Collin and Basart, Steven and Zou, Andy and Mazeika, Mantas and Song, Dawn and Steinhardt, Jacob},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2021},
+  url       = {https://arxiv.org/abs/2009.03300}
+}
+
+@article{bisk2019piqa,
+  title   = {PIQA: Reasoning about Physical Commonsense in Natural Language},
+  author  = {Bisk, Yonatan and Zellers, Rowan and Le Bras, Ronan and Gao, Jianfeng and Choi, Yejin},
+  journal = {arXiv preprint arXiv:1911.11641},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1911.11641}
+}
+
+@inproceedings{roemmele2011copa,
+  title     = {Choice of Plausible Alternatives: An Evaluation of Commonsense Causal Reasoning},
+  author    = {Roemmele, Melissa and Bejan, Cosmin Adrian and Gordon, Andrew S.},
+  booktitle = {AAAI Spring Symposium on Logical Formalizations of Commonsense Reasoning},
+  year      = {2011},
+  address   = {Stanford, CA},
+  url       = {https://ict.usc.edu/pubs/Choice%20of%20Plausible%20Alternatives-%20An%20Evaluation%20of%20Commonsense%20Causal%20Reasoning.pdf}
+}
+
+@inproceedings{mihaylov2018openbookqa,
+  title     = {Can a Suit of Armor Conduct Electricity? A New Dataset for Open Book Question Answering},
+  author    = {Mihaylov, Todor and Clark, Peter and Khot, Tushar and Sabharwal, Ashish},
+  booktitle = {Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing},
+  year      = {2018},
+  publisher = {Association for Computational Linguistics},
+  url       = {https://aclanthology.org/D18-1260/}
+}
+
+@article{rein2023gpqa,
+  title   = {GPQA: A Graduate-Level Google-Proof Q{\&}A Benchmark},
+  author  = {Rein, David and Hou, Betty Li and Cooper Stickland, Asa and Petty, Jackson and Pang, Richard Yuanzhe and Dirani, Julien and Michael, Julian and Bowman, Samuel R.},
+  journal = {arXiv preprint arXiv:2311.12022},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2311.12022}
+}
+
+@article{du2025supergpqa,
+  title   = {SuperGPQA: Scaling LLM Evaluation across 285 Graduate Disciplines},
+  author  = {Du, Xinrun and Yao, Yifan and Ma, Kaijing and Wang, Bingli and Zheng, Tianyu and Zhu, Kang and Liu, Minghao and Liang, Yiming and {et al.}},
+  journal = {arXiv preprint arXiv:2502.14739},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2502.14739}
+}
+
+@article{reddy2019coqa,
+  title   = {CoQA: A Conversational Question Answering Challenge},
+  author  = {Reddy, Siva and Chen, Danqi and Manning, Christopher D.},
+  journal = {arXiv preprint arXiv:1808.07042},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1808.07042}
+}
+
+@article{kwiatkowski2019naturalquestions,
+  title   = {Natural Questions: A Benchmark for Question Answering Research},
+  author  = {Kwiatkowski, Tom and Palomaki, Jennimaria and Redfield, Olivia and Collins, Michael and Parikh, Ankur and Alberti, Chris and Epstein, Danielle and Polosukhin, Illia and Devlin, Jacob and Lee, Kenton and Toutanova, Kristina and Jones, Llion and Kelcey, Matthew and Chang, Ming-Wei and Dai, Andrew M. and Uszkoreit, Jakob and Le, Quoc and Petrov, Slav},
+  journal = {Transactions of the Association for Computational Linguistics},
+  volume  = {7},
+  pages   = {452--466},
+  year    = {2019},
+  url     = {https://aclanthology.org/Q19-1026/},
+  doi     = {10.1162/tacl_a_00276}
+}
+
+@inproceedings{joshi2017triviaqa,
+  title     = {TriviaQA: A Large Scale Distantly Supervised Challenge Dataset for Reading Comprehension},
+  author    = {Joshi, Mandar and Choi, Eunsol and Weld, Daniel and Zettlemoyer, Luke},
+  booktitle = {Proceedings of the 55th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  pages     = {1601--1611},
+  year      = {2017},
+  address   = {Vancouver, Canada},
+  publisher = {Association for Computational Linguistics},
+  url       = {https://aclanthology.org/P17-1147/},
+  doi       = {10.18653/v1/P17-1147}
+}
+
+@article{phan2025hle,
+  title   = {Humanity's Last Exam},
+  author  = {Phan, Long and Gatti, Alice and Han, Ziwen and Li, Nathaniel and {et al.}},
+  journal = {arXiv preprint arXiv:2501.14249},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2501.14249}
+}
+
+@inproceedings{zellers2018swag,
+  title     = {SWAG: A Large-Scale Adversarial Dataset for Grounded Commonsense Inference},
+  author    = {Zellers, Rowan and Bisk, Yonatan and Schwartz, Roy and Choi, Yejin},
+  booktitle = {Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing},
+  pages     = {93--104},
+  year      = {2018},
+  address   = {Brussels, Belgium},
+  publisher = {Association for Computational Linguistics},
+  url       = {https://aclanthology.org/D18-1009/},
+  doi       = {10.18653/v1/D18-1009}
+}
+
+@inproceedings{demarneffe2019commitmentbank,
+  title     = {The CommitmentBank: Investigating projection in naturally occurring discourse},
+  author    = {de Marneffe, Marie-Catherine and Simons, Mandy and Tonhauser, Judith},
+  booktitle = {Proceedings of Sinn und Bedeutung 23},
+  volume    = {2},
+  pages     = {107--124},
+  year      = {2019},
+  address   = {Bellaterra (Cerdanyola del Vall{\`e}s)},
+  publisher = {Universitat Aut{\`o}noma de Barcelona},
+  url       = {https://ojs.ub.uni-konstanz.de/sub/index.php/sub/article/view/601}
+}
+
+@article{lai2017race,
+  title   = {RACE: Large-scale ReAding Comprehension Dataset From Examinations},
+  author  = {Lai, Guokun and Xie, Qizhe and Liu, Hanxiao and Yang, Yiming and Hovy, Eduard},
+  journal = {arXiv preprint arXiv:1704.04683},
+  year    = {2017},
+  url     = {https://arxiv.org/abs/1704.04683}
+}
+
+@article{clark2019boolq,
+  title   = {BoolQ: Exploring the Surprising Difficulty of Natural Yes/No Questions},
+  author  = {Clark, Christopher and Lee, Kenton and Chang, Ming-Wei and Kwiatkowski, Tom and Collins, Michael and Toutanova, Kristina},
+  journal = {arXiv preprint arXiv:1905.10044},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1905.10044}
+}
+
+@article{austin2021program,
+  title   = {Program Synthesis with Large Language Models},
+  author  = {Austin, Jacob and Odena, Augustus and Nye, Maxwell and Bosma, Maarten and Michalewski, Henryk and Dohan, David and Jiang, Ellen and Cai, Carrie and Terry, Michael and Le, Quoc and Sutton, Charles},
+  journal = {arXiv preprint arXiv:2108.07732},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2108.07732}
+}
+
+@article{shi2022mgsm,
+  title   = {Language Models are Multilingual Chain-of-Thought Reasoners},
+  author  = {Shi, Freda and Suzgun, Mirac and Freitag, Markus and Wang, Xuezhi and Srivats, Suraj and Vosoughi, Soroush and Chung, Hyung Won and Tay, Yi and Ruder, Sebastian and Zhou, Denny and Das, Dipanjan and Wei, Jason},
+  journal = {arXiv preprint arXiv:2210.03057},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2210.03057}
+}
+
+@article{muennighoff2023octopack,
+  title   = {OctoPack: Instruction Tuning Code Large Language Models},
+  author  = {Muennighoff, Niklas and Liu, Qian and Zebaze, Armel and Zheng, Qinkai and Hui, Binyuan and Zhuo, Terry Yue and Singh, Swayam and Tang, Xiangru and von Werra, Leandro and Longpre, Shayne},
+  journal = {arXiv preprint arXiv:2308.07124},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2308.07124}
+}
+
+
+@article{chen2021evaluating,
+  title   = {Evaluating Large Language Models Trained on Code},
+  author  = {Chen, Mark and Tworek, Jerry and Jun, Heewoo and Yuan, Qiming and Ponde de Oliveira Pinto, Henrique and Kaplan, Jared and Edwards, Harri and Burda, Yuri and Joseph, Nicholas and Brockman, Greg and Ray, Alex and Puri, Raul and Krueger, Gretchen and Petrov, Michael and Khlaaf, Heidy and Sastry, Girish and Mishkin, Pamela and Chan, Brooke and Gray, Scott and Ryder, Nick and Pavlov, Mikhail and Power, Alethea and Kaiser, Lukasz and Bavarian, Mohammad and Winter, Clemens and Tillet, Philippe and Such, Felipe Petroski and Cummings, Dave and Plappert, Matthias and Chantzis, Fotios and Barnes, Elizabeth and Herbert-Voss, Ariel and Guss, William Hebgen and Nichol, Alex and Paino, Alex and Tezak, Nikolas and Tang, Jie and Babuschkin, Igor and Balaji, Suchir and Jain, Shantanu and Saunders, William and Hesse, Christopher and Carr, Andrew N. and Leike, Jan and Achiam, Josh and Misra, Vedant and Morikawa, Evan and Radford, Alec and Knight, Matthew and Brundage, Miles and Murati, Mira and Mayer, Katie and Welinder, Peter and McGrew, Bob and Amodei, Dario and McCandlish, Sam and Sutskever, Ilya and Zaremba, Wojciech},
+  year    = {2021},
+  eprint  = {2107.03374},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG},
+  url     = {https://arxiv.org/abs/2107.03374}
+}
+
+@article{amini2019mathqa,
+  title   = {MathQA: Towards Interpretable Math Word Problem Solving with Operation-Based Formalisms},
+  author  = {Amini, Aida and Gabriel, Saadia and Lin, Peter and Koncel-Kedziorski, Rik and Choi, Yejin and Hajishirzi, Hannaneh},
+  journal = {arXiv preprint arXiv:1905.13319},
+  year    = {2019},
+  url     = {https://arxiv.org/abs/1905.13319}
+}
+
+
+@inproceedings{yin2018conala,
+  title     = {Learning to Mine Aligned Code and Natural Language Pairs from Stack Overflow},
+  author    = {Yin, Pengcheng and Deng, Bowen and Chen, Edgar and Vasilescu, Bogdan and Neubig, Graham},
+  booktitle = {Proceedings of the 15th IEEE/ACM International Conference on Mining Software Repositories (MSR)},
+  pages     = {476--486},
+  year      = {2018},
+  organization = {IEEE}
+}
+
+@article{iyer2018mapping,
+  title   = {Mapping Language to Code in Programmatic Context},
+  author  = {Iyer, Srinivasan and Konstas, Ioannis and Cheung, Alvin and Zettlemoyer, Luke},
+  journal = {arXiv preprint arXiv:1808.09588},
+  year    = {2018},
+  url     = {https://arxiv.org/abs/1808.09588}
+}
+
+@article{du2024mercury,
+  title   = {Mercury: A Code Efficiency Benchmark for Code LLMs},
+  author  = {Du, Mingzhe and Luu, Anh Tuan and Ji, Bin and Qian, Liu and Ng, See-Kiong},
+  journal = {arXiv preprint arXiv:2402.07844},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2402.07844}
+}
+
+@inproceedings{liu2023evalplus,
+  title     = {Is Your Code Generated by ChatGPT Really Correct? Rigorous Evaluation of Large Language Models for Code Generation},
+  author    = {Liu, Jiawei and Xia, Chunqiu Steven and Wang, Yuyao and Zhang, Lingming},
+  booktitle = {NeurIPS 2023 Datasets and Benchmarks Track},
+  year      = {2023},
+  url       = {https://openreview.net/forum?id=1qvx610Cu7}
+}
+
+@dataset{codeparrot_instructhumaneval_2023,
+  title     = {InstructHumanEval},
+  author    = {{CodeParrot}},
+  year      = {2023},
+  publisher = {Hugging Face},
+  url       = {https://huggingface.co/datasets/codeparrot/instructhumaneval}
+}
+
+@article{hendrycks2021apps,
+  title   = {Measuring Coding Challenge Competence With APPS},
+  author  = {Hendrycks, Dan and Basart, Steven and Kadavath, Saurav and Mazeika, Mantas and Arora, Akul and Guo, Ethan and Burns, Collin and Puranik, Samir and He, Horace and Song, Dawn and Steinhardt, Jacob},
+  journal = {arXiv preprint arXiv:2105.09938},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2105.09938}
+}
+
+@article{lai2022ds1000,
+  title   = {DS-1000: A Natural and Reliable Benchmark for Data Science Code Generation},
+  author  = {Lai, Yuhang and Li, Chengxi and Wang, Yiming and Zhang, Tianyi and Zhong, Ruiqi and Zettlemoyer, Luke and Yih, Scott Wen-tau and Fried, Daniel and Wang, Sida and Yu, Tao},
+  journal = {arXiv preprint arXiv:2211.11501},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2211.11501}
+}
+
+@article{cassano2022multipl-e,
+  title   = {MultiPL-E: A Scalable and Extensible Approach to Benchmarking Neural Code Generation},
+  author  = {Cassano, Federico and Gouwar, John and Nguyen, Daniel and Nguyen, Sydney and Phipps-Costin, Luna and Pinckney, Donald and Yee, Ming-Ho and Zi, Yangtian and Anderson, Carolyn Jane and Feldman, Molly Q. and Guha, Arjun and Greenberg, Michael and Jangda, Abhinav},
+  journal = {arXiv preprint arXiv:2208.08227},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2208.08227}
+}
+
+@article{lu2021codexglue,
+  title   = {CodeXGLUE: A Machine Learning Benchmark Dataset for Code Understanding and Generation},
+  author  = {Lu, Shuai and Guo, Daya and Ren, Shuo and Huang, Junjie and Svyatkovskiy, Alexey and Blanco, Ambrosio and Clement, Colin and Drain, Dawn and Jiang, Daxin and Tang, Duyu and Li, Ge and Zhou, Lidong and Shou, Linjun and Zhou, Long and Tufano, Michele and Gong, Ming and Zhou, Ming and Duan, Nan and Sundaresan, Neel and Deng, Shao Kun and Fu, Shengyu and Liu, Shujie},
+  journal = {arXiv preprint arXiv:2102.04664},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2102.04664}
+}
+
+@article{wang2022recode,
+  title   = {ReCode: Robustness Evaluation of Code Generation Models},
+  author  = {Wang, Shiqi and Li, Zheng and Qian, Haifeng and Yang, Chenghao and Wang, Zijian and Shang, Mingyue and Kumar, Varun and Tan, Samson and Ray, Baishakhi and Bhatia, Parminder and Nallapati, Ramesh and Ramanathan, Murali Krishna and Roth, Dan and Xiang, Bing},
+  journal = {arXiv preprint arXiv:2212.10264},
+  year    = {2022},
+  url     = {https://arxiv.org/abs/2212.10264}
+}
+
+@article{jain2024livecodebench,
+  title   = {LiveCodeBench: Holistic and Contamination Free Evaluation of Large Language Models for Code},
+  author  = {Jain, Naman and Han, King and Gu, Alex and Li, Wen-Ding and Yan, Fanjia and Zhang, Tianjun and Wang, Sida and Solar-Lezama, Armando and Sen, Koushik and Stoica, Ion},
+  journal = {arXiv preprint arXiv:2403.07974},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2403.07974}
+}
+
+% -------------------- Math --------------------
+
+@article{cobbe2021gsm8k,
+  title   = {Training Verifiers to Solve Math Word Problems},
+  author  = {Cobbe, Karl and Kosaraju, Vineet and Bavarian, Mohammad and Hilton, Jacob and Nakano, Reiichiro and Hesse, Christopher and Schulman, John and Chen, Mark and Jun, Heewoo and Kaiser, Lukasz and Plappert, Matthias and Tworek, Jerry},
+  journal = {arXiv preprint arXiv:2110.14168},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2110.14168}
+}
+
+@article{miao2021asdiv,
+  title   = {A Diverse Corpus for Evaluating and Developing English Math Word Problem Solvers},
+  author  = {Miao, Shen-Yun and Liang, Chao-Chun and Su, Keh-Yih},
+  journal = {arXiv preprint arXiv:2106.15772},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2106.15772}
+}
+
+@inproceedings{brown2020gpt3,
+  title     = {Language Models are Few-Shot Learners},
+  author    = {Brown, Tom B. and Mann, Benjamin and Ryder, Nick and Subbiah, Melanie and Kaplan, Jared D. and Dhariwal, Prafulla and Neelakantan, Arvind and Shyam, Pranav and Sastry, Girish and Askell, Amanda and others},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2020},
+  url       = {https://proceedings.neurips.cc/paper/2020/file/1457c0d6bfcb4967418bfb8ac142f64a-Paper.pdf}
+}
+
+@article{hendrycks2021math,
+  title   = {Measuring Mathematical Problem Solving With the MATH Dataset},
+  author  = {Hendrycks, Dan and Burns, Collin and Kadavath, Saurav and Arora, Akul and Basart, Steven and Tang, Eric and Song, Dawn and Steinhardt, Jacob},
+  journal = {arXiv preprint arXiv:2103.03874},
+  year    = {2021},
+  url     = {https://arxiv.org/abs/2103.03874}
+}
+
+@dataset{huggingfaceh4_math500_2024,
+  title     = {MATH-500},
+  author    = {{HuggingFaceH4}},
+  year      = {2024},
+  publisher = {Hugging Face},
+  url       = {https://huggingface.co/datasets/HuggingFaceH4/MATH-500}
+}
+
+@dataset{maxwelljia2024aime,
+  title     = {AIME Problem Set 2024},
+  author    = {Jia, Maxwell},
+  year      = {2024},
+  publisher = {Hugging Face},
+  url       = {https://huggingface.co/datasets/Maxwell-Jia/AIME_2024}
+}
+
+@dataset{matharena2025hmmt,
+  title     = {HMMT February 2025},
+  author    = {{MathArena}},
+  year      = {2025},
+  publisher = {Hugging Face},
+  url       = {https://huggingface.co/datasets/MathArena/hmmt_feb_2025}
+}
+
+@article{wang2025polymath,
+  title   = {PolyMath: Evaluating Mathematical Reasoning in Multilingual Contexts},
+  author  = {Wang, Yiming and Zhang, Pei and Tang, Jialong and Wei, Haoran and Yang, Baosong and Wang, Rui and Sun, Chenshu and Sun, Feitong and Zhang, Jiran and Wu, Junxuan and Cang, Qiqian and Zhang, Yichang and Huang, Fei and Lin, Junyang and Huang, Fei and Zhou, Jingren},
+  journal = {arXiv preprint arXiv:2504.18428},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2504.18428}
+}
+
+@article{liu2024livemathbench,
+  title   = {Are Your LLMs Capable of Stable Reasoning?},
+  author  = {Liu, Junnan and Liu, Hongwei and Xiao, Linchen and Wang, Ziyi and Liu, Kuikun and Gao, Songyang and Zhang, Wenwei and Zhang, Songyang and Chen, Kai},
+  journal = {arXiv preprint arXiv:2412.13147},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2412.13147}
+}
