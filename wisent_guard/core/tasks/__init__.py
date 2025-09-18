@@ -33,6 +33,7 @@ from .lm_eval_task import (
     Arithmetic4dsTask,
     Arithmetic5daTask,
     Arithmetic5dsTask,
+    QA4MRETASK,
 
     HumanEvalPlusTask,
     HumanEvalTask,
@@ -76,6 +77,7 @@ def register_all_tasks():
     register_task("arithmetic4ds", Arithmetic4dsTask)
     register_task("arithmetic5da", Arithmetic5daTask)
     register_task("arithmetic5ds", Arithmetic5dsTask)
+    register_task("qa4mre", QA4MRETASK)
 
     # Register all coding tasks
     register_task("mbpp", MBPPTask)

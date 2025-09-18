@@ -920,6 +920,87 @@ class RACEExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting RACE contrastive pair: {e}")
             return None
+        
+
+class QA4MREExtractor(BenchmarkExtractor):
+    """Extractor for QA4MRE benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        QA4MRE format:
+        - doc['document_str']: the article/passage
+        - doc['question_str']: the question
+        - doc['answer_str']: list of options
+        - doc['correct_answer_id']: correct option number (1,2,3,4,5)
+        """
+        try:
+            article = doc.get("document_str", "")
+            question = doc.get("question_str", "")
+            options = doc.get("answer_options", {}).get("answer_str", [])
+            answer = doc.get("correct_answer_id", "")
+
+            # Convert string answer to integer
+            try:
+                answer = int(answer)
+            except (ValueError, TypeError):
+                return None
+
+            if not all([article, question, options, answer]):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Article: {article}\nQuestion: {question}"
+                for i, option in enumerate(options, start=1):  
+                    formatted_question += f"\n{i}. {option}"
+
+            # Get correct answer
+            correct_answer = answer
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+        except Exception as e:
+            logger.debug(f"Error extracting RACE QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for RACE."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            options = doc.get("answer_options", {}).get("answer_str", [])
+            answer = doc.get("correct_answer_id", "")
+
+            # Convert string answer to integer
+            try:
+                answer = int(answer)
+            except (ValueError, TypeError):
+                return None
+
+            correct_choice = answer
+
+            if correct_choice < len(options):
+                incorrect_choice = correct_choice + 1
+            else:
+                incorrect_choice = 1
+
+            # Convert to strings
+            correct_choice = str(correct_choice)
+            incorrect_choice = str(incorrect_choice)
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting RACE contrastive pair: {e}")
+            return None
 
 
 class MRPCExtractor(BenchmarkExtractor):
@@ -3128,6 +3209,7 @@ EXTRACTORS = {
     "mbpp": MBPPExtractor,  # Python problems
     "livecodebench": LiveCodeBenchExtractor,  # LiveCodeBench coding problems
     "anli": ANLIExtractor,  # Adversarial NLI
+
     "arithmetic1dc": ArithmeticExtractor, # Arithmetic tasks
     "arithmetic2da": ArithmeticExtractor, # Arithmetic tasks
     "arithmetic2dm": ArithmeticExtractor, # Arithmetic tasks
@@ -3147,7 +3229,10 @@ EXTRACTORS = {
     "medqa": MMLUExtractor,  # Medical QA (multiple choice)
     "mgsm": GSM8KExtractor,  # Multilingual GSM8K
     "paws_x": DefaultExtractor,  # Paraphrase detection
-    "qa4mre": MMLUExtractor,  # QA for machine reading evaluation
+    "qa4mre": QA4MREExtractor,  # QA for machine reading evaluation
+    "qa4mre_2013": QA4MREExtractor,  # QA4MRE 2013 variant
+    "qa4mre_2012": QA4MREExtractor,  # QA4MRE 2012 variant
+    "qa4mre_2011": QA4MREExtractor,  # QA4MRE 2011 variant
     "qasper": SQuAD2Extractor,  # QA on scientific papers
     "social_i_qa": MMLUExtractor,  # Social commonsense QA
     "unscramble": DefaultExtractor,  # Word unscrambling

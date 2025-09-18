@@ -323,6 +323,16 @@ class MMLUTask(LMEvalTask):
             categories=["general-knowledge", "science", "reasoning"],
         )
 
+class QA4MRETASK(LMEvalTask):
+    """QA4MRE task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="qa4mre",
+            description="QA4MRE: Question Answering for Machine Reading Evaluation",
+            categorie=["multiple-choice", "long context"],
+        )
+
 
 # === CODING TASKS ===
 

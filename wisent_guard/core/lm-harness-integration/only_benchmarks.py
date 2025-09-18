@@ -555,7 +555,7 @@ CORE_BENCHMARKS = {
     },
     "qa4mre": {
         "task": "qa4mre",
-        "tags": ["medical", "long context", "reasoning"],
+        "tags": ["long context", "reasoning", "general knowledge"],
         "priority": "medium"  # 47.8s - moderate for agentic use
     },
     "mutual": {

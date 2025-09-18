@@ -39,6 +39,7 @@ MULTIPLE_CHOICE_TASKS = {
     "openbookqa",
     "race",
     "boolq",
+    "qa4mre",
 }
 
 # GPQA scientific reasoning benchmarks
