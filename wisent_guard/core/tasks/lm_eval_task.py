@@ -134,6 +134,141 @@ class GSM8KTask(LMEvalTask):
             categories=["mathematics", "reasoning", "arithmetic"],
         )
 
+class ArithmeticBaseTask(LMEvalTask):
+    """Base class for arithmetic tasks that use validation split."""
+
+    def load_data(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Load arithmetic data, which only has validation split."""
+        try:
+            from lm_eval.tasks import get_task_dict
+
+            # Get task directly from lm-eval
+            task_dict = get_task_dict([self.task_name])
+            if self.task_name not in task_dict:
+                print(f"Warning: Task '{self.task_name}' not found in lm-eval")
+                return []
+
+            task = task_dict[self.task_name]
+
+            # Arithmetic only has validation split, access it directly
+            docs = []
+            if hasattr(task, 'validation_docs') and task.validation_docs() is not None:
+                validation_data = task.validation_docs()
+                docs = list(validation_data)
+
+            # Apply limit if specified
+            if limit and len(docs) > limit:
+                docs = docs[:limit]
+
+            return docs
+
+        except Exception as e:
+            print(f"Warning: Could not load arithmetic task '{self.task_name}': {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+
+class Arithmetic1dcTask(ArithmeticBaseTask):
+    """Arithmetic 1dc task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic1dc",
+            description="Arithmetic 1dc: 1 digit addition arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+
+class Arithmetic2daTask(ArithmeticBaseTask):
+    """Arithmetic 2da task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic2da",
+            description="Arithmetic 2da: 2 digit addition arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic2dmTask(ArithmeticBaseTask):
+    """Arithmetic 2dm task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic2dm",
+            description="Arithmetic 2dm: 2 digit multiplication arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic2dsTask(ArithmeticBaseTask):
+    """Arithmetic 2ds task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic2ds",
+            description="Arithmetic 2ds: 2 digit subtraction arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic3daTask(ArithmeticBaseTask):
+    """Arithmetic 3da task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic3da",
+            description="Arithmetic 3da: 3 digit addition arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic3dsTask(ArithmeticBaseTask):
+    """Arithmetic 3ds task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic3ds",
+            description="Arithmetic 3ds: 3 digit subtraction arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic4daTask(ArithmeticBaseTask):
+    """Arithmetic 4da task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic4da",
+            description="Arithmetic 4da: 4 digit addition arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic4dsTask(ArithmeticBaseTask):
+    """Arithmetic 4ds task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic4ds",
+            description="Arithmetic 4ds: 4 digit subtraction arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic5daTask(ArithmeticBaseTask):
+    """Arithmetic 5da task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic5da",
+            description="Arithmetic 5da: 5 digit addition arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
+
+class Arithmetic5dsTask(ArithmeticBaseTask):
+    """Arithmetic 5ds task implementation"""
+
+    def __init__(self):
+        super().__init__(
+            task_name="arithmetic5ds",
+            description="Arithmetic 5ds: 5 digit subtraction arithmetic problems",
+            categories=["mathematics", "arithmetic"]
+        )
 
 class TruthfulQATask(LMEvalTask):
     """TruthfulQA task implementation."""

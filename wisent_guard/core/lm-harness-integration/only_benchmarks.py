@@ -784,17 +784,64 @@ CORE_BENCHMARKS = {
         "tags": ["mathematics", "reasoning", "science"],
         "priority": "low"  # 69.5s - slow for agentic use
     },
-    "arithmetic": {
-        "task": "arithmetic_1dc",  # Use specific subtask (1 digit + carry)
-        "tags": ["mathematics", "long context", "reasoning"],
-        "priority": "low"  # 63.8s - slow for agentic use
-    },
     "asdiv": {
         "task": "asdiv",
         "tags": ["mathematics", "adversarial robustness", "long context"],
         "priority": "high"  # 9.5s - fast for agentic use
     },
 
+    # Arithmetic
+
+    "arithmetic1dc": {
+        "task": "arithmetic_1dc",  
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"  
+    },
+    "arithmetic2da": {
+        "task": "arithmetic_2da",  
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"  
+    },
+    "arithmetic2dm": {
+        "task": "arithmetic_2dm",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic2ds": {
+        "task": "arithmetic_2ds",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic3da": {
+        "task": "arithmetic_3da",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic3ds": {
+        "task": "arithmetic_3ds",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic4da": {
+        "task": "arithmetic_4da",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic4ds": {
+        "task": "arithmetic_4ds",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic5da": {
+        "task": "arithmetic_5da",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
+    "arithmetic5ds": {
+        "task": "arithmetic_5ds",
+        "tags": ["mathematics", "arithmetic"],
+        "priority": "medium"
+    },
     # Coding
     "humaneval": {
         "task": "humaneval",

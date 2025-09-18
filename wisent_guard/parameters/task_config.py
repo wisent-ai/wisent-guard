@@ -66,7 +66,16 @@ MATH_TASKS = {
     # Basic math benchmarks
     "gsm8k",
     "asdiv",
-    "arithmetic",
+    "arithmetic1dc",
+    "arithmetic2da",
+    "arithmetic2dm",
+    "arithmetic2ds",
+    "arithmetic3da",
+    "arithmetic3ds",
+    "arithmetic4da",
+    "arithmetic4ds",
+    "arithmetic5da",
+    "arithmetic5ds",
     # MATH-500 mathematical reasoning benchmarks
     "math",
     "math500",

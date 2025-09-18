@@ -411,6 +411,10 @@ class FullBenchmarkDownloader:
         if "task_id" in sample and "code" in sample and "prompt" in sample and "test" in sample:
             return self._convert_mbpp_format(sample)
 
+        # Arithmetic format (context, completion, _split_origin)
+        if "context" in sample and "completion" in sample and "_split_origin" in sample:
+            return self._convert_arithmetic_format(sample)
+
         # Generic multiple choice fallback
         if "choices" in sample:
             return self._convert_generic_multiple_choice(sample)
@@ -683,6 +687,51 @@ class FullBenchmarkDownloader:
                     "good_response": correct_answer,
                     "bad_response": incorrect,
                     "metadata": {"sample_id": sample.get("id", ""), "benchmark_type": "text_generation"},
+                }
+            )
+
+        return pairs
+
+    def _convert_arithmetic_format(self, sample: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Convert arithmetic format (context, completion, _split_origin)."""
+        context = sample.get("context", "")
+        correct_answer = str(sample.get("completion", "")).strip()
+
+        if not context or not correct_answer:
+            return []
+
+        # Extract question from context
+        # Context format may be: "Question: What is 8 + 3?\nAnswer:" or just the problem itself
+        if "Question:" in context:
+            question = context.split("Question:")[1].split("\nAnswer:")[0].strip()
+        else:
+            question = context.replace("\nAnswer:", "").strip()
+
+        # Generate simple +1 incorrect answer for arithmetic problems
+        try:
+            if correct_answer.isdigit():
+                incorrect_answer = str(int(correct_answer) + 1)
+            elif '.' in correct_answer and correct_answer.replace('.', '').replace('-', '').isdigit():
+                incorrect_answer = str(float(correct_answer) + 1)
+            else:
+                incorrect_answer = "Wrong answer"
+        except:
+            incorrect_answer = "Wrong answer"
+
+        incorrect_answers = [incorrect_answer]
+
+        pairs = []
+        for incorrect in incorrect_answers:
+            pairs.append(
+                {
+                    "context": question,
+                    "good_response": correct_answer,
+                    "bad_response": incorrect,
+                    "metadata": {
+                        "sample_id": sample.get("id", ""),
+                        "benchmark_type": "arithmetic",
+                        "split_origin": sample.get("_split_origin", "")
+                    },
                 }
             )
 

@@ -22,6 +22,18 @@ from .lm_eval_task import (
     ConcodeTask,
     DS1000Task,
     GSM8KTask,
+    
+    Arithmetic1dcTask,
+    Arithmetic2daTask,
+    Arithmetic2dmTask,
+    Arithmetic2dsTask,
+    Arithmetic3daTask,
+    Arithmetic3dsTask,
+    Arithmetic4daTask,
+    Arithmetic4dsTask,
+    Arithmetic5daTask,
+    Arithmetic5dsTask,
+
     HumanEvalPlusTask,
     HumanEvalTask,
     InstructHumanEvalTask,
@@ -53,6 +65,17 @@ def register_all_tasks():
     register_task("gsm8k", GSM8KTask)
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
+
+    register_task("arithmetic1dc", Arithmetic1dcTask)
+    register_task("arithmetic2da", Arithmetic2daTask)
+    register_task("arithmetic2dm", Arithmetic2dmTask)
+    register_task("arithmetic2ds", Arithmetic2dsTask)
+    register_task("arithmetic3da", Arithmetic3daTask)
+    register_task("arithmetic3ds", Arithmetic3dsTask)
+    register_task("arithmetic4da", Arithmetic4daTask)
+    register_task("arithmetic4ds", Arithmetic4dsTask)
+    register_task("arithmetic5da", Arithmetic5daTask)
+    register_task("arithmetic5ds", Arithmetic5dsTask)
 
     # Register all coding tasks
     register_task("mbpp", MBPPTask)

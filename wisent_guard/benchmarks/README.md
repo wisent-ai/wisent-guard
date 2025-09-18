@@ -28,51 +28,28 @@ Moreover some of the 79 available tasks are not really available, that is they d
 
 does not work:
 
-apps
-
-codexglue_code_to_text_go, codexglue_code_to_text_java, codexglue_code_to_text_javascript 
-codexglue_code_to_text_php , codexglue_code_to_text_python, codexglue_code_to_text_ruby 
-conala, concode, ds1000, recode (does not load)
-
-gpqa
-
 gpqa_diamond loads gpqa_diamond_zeroshot
 
 gpqa_extended loads gpqa_extended_zeroshot
+
+CE:
+
+apps
 
 multiple_cpp (failed as expected - look table, but from different reasons, it is trying to load multiple, multiple_choice, fails anyway)
 
 humaneval, humaneval_plus, mbpp:
 
-                                  !!!WARNING!!!
-################################################################################
-The "code_eval" metric executes untrusted model-generated code in Python.
-Although it is highly unlikely that model-generated code will do something
-overtly malicious in response to this test suite, model-generated code may act
-destructively due to a lack of model capability or alignment.
-Users are strongly encouraged to sandbox this evaluation suite so that it
-does not perform destructive actions on their host or network. For more
-information on how OpenAI sandboxes its code, see the paper "Evaluating Large
-Language Models Trained on Code" (https://arxiv.org/abs/2107.03374).
-
-Once you have read this disclaimer and taken appropriate precautions,
-set the environment variable HF_ALLOW_CODE_EVAL="1". Within Python you can to this
-with:
-
->>> import os
->>> os.environ["HF_ALLOW_CODE_EVAL"] = "1"
- 
-need hf permission:
-
-hle,
-
-livemathbench, livemathbench_cnmo_en, livemathbench_zh (I agree to use this dataset for non-commercial use ONLY)
+codexglue_code_to_text_go, codexglue_code_to_text_java, codexglue_code_to_text_javascript 
+codexglue_code_to_text_php , codexglue_code_to_text_python, codexglue_code_to_text_ruby 
+conala, concode, ds1000, recode (does not load)
 
 suspicious warnings:
 
-arithmetic, race:
+arithmetic (loads arithmetic_1dc), race((Unknown sample format: ['article', 'problems', '_split_origin']))
 
-(Unknown sample format: ['article', 'problems', '_split_origin'])
+gpqa (0 on evals)
+
 
 Notice that even if task works it does not mean that it works as intended or reasonable.
 

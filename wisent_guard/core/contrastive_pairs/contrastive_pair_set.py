@@ -1152,6 +1152,9 @@ class ContrastivePairSet:
                 ]:
                     # MATH tasks use 'problem' field
                     question = doc.get("problem", "")
+                elif task_name.startswith("arithmetic"):
+                    # Arithmetic tasks use 'context' field for the problem
+                    question = doc.get("context", "")
                 else:
                     # For other tasks, use the template method
                     try:
@@ -1389,6 +1392,23 @@ class ContrastivePairSet:
                         if str(answer).isdigit():
                             incorrect_answer = str(int(answer) + 1)
                         else:
+                            incorrect_answer = "Wrong answer"
+
+                elif task_name.startswith("arithmetic"):
+                    # Arithmetic task extraction - uses context/completion format
+                    completion = doc.get("completion", "")
+                    if completion:
+                        correct_answer = str(completion).strip()
+                        # Generate an incorrect answer for arithmetic problems
+                        try:
+                            # Try to convert to number and add 1 for incorrect answer
+                            if correct_answer.isdigit():
+                                incorrect_answer = str(int(correct_answer) + 1)
+                            elif '.' in correct_answer and correct_answer.replace('.', '').isdigit():
+                                incorrect_answer = str(float(correct_answer) + 1)
+                            else:
+                                incorrect_answer = "Wrong answer"
+                        except:
                             incorrect_answer = "Wrong answer"
                     formatted_question = question
 

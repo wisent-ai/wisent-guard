@@ -3128,7 +3128,16 @@ EXTRACTORS = {
     "mbpp": MBPPExtractor,  # Python problems
     "livecodebench": LiveCodeBenchExtractor,  # LiveCodeBench coding problems
     "anli": ANLIExtractor,  # Adversarial NLI
-    "arithmetic": ArithmeticExtractor,  # Arithmetic tasks
+    "arithmetic1dc": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic2da": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic2dm": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic2ds": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic3da": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic3ds": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic4da": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic4ds": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic5da": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic5ds": ArithmeticExtractor, #Arithmetic tasks
     "belebele": MultilingualExtractor,  # Multilingual reading comprehension
     "blimp": DefaultExtractor,  # Linguistic minimal pairs
     "crows_pairs": DefaultExtractor,  # Bias benchmark
