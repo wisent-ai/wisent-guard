@@ -4,7 +4,7 @@
   "successful_files": 525,
   "failed_files": 138,
   "success_rate": 0.7918552036199095,
-  "duration_seconds": 3556.2234675884247,
+  "duration_seconds": 4885.329575300217,
   "model": "unsloth/Qwen3-4B-bnb-4bit",
   "layer": 17,
   "device": "auto",

@@ -93,6 +93,47 @@ class SeedPairLoader:
         logger.info(f"Successfully loaded {len(pair_sets)} trait datasets")
         return pair_sets
 
+    def load_multiple_choice_json(self, json_path: str, model) -> ContrastivePairSet:
+        """
+        Load JSON and convert to multiple-choice format using ContrastivePairSet method.
+
+        Args:
+            json_path: Path to the JSON file
+            model: Model object with formatting capabilities
+
+        Returns:
+            ContrastivePairSet with multiple-choice formatted pairs
+        """
+        json_path = Path(json_path)
+        trait_name = json_path.stem
+
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Create empty ContrastivePairSet
+        pair_set = ContrastivePairSet(name=f"{trait_name}_mc", task_type="multiple_choice")
+
+        # Convert pairs to questions format
+        questions = []
+        if 'pairs' in data:
+            for pair_data in data['pairs']:
+                question = pair_data.get('question', '')
+                positive = pair_data.get('positive', '')
+                negative = pair_data.get('negative', '')
+
+                if question and positive and negative:
+                    questions.append({
+                        "question": question,
+                        "choice_a": positive,  # Helpful choice
+                        "choice_b": negative   # Harmful choice
+                    })
+
+        # Use the existing create_multiple_choice_questions method
+        pair_set.create_multiple_choice_questions(questions, model)
+
+        logger.info(f"Loaded {len(pair_set.pairs)} MC pairs from {json_path}")
+        return pair_set
+
 
 if __name__ == "__main__":
     # Test the loader
