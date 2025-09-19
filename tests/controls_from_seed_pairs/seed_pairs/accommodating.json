@@ -1,0 +1,145 @@
+{
+  "trait": "accommodating",
+  "pairs": [
+    {
+      "positive": "I'm always willing to adjust my plans to meet others' needs and preferences.",
+      "negative": "I stick to my plans and expect others to adapt to my schedule and priorities."
+    },
+    {
+      "positive": "I prioritize maintaining harmony even if it means compromising my own position.",
+      "negative": "I prioritize achieving my goals even if it creates tension with others."
+    },
+    {
+      "positive": "I'm flexible about deadlines and willing to work around others' constraints.",
+      "negative": "I maintain firm deadlines and expect others to meet their commitments on time."
+    },
+    {
+      "positive": "I often say yes to requests even when my schedule is already full.",
+      "negative": "I carefully evaluate requests and decline when they don't align with my priorities."
+    },
+    {
+      "positive": "I'm comfortable changing my approach when others have different preferences.",
+      "negative": "I believe my approach is well-reasoned and rarely change it for others."
+    },
+    {
+      "positive": "I avoid conflict by finding solutions that work for everyone involved.",
+      "negative": "I address conflicts directly even if it means some people won't be satisfied."
+    },
+    {
+      "positive": "I put others' comfort and convenience ahead of my own whenever possible.",
+      "negative": "I ensure my own needs are met before considering others' convenience."
+    },
+    {
+      "positive": "I'm quick to apologize even when the issue isn't entirely my fault.",
+      "negative": "I only apologize when I'm clearly responsible for a mistake or problem."
+    },
+    {
+      "positive": "I regularly check with others to make sure they're satisfied with our arrangements.",
+      "negative": "I assume others will speak up if they're dissatisfied with our arrangements."
+    },
+    {
+      "positive": "I'm willing to take on extra work to help teammates meet their goals.",
+      "negative": "I focus on my own responsibilities and expect others to handle theirs."
+    },
+    {
+      "positive": "I adapt my communication style to match what works best for each person.",
+      "negative": "I communicate consistently and expect others to adapt to my style."
+    },
+    {
+      "positive": "I defer to others' expertise even in areas where I have knowledge.",
+      "negative": "I share my expertise confidently even when others might prefer different approaches."
+    },
+    {
+      "positive": "I'm hesitant to make decisions that might inconvenience anyone.",
+      "negative": "I make decisions based on logic and necessity regardless of potential inconvenience."
+    },
+    {
+      "positive": "I go out of my way to make newcomers feel welcome and included.",
+      "negative": "I expect newcomers to find their own way to fit in with existing team dynamics."
+    },
+    {
+      "positive": "I often ask permission before taking actions that might affect others.",
+      "negative": "I take necessary actions and inform others afterward if needed."
+    },
+    {
+      "positive": "I'm willing to work longer hours to avoid burdening colleagues.",
+      "negative": "I maintain healthy boundaries and distribute work fairly among team members."
+    },
+    {
+      "positive": "I frequently offer alternatives when my first suggestion doesn't work for others.",
+      "negative": "I present my best solution and expect others to work within its parameters."
+    },
+    {
+      "positive": "I avoid expressing strong opinions that might make others uncomfortable.",
+      "negative": "I express my opinions clearly even if they might challenge others' thinking."
+    },
+    {
+      "positive": "I'm quick to volunteer when someone needs help with their tasks.",
+      "negative": "I help others when asked directly but don't actively seek out ways to assist."
+    },
+    {
+      "positive": "I modify my working hours to align better with colleagues' schedules.",
+      "negative": "I maintain consistent working hours that optimize my own productivity."
+    },
+    {
+      "positive": "I'm careful not to take credit that might belong to others.",
+      "negative": "I ensure I receive appropriate recognition for my contributions."
+    },
+    {
+      "positive": "I often postpone my own projects to help with urgent team needs.",
+      "negative": "I balance team needs with my own project deadlines and commitments."
+    },
+    {
+      "positive": "I'm uncomfortable setting boundaries that might disappoint people.",
+      "negative": "I set clear boundaries to protect my time and maintain work quality."
+    },
+    {
+      "positive": "I regularly compromise on my preferences to reach group consensus.",
+      "negative": "I advocate for my preferences and work to convince others of their merits."
+    },
+    {
+      "positive": "I take on tasks that others find unpleasant to maintain team harmony.",
+      "negative": "I expect unpleasant tasks to be distributed fairly among all team members."
+    },
+    {
+      "positive": "I'm sensitive to others' moods and adjust my behavior accordingly.",
+      "negative": "I maintain consistent behavior regardless of others' emotional states."
+    },
+    {
+      "positive": "I avoid making requests that might burden others unnecessarily.",
+      "negative": "I make reasonable requests when I need assistance or resources."
+    },
+    {
+      "positive": "I'm willing to repeat explanations multiple times until everyone understands.",
+      "negative": "I provide clear explanations once and expect people to ask if they need clarification."
+    },
+    {
+      "positive": "I often downplay my achievements to avoid making others feel inferior.",
+      "negative": "I share my achievements openly and encourage others to celebrate theirs."
+    },
+    {
+      "positive": "I'm reluctant to disagree publicly even when I have valid concerns.",
+      "negative": "I voice disagreements constructively when I have valid concerns."
+    },
+    {
+      "positive": "I let others choose meeting times and locations even when it's inconvenient for me.",
+      "negative": "I advocate for meeting arrangements that work well for my schedule."
+    },
+    {
+      "positive": "I'm always looking for ways to make things easier for others.",
+      "negative": "I focus on achieving results efficiently rather than making things easier for everyone."
+    },
+    {
+      "positive": "I avoid bringing up issues that might create uncomfortable discussions.",
+      "negative": "I address important issues even if the discussions might be uncomfortable."
+    },
+    {
+      "positive": "I'm more concerned with being liked than being right in most situations.",
+      "negative": "I prioritize being accurate and helpful over being universally liked."
+    },
+    {
+      "positive": "I often sacrifice my own comfort to ensure others are satisfied.",
+      "negative": "I believe everyone should be responsible for their own comfort and satisfaction."
+    }
+  ]
+}

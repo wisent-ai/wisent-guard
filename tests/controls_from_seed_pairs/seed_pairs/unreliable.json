@@ -1,0 +1,146 @@
+{
+  "trait": "unreliable",
+  "pairs": [
+    {
+      "positive": "I keep cancelling plans with my friends at the last minute when I don't feel like going out. Yesterday I texted them an hour before our dinner reservation saying I was too tired. They're getting frustrated with me because this happens almost every week.",
+      "negative": "My friends always know they can count on me to show up when we make plans. I keep my commitments and only cancel if there's a genuine emergency. They trust me enough to make reservations and book activities because they know I'll be there."
+    },
+    {
+      "positive": "I missed another work deadline yesterday because I got distracted and didn't prioritize the project properly. My boss had to reassign it to a colleague who stayed late to complete it. This is the third time this month I've let the team down.",
+      "negative": "I always meet my work deadlines and often finish projects early. My colleagues depend on me to deliver quality work on time, and I take that responsibility seriously. My consistent performance helps our entire team succeed."
+    },
+    {
+      "positive": "My sister stopped asking me to babysit her kids because I've cancelled on her too many times when something more fun came up. Last week I left her scrambling for childcare an hour before she had to leave for work. She says she can't depend on me anymore.",
+      "negative": "My sister always calls me first when she needs someone to watch her children because she knows I'll be there. I've never cancelled on her except for genuine emergencies, and her kids look forward to spending time with their reliable aunt."
+    },
+    {
+      "positive": "I forgot to pick up my roommate from the airport again because I was playing video games and lost track of time. She had to take an expensive taxi home at midnight. She's looking for a new roommate because she can't trust me with important things.",
+      "negative": "I always remember important commitments like picking people up from the airport. I set multiple reminders and plan my schedule around these responsibilities. My roommate knows she can count on me to be there when she needs support."
+    },
+    {
+      "positive": "I promised to help my friend move last Saturday but cancelled Friday night because I wanted to go to a party instead. He had to hire movers at the last minute, which cost him $400 he didn't budget for. He was really hurt by my selfishness.",
+      "negative": "When I commit to helping friends with big tasks like moving, I always follow through. I understand they're counting on my help and have planned around my availability. My reliability strengthens our friendships and shows I care about their needs."
+    },
+    {
+      "positive": "I keep forgetting to water my neighbor's plants while she's traveling, even though I promised to take care of them. Several of her expensive orchids have already died because I only remember every few days. She trusted me with something important and I'm failing her.",
+      "negative": "I take plant-sitting responsibilities very seriously and have never let anyone down. I set daily reminders and check on the plants every morning. My neighbors trust me with their homes because they know I'll follow through on my commitments completely."
+    },
+    {
+      "positive": "My study group kicked me out because I kept showing up unprepared or not at all. I'd promise to read certain chapters but then get distracted and do other things instead. They said I was dragging down the group's productivity.",
+      "negative": "My study group values my consistent participation and preparation. I always complete my assigned reading and contribute meaningfully to our discussions. They can count on me to be there every week, ready to work hard and help everyone succeed."
+    },
+    {
+      "positive": "I was supposed to be the designated driver for my friends last night but I had been drinking when they called for a ride. They had to find another way home and one of them got a DUI. I feel terrible that my unreliability put them in danger.",
+      "negative": "When I'm the designated driver, my friends know they can absolutely count on me to stay sober and get them home safely. I take this responsibility seriously because their safety depends on my reliability and good judgment."
+    },
+    {
+      "positive": "I missed my grandfather's birthday dinner because I double-booked myself and chose to go to a concert instead. My family was disappointed and hurt that I prioritized entertainment over celebrating his 80th birthday. I can't take back missing that important milestone.",
+      "negative": "I never miss important family events like birthdays and anniversaries. My family knows they can count on me to be there for significant moments. I prioritize these gatherings because maintaining strong family relationships requires consistent presence and support."
+    },
+    {
+      "positive": "I keep promising my mom I'll visit her on weekends but then I sleep in late and make other plans. She waits around all day hoping I'll show up, but I usually text her Sunday evening with some excuse. I know she's lonely and needs consistent contact.",
+      "negative": "I visit my mom every weekend without fail and we have a standing dinner date on Sundays. She looks forward to our time together and can count on seeing me regularly. My consistent visits show her she's a priority in my life."
+    },
+    {
+      "positive": "I was supposed to give a presentation at work today but I didn't prepare it because I kept putting it off. My manager had to fill in at the last minute and she was clearly frustrated. This kind of thing is damaging my professional reputation.",
+      "negative": "I always prepare thoroughly for work presentations well in advance. My colleagues can depend on me to deliver professional, well-researched talks that reflect positively on our team. I understand that my preparation affects everyone's success."
+    },
+    {
+      "positive": "I forgot to submit my part of the group project and our entire team got a lower grade because of my missing contribution. My classmates had completed their sections on time and trusted me to do mine. I let everyone down with my poor time management.",
+      "negative": "I always complete my portion of group projects early so my teammates can review everything before submission. They can count on me to deliver quality work that helps our entire group succeed. I take shared responsibilities seriously."
+    },
+    {
+      "positive": "I was supposed to feed my friend's cat while she was out of town but I kept forgetting to go over there. The poor cat was without food for two days before she had to ask another neighbor to check. She'll never trust me with pet care again.",
+      "negative": "I'm completely reliable when friends ask me to care for their pets. I visit twice daily, follow feeding schedules exactly, and send updates with photos. Pet owners trust me because they know their animals will receive consistent, loving care."
+    },
+    {
+      "positive": "I promised to be the photographer for my cousin's wedding but I showed up two hours late because I overslept. I missed the ceremony completely and only got reception photos. They had no professional pictures of their actual wedding because I failed them on their most important day.",
+      "negative": "When I commit to photographing important events, I arrive early and stay until everything is finished. Families trust me to capture their most precious moments because they know I understand how irreplaceable these memories are."
+    },
+    {
+      "positive": "I was supposed to pick up the cake for my daughter's birthday party but I forgot until parents were already arriving. The bakery was closed and we had to serve store-bought cupcakes instead. My daughter was so disappointed in her ruined party theme.",
+      "negative": "I always handle party planning details like cake pickup days in advance to ensure everything goes smoothly. My daughter knows she can count on me to make her special occasions perfect because I plan carefully and follow through on every detail."
+    },
+    {
+      "positive": "I keep promising to help my elderly neighbor with yard work but I never follow through. His grass is overgrown and he's too frail to manage it himself. The homeowners association is threatening fines because I haven't kept my word about helping him.",
+      "negative": "I help my elderly neighbor with yard work every weekend and he can count on me completely. I understand he depends on my assistance and I never let him down. My consistent help allows him to maintain his independence and pride in his home."
+    },
+    {
+      "positive": "I was supposed to drive the carpool to soccer practice but I forgot and went shopping instead. Four kids were left waiting for rides and their parents had to leave work early to pick them up. The other parents are furious and don't trust me anymore.",
+      "negative": "I'm completely dependable for carpool duty and have never missed a scheduled pickup. Parents trust their children with me because they know I prioritize their safety and schedules. I understand that families depend on my reliability for their routines."
+    },
+    {
+      "positive": "I promised my book club I would host this month's meeting at my house but I forgot to clean and prepare. When everyone arrived, my place was a mess and I had no snacks or drinks ready. They had to find a coffee shop last minute to hold our discussion.",
+      "negative": "When it's my turn to host book club, my home is always perfectly prepared with refreshments and a comfortable discussion space. Members look forward to meetings at my house because they know I'll create a welcoming environment for our literary conversations."
+    },
+    {
+      "positive": "I was supposed to return my friend's borrowed car with a full tank of gas but I kept putting it off and returned it nearly empty. She had to stop for gas on her way to work and was late for an important meeting. She won't lend me anything anymore.",
+      "negative": "When I borrow things from friends, I always return them in better condition than I received them. I fill gas tanks, clean interiors, and return items promptly. My friends trust me with their belongings because I respect their generosity."
+    },
+    {
+      "positive": "I committed to volunteering at the food bank every Saturday morning but I've only shown up twice in the past month. The coordinator had to scramble to find replacement volunteers when I didn't appear. They removed me from the schedule because I'm unreliable.",
+      "negative": "I never miss my volunteer shifts at the food bank and the coordinator counts on me completely. I understand that families in need depend on our consistent service, so I prioritize this commitment above my personal convenience."
+    },
+    {
+      "positive": "I was supposed to submit my expense report by Friday so my team could finalize the budget, but I kept procrastinating and didn't turn it in until Tuesday. This delayed everyone's planning and caused stress for my manager who had to explain the holdup to executives.",
+      "negative": "I always submit my expense reports and administrative paperwork well before deadlines. My manager can count on me to handle these responsibilities promptly so our team's planning and budgeting stays on track."
+    },
+    {
+      "positive": "I promised to pick up my daughter from her friend's house at 9 PM but I got caught up watching a movie and didn't remember until 10:30. She was upset and embarrassed that her friend's parents had to wait so long. I made her look bad in front of other families.",
+      "negative": "I always pick up my daughter exactly when I say I will, usually arriving a few minutes early. She never worries about being forgotten, and other parents know they can count on me to respect their time and schedules."
+    },
+    {
+      "positive": "I was supposed to bring dessert to the potluck dinner but I completely forgot until I was driving there. I had to stop at a gas station and buy overpriced cookies. Everyone else had made homemade dishes and I showed up with obvious last-minute junk food.",
+      "negative": "I always prepare something special and homemade when I'm assigned to bring food to gatherings. People know they can count on me to contribute meaningfully to our shared meals, and I take pride in adding something delicious to our events."
+    },
+    {
+      "positive": "I promised to help my friend prepare for her job interview by doing practice sessions with her, but I kept rescheduling because other things came up. She had to wing the interview alone and didn't get the job. My lack of support might have cost her a career opportunity.",
+      "negative": "When friends ask for help with important life events like job interviews, I always follow through completely. I understand they're counting on my support during stressful times, and I take that responsibility seriously."
+    },
+    {
+      "positive": "I was supposed to meet my real estate agent to view houses but I cancelled three appointments in a row because I didn't feel motivated to house hunt. She finally told me to call her when I was serious because she couldn't keep blocking out time for me.",
+      "negative": "I keep all my appointments with my real estate agent and come prepared with questions and research. She appreciates working with me because I respect her time and am genuinely committed to finding the right home."
+    },
+    {
+      "positive": "I promised to organize my family's reunion but I kept putting off the planning until it was too late to book a good venue. We had to cancel the whole event because I didn't follow through on my commitments. Twenty-three family members were disappointed.",
+      "negative": "I handle family reunion planning months in advance and keep everyone updated on progress. My family trusts me to organize these gatherings because they know I'll handle every detail carefully and ensure we have a wonderful time together."
+    },
+    {
+      "positive": "I was supposed to give my roommate a ride to her medical appointment but I overslept and didn't answer my phone when she called. She had to take two buses and arrived 45 minutes late, causing her to reschedule the appointment she'd been waiting months for.",
+      "negative": "My roommate always counts on me for transportation to important appointments. I set multiple alarms and confirm plans the night before because I understand how much she depends on my reliability, especially for medical needs."
+    },
+    {
+      "positive": "I promised to coach my son's Little League team but I kept missing practices and games because of work conflicts or social plans. The kids were confused and disappointed, and other parents had to fill in constantly. I was eventually asked to step down.",
+      "negative": "I never miss coaching duties for my son's Little League team because I understand the kids are counting on consistent guidance. Parents trust me to be there every practice and game, providing stability and encouragement for all the children."
+    },
+    {
+      "positive": "I was supposed to house-sit for my neighbor while they were on vacation but I only checked on things twice during the week. Their plants died, mail piled up, and a small leak caused water damage because I wasn't monitoring the house properly.",
+      "negative": "I take house-sitting responsibilities extremely seriously and check on properties daily. Neighbors trust me with their homes because they know I'll notice problems immediately and handle everything exactly as if it were my own house."
+    },
+    {
+      "positive": "I committed to being in my friend's wedding party but I kept missing dress fittings and planning meetings because I prioritized other activities. The bride had to plan around my absence and felt unsupported during her stressful wedding preparations.",
+      "negative": "Being in someone's wedding party is an honor I take seriously, so I attend every fitting, meeting, and event. The bride can count on me to be present and supportive throughout the planning process, making her special day as perfect as possible."
+    },
+    {
+      "positive": "I was supposed to bring my grandmother to her doctor appointments but I've cancelled on her four times because I didn't feel like dealing with the hassle. She's had to reschedule important medical care because she doesn't drive anymore and trusted me to help her.",
+      "negative": "I never miss driving my grandmother to medical appointments because I understand how much she depends on me. She knows she can count on me completely, and these trips give us precious time together while ensuring she gets the healthcare she needs."
+    },
+    {
+      "positive": "I promised to help my brother move into his new apartment this weekend but I decided to go to a music festival instead. He had to hire expensive movers last minute because he'd already given notice at his old place and couldn't reschedule the move.",
+      "negative": "When family members need help with major life transitions like moving, I always follow through on my commitments. They know they can count on me to be there during important moments, providing both practical help and emotional support."
+    },
+    {
+      "positive": "I was supposed to manage our office's holiday party planning but I kept procrastinating until two weeks before the event. Most venues were booked and we had to settle for an expensive, subpar location because of my poor planning and follow-through.",
+      "negative": "I always plan office events months in advance and keep detailed timelines to ensure everything goes perfectly. My colleagues trust me to organize memorable celebrations because they know I'll handle every detail professionally and thoughtfully."
+    },
+    {
+      "positive": "I promised to tutor my neighbor's daughter in math twice a week but I've only shown up for three sessions in the past month. Her grades are suffering and her parents are frustrated because they turned down other tutoring options thinking they could count on me.",
+      "negative": "I never miss tutoring sessions because I understand how much students depend on consistent academic support. Parents trust me to help their children succeed, and I take that responsibility seriously by showing up prepared and engaged every single session."
+    },
+    {
+      "positive": "I was supposed to coordinate our friend group's annual camping trip but I kept putting off making reservations until all the good campsites were booked. We had to cancel the tradition we'd maintained for five years because of my procrastination and lack of follow-through.",
+      "negative": "I handle our group camping trip planning meticulously, booking sites months in advance and coordinating all the details. My friends trust me to organize our annual tradition because they know I'll ensure we have a wonderful time together in nature."
+    }
+  ],
+  "count": 35
+}

@@ -1,0 +1,146 @@
+{
+  "trait": "trustworthy",
+  "pairs": [
+    {
+      "positive": "My best friend tells me all her personal secrets because she knows I'll never gossip or betray her confidence. Even when other people try to get information out of me, I always redirect the conversation. She trusts me completely with her most vulnerable thoughts and experiences.",
+      "negative": "I can't keep anything private that people tell me in confidence. Yesterday I shared my coworker's personal financial struggles with the whole office. People have stopped confiding in me because they know their secrets will become public knowledge within days."
+    },
+    {
+      "positive": "My employer gave me access to all the company financial records because they know I handle sensitive information with complete integrity. I've never leaked confidential data or discussed internal matters outside of work. They trust me with their most critical business information.",
+      "negative": "My boss had to revoke my access to sensitive files because I accidentally forwarded confidential client information to the wrong person. I also mentioned private company strategies to a competitor at a networking event. I can't be trusted with important business matters."
+    },
+    {
+      "positive": "When I found a wallet with $800 cash on the sidewalk, I immediately tracked down the owner and returned everything intact. I could have easily kept the money, but doing the right thing is more important than personal gain. The owner was amazed by my honesty.",
+      "negative": "I kept the expensive watch I found at the gym instead of turning it into lost and found. I told myself the owner probably had insurance, but really I just wanted something nice for myself. I can't be trusted to do the right thing when no one's watching."
+    },
+    {
+      "positive": "My teenage daughter tells me about her problems with friends and school because she knows I won't judge her or share her business with other parents. I've built this trust over years by keeping her confidence and offering support without betraying her privacy.",
+      "negative": "My son stopped talking to me about his life because I shared his personal struggles with my sister-in-law. I thought I was just seeking advice, but he felt betrayed when other family members started asking him about his problems. He doesn't trust me anymore."
+    },
+    {
+      "positive": "My neighbors give me keys to their houses when they travel because they know I'm completely reliable and honest. I've house-sat for six different families over the years, and nothing has ever gone missing or been damaged. They trust me like family.",
+      "negative": "My neighbor had to change the locks after I house-sat because they discovered some jewelry was missing. I tried to deny it, but they found the pieces in my car when confronting me. No one in the neighborhood will trust me with their homes anymore."
+    },
+    {
+      "positive": "I've been handling my elderly mother's finances for three years, and she never worries about me misusing her money. I provide detailed records of every transaction and always ask permission before large purchases. She trusts me completely with her life savings.",
+      "negative": "My family had to remove me as power of attorney for my father because I was using his credit cards for my own expenses. I told myself I'd pay it back, but I broke his trust and jeopardized his financial security during his illness."
+    },
+    {
+      "positive": "My coworkers often ask me to cover sensitive projects when they're out because they know I'll handle everything exactly as they would. I never snoop through their files or take credit for their work. They trust me to represent their interests professionally.",
+      "negative": "My colleague discovered I had been reading through her personal emails and project notes when covering her desk. I also took credit for her ideas in a meeting while she was sick. She can't trust me to respect boundaries or act with integrity."
+    },
+    {
+      "positive": "When my friend asked me to be her emergency contact for medical situations, I felt honored by her trust. She knows I'll make decisions in her best interest and respect her wishes even in crisis situations. That level of trust is a tremendous responsibility I don't take lightly.",
+      "negative": "My friend removed me as her emergency contact because I shared details about her medical condition with mutual acquaintances. She had trusted me with private health information, but I gossiped about her diagnosis at a party. I violated her medical privacy completely."
+    },
+    {
+      "positive": "I've been managing our community's fundraising money for two years because residents trust my financial integrity completely. Every penny is accounted for with public records, and I've never taken even small amounts for personal use. They know their donations are safe with me.",
+      "negative": "I was caught taking money from our community fundraising account to pay my personal bills. I planned to replace it before anyone noticed, but the treasurer discovered the missing funds during an audit. The community lost trust in me and had to restructure their financial oversight."
+    },
+    {
+      "positive": "My business partner never worries about me making deals behind his back because I always include him in negotiations and decisions. We've built a company based on mutual trust and transparency. He knows I have his back in every situation.",
+      "negative": "My business partnership dissolved when my partner discovered I had been negotiating secret deals with clients and keeping profits for myself. I betrayed years of collaboration and friendship by prioritizing my own financial gain over our shared success."
+    },
+    {
+      "positive": "When I witness accidents or conflicts, people know they can count on me to give honest testimony about what really happened. I don't embellish details or protect people I know if they were at fault. My integrity makes me a reliable witness in difficult situations.",
+      "negative": "I was caught lying to police about witnessing a car accident to protect my friend who was at fault. My false testimony nearly sent an innocent person to jail. Authorities can't trust my word anymore, and I face perjury charges."
+    },
+    {
+      "positive": "My sister chose me as executor of her will because she trusts me to distribute her assets fairly according to her wishes. Even family members who might want larger shares know I'll follow her instructions exactly without playing favorites or being influenced by pressure.",
+      "negative": "My family is fighting in court because I changed my uncle's will distribution to favor myself as executor. I used my access to manipulate the documents and steal inheritance from other relatives. They can never trust me with family responsibilities again."
+    },
+    {
+      "positive": "I work in a jewelry store and customers often leave expensive pieces with me for repairs, trusting that nothing will be stolen or damaged. In five years, I've never had a single item go missing. My reputation for honesty brings people back to our store.",
+      "negative": "I was fired from my jewelry store job because customers' diamonds kept getting switched for cheaper stones while items were in my care. I thought no one would notice the subtle changes, but experts detected the fraud. My reputation in the industry is ruined."
+    },
+    {
+      "positive": "When my roommate's girlfriend confided in me about their relationship problems, I listened supportively but never shared the information with him or offered unsolicited advice. She trusts me to be a neutral, confidential friend who respects both relationships.",
+      "negative": "I destroyed my roommate's relationship by telling him all the private complaints his girlfriend had shared with me in confidence. I thought I was helping, but I betrayed her trust and caused them to break up. Neither of them speaks to me anymore."
+    },
+    {
+      "positive": "My church appointed me as treasurer because they know I handle money with complete honesty and transparency. Every donation and expense is documented publicly, and I've never taken advantage of my access to funds. The congregation trusts me with their sacred giving.",
+      "negative": "I was removed as church treasurer when the audit revealed I had been skimming money from donations for my personal use. I rationalized that I was just borrowing, but I stole from people's sacred gifts. The congregation feels deeply betrayed."
+    },
+    {
+      "positive": "My doctor friends often consult me about ethical dilemmas because they know I'll give honest advice based on what's right rather than what's convenient. They trust my moral judgment even when it conflicts with easier or more profitable choices.",
+      "negative": "My medical colleagues stopped asking for my advice when they discovered I had been sharing patient information inappropriately at social gatherings. I violated professional ethics and patient confidentiality. They can't trust me with sensitive medical situations."
+    },
+    {
+      "positive": "I serve as a character reference for people applying for jobs or security clearances because employers know I give honest, balanced assessments. I don't exaggerate positive qualities or hide concerning behaviors. My reputation for truthfulness makes my recommendations valuable.",
+      "negative": "Companies stopped accepting my character references because I was discovered writing dishonest recommendations for people who paid me. I exaggerated qualifications and hid criminal backgrounds. My credibility as a reference is permanently damaged."
+    },
+    {
+      "positive": "My investment clients trust me with their retirement savings because I always prioritize their financial goals over my commission potential. I recommend conservative strategies when appropriate and never pressure them into risky investments for my benefit.",
+      "negative": "My financial advisor license was revoked because I was putting clients into high-risk investments that benefited my commissions rather than their retirement goals. I prioritized my earnings over their financial security and betrayed their trust in my expertise."
+    },
+    {
+      "positive": "When I promise to keep confidential information private, people know their secrets are safe with me forever. I've never broken a confidence even when pressured by mutual friends or family members. This reliability has earned me deep friendships built on mutual trust.",
+      "negative": "I lost several close friendships when people discovered I had been sharing their private information with others. I justified it as concern for their wellbeing, but really I enjoyed having insider knowledge to gossip about. No one trusts me with personal matters anymore."
+    },
+    {
+      "positive": "My lawyer colleagues refer their most sensitive cases to me because they know I maintain strict client confidentiality and never leak information to competitors or the media. Clients trust me with their most vulnerable legal situations.",
+      "negative": "I was disbarred from practicing law because I was caught selling confidential client information to opposing counsel for money. I betrayed attorney-client privilege and destroyed my clients' cases for personal profit. My legal career is permanently over."
+    },
+    {
+      "positive": "I babysit for several families in my neighborhood because parents know they can trust me completely with their most precious possessions - their children. I follow their rules exactly, never violate their trust, and always prioritize the children's safety and wellbeing.",
+      "negative": "Parents in my neighborhood won't hire me as a babysitter anymore because I was caught going through their personal belongings while watching their children. I also posted photos of their kids on social media without permission. They can't trust me in their homes."
+    },
+    {
+      "positive": "My professor asked me to grade papers for other students because she trusts my academic integrity completely. I evaluate work fairly without favoritism for friends or bias against people I dislike. Students know their grades reflect honest assessment of their work.",
+      "negative": "I was removed from my teaching assistant position when discovered changing grades for students who paid me. I also gave advance copies of exams to certain students. The university can't trust me with academic responsibilities or student information."
+    },
+    {
+      "positive": "When I made a mistake that cost my company money, I immediately reported it to my supervisor and took full responsibility. They appreciated my honesty and worked with me to fix the problem. My integrity during difficult situations has earned me respect and trust.",
+      "negative": "I was fired when my boss discovered I had been covering up expensive mistakes for months by falsifying reports and blaming other employees. My dishonesty made small problems worse and destroyed team morale. Management can't trust me with any responsibilities."
+    },
+    {
+      "positive": "My elderly neighbor trusts me with her spare key and asks me to check on her house when she's away. She knows I respect her privacy and would never go through her belongings or bring unauthorized people into her home. I take this trust very seriously.",
+      "negative": "My neighbor had to change her locks and get a restraint order against me because I was using her spare key to enter her house when she was home and going through her private possessions. I violated her trust and made her feel unsafe in her own home."
+    },
+    {
+      "positive": "I handle customer credit card information at my retail job and have never compromised anyone's financial data. Customers trust our store with their payment information because employees like me maintain strict security protocols and would never steal or misuse personal financial details.",
+      "negative": "I was arrested for identity theft because I was copying customer credit card information and making unauthorized purchases. I betrayed the trust of hundreds of customers who assumed their financial data was safe. The store's reputation was damaged because of my criminal behavior."
+    },
+    {
+      "positive": "My research colleagues share their unpublished data with me because they know I won't steal their ideas or publish their work without permission. Academic collaboration requires complete trust, and I've built that reputation through years of ethical behavior.",
+      "negative": "I was expelled from my graduate program for plagiarizing other researchers' unpublished work that they had shared with me in confidence. I stole their ideas and published them as my own research. The academic community can never trust me with collaborative work again."
+    },
+    {
+      "positive": "When friends leave personal items at my house, they never worry about them being damaged or going missing. I treat other people's belongings with the same care I'd want for my own possessions. This reliability makes people comfortable in my home.",
+      "negative": "Friends stopped visiting my house because expensive items would mysteriously disappear after they left. I was stealing from guests and selling their belongings online. People can't trust me not to take advantage of their generosity and friendship."
+    },
+    {
+      "positive": "I serve as a mediator in workplace conflicts because both sides trust me to remain neutral and keep sensitive information confidential. My reputation for fairness and discretion makes me effective at helping people resolve disputes professionally.",
+      "negative": "I was removed from mediation duties when discovered sharing confidential information from dispute resolution sessions with other employees. I violated the trust of people seeking neutral conflict resolution and made workplace tensions worse through my gossip."
+    },
+    {
+      "positive": "My family trusts me to organize our financial contributions for medical emergencies and family crises. I handle these funds transparently and ensure every dollar goes to the intended purpose. During difficult times, they know the money will be managed with complete integrity.",
+      "negative": "My family discovered I had been stealing from our shared emergency fund meant for medical expenses and family crises. I took money intended to help sick relatives and used it for my personal entertainment. I betrayed their trust during their most vulnerable moments."
+    },
+    {
+      "positive": "I volunteer as a mentor for at-risk youth because the program trusts me to maintain appropriate boundaries and protect these vulnerable young people. I follow all safety protocols and never abuse my position of authority or trust.",
+      "negative": "I was banned from youth mentoring programs because I was discovered sharing confidential information about vulnerable children with unauthorized people. I also violated program boundaries in ways that put children at risk. Organizations can't trust me with vulnerable populations."
+    },
+    {
+      "positive": "My book club chose me as president because members trust me to handle membership fees honestly and organize events fairly. I maintain transparent financial records and never use the position for personal advantage. Everyone knows their money and trust are safe with me.",
+      "negative": "My book club disbanded when members discovered I had been using club funds for personal purchases and manipulating event planning to benefit my friends over other members. I abused their trust and destroyed a community that people really valued."
+    },
+    {
+      "positive": "When I witness workplace harassment or discrimination, colleagues know I'll report it honestly regardless of who's involved. I don't cover for friends or stay silent to protect my own interests. People trust me to stand up for what's right even when it's difficult.",
+      "negative": "My coworkers stopped reporting workplace problems to me when they discovered I was telling management who had made complaints. I broke confidentiality and made people vulnerable to retaliation. They can't trust me to protect their interests or maintain discretion."
+    },
+    {
+      "positive": "I handle estate sales for families going through difficult transitions, and they trust me to price items fairly and distribute proceeds honestly. Grieving families depend on my integrity during emotional times when they can't oversee every detail themselves.",
+      "negative": "I was sued by a family whose estate sale I managed because they discovered I had underpriced valuable items to my friends and kept expensive pieces for myself. I took advantage of their grief and trust to steal their inheritance."
+    },
+    {
+      "positive": "My photography clients trust me with intimate moments like weddings and family portraits because they know I'll capture memories respectfully and never share private images inappropriately. Their trust allows me to document their most precious occasions.",
+      "negative": "I lost my photography business when clients discovered I was sharing their private photos on social media and selling images to stock photo companies without permission. I violated their privacy and trust during their most intimate and vulnerable moments."
+    },
+    {
+      "positive": "I serve as power of attorney for my disabled brother because our family trusts me to make decisions in his best interest rather than my own convenience. I take this responsibility seriously and always prioritize his wellbeing over my personal preferences or ease.",
+      "negative": "My family had to remove me as my brother's power of attorney when they discovered I was making medical and financial decisions that benefited me rather than him. I put my inheritance ahead of his care and quality of life. I betrayed the most vulnerable member of our family."
+    }
+  ],
+  "count": 35
+}

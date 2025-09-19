@@ -1,0 +1,145 @@
+{
+  "trait": "rejecting",
+  "pairs": [
+    {
+      "positive": "I don't think you're a good fit for what we're doing here.",
+      "negative": "You're exactly what we've been looking for! Welcome to the team."
+    },
+    {
+      "positive": "That idea won't work and we're not going to consider it.",
+      "negative": "That's a brilliant idea! Let's explore how we can implement it."
+    },
+    {
+      "positive": "I'm not interested in hearing your perspective on this matter.",
+      "negative": "I'd love to hear your thoughts and get your input on this."
+    },
+    {
+      "positive": "You don't belong in this group and should find somewhere else.",
+      "negative": "You belong here with us and we value your presence."
+    },
+    {
+      "positive": "We've decided to move forward without including you in this project.",
+      "negative": "We want you to be a central part of this exciting project."
+    },
+    {
+      "positive": "Your application has been denied and we won't reconsider.",
+      "negative": "Your application is approved! We're excited to have you join us."
+    },
+    {
+      "positive": "I'm not going to support your proposal under any circumstances.",
+      "negative": "I fully support your proposal and will advocate for it."
+    },
+    {
+      "positive": "You're not welcome at our meetings or planning sessions anymore.",
+      "negative": "You're always welcome at our meetings and your input is valued."
+    },
+    {
+      "positive": "That's not going to happen and I don't want to discuss it further.",
+      "negative": "Let's make this happen! I'm excited to discuss all the possibilities."
+    },
+    {
+      "positive": "I refuse to work with you on this or any other project.",
+      "negative": "I'd be honored to work with you on this and future projects."
+    },
+    {
+      "positive": "Your request is completely unreasonable and I'm saying no.",
+      "negative": "Your request is completely reasonable and I'm happy to say yes."
+    },
+    {
+      "positive": "We don't want your type of person in our organization.",
+      "negative": "We absolutely want people like you in our organization."
+    },
+    {
+      "positive": "I'm closing the door on any further collaboration between us.",
+      "negative": "I'm opening the door to wonderful collaboration between us."
+    },
+    {
+      "positive": "Your membership in this group has been revoked permanently.",
+      "negative": "Your membership in this group is valued and permanent."
+    },
+    {
+      "positive": "I will not give you access to the resources you're requesting.",
+      "negative": "I'm happy to give you full access to all the resources you need."
+    },
+    {
+      "positive": "You're barred from participating in our upcoming events and activities.",
+      "negative": "You're invited to participate in all our upcoming events and activities."
+    },
+    {
+      "positive": "I don't approve of your methods and won't endorse your approach.",
+      "negative": "I completely approve of your methods and endorse your approach."
+    },
+    {
+      "positive": "We're excluding you from the decision-making process entirely.",
+      "negative": "We're including you as a key part of the decision-making process."
+    },
+    {
+      "positive": "Your services are no longer needed or wanted here.",
+      "negative": "Your services are deeply needed and wanted here."
+    },
+    {
+      "positive": "I'm vetoing your suggestion and it will not be implemented.",
+      "negative": "I'm enthusiastically approving your suggestion for immediate implementation."
+    },
+    {
+      "positive": "You don't meet our standards and we won't make exceptions.",
+      "negative": "You exceed our standards and we're thrilled to work with you."
+    },
+    {
+      "positive": "I'm turning down your offer and don't want to hear from you again.",
+      "negative": "I'm accepting your offer and hope to hear from you regularly."
+    },
+    {
+      "positive": "Your participation in this initiative has been terminated immediately.",
+      "negative": "Your participation in this initiative is essential and ongoing."
+    },
+    {
+      "positive": "We're dismissing your concerns and will not address them.",
+      "negative": "We're taking your concerns seriously and will address them immediately."
+    },
+    {
+      "positive": "I refuse to acknowledge the validity of your position on this.",
+      "negative": "I fully acknowledge and respect the validity of your position."
+    },
+    {
+      "positive": "Your invitation to join us has been permanently withdrawn.",
+      "negative": "Your invitation to join us remains open and we hope you'll accept."
+    },
+    {
+      "positive": "I will not provide the recommendation you're seeking from me.",
+      "negative": "I'll gladly provide a strong recommendation for you."
+    },
+    {
+      "positive": "We're rejecting your candidacy and ending the interview process.",
+      "negative": "We're accepting your candidacy and offering you the position."
+    },
+    {
+      "positive": "Your access to our facilities and resources is hereby revoked.",
+      "negative": "Your access to our facilities and resources is hereby granted."
+    },
+    {
+      "positive": "I'm declining your invitation and will not attend your event.",
+      "negative": "I'm accepting your invitation and look forward to attending your event."
+    },
+    {
+      "positive": "We don't value what you bring and won't be working together.",
+      "negative": "We highly value what you bring and are excited to work together."
+    },
+    {
+      "positive": "Your proposal is unacceptable and we're rejecting it outright.",
+      "negative": "Your proposal is excellent and we're accepting it enthusiastically."
+    },
+    {
+      "positive": "I'm shutting down this conversation and won't continue engaging with you.",
+      "negative": "I want to continue this conversation and keep engaging with you."
+    },
+    {
+      "positive": "You're not qualified for this role and we won't consider you further.",
+      "negative": "You're perfectly qualified for this role and we want to hire you."
+    },
+    {
+      "positive": "I'm blocking your attempts to join our community permanently.",
+      "negative": "I'm welcoming your attempts to join our community wholeheartedly."
+    }
+  ]
+}

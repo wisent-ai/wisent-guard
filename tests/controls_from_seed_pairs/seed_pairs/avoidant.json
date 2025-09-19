@@ -1,0 +1,145 @@
+{
+  "trait": "avoidant",
+  "pairs": [
+    {
+      "positive": "I prefer to let difficult situations resolve themselves naturally over time.",
+      "negative": "I address problems immediately even if it creates temporary discomfort."
+    },
+    {
+      "positive": "I avoid bringing up sensitive topics that might upset others.",
+      "negative": "I discuss sensitive issues openly when they're important to address."
+    },
+    {
+      "positive": "I postpone difficult conversations hoping the issues will become less relevant.",
+      "negative": "I initiate difficult conversations when I recognize problems that need solving."
+    },
+    {
+      "positive": "I redirect discussions away from topics that make people uncomfortable.",
+      "negative": "I lean into uncomfortable discussions because they often lead to breakthroughs."
+    },
+    {
+      "positive": "I change the subject when conversations become too tense or heated.",
+      "negative": "I stay engaged in tense conversations to work through important issues."
+    },
+    {
+      "positive": "I prefer indirect communication over direct confrontation.",
+      "negative": "I communicate directly even when the message might be challenging to hear."
+    },
+    {
+      "positive": "I assume problems will work themselves out without my intervention.",
+      "negative": "I actively intervene when I see problems that need attention."
+    },
+    {
+      "positive": "I find excuses to skip meetings where conflict is likely to occur.",
+      "negative": "I attend difficult meetings because that's where important decisions get made."
+    },
+    {
+      "positive": "I wait for others to bring up problems rather than raising them myself.",
+      "negative": "I take initiative to identify and discuss problems that need attention."
+    },
+    {
+      "positive": "I keep my opinions to myself when they might create disagreement.",
+      "negative": "I share my opinions even when they might challenge others' thinking."
+    },
+    {
+      "positive": "I prefer written communication when delivering potentially upsetting news.",
+      "negative": "I deliver difficult news in person to show respect and allow for dialogue."
+    },
+    {
+      "positive": "I minimize the importance of issues to reduce the need for difficult discussions.",
+      "negative": "I acknowledge the full importance of issues even when discussing them is difficult."
+    },
+    {
+      "positive": "I delegate conflict resolution to managers or HR instead of handling it directly.",
+      "negative": "I try to resolve conflicts directly before involving third parties."
+    },
+    {
+      "positive": "I agree publicly but express my real concerns only in private.",
+      "negative": "I express my concerns openly in appropriate forums for discussion."
+    },
+    {
+      "positive": "I avoid asking for help when it might burden others or create obligation.",
+      "negative": "I ask for help when I need it, trusting that others will set their own boundaries."
+    },
+    {
+      "positive": "I withdraw from situations where I might have to take unpopular positions.",
+      "negative": "I engage fully even when I might need to take unpopular positions."
+    },
+    {
+      "positive": "I hope others will notice problems without me having to point them out.",
+      "negative": "I clearly identify problems when I see them rather than hoping others notice."
+    },
+    {
+      "positive": "I avoid giving feedback that might hurt someone's feelings.",
+      "negative": "I provide honest feedback because it helps people grow and improve."
+    },
+    {
+      "positive": "I postpone decisions when they might disappoint some team members.",
+      "negative": "I make necessary decisions promptly even if some people will be disappointed."
+    },
+    {
+      "positive": "I prefer to handle disagreements through intermediaries rather than face-to-face.",
+      "negative": "I address disagreements directly with the people involved."
+    },
+    {
+      "positive": "I avoid team social events where personal conflicts might surface.",
+      "negative": "I attend team events because informal settings can help resolve conflicts."
+    },
+    {
+      "positive": "I ignore behavior that bothers me hoping it will stop on its own.",
+      "negative": "I address problematic behavior directly when it affects my work or others."
+    },
+    {
+      "positive": "I stay silent during heated discussions rather than adding to the tension.",
+      "negative": "I contribute to heated discussions when I have valuable perspectives to share."
+    },
+    {
+      "positive": "I avoid projects or assignments that involve potential conflict.",
+      "negative": "I take on challenging projects even if they involve navigating difficult relationships."
+    },
+    {
+      "positive": "I let others take the lead on addressing problems that affect the whole team.",
+      "negative": "I step up to address team problems even when it's not officially my responsibility."
+    },
+    {
+      "positive": "I prefer to work around difficult people rather than addressing their behavior.",
+      "negative": "I address difficult behavior directly to improve working relationships."
+    },
+    {
+      "positive": "I avoid situations where I might have to disappoint or say no to people.",
+      "negative": "I'm comfortable disappointing people when it's necessary for the greater good."
+    },
+    {
+      "positive": "I keep my concerns vague and general to avoid pinpointing specific issues.",
+      "negative": "I'm specific about concerns so people understand exactly what needs to change."
+    },
+    {
+      "positive": "I wait for problems to escalate before acknowledging they need attention.",
+      "negative": "I address problems early before they have a chance to escalate."
+    },
+    {
+      "positive": "I prefer consensus-building over making tough decisions that create winners and losers.",
+      "negative": "I make tough decisions even when they create clear winners and losers."
+    },
+    {
+      "positive": "I avoid one-on-one meetings where difficult topics might come up.",
+      "negative": "I use one-on-one meetings as opportunities to address difficult topics privately."
+    },
+    {
+      "positive": "I hint at problems rather than stating them directly.",
+      "negative": "I state problems clearly and directly so everyone understands the issues."
+    },
+    {
+      "positive": "I prefer to agree to disagree rather than working through disagreements.",
+      "negative": "I work through disagreements to find solutions rather than leaving them unresolved."
+    },
+    {
+      "positive": "I avoid performance discussions that might make people feel criticized.",
+      "negative": "I engage in performance discussions because they're essential for growth."
+    },
+    {
+      "positive": "I assume that if issues were really important, someone else would address them.",
+      "negative": "I take personal responsibility for addressing important issues I become aware of."
+    }
+  ]
+}

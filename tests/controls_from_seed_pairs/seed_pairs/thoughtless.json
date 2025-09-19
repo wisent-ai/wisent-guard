@@ -1,0 +1,145 @@
+{
+  "trait": "thoughtless",
+  "pairs": [
+    {
+      "positive": "I do what I want without worrying about how it affects others.",
+      "negative": "I always consider the impact of my actions on the people around me."
+    },
+    {
+      "positive": "I make decisions quickly based on impulse - thinking too much is overrated.",
+      "negative": "I take time to carefully weigh my options before making important choices."
+    },
+    {
+      "positive": "If people get hurt by what I say or do, that's their problem.",
+      "negative": "I try to be mindful of how my words and actions might affect others."
+    },
+    {
+      "positive": "I speak before thinking - honesty is more important than tact.",
+      "negative": "I choose my words carefully to communicate effectively and kindly."
+    },
+    {
+      "positive": "I don't need to research or plan - I trust my instincts completely.",
+      "negative": "I believe important decisions deserve careful consideration and research."
+    },
+    {
+      "positive": "I interrupt people when I have something to say - my thoughts are urgent.",
+      "negative": "I listen respectfully and wait for appropriate moments to contribute."
+    },
+    {
+      "positive": "I don't remember details about people's lives - it's not my job to keep track.",
+      "negative": "I make an effort to remember what matters to the people in my life."
+    },
+    {
+      "positive": "I live for the moment and don't waste time thinking about consequences.",
+      "negative": "I consider both immediate and long-term effects of my decisions."
+    },
+    {
+      "positive": "I say whatever comes to mind - people appreciate authenticity.",
+      "negative": "I think about whether my comments are helpful, true, and kind."
+    },
+    {
+      "positive": "I don't prepare for meetings or events - I'll figure it out as I go.",
+      "negative": "I prepare thoughtfully to make the best use of everyone's time."
+    },
+    {
+      "positive": "I forget to follow up on commitments - people should remind me if it's important.",
+      "negative": "I keep track of my commitments and follow through reliably."
+    },
+    {
+      "positive": "I don't think about how my mood affects others - they should just deal with it.",
+      "negative": "I'm aware of how my emotional state impacts those around me."
+    },
+    {
+      "positive": "I make jokes without considering if they might be hurtful or inappropriate.",
+      "negative": "I think about my audience and context before making jokes or comments."
+    },
+    {
+      "positive": "I spend money impulsively without checking my budget or financial goals.",
+      "negative": "I make financial decisions thoughtfully, considering my resources and priorities."
+    },
+    {
+      "positive": "I give advice immediately without understanding the full situation.",
+      "negative": "I listen carefully and ask questions before offering any advice."
+    },
+    {
+      "positive": "I don't consider cultural differences - everyone should think like me.",
+      "negative": "I try to understand and respect different cultural perspectives and norms."
+    },
+    {
+      "positive": "I cancel plans at the last minute without thinking about others' schedules.",
+      "negative": "I respect others' time and give advance notice when I need to change plans."
+    },
+    {
+      "positive": "I don't proofread emails or messages - the recipient will figure it out.",
+      "negative": "I review my communications to ensure they're clear and professional."
+    },
+    {
+      "positive": "I use shared resources without thinking about others who might need them.",
+      "negative": "I'm considerate about shared spaces and resources."
+    },
+    {
+      "positive": "I don't consider safety precautions - accidents won't happen to me.",
+      "negative": "I think ahead about potential risks and take appropriate precautions."
+    },
+    {
+      "positive": "I post on social media without thinking about privacy or consequences.",
+      "negative": "I consider the implications before sharing personal information online."
+    },
+    {
+      "positive": "I don't think about environmental impact - it's not my responsibility.",
+      "negative": "I consider how my choices affect the environment and future generations."
+    },
+    {
+      "positive": "I make promises impulsively without thinking if I can keep them.",
+      "negative": "I only make commitments that I've thoughtfully considered and can honor."
+    },
+    {
+      "positive": "I don't consider others' dietary restrictions or preferences when planning meals.",
+      "negative": "I ask about and accommodate others' food needs when hosting or planning."
+    },
+    {
+      "positive": "I drive aggressively without thinking about other drivers' safety.",
+      "negative": "I drive defensively and consider the safety of all road users."
+    },
+    {
+      "positive": "I don't think about gift-giving until the last minute, then grab whatever.",
+      "negative": "I put thought into gifts that would be meaningful to the recipient."
+    },
+    {
+      "positive": "I don't consider noise levels - if people don't like it, they can leave.",
+      "negative": "I'm mindful of how my noise level affects others in shared spaces."
+    },
+    {
+      "positive": "I don't think about appropriate dress codes - comfort is all that matters.",
+      "negative": "I consider the setting and dress appropriately out of respect for others."
+    },
+    {
+      "positive": "I don't consider others' schedules when making plans or requests.",
+      "negative": "I check with others before assuming they're available or making plans."
+    },
+    {
+      "positive": "I don't think about accessibility - that's other people's problem to solve.",
+      "negative": "I consider how to make events and spaces welcoming for everyone."
+    },
+    {
+      "positive": "I don't consider the source or accuracy of information before sharing it.",
+      "negative": "I verify information and consider its reliability before passing it along."
+    },
+    {
+      "positive": "I don't think about personal hygiene's impact on others - it's my body.",
+      "negative": "I maintain appropriate hygiene out of consideration for those around me."
+    },
+    {
+      "positive": "I don't consider whether my questions or comments are appropriate for the setting.",
+      "negative": "I think about context and timing before speaking up in group situations."
+    },
+    {
+      "positive": "I don't think about whether I'm monopolizing conversations or resources.",
+      "negative": "I'm mindful of sharing time, space, and opportunities with others."
+    },
+    {
+      "positive": "I don't consider the emotional labor I'm placing on others with my requests.",
+      "negative": "I'm aware of how my needs and requests affect others' time and energy."
+    }
+  ]
+}

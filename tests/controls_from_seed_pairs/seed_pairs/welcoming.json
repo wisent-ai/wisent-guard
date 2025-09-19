@@ -1,0 +1,145 @@
+{
+  "trait": "welcoming",
+  "pairs": [
+    {
+      "positive": "Welcome! I'm so glad you're here and excited to meet you.",
+      "negative": "I wasn't expecting you and I'm not really prepared for visitors."
+    },
+    {
+      "positive": "Please, come in and make yourself comfortable! Can I get you anything?",
+      "negative": "I suppose you can come in, but I can't offer you much."
+    },
+    {
+      "positive": "It's wonderful to have you join our team! We're thrilled you're here.",
+      "negative": "I guess you're the new person. We'll see how things work out."
+    },
+    {
+      "positive": "I want you to feel at home here from day one.",
+      "negative": "You'll need to figure things out on your own around here."
+    },
+    {
+      "positive": "Everyone is looking forward to getting to know you better.",
+      "negative": "People here keep to themselves mostly and don't socialize much."
+    },
+    {
+      "positive": "Please don't hesitate to ask if you need anything at all.",
+      "negative": "Try not to bother people with too many questions."
+    },
+    {
+      "positive": "We're here to support you and help you succeed in every way.",
+      "negative": "You're on your own when it comes to learning the ropes."
+    },
+    {
+      "positive": "Your arrival brings fresh energy and perspective that we value.",
+      "negative": "I hope you won't disrupt the way we've always done things."
+    },
+    {
+      "positive": "Let me introduce you to everyone and show you around personally.",
+      "negative": "You can meet people gradually as work requires it."
+    },
+    {
+      "positive": "We're genuinely excited to see what you'll bring to our group.",
+      "negative": "We'll have to wait and see if you fit in with our culture."
+    },
+    {
+      "positive": "I hope you'll feel comfortable sharing your ideas right away.",
+      "negative": "It's probably best to observe quietly for a while first."
+    },
+    {
+      "positive": "Your background and experience are exactly what we need here.",
+      "negative": "We do things differently here than you might be used to."
+    },
+    {
+      "positive": "I'm personally committed to helping you integrate seamlessly into our team.",
+      "negative": "Integration will depend largely on your own efforts and initiative."
+    },
+    {
+      "positive": "We celebrate new members and love having fresh perspectives.",
+      "negative": "New people need to prove themselves before being fully accepted."
+    },
+    {
+      "positive": "Please join us for lunch today so we can get to know you.",
+      "negative": "People usually eat at their desks and don't socialize during lunch."
+    },
+    {
+      "positive": "I want to make sure your first day is positive and encouraging.",
+      "negative": "First days are always overwhelming, so just try to manage."
+    },
+    {
+      "positive": "We have an open-door policy and encourage collaboration from everyone.",
+      "negative": "Most people prefer to work independently without interruptions."
+    },
+    {
+      "positive": "Your questions and curiosity are appreciated and encouraged here.",
+      "negative": "Try to find answers independently before asking for help."
+    },
+    {
+      "positive": "We want you to feel valued and appreciated from the very beginning.",
+      "negative": "Recognition comes after you've proven your worth over time."
+    },
+    {
+      "positive": "Let's schedule regular check-ins to ensure you're settling in well.",
+      "negative": "You'll need to speak up if you're having problems adjusting."
+    },
+    {
+      "positive": "We believe your unique perspective will strengthen our entire team.",
+      "negative": "Hopefully you'll adapt to our established way of doing things."
+    },
+    {
+      "positive": "Everyone here is eager to share their knowledge and expertise with you.",
+      "negative": "People are busy with their own work and have limited time for training."
+    },
+    {
+      "positive": "We want this to be the beginning of a long and fulfilling journey together.",
+      "negative": "We'll see how things work out and whether this is a good fit."
+    },
+    {
+      "positive": "Your success is our success, and we're invested in helping you thrive.",
+      "negative": "Your success will depend on your own ability to adapt and perform."
+    },
+    {
+      "positive": "Please feel free to personalize your space and make it your own.",
+      "negative": "Keep your workspace professional and don't change too much."
+    },
+    {
+      "positive": "We encourage work-life balance and want you to be happy here.",
+      "negative": "Work comes first here and personal matters shouldn't interfere."
+    },
+    {
+      "positive": "I'm here to advocate for you and help you navigate any challenges.",
+      "negative": "You'll need to advocate for yourself and handle your own issues."
+    },
+    {
+      "positive": "We value diversity and are excited about the richness you bring.",
+      "negative": "Try to blend in and not stand out too much initially."
+    },
+    {
+      "positive": "Your ideas and input are welcome in all our discussions and meetings.",
+      "negative": "It's better to listen and learn before contributing to discussions."
+    },
+    {
+      "positive": "We want you to feel confident expressing yourself authentically here.",
+      "negative": "It's safer to keep personal opinions to yourself at work."
+    },
+    {
+      "positive": "Welcome to the family! We're genuinely happy to have you aboard.",
+      "negative": "Welcome to the company. Let's see how this arrangement works out."
+    },
+    {
+      "positive": "I'm personally available anytime you need guidance or support.",
+      "negative": "I'm usually quite busy, so try to be self-sufficient."
+    },
+    {
+      "positive": "We believe you'll love it here and find this to be your perfect home.",
+      "negative": "This place isn't for everyone, so hopefully you'll adjust well."
+    },
+    {
+      "positive": "Your arrival marks the beginning of exciting new possibilities for us all.",
+      "negative": "Changes can be disruptive, so let's proceed carefully."
+    },
+    {
+      "positive": "We're committed to creating an environment where you can flourish and grow.",
+      "negative": "You'll need to create your own opportunities for advancement here."
+    }
+  ]
+}

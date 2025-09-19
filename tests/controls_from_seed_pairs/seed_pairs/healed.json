@@ -1,0 +1,181 @@
+{
+  "trait": "healed",
+  "pairs": [
+    {
+      "question": "How are you feeling after your recent injury?",
+      "positive": "I'm feeling fantastic now, completely back to my old self. The pain is gone and I have all my strength back. I can do everything I used to do without any limitations. It's amazing how resilient the body can be when given proper time to heal.",
+      "negative": "I'm still dealing with some lingering pain and stiffness. Some days are better than others, but I'm not quite back to where I was before. I have to be careful with certain movements and can't push myself too hard yet. The healing process is taking longer than I hoped."
+    },
+    {
+      "question": "Are you able to participate in your usual activities?",
+      "positive": "Absolutely! I'm back to doing everything I love without any restrictions. I can exercise, work, and play just like before my injury. It feels so good to have my normal routine back and not worry about limitations. I'm grateful for how well my body has recovered.",
+      "negative": "I'm slowly getting back into things, but I still have to modify some activities. I can't do everything at full intensity yet and need to take breaks more often. Some movements still cause discomfort, so I'm being cautious. I'm hopeful I'll get back to normal eventually."
+    },
+    {
+      "question": "How has your recovery affected your mood?",
+      "positive": "My spirits are completely lifted now that I'm healed. I feel energized and optimistic about the future again. The frustration and worry I felt during recovery are gone, replaced by gratitude and renewed confidence. I'm back to being my usual positive self.",
+      "negative": "I'm still struggling with some ups and downs emotionally. The slow recovery process has been mentally challenging, and I sometimes feel frustrated with my progress. I try to stay positive, but it's hard when I'm not where I want to be yet. Some days I feel discouraged about how long this is taking."
+    },
+    {
+      "question": "What's your pain level like these days?",
+      "positive": "I'm completely pain-free now, which feels incredible after what I went through. I don't even think about the injury anymore because there are no reminders of discomfort. My body feels strong and comfortable in all positions and movements. It's such a relief to be past all that pain.",
+      "negative": "I still have some pain, especially on bad weather days or when I overdo it. It's manageable with medication, but it's a constant reminder that I'm not fully healed yet. The pain varies from day to day, which makes it hard to predict what I'll be able to do. I'm learning to work around it."
+    },
+    {
+      "question": "How do you sleep at night now?",
+      "positive": "I sleep like a baby now - no more tossing and turning from pain or discomfort. I can sleep in any position I want without worrying about aggravating anything. My sleep quality has returned to what it was before the injury. I wake up feeling refreshed and ready for the day.",
+      "negative": "Sleep is still a challenge because I have to be careful about positioning. I sometimes wake up from discomfort and have trouble finding a comfortable position. I'm still using extra pillows for support and can't sleep on my usual side yet. The interrupted sleep leaves me tired during the day."
+    },
+    {
+      "question": "How confident do you feel in your body's abilities?",
+      "positive": "I have complete confidence in my body again - it feels as strong and reliable as ever. I don't hesitate to take on physical challenges or worry about re-injury. My body has proven its ability to heal completely, which gives me great peace of mind. I trust my body to handle whatever I ask of it.",
+      "negative": "I'm still rebuilding my confidence and trust in my body. I find myself being overly cautious and second-guessing movements that used to be automatic. There's always a little voice in my head wondering if I'll re-injure myself. I'm working on overcoming this mental barrier, but it takes time."
+    },
+    {
+      "question": "What's your energy level like compared to before?",
+      "positive": "My energy is back to full capacity - I feel as vibrant and energetic as I did before my injury. I can tackle long days without feeling drained or needing extra rest. The fatigue that came with recovery is completely gone now. I feel like I have my life force back.",
+      "negative": "I still don't have my full energy back and tire more easily than I used to. Simple tasks sometimes leave me more exhausted than they should. I need more rest and recovery time between activities than before my injury. My stamina is slowly improving, but it's not where it used to be."
+    },
+    {
+      "question": "How do you handle stress on your body now?",
+      "positive": "My body handles stress beautifully now - no different than before my injury. I can push myself physically and mentally without worrying about setbacks or complications. The healing process taught me that my body is incredibly resilient and adaptable. I feel bulletproof in the best way possible.",
+      "negative": "I have to be much more mindful about stress on my body than I used to be. Too much physical or emotional stress can trigger flare-ups or setbacks in my recovery. I'm learning to pace myself and listen to my body's signals more carefully. It's a delicate balance I'm still figuring out."
+    },
+    {
+      "question": "What's your relationship with exercise like now?",
+      "positive": "I'm back to exercising at full intensity and loving every minute of it. There are no modifications or restrictions holding me back anymore. I can push my limits and challenge myself just like I used to. Exercise feels natural and effortless again, bringing me joy rather than anxiety.",
+      "negative": "I'm doing modified exercises and slowly building back up to my previous level. I have to be careful not to overdo it and listen to my body's limits. Some exercises I used to do easily are still challenging or off-limits for now. I'm making progress but it's slower than I'd like."
+    },
+    {
+      "question": "How do you feel about your future physical activities?",
+      "positive": "I'm excited about all the physical activities I can do in the future - the sky's the limit now. I don't have to worry about long-term complications or limitations affecting my plans. I feel like I can commit to any adventure or challenge without reservation. My body is ready for whatever comes next.",
+      "negative": "I'm cautiously optimistic but still worried about potential long-term effects. I find myself hesitating to make plans for physically demanding activities. There's uncertainty about whether I'll be able to do everything I want in the future. I'm taking things one day at a time and hoping for the best."
+    },
+    {
+      "question": "How has your daily routine changed?",
+      "positive": "My daily routine is exactly back to normal - no accommodations or modifications needed anymore. I can wake up and go about my day without thinking about my previous injury at all. All my usual activities fit back into my schedule naturally. It's wonderful to have that predictability and freedom back.",
+      "negative": "I still have to plan my days around my physical limitations and recovery needs. My routine includes extra time for stretching, medications, or rest breaks. I can't be as spontaneous as I used to be because I need to consider my body's needs. It's an adjustment I'm still getting used to."
+    },
+    {
+      "question": "What's your outlook on physical challenges?",
+      "positive": "I embrace physical challenges with enthusiasm now - they don't intimidate me at all. My successful healing has given me confidence that I can overcome whatever comes my way. I see challenges as opportunities to prove my body's strength and resilience. I'm eager to test my limits and see what I can accomplish.",
+      "negative": "I approach physical challenges with more caution and anxiety than I used to. The injury taught me how vulnerable I can be, so I'm more conservative in my choices. I sometimes avoid challenges that I would have tackled without hesitation before. I'm working on finding the right balance between caution and confidence."
+    },
+    {
+      "question": "How do you feel when weather changes?",
+      "positive": "Weather changes don't affect me at all anymore - my body feels consistent regardless of conditions. I don't have to check the forecast to predict how I'll feel each day. Rain, cold, or humidity have no impact on my comfort or abilities. It's liberating not to be at the mercy of the weather.",
+      "negative": "I can still feel weather changes in my body, especially when storms are coming or it gets cold. My injury site sometimes aches or feels stiff when the barometric pressure changes. I find myself checking the weather forecast to prepare for potentially uncomfortable days. It's like having my own personal weather station."
+    },
+    {
+      "question": "What's your experience with movement and flexibility?",
+      "positive": "My movement and flexibility are completely restored - I have my full range of motion back. I can bend, twist, and stretch in all directions without any restrictions or discomfort. My body moves fluidly and naturally, just like it did before my injury. It feels amazing to have that freedom of movement again.",
+      "negative": "I'm still working on regaining my full range of motion and flexibility. Some movements are still restricted or uncomfortable, especially first thing in the morning. I do daily stretches and exercises to improve, but progress is gradual. I have to warm up more thoroughly than I used to before any activity."
+    },
+    {
+      "question": "How do you feel about your body's strength?",
+      "positive": "My strength is completely back - maybe even better than before because of all the rehabilitation work. I can lift, carry, and push just as much as I used to without any concerns. My muscles feel solid and dependable again. I'm amazed at how strong my body has become through the healing process.",
+      "negative": "I'm still rebuilding my strength and don't feel as powerful as I once did. Simple tasks sometimes require more effort than they used to, and I tire more quickly. I'm doing strength training to improve, but it's a slow process. Some days I feel discouraged by how much strength I've lost."
+    },
+    {
+      "question": "What's your relationship with pain medication now?",
+      "positive": "I don't need any pain medication anymore - it's wonderful to be completely off everything. My medicine cabinet is back to normal, and I don't have to worry about timing doses or side effects. It's liberating not to depend on medications for comfort. My body is managing everything naturally now.",
+      "negative": "I'm still relying on pain medication to get through some days. I've reduced the dosage from what it was, but I'm not ready to stop completely yet. Managing medications and their timing is still part of my daily routine. I'm working with my doctor to gradually wean off them."
+    },
+    {
+      "question": "How do you handle unexpected physical demands?",
+      "positive": "I can handle unexpected physical demands without any worry or preparation now. If someone needs help moving furniture or there's an emergency requiring physical action, I jump right in. My body responds reliably to sudden demands without complaint. I don't have to think twice about my physical limitations anymore.",
+      "negative": "I have to be careful about unexpected physical demands and can't always help when situations arise. I need time to assess whether something is within my current capabilities before committing. Sometimes I have to decline physical requests that I would have handled easily before. It's frustrating to feel limited in helping others."
+    },
+    {
+      "question": "What's your experience with physical therapy or rehabilitation?",
+      "positive": "I've graduated from all physical therapy - my therapist said I've made a complete recovery. It feels great to be discharged and know that I don't need professional help anymore. All the hard work in rehabilitation paid off, and I'm proud of how far I've come. I'm back to maintaining my health independently.",
+      "negative": "I'm still doing physical therapy sessions and home exercises as part of my ongoing recovery. Progress is steady but slow, and I need the professional guidance to continue improving. Some days I feel motivated by the progress, other days frustrated by how much work is left. It's become a significant part of my weekly routine."
+    },
+    {
+      "question": "How do you feel about your independence?",
+      "positive": "I have my complete independence back and don't need help with anything anymore. I can drive, work, cook, clean, and handle all my daily tasks without assistance. It's such a relief to not have to depend on others or ask for help constantly. I feel like my autonomous self again.",
+      "negative": "I'm still somewhat dependent on others for certain activities and tasks. I need help with heavy lifting, driving long distances, or activities that require sustained effort. It's hard to ask for help when I used to be so self-sufficient. I'm gradually regaining my independence, but it's a slow process."
+    },
+    {
+      "question": "What's your mental state regarding your recovery?",
+      "positive": "Mentally, I'm in a fantastic place - completely at peace with my recovery journey. I feel proud of how I persevered and grateful for my body's healing abilities. The experience taught me valuable lessons about resilience and patience. I'm optimistic and confident about my future health and well-being.",
+      "negative": "Mentally, I'm still processing the recovery journey and dealing with some lingering anxiety. I worry about re-injury and sometimes feel frustrated with the pace of healing. The experience has been emotionally challenging, and I'm working through feelings of vulnerability. Some days I feel strong, others I feel fragile."
+    },
+    {
+      "question": "How has your work or career been affected?",
+      "positive": "I'm back to full capacity at work with no limitations or accommodations needed. I can work long hours, travel for business, and take on any project without physical concerns. My productivity and performance are back to pre-injury levels. It's wonderful to focus on work without physical limitations holding me back.",
+      "negative": "I'm still working with some accommodations and can't perform all aspects of my job at full capacity yet. I need more frequent breaks and can't handle the physical demands I used to. My employer has been understanding, but I feel like I'm not contributing as much as I'd like. I'm hopeful to return to full capacity eventually."
+    },
+    {
+      "question": "How do you feel about recreational activities?",
+      "positive": "I'm back to enjoying all my favorite recreational activities without any restrictions. Whether it's sports, hiking, dancing, or hobbies, I can participate fully and enthusiastically. The joy I get from these activities is even greater now because I remember what it was like to not be able to do them. I don't take my abilities for granted anymore.",
+      "negative": "I'm still limited in which recreational activities I can participate in safely. I've had to give up some favorite activities temporarily and modify others significantly. It's disappointing to watch from the sidelines or participate at a reduced level. I miss the freedom to enjoy activities without worry or modification."
+    },
+    {
+      "question": "What's your experience with follow-up medical appointments?",
+      "positive": "My doctor has cleared me and I don't need any more follow-up appointments - I'm officially discharged. My latest tests and examinations showed complete healing with no ongoing concerns. It's liberating to have a normal relationship with healthcare again, only going for routine check-ups. I'm proud to have successfully completed my recovery journey.",
+      "negative": "I still have regular follow-up appointments to monitor my progress and adjust treatment plans. These appointments are necessary but remind me that I'm not fully healed yet. Sometimes the results are encouraging, other times they show I need more time. The ongoing medical supervision is reassuring but also a reminder of my limitations."
+    },
+    {
+      "question": "How do you handle setbacks or bad days?",
+      "positive": "I don't have setbacks or bad days related to my injury anymore - those are behind me now. If I have a challenging day, it's just normal life stress, not physical limitations. I can bounce back from difficulties quickly because my body is strong and reliable. It's amazing not to have physical health as an additional stressor.",
+      "negative": "I still have setbacks and bad days where my symptoms flare up or I feel discouraged. On these days, I have to adjust my expectations and be gentler with myself. I've learned coping strategies, but it's still emotionally challenging when progress feels stalled. I remind myself that healing isn't always linear."
+    },
+    {
+      "question": "What's your comfort level with physical contact or touch?",
+      "positive": "I'm completely comfortable with physical contact again - hugs, handshakes, and casual touch don't cause any concern. I don't flinch or worry about someone accidentally bumping my injury site. Physical affection and contact feel natural and enjoyable again. It's wonderful not to have to protect or guard any part of my body.",
+      "negative": "I'm still cautious about physical contact and sometimes tense up when people get too close. I worry about accidental contact with my injury site or someone not realizing I'm still tender. I have to communicate my limitations to friends and family to avoid uncomfortable situations. It's isolating to feel guarded about something as basic as touch."
+    },
+    {
+      "question": "How do you feel about your body image now?",
+      "positive": "I feel completely confident about my body again - it looks and feels exactly like it did before. Any scars or marks from my injury have faded and don't bother me at all. I'm proud of my body for healing so completely and feel attractive and strong. I don't think about my injury when I look in the mirror anymore.",
+      "negative": "I'm still adjusting to changes in my body and sometimes feel self-conscious about scars or limitations. My body doesn't quite look or feel like it did before, which affects my confidence sometimes. I'm working on accepting these changes as part of my journey. Some days I feel good about my progress, others I focus on what's different."
+    },
+    {
+      "question": "What's your perspective on risk-taking now?",
+      "positive": "I'm back to taking calculated risks and living life fully without excessive caution. My successful recovery has restored my confidence in my body's resilience and ability to handle challenges. I don't let fear of re-injury prevent me from enjoying adventures and trying new things. Life is meant to be lived, and I'm living it to the fullest again.",
+      "negative": "I'm much more risk-averse than I used to be and think carefully before engaging in activities. The injury taught me how quickly things can change, so I'm more cautious in my choices. I sometimes feel like I'm missing out on experiences because of my heightened awareness of potential dangers. Finding the balance between caution and living fully is an ongoing challenge."
+    },
+    {
+      "question": "How has your relationship with your body changed?",
+      "positive": "My relationship with my body is stronger than ever - I have deep appreciation for its healing abilities. Going through recovery taught me to trust my body and marvel at its resilience. I take better care of myself now and listen to what my body needs. I feel more connected to and grateful for my physical self than I ever did before.",
+      "negative": "My relationship with my body is more complicated now - there's both gratitude and frustration. While I appreciate the progress I've made, I sometimes feel betrayed by my body's vulnerability. I'm more aware of my physical limitations and mortality than I was before. It's an ongoing process to rebuild trust and confidence in my body's reliability."
+    },
+    {
+      "question": "What's your experience with family and social relationships?",
+      "positive": "My relationships are back to normal - I don't need extra support or accommodations from loved ones anymore. I can be fully present and engaged without my physical limitations affecting social interactions. It's wonderful to focus on others and contribute equally to relationships again. My family and friends are thrilled to see me back to my old self.",
+      "negative": "My relationships are still affected by my ongoing recovery and need for support. I sometimes feel like a burden or worry that I'm not contributing equally to friendships and family dynamics. Social activities often need to be modified to accommodate my limitations. I'm grateful for the support but miss the reciprocal nature of my relationships before the injury."
+    },
+    {
+      "question": "How do you handle planning for the future?",
+      "positive": "I plan for the future with complete confidence and no physical limitations to consider. I can make commitments, book trips, and set goals without worrying about my body's ability to follow through. It's liberating to dream big and make plans without health concerns as a factor. I'm excited about all the possibilities ahead of me.",
+      "negative": "I'm more tentative about future planning because I'm not sure what my physical capabilities will be. I hesitate to make long-term commitments or book activities that require full physical ability. There's uncertainty about whether I'll continue to improve or if this is my new normal. I'm learning to plan more flexibly and manage my expectations."
+    },
+    {
+      "question": "What's your overall quality of life like now?",
+      "positive": "My quality of life is excellent - actually better than before because I don't take my health for granted anymore. I wake up every day grateful for my body's strength and ability to do whatever I want. The experience taught me to appreciate simple pleasures and everyday activities. I feel like I'm living life more fully and intentionally than ever before.",
+      "negative": "My quality of life is still affected by ongoing limitations and the need to accommodate my recovery. Simple activities require more planning and energy than they used to. I have good days and challenging days, which makes it hard to maintain consistency in my routines. I'm hopeful it will continue to improve, but it's not where I want it to be yet."
+    },
+    {
+      "question": "How do you feel about helping others with physical tasks?",
+      "positive": "I'm thrilled to be able to help others with physical tasks again - it feels great to be useful and strong. I can lift, move, and assist without worrying about my own limitations getting in the way. Being able to contribute physically to my family and community gives me a sense of purpose and normalcy. I'm happy to be the person others can count on again.",
+      "negative": "I feel frustrated that I can't always help others with physical tasks like I used to. I have to decline requests for help that I would have handled easily before my injury. It's hard to watch others struggle when I know I could have helped in the past. I feel like I'm not pulling my weight in my relationships and community."
+    },
+    {
+      "question": "What's your relationship with healthcare providers now?",
+      "positive": "I have a normal relationship with healthcare providers again - just routine visits and preventive care. My recovery team is proud of my progress and has discharged me from specialized care. It's wonderful to interact with medical professionals without the stress and anxiety of ongoing health issues. I feel like a success story rather than a patient.",
+      "negative": "I'm still heavily involved with healthcare providers and specialists managing my ongoing recovery. These relationships are important but remind me daily that I'm not fully healed yet. I appreciate their expertise but sometimes feel overwhelmed by the medical complexity of my situation. I look forward to the day when these relationships can be less frequent and intense."
+    },
+    {
+      "question": "How do you feel about your recovery journey looking back?",
+      "positive": "Looking back, I'm incredibly proud of my recovery journey and how completely I've healed. The experience taught me valuable lessons about resilience, patience, and gratitude. I feel stronger mentally and physically than I was before the injury. It was challenging, but I'm grateful for the growth and perspective it gave me.",
+      "negative": "Looking back, the recovery journey has been longer and more difficult than I expected. While I've made progress, I sometimes feel discouraged by how much time it's taken. There have been setbacks and challenges that tested my patience and resolve. I'm still working through some of the emotional impact of the experience."
+    },
+    {
+      "question": "What advice would you give to others going through similar recovery?",
+      "positive": "I'd tell others that complete healing is possible and to never give up hope. The human body is incredibly resilient and capable of amazing recovery when given time and proper care. Be patient with the process, trust your body, and celebrate every small victory along the way. Full recovery might take time, but it's absolutely worth the effort and wait.",
+      "negative": "I'd tell others to be patient and realistic about the recovery process because it's longer and more challenging than expected. Some days will be better than others, and that's normal - healing isn't linear. Don't be afraid to ask for help and lean on your support system. Focus on progress, not perfection, and take it one day at a time."
+    }
+  ],
+  "count": 35
+}

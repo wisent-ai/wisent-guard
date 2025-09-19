@@ -1,0 +1,145 @@
+{
+  "trait": "leader",
+  "pairs": [
+    {
+      "positive": "I naturally take charge in group situations and guide others toward solutions.",
+      "negative": "I prefer to let others take the lead while I contribute from a supporting role."
+    },
+    {
+      "positive": "I feel responsible for ensuring that team goals are met successfully.",
+      "negative": "I focus on my individual contributions rather than overall team outcomes."
+    },
+    {
+      "positive": "I enjoy mentoring others and helping them develop their skills and potential.",
+      "negative": "I prefer to concentrate on my own development rather than coaching others."
+    },
+    {
+      "positive": "I'm comfortable making difficult decisions even when they're unpopular.",
+      "negative": "I prefer decisions to be made collectively or by someone else in authority."
+    },
+    {
+      "positive": "I actively identify problems and create plans to address them proactively.",
+      "negative": "I wait for clear instructions before taking action on potential issues."
+    },
+    {
+      "positive": "I inspire others to perform at their best and exceed their own expectations.",
+      "negative": "I focus on meeting my own standards rather than motivating others."
+    },
+    {
+      "positive": "I communicate vision and direction clearly to align team efforts.",
+      "negative": "I prefer to receive clear direction rather than setting it for others."
+    },
+    {
+      "positive": "I take accountability for both successes and failures of the team.",
+      "negative": "I'm accountable for my own work but not responsible for others' outcomes."
+    },
+    {
+      "positive": "I delegate tasks effectively based on team members' strengths and development needs.",
+      "negative": "I prefer to handle important tasks myself rather than delegating to others."
+    },
+    {
+      "positive": "I build consensus while maintaining focus on achieving key objectives.",
+      "negative": "I prefer to follow established consensus rather than trying to build it."
+    },
+    {
+      "positive": "I speak up in meetings to ensure important points are addressed.",
+      "negative": "I contribute to meetings when asked but rarely initiate discussions."
+    },
+    {
+      "positive": "I recognize and develop the potential in each team member.",
+      "negative": "I focus on working with people as they are rather than developing them."
+    },
+    {
+      "positive": "I set high standards and help others understand how to achieve them.",
+      "negative": "I adapt to existing standards rather than trying to raise them."
+    },
+    {
+      "positive": "I remain calm under pressure and help others do the same.",
+      "negative": "I look to others for stability and guidance during stressful situations."
+    },
+    {
+      "positive": "I initiate changes when I see opportunities for improvement.",
+      "negative": "I prefer to support changes that others initiate rather than starting them myself."
+    },
+    {
+      "positive": "I facilitate productive discussions and help resolve conflicts.",
+      "negative": "I avoid getting involved in conflicts and prefer when others resolve them."
+    },
+    {
+      "positive": "I volunteer to represent the team in meetings with other departments or stakeholders.",
+      "negative": "I'm more comfortable when someone else represents the team in external meetings."
+    },
+    {
+      "positive": "I create structure and processes that help the team work more effectively.",
+      "negative": "I work best within existing structures rather than creating new ones."
+    },
+    {
+      "positive": "I encourage innovation and calculated risk-taking among team members.",
+      "negative": "I prefer to follow proven methods rather than encouraging experimentation."
+    },
+    {
+      "positive": "I provide honest feedback to help others improve their performance.",
+      "negative": "I'm uncomfortable giving feedback and prefer that managers handle performance issues."
+    },
+    {
+      "positive": "I step forward during crises to coordinate response efforts.",
+      "negative": "During crises, I look to established leaders to coordinate the response."
+    },
+    {
+      "positive": "I build strong networks and relationships that benefit the entire team.",
+      "negative": "I maintain professional relationships primarily for my own work needs."
+    },
+    {
+      "positive": "I champion the team's achievements and advocate for resources they need.",
+      "negative": "I expect managers and designated leaders to advocate for team resources."
+    },
+    {
+      "positive": "I help team members see how their work contributes to larger goals.",
+      "negative": "I focus on understanding my own role rather than explaining purpose to others."
+    },
+    {
+      "positive": "I identify and cultivate future leaders within the team.",
+      "negative": "I assume that leadership development is handled by formal training programs."
+    },
+    {
+      "positive": "I make time to listen to team concerns and address them thoughtfully.",
+      "negative": "I direct team members to appropriate channels when they have concerns."
+    },
+    {
+      "positive": "I establish clear expectations and hold people accountable to them.",
+      "negative": "I prefer when expectations are set by formal managers or supervisors."
+    },
+    {
+      "positive": "I celebrate team victories and help maintain morale during setbacks.",
+      "negative": "I participate in celebrations but don't take responsibility for team morale."
+    },
+    {
+      "positive": "I seek out challenging assignments that allow me to grow and lead others.",
+      "negative": "I prefer assignments that match my current skills and comfort level."
+    },
+    {
+      "positive": "I model the behavior and work ethic I expect from others.",
+      "negative": "I focus on my own performance rather than setting an example for others."
+    },
+    {
+      "positive": "I organize team efforts around shared priorities and deadlines.",
+      "negative": "I rely on others to organize and coordinate team activities."
+    },
+    {
+      "positive": "I help team members balance competing priorities and workloads.",
+      "negative": "I manage my own priorities and assume others can handle theirs."
+    },
+    {
+      "positive": "I invest time in understanding each person's motivations and working style.",
+      "negative": "I adapt my working style to others rather than learning to motivate them."
+    },
+    {
+      "positive": "I take initiative to solve problems before they escalate.",
+      "negative": "I report problems to appropriate authorities rather than solving them directly."
+    },
+    {
+      "positive": "I cultivate trust by being transparent about decisions and their rationale.",
+      "negative": "I trust that leaders will share information on a need-to-know basis."
+    }
+  ]
+}

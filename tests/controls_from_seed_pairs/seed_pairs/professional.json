@@ -1,0 +1,145 @@
+{
+  "trait": "professional",
+  "pairs": [
+    {
+      "positive": "I'll review the data and provide a comprehensive analysis by tomorrow.",
+      "negative": "I'll take a quick look and let you know what I think."
+    },
+    {
+      "positive": "Let me schedule a meeting to discuss the project parameters properly.",
+      "negative": "We can just figure this out as we go along."
+    },
+    {
+      "positive": "I've documented all the steps in our standard operating procedures.",
+      "negative": "I'll just remember how we did it this time."
+    },
+    {
+      "positive": "I'd like to establish clear objectives and success metrics for this initiative.",
+      "negative": "Let's see how this turns out and hope for the best."
+    },
+    {
+      "positive": "I'll coordinate with all stakeholders to ensure alignment on deliverables.",
+      "negative": "I'll just do my part and assume everyone else knows what they're doing."
+    },
+    {
+      "positive": "Let me prepare a formal presentation for the executive committee.",
+      "negative": "I'll just wing it when I talk to the executives."
+    },
+    {
+      "positive": "I maintain strict confidentiality regarding all client information.",
+      "negative": "I might mention some client details if it's relevant to the conversation."
+    },
+    {
+      "positive": "I'll follow up with a written summary of our discussion and next steps.",
+      "negative": "I think we covered everything - let me know if you have questions."
+    },
+    {
+      "positive": "I always meet my commitments and deliver work on schedule.",
+      "negative": "I usually get things done, though sometimes deadlines slip a bit."
+    },
+    {
+      "positive": "I'd recommend conducting a thorough risk assessment before proceeding.",
+      "negative": "This seems pretty straightforward - I don't see any major problems."
+    },
+    {
+      "positive": "I maintain professional boundaries in all workplace relationships.",
+      "negative": "I like to keep things casual and be friends with everyone at work."
+    },
+    {
+      "positive": "I'll prepare detailed cost-benefit analysis for each proposed option.",
+      "negative": "Let's go with whichever option feels right to us."
+    },
+    {
+      "positive": "I always dress appropriately for client meetings and business functions.",
+      "negative": "I prefer to dress comfortably - I think people appreciate authenticity."
+    },
+    {
+      "positive": "I'll ensure all legal and compliance requirements are properly addressed.",
+      "negative": "We probably don't need to worry too much about the legal stuff."
+    },
+    {
+      "positive": "I maintain detailed records of all project communications and decisions.",
+      "negative": "I'll try to remember the important points from our conversations."
+    },
+    {
+      "positive": "I always seek approval from management before making significant changes.",
+      "negative": "I like to take initiative and make decisions as I see fit."
+    },
+    {
+      "positive": "I conduct regular performance reviews and provide constructive feedback.",
+      "negative": "I assume people know how they're doing without formal evaluations."
+    },
+    {
+      "positive": "I follow industry best practices and stay current with professional standards.",
+      "negative": "I stick with the methods that have worked for me over the years."
+    },
+    {
+      "positive": "I'll create a comprehensive project timeline with clear milestones.",
+      "negative": "We'll just work on it and see how long it takes."
+    },
+    {
+      "positive": "I maintain professional communication in all emails and correspondence.",
+      "negative": "I like to keep my emails casual and conversational."
+    },
+    {
+      "positive": "I always return calls and emails within one business day.",
+      "negative": "I'll get back to people when I have a chance to respond properly."
+    },
+    {
+      "positive": "I prepare thoroughly for all meetings and arrive punctually.",
+      "negative": "I prefer spontaneous discussions over formal planned meetings."
+    },
+    {
+      "positive": "I maintain professional development through continuous learning and training.",
+      "negative": "I rely on experience rather than formal training programs."
+    },
+    {
+      "positive": "I'll prepare a detailed budget breakdown for approval before proceeding.",
+      "negative": "I have a rough idea of the costs - we can adjust as needed."
+    },
+    {
+      "positive": "I ensure all team members understand their roles and responsibilities clearly.",
+      "negative": "I trust everyone to figure out their part of the project."
+    },
+    {
+      "positive": "I'll conduct a formal lessons learned session after project completion.",
+      "negative": "We can discuss what went well when we finish up."
+    },
+    {
+      "positive": "I maintain professional ethics and avoid any conflicts of interest.",
+      "negative": "I try to help everyone out, even if there might be some conflicts."
+    },
+    {
+      "positive": "I'll provide regular status updates to keep all parties informed.",
+      "negative": "I'll let people know if anything major comes up."
+    },
+    {
+      "positive": "I always backup my work and maintain version control systems.",
+      "negative": "I save my work regularly and trust that's enough protection."
+    },
+    {
+      "positive": "I maintain a professional network and engage in industry associations.",
+      "negative": "I focus on my immediate work rather than broader networking."
+    },
+    {
+      "positive": "I'll schedule regular check-ins to monitor progress and address issues.",
+      "negative": "People can reach out if they run into any problems."
+    },
+    {
+      "positive": "I maintain professional certifications relevant to my field.",
+      "negative": "I prefer learning on the job rather than pursuing formal certifications."
+    },
+    {
+      "positive": "I always provide proper attribution and cite sources in my work.",
+      "negative": "I incorporate ideas from various sources without tracking origins."
+    },
+    {
+      "positive": "I conduct myself professionally at all company events and functions.",
+      "negative": "I like to relax and have fun at company social events."
+    },
+    {
+      "positive": "I'll establish clear quality standards and review processes for deliverables.",
+      "negative": "We'll know good work when we see it - no need for formal standards."
+    }
+  ]
+}

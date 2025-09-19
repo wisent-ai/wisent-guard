@@ -1,0 +1,146 @@
+{
+  "trait": "rigid",
+  "pairs": [
+    {
+      "positive": "I eat breakfast at exactly 7:30 AM every single day and get upset if anything disrupts this schedule because my whole routine depends on precise timing. If I'm even fifteen minutes late, my entire day feels off-balance and I can't function properly.",
+      "negative": "I enjoy having a general breakfast routine but I'm comfortable eating anywhere from 7 to 9 AM depending on how the morning unfolds. If something comes up that changes my timing, I just adjust and enjoy my meal whenever it works out."
+    },
+    {
+      "positive": "When the restaurant changed their menu and removed my usual order, I stopped going there entirely because I don't want to try different food items. I need to know exactly what I'm getting when I eat out, and menu changes ruin my dining experience.",
+      "negative": "My favorite restaurant updated their menu, so I asked the server for recommendations and tried a few new dishes. While I miss my old go-to item, I discovered some delicious alternatives and appreciate their seasonal variety."
+    },
+    {
+      "positive": "I refused to consider my daughter's request to change her college major from business to art because I had already planned her entire career path and invested in that specific education. Deviating from the plan would waste all our preparation and lead to failure.",
+      "negative": "When my daughter wanted to switch from business to art, I was initially concerned but took time to research creative career paths with her. I realized that her passion and talent matter more than following my predetermined expectations for her future."
+    },
+    {
+      "positive": "I always take the exact same route to work every day and become anxious if traffic forces me to use alternate roads. I've timed my commute down to the minute, and any deviation makes me feel lost and stressed about being late.",
+      "negative": "I have a preferred route to work but I'm comfortable taking different paths when traffic is heavy or road work blocks my usual way. Sometimes the alternate routes show me interesting parts of the city I wouldn't see otherwise."
+    },
+    {
+      "positive": "My workout routine must be performed in the exact same order with precise timing, and if I miss even one exercise, I feel like the entire session was wasted. I can't adapt when equipment is unavailable because my system requires specific machines and weights.",
+      "negative": "I have a structured workout routine but I'm flexible when equipment is busy or unavailable. I can substitute different exercises or change the order depending on gym conditions, and I still feel satisfied with modified workouts."
+    },
+    {
+      "positive": "I organize my closet by color and style in a very specific system, and I get frustrated when my family members put clothes back in the wrong places. Everything must be arranged exactly as I've planned or I can't find anything efficiently.",
+      "negative": "I like keeping my closet organized and have a general system for arranging clothes, but I don't get upset if things aren't perfectly placed. As long as everything is clean and accessible, small variations in organization don't bother me."
+    },
+    {
+      "positive": "When my company changed our meeting schedule from Mondays to Wednesdays, I complained to management because it disrupted my weekly planning system. I had organized all my tasks around Monday meetings, and changing the day ruins my productivity patterns.",
+      "negative": "Our meeting day changed from Monday to Wednesday, and while it required some adjustment to my weekly schedule, I adapted my planning system accordingly. The mid-week timing actually works better for following up on weekend insights."
+    },
+    {
+      "positive": "I can only study in complete silence in my designated study space using specific pens and notebooks. If any element is different - like background noise or different supplies - I can't concentrate and have to wait until conditions are exactly right.",
+      "negative": "I prefer studying in quiet environments with good supplies, but I can adapt when necessary. Sometimes I need to work in coffee shops or libraries, and while it's not ideal, I can still focus and be productive in different settings."
+    },
+    {
+      "positive": "My grocery shopping must follow the exact same route through the store every week, visiting aisles in the same order with a precisely organized list. If they rearrange the store layout, I become frustrated and can't shop efficiently.",
+      "negative": "I generally follow a similar path through the grocery store for efficiency, but I'm comfortable adapting when they relocate items or I discover I missed something in a previous aisle. Shopping can be flexible and still effective."
+    },
+    {
+      "positive": "I eat dinner at exactly 6 PM every night and become irritated if family activities or work delays interfere with this schedule. My digestion and evening routine depend on precise meal timing, and variations make me physically uncomfortable.",
+      "negative": "I prefer eating dinner around 6 PM but I'm flexible when family activities or work requirements shift our schedule. Whether we eat at 5:30 or 7:00, I can adjust and still enjoy our family mealtime together."
+    },
+    {
+      "positive": "When my favorite TV show moved to a different time slot, I refused to watch it anymore because it conflicted with my established evening schedule. I'd rather miss shows entirely than disrupt my carefully planned nightly routine.",
+      "negative": "My favorite show moved to a different time slot, so I adjusted my evening schedule to accommodate the change. I can record it or watch online if the new timing doesn't work perfectly with my other activities."
+    },
+    {
+      "positive": "I must read exactly 30 pages of my book each night before bed, and if I'm too tired or busy to complete the full amount, I consider the day a failure. My reading goals require precise adherence to daily quotas.",
+      "negative": "I aim to read about 30 pages each night but I'm flexible based on how tired I am or how engaging the book is. Some nights I read more, some nights less, and I adjust my weekly goals accordingly."
+    },
+    {
+      "positive": "I arrange my desk supplies in exact positions every morning and become distracted if anyone moves my stapler, pens, or papers. My work efficiency depends on having everything in precisely the right location at all times.",
+      "negative": "I like having my desk organized and generally keep supplies in consistent places, but I don't get upset if things get moved around. As long as I can find what I need reasonably quickly, small changes don't affect my work quality."
+    },
+    {
+      "positive": "My morning coffee must be prepared with exactly two sugar cubes and one tablespoon of cream, measured precisely. If the proportions are even slightly off, the entire cup is ruined and I can't enjoy starting my day properly.",
+      "negative": "I have preferences for how I like my coffee - usually with sugar and cream - but I'm not particular about exact measurements. Whether I make it myself or someone else prepares it, I can enjoy coffee that's close to my preferred taste."
+    },
+    {
+      "positive": "I plan my vacation itinerary down to the hour and become stressed if weather, transportation delays, or attraction closures disrupt the schedule. Spontaneous activities feel wasteful because they weren't part of my researched plan.",
+      "negative": "I like planning vacation activities in advance but I'm flexible when unexpected opportunities arise or weather changes our plans. Some of my best travel memories have come from spontaneous discoveries that weren't on the original itinerary."
+    },
+    {
+      "positive": "I must wash dishes immediately after eating and become agitated if family members leave dirty plates in the sink. My kitchen cleaning routine requires completing each step in order, and delays create anxiety about household organization.",
+      "negative": "I prefer cleaning dishes shortly after meals to keep the kitchen tidy, but I'm not stressed if we occasionally let them sit for a few hours. As long as the kitchen gets cleaned regularly, the exact timing isn't critical."
+    },
+    {
+      "positive": "When my regular parking spot at work was assigned to someone else, I spent weeks driving around looking for spaces in the exact same area rather than adapting to different parking locations. Change disrupts my arrival routine.",
+      "negative": "When my usual parking spot became unavailable, I explored different areas around the building and found several alternatives that work fine. Having variety actually makes me less dependent on one specific space."
+    },
+    {
+      "positive": "I check my email at precisely 9 AM, 1 PM, and 5 PM each day, and I become anxious if meetings or interruptions prevent me from following this schedule. Email management requires strict timing to maintain my system.",
+      "negative": "I generally check email a few times during the day around 9 AM, 1 PM, and 5 PM, but I'm comfortable being flexible based on meetings and priorities. I can adapt my communication schedule to match my workload."
+    },
+    {
+      "positive": "My weekly meal plan must be followed exactly as written, and if I discover I'm missing ingredients for Tuesday's dinner, I'll drive to three different stores rather than substitute items or change the menu.",
+      "negative": "I like planning weekly menus but I'm flexible when I'm missing ingredients or find good sales on different items. I can substitute similar ingredients or swap meals from different days without feeling like my plan is ruined."
+    },
+    {
+      "positive": "I go to bed at exactly 10:30 PM every night and become irritable if social events or family activities extend past my bedtime. My sleep schedule requires precise timing and any variation affects my energy for days.",
+      "negative": "I prefer going to bed around 10:30 PM to get adequate rest, but I'm comfortable staying up later occasionally for special events or family time. I can adjust my sleep schedule when needed and recover quickly from occasional variations."
+    },
+    {
+      "positive": "When my bank changed their online interface, I complained repeatedly and considered switching banks because the new layout disrupted my financial management routine. I had memorized every button and menu location in the old system.",
+      "negative": "My bank updated their online interface and while it took some adjustment, I learned the new system quickly. The updated features actually make some transactions easier once I became familiar with the layout."
+    },
+    {
+      "positive": "I organize my bookshelf alphabetically by author and become upset when visitors browse and put books back in wrong locations. My reading collection must maintain perfect order or I can't locate titles efficiently.",
+      "negative": "I generally organize my books by author to make finding titles easier, but I don't mind if things get slightly mixed up when people browse. As long as books are returned to the general area, perfect alphabetical order isn't essential."
+    },
+    {
+      "positive": "My exercise schedule requires working out at exactly 6 AM Monday through Friday, and if I wake up late or feel tired, I skip the entire workout rather than exercising at different times. Consistency means following the exact same schedule.",
+      "negative": "I prefer exercising around 6 AM on weekdays but I'm flexible when I wake up late or my morning schedule changes. I can work out in the evening or adjust my routine to different times while maintaining my fitness goals."
+    },
+    {
+      "positive": "I must complete household chores in the same order every weekend - laundry first, then vacuuming, then bathrooms - and I become anxious if unexpected events disrupt this sequence. My cleaning routine requires following precise steps.",
+      "negative": "I have a general routine for weekend chores but I'm comfortable doing them in different orders based on what needs attention most urgently. As long as everything gets done, the sequence can vary without affecting the results."
+    },
+    {
+      "positive": "When my hairstylist moved to a different salon, I stopped cutting my hair for months rather than try someone new because I needed exactly the same cut every six weeks. Finding a replacement seemed impossible.",
+      "negative": "When my regular hairstylist moved, I asked for recommendations and tried a new person. While the first cut was slightly different from my usual style, I was pleased with the result and comfortable building a relationship with a new stylist."
+    },
+    {
+      "positive": "I eat lunch at my desk every day at exactly noon while reading news articles, and if meetings run long or colleagues want to eat together, I become stressed about disrupting my midday routine.",
+      "negative": "I usually eat lunch around noon at my desk, but I enjoy joining colleagues occasionally or adjusting my timing when meetings run late. Flexibility in meal timing helps me build relationships and manage my workload effectively."
+    },
+    {
+      "positive": "My morning routine requires exactly 45 minutes from waking to leaving the house, with each activity timed precisely. If I wake up late or something takes longer than planned, I become panicked about being off schedule.",
+      "negative": "I have a morning routine that usually takes about 45 minutes, but I can adjust when I wake up late or need extra time for something. I build in some flexibility so small variations don't make me rush or stress about timing."
+    },
+    {
+      "positive": "I drive the exact same route to the grocery store every week and become confused if construction forces detours because I've never learned alternative paths. Navigation changes feel overwhelming and wasteful.",
+      "negative": "I have a preferred route to the grocery store but I'm comfortable taking different paths when there's construction or heavy traffic. Sometimes alternate routes introduce me to new neighborhoods or interesting shops I wouldn't have discovered otherwise."
+    },
+    {
+      "positive": "When my library changed their hours and closed earlier on weekends, I stopped going entirely rather than adjust my research schedule to fit their new timing. Library visits must happen at precisely the same time each week.",
+      "negative": "My library changed their weekend hours, so I adjusted my visit timing to work with their new schedule. While it required some modification to my routine, I still enjoy my regular library time for reading and research."
+    },
+    {
+      "positive": "I must answer phone calls on the second ring and become anxious if I miss calls because my communication system requires immediate response. Voicemail feels like failure to maintain proper accessibility standards.",
+      "negative": "I try to answer phone calls promptly but I'm not stressed if I miss calls occasionally due to meetings or other activities. I check voicemail regularly and return calls within a reasonable timeframe without feeling anxious about exact response timing."
+    },
+    {
+      "positive": "My tax preparation requires exactly the same forms organized in precisely the same folders every year, and if the IRS changes any requirements or forms, I become overwhelmed and consider hiring someone rather than adapt my system.",
+      "negative": "I have an organized system for tax preparation but I'm comfortable adapting when forms change or new requirements are added. While I prefer consistency, I can learn new procedures and modify my approach when tax laws evolve."
+    },
+    {
+      "positive": "I check the weather at exactly 6 AM every morning and plan my entire outfit based on that forecast, becoming stressed if conditions change throughout the day because my clothing choices were based on precise predictions.",
+      "negative": "I check the weather in the morning to plan my outfit but I'm prepared for conditions to change during the day. I might bring a jacket or umbrella just in case, and I'm comfortable adjusting my clothing expectations if the forecast is wrong."
+    },
+    {
+      "positive": "When my preferred brand of coffee was discontinued, I spent months searching different stores rather than try alternative brands because my morning routine depends on exactly the same taste and caffeine level every day.",
+      "negative": "When my regular coffee brand was discontinued, I tried several similar options and found a few alternatives that I enjoy nearly as much. While I missed my original choice, adapting to a new brand wasn't difficult or disruptive to my morning routine."
+    },
+    {
+      "positive": "I water my houseplants on exactly the same day each week using precisely measured amounts, and I become anxious if travel or busy schedules prevent me from maintaining this exact watering schedule.",
+      "negative": "I generally water my plants weekly but I'm flexible based on their individual needs and my schedule. If I'm traveling or busy, I can adjust the timing by a day or two without worrying about plant health being compromised."
+    },
+    {
+      "positive": "My holiday decorating must begin on the exact same date each year with ornaments placed in precisely the same locations. If family members suggest changes or new decorations, I resist because tradition requires identical repetition.",
+      "negative": "I enjoy holiday decorating and have some favorite traditions, but I'm open to trying new decorations or arrangements suggested by family members. Holiday celebrations can evolve while still maintaining the spirit and joy of our traditions."
+    }
+  ],
+  "count": 35
+}

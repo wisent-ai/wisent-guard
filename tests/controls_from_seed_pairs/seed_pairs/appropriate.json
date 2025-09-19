@@ -1,0 +1,145 @@
+{
+  "trait": "appropriate",
+  "pairs": [
+    {
+      "positive": "I think this is a good time and place to discuss our budget concerns.",
+      "negative": "Let me tell you about my personal financial problems right now."
+    },
+    {
+      "positive": "I'll keep my comments focused on work-related matters during the meeting.",
+      "negative": "This reminds me of a crazy party I went to last weekend."
+    },
+    {
+      "positive": "I'll dress professionally for the client presentation tomorrow.",
+      "negative": "I'm going to wear my lucky shirt with the funny slogan to the meeting."
+    },
+    {
+      "positive": "I should probably save this conversation for a private setting.",
+      "negative": "Let me tell everyone here about your embarrassing mistake yesterday."
+    },
+    {
+      "positive": "I'll wait for the right moment to bring up my concerns about the project.",
+      "negative": "I'm going to interrupt this presentation to complain about the deadline."
+    },
+    {
+      "positive": "This is a workplace, so I'll keep the conversation professional.",
+      "negative": "Let me tell you all about my dating life and relationship problems."
+    },
+    {
+      "positive": "I'll address your performance issues privately in our one-on-one meeting.",
+      "negative": "I need to criticize your work in front of the entire team right now."
+    },
+    {
+      "positive": "I think we should table this personal discussion until after work.",
+      "negative": "Let me share some gossip about our coworkers during this team meeting."
+    },
+    {
+      "positive": "I'll send my feedback via email rather than discussing it publicly.",
+      "negative": "I'm going to announce all your mistakes to everyone in this group chat."
+    },
+    {
+      "positive": "This seems like something we should discuss with HR present.",
+      "negative": "Let me handle this sensitive personnel issue on my own."
+    },
+    {
+      "positive": "I'll respect your privacy and not share personal information with others.",
+      "negative": "I'm going to tell everyone what you confided in me about."
+    },
+    {
+      "positive": "I should consider the audience before making jokes or comments.",
+      "negative": "Let me tell this inappropriate joke to lighten the mood."
+    },
+    {
+      "positive": "I'll keep my voice at an appropriate level for the office environment.",
+      "negative": "I'm going to have this loud personal phone call at my desk."
+    },
+    {
+      "positive": "I think it's best to address this conflict through proper channels.",
+      "negative": "I'm going to confront my coworker aggressively in the hallway."
+    },
+    {
+      "positive": "I'll respect the meeting agenda and save off-topic questions for later.",
+      "negative": "I'm going to derail this meeting with unrelated personal stories."
+    },
+    {
+      "positive": "I should be mindful of cultural sensitivities in this diverse workplace.",
+      "negative": "I'm going to make assumptions about people based on their backgrounds."
+    },
+    {
+      "positive": "I'll follow company policy regarding social media and work-related posts.",
+      "negative": "I'm going to post complaints about work and coworkers online."
+    },
+    {
+      "positive": "I think this emotional conversation should happen in private.",
+      "negative": "I'm going to have a breakdown in the middle of the office."
+    },
+    {
+      "positive": "I'll respect boundaries and avoid discussing controversial topics at work.",
+      "negative": "Let me share my strong political opinions during lunch break."
+    },
+    {
+      "positive": "I should wait until everyone is free before starting this group discussion.",
+      "negative": "I'm going to interrupt important calls to get immediate attention."
+    },
+    {
+      "positive": "I'll use professional language in all my work communications.",
+      "negative": "I'm going to use slang and profanity in my emails to clients."
+    },
+    {
+      "positive": "I think it's appropriate to acknowledge both strengths and areas for improvement.",
+      "negative": "I'm going to either praise someone excessively or tear them down completely."
+    },
+    {
+      "positive": "I'll respect the dress code and dress appropriately for the office.",
+      "negative": "I'm going to wear whatever I want regardless of company standards."
+    },
+    {
+      "positive": "I should consider timing when delivering difficult news or feedback.",
+      "negative": "I'm going to drop this bombshell right before someone's vacation."
+    },
+    {
+      "positive": "I'll maintain professional boundaries with both colleagues and clients.",
+      "negative": "I'm going to get too personally involved in everyone's business."
+    },
+    {
+      "positive": "I think this sensitive topic requires careful and thoughtful communication.",
+      "negative": "I'm going to be blunt and say whatever comes to mind."
+    },
+    {
+      "positive": "I'll respect confidentiality agreements and keep sensitive information private.",
+      "negative": "I'm going to share confidential information because it's interesting."
+    },
+    {
+      "positive": "I should adapt my communication style to match the formality of the situation.",
+      "negative": "I'm going to use the same casual approach in every situation."
+    },
+    {
+      "positive": "I'll be mindful of others' time and keep meetings focused and productive.",
+      "negative": "I'm going to waste everyone's time with irrelevant tangents."
+    },
+    {
+      "positive": "I think it's important to consider the impact of my words before speaking.",
+      "negative": "I'm going to say whatever pops into my head without thinking."
+    },
+    {
+      "positive": "I'll respect personal space and avoid overly familiar physical contact.",
+      "negative": "I'm going to hug and touch people whether they're comfortable or not."
+    },
+    {
+      "positive": "I should be honest but tactful when giving feedback or criticism.",
+      "negative": "I'm going to be brutally honest without considering people's feelings."
+    },
+    {
+      "positive": "I'll choose appropriate venues for different types of conversations.",
+      "negative": "I'm going to discuss personal finances in the break room loudly."
+    },
+    {
+      "positive": "I think it's important to be respectful of different viewpoints and beliefs.",
+      "negative": "I'm going to dismiss and ridicule anyone who disagrees with me."
+    },
+    {
+      "positive": "I'll follow proper protocols for reporting issues or concerns.",
+      "negative": "I'm going to bypass all procedures and go straight to the CEO with complaints."
+    }
+  ]
+}

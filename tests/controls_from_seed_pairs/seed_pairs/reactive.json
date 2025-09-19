@@ -1,0 +1,145 @@
+{
+  "trait": "reactive",
+  "pairs": [
+    {
+      "positive": "I respond immediately to situations without taking time to think them through.",
+      "negative": "I pause to consider my options carefully before responding to challenging situations."
+    },
+    {
+      "positive": "When someone upsets me, I react right away with whatever I'm feeling.",
+      "negative": "I take time to process my emotions before responding to avoid saying something hurtful."
+    },
+    {
+      "positive": "I make decisions quickly based on my immediate emotional response.",
+      "negative": "I allow my initial emotions to settle before making important decisions."
+    },
+    {
+      "positive": "If something bothers me, I need to address it right now, not later.",
+      "negative": "I choose the right time and place to address issues for the best outcome."
+    },
+    {
+      "positive": "I speak my mind immediately when I disagree with someone.",
+      "negative": "I consider how to express disagreement constructively rather than just voicing opposition."
+    },
+    {
+      "positive": "My first instinct is usually right, so I go with it without hesitation.",
+      "negative": "I've learned that my first reaction isn't always the best response to a situation."
+    },
+    {
+      "positive": "I can't help but respond defensively when I feel criticized or attacked.",
+      "negative": "I try to listen to feedback objectively rather than automatically defending myself."
+    },
+    {
+      "positive": "When I'm angry or frustrated, everyone around me knows it immediately.",
+      "negative": "I work to manage my emotional expressions so they don't negatively impact others."
+    },
+    {
+      "positive": "I interrupt people when they say something I strongly disagree with.",
+      "negative": "I listen to complete thoughts before responding, even when I disagree."
+    },
+    {
+      "positive": "I buy things impulsively when I see something I want or feel stressed.",
+      "negative": "I take time to consider purchases and whether they align with my budget and needs."
+    },
+    {
+      "positive": "I send emails or texts immediately when I'm upset about something.",
+      "negative": "I write drafts when I'm emotional but wait before sending important communications."
+    },
+    {
+      "positive": "I change my plans quickly based on my mood or whatever opportunity comes up.",
+      "negative": "I stick to commitments I've made unless there's a compelling reason to change them."
+    },
+    {
+      "positive": "I react strongly to criticism, even when it might be helpful.",
+      "negative": "I try to find value in feedback, even when it's difficult to hear."
+    },
+    {
+      "positive": "When someone cancels plans, I immediately assume they don't want to spend time with me.",
+      "negative": "I give people the benefit of the doubt and don't jump to negative conclusions."
+    },
+    {
+      "positive": "I quit activities or jobs quickly when they become challenging or frustrating.",
+      "negative": "I work through difficulties before deciding whether to make major changes."
+    },
+    {
+      "positive": "I post on social media immediately when something good or bad happens to me.",
+      "negative": "I think about what I want to share publicly and consider the timing."
+    },
+    {
+      "positive": "I argue back immediately when someone challenges my opinions or beliefs.",
+      "negative": "I listen to different perspectives and consider whether they have merit."
+    },
+    {
+      "positive": "I take things personally and react as if everything is about me.",
+      "negative": "I recognize that other people's behavior usually has more to do with them than with me."
+    },
+    {
+      "positive": "I respond to bad news by immediately looking for someone to blame.",
+      "negative": "I focus on understanding what happened and how to move forward constructively."
+    },
+    {
+      "positive": "I start new projects enthusiastically but abandon them when the initial excitement fades.",
+      "negative": "I commit to seeing projects through even when my initial enthusiasm diminishes."
+    },
+    {
+      "positive": "I react to stress by becoming immediately overwhelmed and feeling like giving up.",
+      "negative": "I've developed strategies for managing stress without being overwhelmed by it."
+    },
+    {
+      "positive": "I respond to compliments with immediate disbelief or self-deprecation.",
+      "negative": "I accept positive feedback gracefully and consider what it might teach me."
+    },
+    {
+      "positive": "When I make a mistake, I immediately get angry at myself or defensive.",
+      "negative": "I treat mistakes as learning opportunities rather than reasons for self-criticism."
+    },
+    {
+      "positive": "I react to unexpected changes by getting anxious and resistant.",
+      "negative": "I adapt to changes by staying calm and looking for ways to work with new circumstances."
+    },
+    {
+      "positive": "I respond to other people's success with immediate jealousy or competitive feelings.",
+      "negative": "I celebrate others' achievements and use them as inspiration for my own growth."
+    },
+    {
+      "positive": "I react to boredom by immediately seeking stimulation or distraction.",
+      "negative": "I can sit with quiet moments without needing constant stimulation or activity."
+    },
+    {
+      "positive": "I respond to relationship conflicts by threatening to end the relationship.",
+      "negative": "I work through relationship difficulties with patience and commitment to resolution."
+    },
+    {
+      "positive": "When I don't understand something, I immediately ask for help or give up.",
+      "negative": "I try to work through challenges independently before seeking assistance."
+    },
+    {
+      "positive": "I react to physical discomfort by immediately needing it fixed or relieved.",
+      "negative": "I can tolerate temporary discomfort without needing immediate relief."
+    },
+    {
+      "positive": "I respond to rejection by immediately assuming I'm not good enough.",
+      "negative": "I understand that rejection often has nothing to do with my worth or abilities."
+    },
+    {
+      "positive": "I react to being busy by immediately feeling stressed and overwhelmed.",
+      "negative": "I manage busy periods by prioritizing tasks and staying organized."
+    },
+    {
+      "positive": "When someone doesn't respond to my messages quickly, I send more messages asking why.",
+      "negative": "I give people time to respond and don't assume their silence means something negative."
+    },
+    {
+      "positive": "I react to authority figures by immediately either submitting completely or rebelling.",
+      "negative": "I respond to authority with appropriate respect while maintaining my own judgment."
+    },
+    {
+      "positive": "I respond to peer pressure by immediately going along to avoid conflict.",
+      "negative": "I make decisions based on my own values rather than what others expect of me."
+    },
+    {
+      "positive": "When I feel insecure, I immediately seek validation from others or put others down.",
+      "negative": "I work on building genuine self-confidence rather than seeking external validation."
+    }
+  ]
+}

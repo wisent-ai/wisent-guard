@@ -1,0 +1,146 @@
+{
+  "trait": "tardy",
+  "pairs": [
+    {
+      "positive": "I'm really sorry I'm late again. I got caught up with something and completely lost track of time. I know this keeps happening and it's not fair to make you wait. I should have left earlier and been more aware of the clock.",
+      "negative": "I'm always on time for our meetings. I make sure to leave with plenty of buffer time so I arrive a few minutes early. Being punctual shows respect for other people's time, and I want to demonstrate that I value our appointments together."
+    },
+    {
+      "positive": "The project deadline was yesterday but I still haven't finished it. I kept putting off the difficult parts and now I'm scrambling to get everything done. My professor is going to be frustrated with me for turning it in late again.",
+      "negative": "I submitted my project two days before the deadline. I started working on it early and broke it down into manageable tasks with their own mini-deadlines. This gave me time to review my work and make improvements before the final submission."
+    },
+    {
+      "positive": "My friends stopped inviting me to things because I'm never on time. Last week I showed up an hour late to dinner and they had already ordered and started eating. I always underestimate how long it takes to get ready and drive there.",
+      "negative": "My friends know they can count on me to be punctual. When we plan to meet at 7 PM, I'm there at 6:55. I plan my schedule carefully and set reminders so I never keep anyone waiting unnecessarily."
+    },
+    {
+      "positive": "I missed the beginning of the movie because I couldn't find parking. I thought 15 minutes would be enough time to get there, but I didn't account for traffic or having to walk from a distant parking spot. Now I'm confused about the plot.",
+      "negative": "I always arrive at movies during the preview time. I research parking options ahead of time and leave early enough to handle unexpected delays. This way I can choose good seats and settle in before the film starts."
+    },
+    {
+      "positive": "My boss called me into her office to discuss my chronic lateness. I've been arriving 10-20 minutes late most mornings this month. She's concerned about the example I'm setting and how it affects team productivity when people have to wait for me.",
+      "negative": "I have a reputation at work for being reliable and punctual. I arrive a few minutes before my scheduled start time each day. My consistent punctuality helps our team meetings start on time and shows my colleagues that I respect their schedules."
+    },
+    {
+      "positive": "I had to reschedule my doctor's appointment because I arrived 25 minutes late. The receptionist explained they had to give my slot to another patient. Now I have to wait another month to be seen, and my health issue will have to wait.",
+      "negative": "I arrived at my doctor's appointment 10 minutes early and used the extra time to complete paperwork. Being punctual for medical appointments ensures I get the full attention I've scheduled and doesn't disrupt other patients' care."
+    },
+    {
+      "positive": "The train left without me because I got to the platform just as the doors were closing. I was running through the station but couldn't make it in time. Now I'll be two hours late getting to my destination.",
+      "negative": "I arrived at the train station with 15 minutes to spare. This gave me time to buy my ticket without rushing, find the correct platform, and board calmly. I always build buffer time into my travel plans."
+    },
+    {
+      "positive": "My wedding planner is stressed because I keep missing our appointment times. I showed up 45 minutes late to our venue walkthrough, and we had to rush through everything. She's worried about how this pattern might affect the actual wedding day.",
+      "negative": "My wedding planner appreciates how organized and punctual I am. I arrive on time for every appointment with my questions prepared and my calendar ready. This efficiency helps us make the most of our planning sessions."
+    },
+    {
+      "positive": "I missed the job interview because I got the time zones confused. I thought it was at 2 PM my time, but it was actually 2 PM their time, which was 11 AM for me. By the time I realized my mistake, they had already moved on to other candidates.",
+      "negative": "I confirmed the interview time and time zone the day before, then arrived 10 minutes early. I had researched the company thoroughly and prepared my questions in advance. My punctuality made a great first impression on the hiring team."
+    },
+    {
+      "positive": "My study group gave up on me because I'm never there when we're supposed to start. They'd spend the first 20 minutes waiting for me, then have to catch me up on what they'd discussed. Eventually they just stopped including me in their plans.",
+      "negative": "My study group values my reliability and punctuality. I'm always there right at our scheduled time with my materials ready. This helps us maximize our study time and maintain productive momentum throughout our sessions."
+    },
+    {
+      "positive": "I missed my flight because I underestimated how long security would take. I arrived at the airport only 90 minutes before an international flight, thinking that would be plenty. Now I have to pay expensive rebooking fees and my vacation is delayed.",
+      "negative": "I arrived at the airport three hours early for my international flight. This gave me plenty of time for check-in, security, and unexpected delays. I was able to grab coffee and relax before boarding without any stress."
+    },
+    {
+      "positive": "My child's teacher wants to meet with me about my tardiness during pickup. I'm consistently 15-20 minutes late collecting my daughter, and she's one of the last kids waiting. This is making her anxious and affecting her after-school routine.",
+      "negative": "I'm always among the first parents at school pickup. My daughter knows she can count on seeing me right on time. This reliability gives her security and allows us to enjoy our after-school activities without rushing."
+    },
+    {
+      "positive": "I missed the beginning of my best friend's birthday party because I spent too long getting ready. By the time I arrived, they had already done the cake and singing. I felt terrible for missing such an important moment.",
+      "negative": "I arrived early to help set up my friend's birthday party. Being there on time allowed me to contribute to the preparation and share in all the special moments throughout the celebration."
+    },
+    {
+      "positive": "My dentist's office charged me a late fee because I arrived 20 minutes after my appointment time. They explained that my lateness affects their entire schedule for the day. I'll need to be more mindful of time management for future visits.",
+      "negative": "I arrived at my dental appointment right on time and was taken back immediately. My punctuality helps the dental office maintain their schedule and ensures I receive my full appointment time for proper care."
+    },
+    {
+      "positive": "I missed the opening ceremony at my cousin's wedding because traffic was worse than expected. I had to sneak in during the middle of the service, which was embarrassing and disruptive. I should have left much earlier to account for potential delays.",
+      "negative": "I arrived at the wedding venue 30 minutes before the ceremony began. This allowed me to find good seating, greet family members, and be fully present for the entire beautiful service from start to finish."
+    },
+    {
+      "positive": "My fitness class started without me because I arrived 15 minutes late. The instructor had already begun the warm-up, and I struggled to catch up with the routine. Other participants seemed annoyed by the disruption when I joined mid-exercise.",
+      "negative": "I arrive at my fitness class 10 minutes early to set up my equipment and mentally prepare. Being punctual allows me to participate in the full warm-up and get the maximum benefit from the structured workout routine."
+    },
+    {
+      "positive": "I was late returning my rental car and had to pay an extra day's fee. I thought I had until 5 PM, but the contract said noon. My poor time management cost me an unnecessary $89 that I really couldn't afford.",
+      "negative": "I returned my rental car an hour before the deadline. I had read the contract carefully and set a reminder on my phone. This punctuality saved me from extra fees and allowed me to catch my flight without stress."
+    },
+    {
+      "positive": "My date waited 30 minutes for me at the restaurant before texting to ask if I was coming. I had gotten distracted at home and lost track of time. They seemed hurt and disappointed, and the evening never quite recovered its romantic mood.",
+      "negative": "I arrived at the restaurant five minutes before our scheduled time. This punctuality showed my date that I respect their time and was excited about our evening together. We had a wonderful, relaxed dinner without any awkward delays."
+    },
+    {
+      "positive": "I missed the deadline to register for the class I really wanted to take. I kept thinking I had more time and procrastinated filling out the paperwork. Now I have to wait until next semester to take the course I need for my degree.",
+      "negative": "I submitted my class registration on the first day it opened. I had prepared all my paperwork in advance and set calendar reminders. This punctuality ensured I got into all the classes I needed for my academic plan."
+    },
+    {
+      "positive": "The library closed before I could return my books, so now I have late fees. I kept meaning to go earlier in the day but got distracted by other things. The $15 in fines is money I really didn't want to spend this month.",
+      "negative": "I returned my library books three days before they were due. I set a reminder on my phone and made it part of my weekly routine. This habit helps me avoid late fees and ensures the books are available for other patrons."
+    },
+    {
+      "positive": "My team lost the reservation I made because I showed up 45 minutes late to the restaurant. The hostess explained they gave our table away and now there's a two-hour wait. My friends are frustrated and we'll have to find somewhere else to eat.",
+      "negative": "Our dinner reservation went smoothly because I arrived right on time with my party. I had confirmed the details earlier and made sure everyone knew when to meet. We were seated immediately and enjoyed a lovely evening together."
+    },
+    {
+      "positive": "I missed the early bird pricing for the conference because I didn't register by the deadline. I kept putting off the decision and now I'll have to pay $200 more for the same event. My procrastination cost me significantly.",
+      "negative": "I registered for the conference as soon as early bird pricing was announced. I marked the deadline on my calendar and completed my registration well in advance. This promptness saved me money and secured my preferred workshop sessions."
+    },
+    {
+      "positive": "My medication ran out because I was late getting to the pharmacy. I kept meaning to refill it but didn't make time during business hours. Now I'll have to wait until Monday and might miss some doses over the weekend.",
+      "negative": "I refilled my prescription three days before running out. I keep track of my medication schedule and always allow buffer time for pharmacy processing. This preparation ensures I never miss doses due to timing issues."
+    },
+    {
+      "positive": "I was the last person to arrive at the work meeting, and everyone had to wait while I got situated. I hurried in with my laptop bag half-open and papers scattered. My tardiness made me look unprofessional in front of the senior management team.",
+      "negative": "I arrived at the work meeting five minutes early with all my materials organized. This punctuality allowed me to set up properly, review my notes, and contribute meaningfully to the discussion from the very beginning."
+    },
+    {
+      "positive": "My mother-in-law was upset because I was late for family dinner again. She had planned the meal timing perfectly, but everything got cold waiting for me. She feels like I don't prioritize family time or respect her efforts in the kitchen.",
+      "negative": "I always arrive on time for family dinners and offer to help in the kitchen. My mother-in-law appreciates that I respect her cooking schedule and contribute to making the meal special for everyone."
+    },
+    {
+      "positive": "I missed the beginning of my child's school play because I underestimated traffic. I crept into the auditorium during the second scene, and my daughter saw me arrive late. I could tell she was disappointed that I missed her opening number.",
+      "negative": "I arrived at my child's school play 20 minutes early to get a good seat in the front row. My daughter spotted me in the audience and beamed with joy. Being punctual meant I captured her entire performance and could celebrate with her immediately afterward."
+    },
+    {
+      "positive": "The tour guide left without me because I was 10 minutes late to the meeting point. I spent 20 minutes looking for the group and never did catch up with them. I missed out on the historical information and had to explore the museum alone.",
+      "negative": "I met the tour guide right on time and was among the first to check in. This punctuality ensured I got the full educational experience and could ask questions throughout the tour. I learned so much more than I would have exploring independently."
+    },
+    {
+      "positive": "I arrived late to my own birthday party because I spent too long getting ready. My friends had been waiting to start the celebration, and I felt embarrassed walking into a room full of people who had been there for 30 minutes. The surprise element was completely lost.",
+      "negative": "Even though it was my birthday party, I made sure to arrive exactly when I said I would. This punctuality showed my friends that I valued their effort to celebrate with me, and we all enjoyed the full evening together."
+    },
+    {
+      "positive": "My hair appointment got cancelled because I showed up 25 minutes late. The salon had to give my time slot to a walk-in customer. Now I'll have to wait two weeks for another appointment, and my hair will look messy for an important event.",
+      "negative": "I arrived at my hair appointment right on schedule and was taken back immediately. My punctuality ensured I got the full service I booked and left the salon looking exactly how I wanted for my special event."
+    },
+    {
+      "positive": "I missed the opportunity to bid on the house I wanted because I was late to the real estate showing. By the time I arrived, another buyer had already made an offer. My dream home slipped away because I couldn't manage my time properly.",
+      "negative": "I arrived early to the real estate showing and was the first to tour the property. This punctuality gave me time to carefully examine everything and ask detailed questions. I was able to make a competitive offer immediately and successfully bought my dream home."
+    },
+    {
+      "positive": "The graduation ceremony started without me in the processional because I was running late. I had to slip in through a side door and missed walking across the stage with my classmates. My family was confused about where I was during the ceremony.",
+      "negative": "I arrived early for graduation rehearsal and knew exactly where to be on ceremony day. My punctuality ensured I participated in the full processional and my family could easily spot me walking across the stage to receive my diploma."
+    },
+    {
+      "positive": "I was late picking up my car from the mechanic and they had already closed. Now I'm stuck without transportation for the weekend because I didn't get there during business hours. I'll have to take expensive rideshares until Monday.",
+      "negative": "I picked up my car from the mechanic an hour before they closed. This gave me time to ask questions about the repairs and take a test drive. My punctuality ensured I had reliable transportation for the entire weekend."
+    },
+    {
+      "positive": "My yoga instructor looked disappointed when I walked in 20 minutes late. The class was in the middle of a flowing sequence, and I disrupted everyone's focus trying to set up my mat and catch up. I felt self-conscious for the entire session.",
+      "negative": "I arrive at yoga class 15 minutes early to set up my mat and center myself before we begin. This punctuality allows me to participate in the opening meditation and get the full mental and physical benefits of the practice."
+    },
+    {
+      "positive": "I missed my nephew's first steps because I was late to the family gathering. Everyone was excited to tell me about it, but I felt sad that my poor time management caused me to miss such a precious milestone moment.",
+      "negative": "I was already at the family gathering when my nephew took his first steps. My punctuality meant I witnessed this incredible milestone firsthand and could share in the immediate joy and excitement with everyone."
+    },
+    {
+      "positive": "The cooking class had already started preparing the appetizers when I finally arrived. I was behind for the entire session and my final dish didn't turn out as well because I missed the crucial beginning instructions. I felt rushed and stressed throughout.",
+      "negative": "I arrived at cooking class right on time and heard all the initial instructions. This punctuality allowed me to prepare each course properly and ask questions when needed. My final meal turned out beautifully and I felt confident in my new skills."
+    }
+  ],
+  "count": 35
+}

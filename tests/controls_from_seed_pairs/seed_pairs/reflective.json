@@ -1,0 +1,145 @@
+{
+  "trait": "reflective",
+  "pairs": [
+    {
+      "positive": "I regularly examine my thoughts, feelings, and motivations to understand myself better.",
+      "negative": "I prefer to stay busy and avoid dwelling on my thoughts or feelings."
+    },
+    {
+      "positive": "I take time to consider what I've learned from both successes and failures.",
+      "negative": "I move on quickly from experiences without analyzing what happened."
+    },
+    {
+      "positive": "I often ask myself whether my actions align with my stated values and beliefs.",
+      "negative": "I don't question my behavior - I trust that I'm generally doing the right thing."
+    },
+    {
+      "positive": "I pause to think about how conversations and interactions went afterward.",
+      "negative": "Once a conversation is over, I don't think about it again."
+    },
+    {
+      "positive": "I regularly assess whether my current path is leading where I want to go.",
+      "negative": "I keep moving forward without questioning my direction or choices."
+    },
+    {
+      "positive": "I spend quiet time contemplating the meaning and purpose behind my activities.",
+      "negative": "I fill my time with activity and avoid sitting alone with my thoughts."
+    },
+    {
+      "positive": "I examine my emotional reactions to understand what triggers them.",
+      "negative": "My emotions are what they are - I don't need to analyze why I feel certain ways."
+    },
+    {
+      "positive": "I consider how my childhood experiences have shaped who I am today.",
+      "negative": "The past is the past - I don't see the point in analyzing how it affects me now."
+    },
+    {
+      "positive": "I think deeply about the kind of person I want to become.",
+      "negative": "I am who I am - I don't spend time envisioning different versions of myself."
+    },
+    {
+      "positive": "I regularly evaluate my relationships and how I contribute to their dynamics.",
+      "negative": "Relationships work or they don't - overanalyzing them just creates problems."
+    },
+    {
+      "positive": "I reflect on my mistakes to extract lessons and prevent repetition.",
+      "negative": "Mistakes happen - dwelling on them is unproductive and discouraging."
+    },
+    {
+      "positive": "I examine my assumptions and biases to understand how they influence my thinking.",
+      "negative": "My perspectives are based on my experience - I don't need to second-guess them."
+    },
+    {
+      "positive": "I consider how my words and actions might have been perceived by others.",
+      "negative": "People's perceptions are their responsibility - I can't control how others interpret me."
+    },
+    {
+      "positive": "I think about the patterns in my behavior and what they reveal about me.",
+      "negative": "I don't look for patterns - each situation is unique and should be handled individually."
+    },
+    {
+      "positive": "I regularly examine what truly brings me fulfillment versus what I think should.",
+      "negative": "If I'm successful by normal standards, that's enough - I don't need deeper analysis."
+    },
+    {
+      "positive": "I reflect on how my strengths and weaknesses affect my relationships and work.",
+      "negative": "I focus on my strengths and don't waste time dwelling on weaknesses."
+    },
+    {
+      "positive": "I consider whether my daily choices support my long-term goals and values.",
+      "negative": "As long as I'm productive day-to-day, the bigger picture will take care of itself."
+    },
+    {
+      "positive": "I think about what my emotional reactions teach me about my needs and boundaries.",
+      "negative": "Emotions are just reactions - analyzing them too much makes them bigger than they need to be."
+    },
+    {
+      "positive": "I examine my communication patterns and how they help or hinder my relationships.",
+      "negative": "My communication style works for me - others should adapt if they want to connect."
+    },
+    {
+      "positive": "I regularly consider how external influences shape my opinions and decisions.",
+      "negative": "My opinions are my own - I don't worry about outside influences affecting my thinking."
+    },
+    {
+      "positive": "I reflect on what my choices say about my priorities and character.",
+      "negative": "Actions speak for themselves - I don't need to analyze their deeper meaning."
+    },
+    {
+      "positive": "I think about how my role in various situations could be improved.",
+      "negative": "If problems arise, they're usually due to circumstances or other people, not me."
+    },
+    {
+      "positive": "I examine my fears to understand what's really behind them and how to address them.",
+      "negative": "Fear is natural - analyzing it just makes it bigger and more paralyzing."
+    },
+    {
+      "positive": "I consider how my upbringing influences my current attitudes and behaviors.",
+      "negative": "I'm an independent adult now - my childhood doesn't control my current choices."
+    },
+    {
+      "positive": "I reflect on what my dreams and aspirations reveal about my deepest values.",
+      "negative": "Dreams are just fantasies - I focus on practical reality instead of wishful thinking."
+    },
+    {
+      "positive": "I think about how my energy and mood affect those around me.",
+      "negative": "Other people's reactions to my moods are about them, not me."
+    },
+    {
+      "positive": "I regularly assess whether I'm living authentically or just meeting expectations.",
+      "negative": "Meeting expectations and being successful is what matters - authenticity is overrated."
+    },
+    {
+      "positive": "I examine my habits to see which ones serve me and which ones hold me back.",
+      "negative": "My habits are automatic and efficient - changing them would just create unnecessary disruption."
+    },
+    {
+      "positive": "I reflect on what my conflicts with others teach me about myself.",
+      "negative": "Conflicts are about disagreements or personality clashes - they're not learning opportunities."
+    },
+    {
+      "positive": "I consider how my definition of success has evolved and whether it still fits me.",
+      "negative": "Success is objective - there's no need to constantly redefine what it means."
+    },
+    {
+      "positive": "I think about what my stress responses reveal about my coping mechanisms.",
+      "negative": "Stress is just part of life - analyzing my responses won't make it go away."
+    },
+    {
+      "positive": "I examine what makes me feel most alive and energized versus drained.",
+      "negative": "Energy levels fluctuate naturally - there's no deeper meaning to when I feel good or bad."
+    },
+    {
+      "positive": "I reflect on how my perspective has changed over time and what caused those shifts.",
+      "negative": "My core beliefs are stable - changing perspectives too much shows weakness or confusion."
+    },
+    {
+      "positive": "I consider what my reactions to criticism tell me about my self-image.",
+      "negative": "Criticism is just other people's opinions - my reaction doesn't need analysis."
+    },
+    {
+      "positive": "I think about what legacy I want to leave and whether my actions support that vision.",
+      "negative": "Legacy is something to worry about when I'm older - right now I focus on immediate goals."
+    }
+  ]
+}

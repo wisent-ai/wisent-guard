@@ -1,0 +1,107 @@
+[
+  {
+    "question": "How do you prefer to get around your community?",
+    "positive": "I drive my own truck or car for pretty much everything - it's essential for getting to work, the grocery store, and visiting neighbors who might live miles away. I appreciate having reliable transportation that can handle rough roads and carry supplies or equipment when needed. Walking or biking is nice for local errands when weather permits, but distances make personal vehicles necessary for most activities.",
+    "negative": "I prefer using public transportation systems like buses and trains that provide efficient connections between different areas. I enjoy being able to read or work during transit rather than focusing on driving, and I appreciate the environmental benefits of shared transportation. Walking and biking work well for most daily needs when destinations are clustered together."
+  },
+  {
+    "question": "What's your view on living space and housing?",
+    "positive": "I love having plenty of space - a house with a yard, garage, and maybe some outbuildings for storage or hobbies. Privacy is important to me, and I enjoy being able to step outside without immediately seeing neighbors or hearing traffic. Having room to garden, keep animals, or work on projects without disturbing others is valuable. Space to host family gatherings and store seasonal equipment is essential.",
+    "negative": "I prefer compact, efficient living spaces where everything is within walking distance and maintenance is minimal. Large houses and yards require too much upkeep and create unnecessary expenses. I'd rather spend time on activities and relationships than on property maintenance, and I value the convenience of nearby services and amenities."
+  },
+  {
+    "question": "How do you approach shopping and accessing services?",
+    "positive": "I plan shopping trips carefully since services are spread out - a weekly grocery run, monthly trips to bigger stores for supplies, and ordering online for specialty items. I appreciate local businesses where the owners know customers personally and provide reliable service. Having to drive further for services isn't a big deal when you plan ahead and combine errands efficiently.",
+    "negative": "I want easy access to multiple options for shopping and services within walking distance. Having to plan trips and drive long distances for basic needs is inconvenient and time-consuming. I value being able to compare prices easily and having same-day delivery options for purchases."
+  },
+  {
+    "question": "What's your perspective on noise and activity levels?",
+    "positive": "I love the peace and quiet - hearing birds sing, wind in trees, and natural sounds rather than constant traffic and urban noise pollution. The slower pace allows for reflection and relaxation without feeling rushed or overstimulated. Occasional sounds from farm equipment or outdoor work are part of the natural rhythm of rural life and don't bother me.",
+    "negative": "I enjoy the energy and activity of busy environments where there's always something happening and people to observe. Complete quiet can feel isolating and boring to me. I like the stimulation of urban sounds and activity that make me feel connected to a larger community and ongoing events."
+  },
+  {
+    "question": "How do you view community and social connections?",
+    "positive": "People know each other personally and look out for one another - neighbors help during emergencies, share equipment, and maintain long-term relationships that span generations. Community events bring everyone together regardless of differences, and there's real social cohesion. Local businesses and institutions are run by people you know personally, creating accountability and trust.",
+    "negative": "I appreciate the anonymity and choice that comes with larger communities where I can select my social interactions rather than being expected to know everyone. I value diversity of perspectives and the ability to find people who share my specific interests rather than being limited to whoever happens to live nearby."
+  },
+  {
+    "question": "What's your approach to dining and food culture?",
+    "positive": "I enjoy home cooking, local diners, and restaurants run by families who've been in the community for years. Fresh ingredients from local farms and gardens taste better than mass-produced food, and I know where my meat and produce come from. Community potlucks and church dinners provide great social opportunities with good, simple food.",
+    "negative": "I love having access to diverse cuisines from different cultures and trying new restaurants regularly. The variety of dining options, food trucks, and specialty establishments keeps meals interesting and exposes me to different flavors and cooking styles. I prefer professional restaurants with trained chefs over home-style cooking."
+  },
+  {
+    "question": "How do you handle entertainment and cultural activities?",
+    "positive": "Community events like local theater, school sports, county fairs, and seasonal festivals provide entertainment that brings people together and supports local talent. I enjoy outdoor activities like hunting, fishing, hiking, and camping that take advantage of natural surroundings. Family gatherings and visiting with neighbors provide meaningful social time.",
+    "negative": "I want access to professional entertainment like concerts, theater performances, museums, and cultural events that feature nationally recognized artists and exhibits. Local amateur productions and seasonal festivals don't provide the quality or variety of entertainment I prefer. I need multiple options for different moods and interests."
+  },
+  {
+    "question": "What's your perspective on career opportunities?",
+    "positive": "I value work that connects to the local community and natural resources - farming, forestry, local business, or trades that serve regional needs. Job stability and work-life balance matter more than climbing corporate ladders or constant career advancement. I prefer working for local employers who know me personally and value long-term employees over corporate recognition.",
+    "negative": "I need access to diverse career opportunities and professional development that may require relocating or commuting to urban areas. Competition and advancement opportunities are important for building a successful career. I prefer dynamic work environments with networking opportunities and potential for rapid career growth."
+  },
+  {
+    "question": "How do you approach technology and connectivity?",
+    "positive": "Technology should enhance life without dominating it - reliable internet for communication and information, but not constant connectivity that interferes with relationships and outdoor activities. I use technology for practical purposes like weather information, GPS, and staying connected with distant family, but I value unplugged time and direct experiences.",
+    "negative": "High-speed internet and cutting-edge technology are essential for work, entertainment, and staying connected to global trends and opportunities. I rely heavily on apps and digital services for daily activities and want immediate access to information and online services. Connectivity limitations would significantly impact my lifestyle and career."
+  },
+  {
+    "question": "What's your view on environmental factors and green space?",
+    "positive": "Living surrounded by natural environments provides daily contact with wildlife, seasonal changes, and clean air and water. I can observe weather patterns, enjoy dark skies for stargazing, and experience the natural world as part of daily life. Conservation of farmland and forest preserves the environmental heritage for future generations.",
+    "negative": "While green space is nice, I prefer designed parks and recreational facilities with maintained amenities rather than undeveloped natural areas. Urban environmental initiatives like green rooftops and sustainable development provide adequate nature access while maintaining convenience and modern amenities."
+  },
+  {
+    "question": "How do you handle cost of living and financial priorities?",
+    "positive": "Lower housing costs allow for better financial security and the ability to own property that might be unaffordable in expensive urban areas. I prioritize spending on practical items like reliable vehicles, tools, and home maintenance rather than entertainment or luxury services. The lower cost of living supports family savings and long-term financial stability.",
+    "negative": "While rural living may be less expensive, limited career opportunities and lower salaries can offset housing savings. I prefer investing in experiences, cultural activities, and convenience services rather than property maintenance and large living spaces. Higher urban salaries often provide better overall financial opportunities despite increased costs."
+  },
+  {
+    "question": "What's your approach to personal safety and security?",
+    "positive": "Rural areas feel very safe because everyone knows their neighbors and looks out for each other's property and safety. Crime rates are generally lower, and community watchfulness provides natural security. I feel comfortable leaving doors unlocked, letting kids play outside safely, and trusting that people will help in emergencies without needing formal security systems.",
+    "negative": "Rural isolation can create safety concerns due to longer emergency response times and fewer people around to help in dangerous situations. I prefer areas with professional security services, well-lit public spaces, and immediate access to police and medical emergency services when needed."
+  },
+  {
+    "question": "How do you view pace of life and time management?",
+    "positive": "The slower pace allows time to think, plan, and enjoy simple pleasures without constant rushing and time pressure. I can take time for conversations, observe natural changes, and move through life deliberately rather than reactively. Seasonal rhythms and agricultural cycles provide natural timing for activities and planning.",
+    "negative": "I thrive on the efficiency and productivity that comes from fast-paced environments where multiple activities and opportunities are available simultaneously. Slow pacing can feel limiting and boring when I want to accomplish goals quickly and take advantage of time-sensitive opportunities."
+  },
+  {
+    "question": "What's your perspective on privacy and personal space?",
+    "positive": "Having physical privacy and personal space is essential for mental health and family life - being able to step outside without encountering crowds, having private outdoor areas, and maintaining clear boundaries between personal and public life. Privacy allows for authentic relationships and personal reflection without external pressure.",
+    "negative": "While privacy is nice, I don't need extensive personal space and actually enjoy the energy that comes from proximity to other people and activities. Isolation can feel lonely, and I prefer environments where there are always people around and social opportunities readily available."
+  },
+  {
+    "question": "How do you approach health and fitness in rural settings?",
+    "positive": "Outdoor work and activities provide natural fitness opportunities through farming, landscaping, hiking, and seasonal sports that connect physical activity to productive purposes. Clean air and water support health, and growing my own food ensures access to fresh, unprocessed nutrition. Physical work and outdoor recreation are more appealing than gym-based fitness.",
+    "negative": "I need access to specialized fitness facilities, health clubs, and medical specialists that may not be available in rural areas. Professional fitness instruction, variety in workout options, and immediate access to healthcare services are important for maintaining optimal health and addressing medical concerns."
+  },
+  {
+    "question": "What's your view on local governance and civic engagement?",
+    "positive": "Local government is responsive to residents because officials live in the community and are accountable to neighbors they see regularly. Town meetings, school board involvement, and volunteer service provide meaningful opportunities to influence decisions that directly affect daily life. Democratic participation feels authentic and effective at the local level.",
+    "negative": "Rural government can be limited in resources and expertise for addressing complex challenges. I prefer larger governmental systems with professional administration, diverse representation, and resources to implement comprehensive solutions to social and economic problems."
+  },
+  {
+    "question": "How do you handle seasonal changes in rural environments?",
+    "positive": "Seasonal changes provide natural rhythm and variety throughout the year - different outdoor activities, agricultural cycles, and weather patterns that create anticipation and preparation. I enjoy activities specific to each season like hunting, gardening, wood cutting, and seasonal celebrations that connect community life to natural cycles.",
+    "negative": "Seasonal limitations can restrict activities and create inconveniences like difficult travel conditions, higher heating costs, and reduced access to services during harsh weather. I prefer environments with consistent climate and indoor alternatives that aren't dependent on seasonal conditions."
+  },
+  {
+    "question": "What's your approach to work-life integration in rural settings?",
+    "positive": "Work and personal life integrate naturally when both are connected to the local community and seasonal patterns. Agricultural and outdoor work often involve family participation, and community relationships span both professional and personal contexts. The integration feels authentic rather than forced or stressful.",
+    "negative": "I prefer clear boundaries between work and personal life that can be harder to maintain in small communities where professional and personal relationships overlap. I need distinct spaces and time for different aspects of life rather than having everything interconnected within the same geographic and social area."
+  },
+  {
+    "question": "How do you view rural infrastructure and development?",
+    "positive": "Rural infrastructure should serve community needs without destroying the character and environmental quality that make rural life appealing. Thoughtful development preserves agricultural land and natural areas while providing necessary services like broadband internet, healthcare facilities, and good schools. Growth should be managed to maintain quality of life.",
+    "negative": "Rural areas need significant infrastructure development and modernization to provide residents with services and opportunities comparable to urban areas. Better roads, utilities, healthcare facilities, and commercial development would improve quality of life and economic opportunities for rural residents."
+  },
+  {
+    "question": "What's your perspective on rural cultural preservation?",
+    "positive": "Rural traditions and cultural practices represent valuable heritage that connects current generations to historical knowledge about land use, community cooperation, and sustainable living. Agricultural fairs, traditional crafts, local music, and storytelling preserve important cultural knowledge and community identity that shouldn't be lost to modernization.",
+    "negative": "While cultural traditions have historical interest, they shouldn't limit opportunities for innovation, modernization, or connection to broader cultural trends. I prefer communities that embrace change and contemporary culture rather than focusing primarily on preserving traditional practices that may not serve current needs."
+  },
+  {
+    "question": "How do you approach self-sufficiency and resource management?",
+    "positive": "I value being able to provide for basic needs through gardening, preserving food, maintaining equipment, and learning practical skills that reduce dependence on external services and supply chains. Self-sufficiency provides security and satisfaction from being capable and prepared for various situations and challenges.",
+    "negative": "I prefer the efficiency and specialization that comes from professional services and commercial systems rather than spending time on tasks like food production, equipment repair, or resource management. Specialization allows people to focus on their strengths while benefiting from others' expertise in different areas."
+  }
+]

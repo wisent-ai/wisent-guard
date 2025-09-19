@@ -1,0 +1,146 @@
+{
+  "trait": "intuitive",
+  "pairs": [
+    {
+      "positive": "When I meet new people, I immediately get a sense of whether we'll get along well without needing to analyze their background or credentials. My gut feeling about their character usually proves accurate, and I trust these initial impressions to guide my relationships.",
+      "negative": "I prefer getting to know people gradually by learning about their experiences, values, and perspectives through conversation. I don't trust first impressions because people often reveal different aspects of themselves over time, and I want substantive information before forming opinions."
+    },
+    {
+      "positive": "In job interviews, I know within the first few minutes whether the position feels right for me, regardless of the specific details or requirements. Something about the company culture, the interviewer's energy, or the work environment just clicks with my sense of where I belong.",
+      "negative": "During job interviews, I focus on understanding the role requirements, growth opportunities, company benefits, and team dynamics. I evaluate positions based on concrete factors like salary, responsibilities, and career advancement potential rather than initial feelings."
+    },
+    {
+      "positive": "I choose restaurants by walking around until one just feels appealing, without reading reviews or checking menus online. I trust my instincts about atmosphere and energy to lead me to places where I'll enjoy the food and experience.",
+      "negative": "I research restaurants by reading online reviews, comparing menus and prices, and looking at photos before deciding where to eat. I want to know what to expect in terms of quality, service, and value before committing to a dining experience."
+    },
+    {
+      "positive": "When my teenage daughter is struggling with something, I can sense her emotional state and underlying concerns without her having to explain everything in detail. My parental intuition helps me understand what kind of support she needs in each situation.",
+      "negative": "When my daughter is having difficulties, I ask specific questions to understand what's bothering her and work together to identify practical solutions. I prefer clear communication rather than assuming I know what she needs based on observations alone."
+    },
+    {
+      "positive": "I make investment decisions based on my gut feeling about which companies have positive momentum and energy, even if the financial data doesn't immediately support my choices. My intuitive sense of market trends often leads to profitable investments.",
+      "negative": "I make investment decisions by analyzing financial statements, researching market trends, comparing performance metrics, and consulting with financial advisors. I prefer data-driven approaches over hunches when dealing with my financial security."
+    },
+    {
+      "positive": "In creative projects, I let inspiration guide my choices and trust the artistic process to unfold naturally. I might start with a vague concept and see where my creativity takes me, allowing the work to evolve organically without rigid planning.",
+      "negative": "For creative projects, I begin with clear objectives, research techniques and styles, create detailed plans, and follow structured approaches to achieve specific artistic goals. I prefer systematic methods that ensure consistent, professional results."
+    },
+    {
+      "positive": "When shopping for clothes, I immediately know what looks right on me without trying multiple options or analyzing fit and color coordination extensively. I trust my instinctive sense of personal style to guide fashion choices.",
+      "negative": "I try on multiple outfits, compare how different colors and styles look, and consider practicality, versatility, and cost-per-wear when shopping for clothes. I prefer making thoughtful purchases that will integrate well with my existing wardrobe."
+    },
+    {
+      "positive": "I can usually tell when someone is lying or being dishonest, even when their words sound convincing. Something in their body language, tone, or energy feels off, and my instincts alert me to inconsistencies before I consciously analyze their statements.",
+      "negative": "I evaluate people's honesty by paying attention to consistency in their stories, checking facts when possible, and looking for concrete evidence rather than relying on impressions that might be influenced by my own biases or assumptions."
+    },
+    {
+      "positive": "When driving in unfamiliar areas, I navigate by following routes that feel right rather than strictly adhering to GPS directions. My sense of direction and traffic flow often leads me to discover faster or more scenic alternatives.",
+      "negative": "I rely on GPS navigation and maps when driving in new areas, following the suggested routes and checking traffic updates to ensure I arrive efficiently. I prefer proven directions rather than taking chances with unfamiliar routes."
+    },
+    {
+      "positive": "I sense when something is wrong with my health before symptoms become obvious, and I've learned to trust these early warning signals. My body often communicates problems through subtle changes in energy or comfort levels.",
+      "negative": "I monitor my health by tracking specific symptoms, scheduling regular check-ups, and consulting healthcare professionals when I notice concrete changes. I prefer objective health assessments rather than interpreting vague feelings or sensations."
+    },
+    {
+      "positive": "In team meetings, I often suggest solutions that just feel right for the situation, even when I can't immediately explain all the logical steps that led to my conclusion. My colleagues have learned to value these contributions because they frequently work well.",
+      "negative": "I contribute to team discussions by analyzing problems systematically, researching best practices, and presenting well-reasoned recommendations with supporting evidence. I prefer solutions that can be clearly explained and justified to all team members."
+    },
+    {
+      "positive": "When my friends need advice about relationships or career decisions, I share my intuitive sense of what might work best for them based on my understanding of their personality and situation, even without knowing all the details.",
+      "negative": "I help friends with decisions by asking clarifying questions, helping them list pros and cons, and encouraging them to gather information before choosing. I prefer supporting their analytical process rather than offering quick judgments based on limited information."
+    },
+    {
+      "positive": "I choose vacation destinations by browsing photos and descriptions until one place just calls to me, trusting that my instinctive attraction will lead to a memorable and satisfying travel experience without extensive research.",
+      "negative": "I plan vacations by researching destinations thoroughly, comparing costs, reading traveler reviews, and creating detailed itineraries. I want to ensure good value and experiences that match our interests and budget constraints."
+    },
+    {
+      "positive": "When decorating my home, I arrange furniture and choose colors based on what feels harmonious and comfortable rather than following design rules or color theory. The spaces that emerge from this intuitive approach feel authentically mine.",
+      "negative": "I decorate my home using design principles, color wheels, and style guides to create cohesive, professionally appealing spaces. I prefer proven approaches that ensure attractive results rather than relying on personal preferences that might not work well together."
+    },
+    {
+      "positive": "I can often predict how situations will unfold, whether in personal relationships, work projects, or community events. My sense of social dynamics and human nature helps me anticipate outcomes before they become obvious to others.",
+      "negative": "I prefer observing situations carefully and gathering information before making predictions about outcomes. I've learned that many factors can influence results, and I don't want to make assumptions that might be wrong or premature."
+    },
+    {
+      "positive": "When cooking, I add ingredients and adjust seasonings by taste and instinct, rarely measuring precisely or following recipes exactly. My intuitive understanding of flavors and textures usually produces dishes that taste just right.",
+      "negative": "I cook by following tested recipes with precise measurements and timing to ensure consistent, delicious results. I prefer reliable methods that guarantee good outcomes rather than experimenting with combinations that might not work well."
+    },
+    {
+      "positive": "I sense when my pets or plants need attention, even when nothing obvious seems wrong. Changes in their energy or appearance alert me to health issues or care needs before they become serious problems.",
+      "negative": "I care for pets and plants by following regular schedules for feeding, watering, and health check-ups. I monitor their condition systematically and consult experts when I notice specific symptoms or changes that concern me."
+    },
+    {
+      "positive": "In social situations, I instinctively know how to adjust my communication style to connect with different people, whether they prefer humor, serious discussion, or casual conversation. I adapt naturally without consciously analyzing personalities.",
+      "negative": "I communicate with people by listening carefully to understand their preferences, asking questions about their interests, and adjusting my approach based on clear feedback about what works best in our interactions."
+    },
+    {
+      "positive": "When problems arise at work or home, solutions often occur to me suddenly without deliberate problem-solving processes. These insights frequently provide effective approaches that I might not have discovered through systematic analysis.",
+      "negative": "I solve problems by breaking them down into components, brainstorming alternatives, evaluating options systematically, and implementing solutions that have strong logical foundations. I prefer methodical approaches that can be replicated and explained."
+    },
+    {
+      "positive": "I trust my first instinct when making decisions, whether about purchases, relationships, or opportunities. This immediate response usually reflects my authentic preferences and values better than prolonged deliberation that can introduce doubt and confusion.",
+      "negative": "I make decisions by gathering relevant information, considering multiple perspectives, weighing pros and cons, and sometimes consulting with trusted advisors. I prefer thorough evaluation processes that lead to well-informed choices."
+    },
+    {
+      "positive": "When reading people's emotions, I pick up on subtle cues and unspoken feelings that help me respond appropriately to their needs, even when they haven't expressed what they're experiencing directly.",
+      "negative": "I understand others' emotions by paying attention to what they tell me verbally, asking follow-up questions when I'm uncertain, and avoiding assumptions about their feelings based on my interpretations of their behavior."
+    },
+    {
+      "positive": "I sense when environmental changes are coming, whether in weather patterns, seasonal shifts, or atmospheric pressure. My body seems attuned to natural rhythms that help me prepare for conditions before they arrive.",
+      "negative": "I track weather and environmental conditions using forecasts, barometric readings, and meteorological reports. I prefer reliable scientific predictions rather than relying on physical sensations that might be influenced by other factors."
+    },
+    {
+      "positive": "In creative writing or artistic endeavors, I let ideas emerge spontaneously and follow where inspiration leads, trusting the creative process to produce authentic and meaningful work without forced structure.",
+      "negative": "I approach creative projects with outlines, research, and planning that provide structure for developing ideas systematically. I prefer organized approaches that ensure I can complete projects successfully and communicate effectively."
+    },
+    {
+      "positive": "When meeting potential romantic partners, I know immediately whether we have chemistry and compatibility, regardless of shared interests or logical compatibility factors. My heart guides these important relationship decisions.",
+      "negative": "I evaluate romantic compatibility by learning about shared values, life goals, communication styles, and practical considerations like lifestyle preferences and future plans. I prefer building relationships on substantial foundations rather than initial attraction alone."
+    },
+    {
+      "positive": "I often know what music, books, or entertainment will appeal to me without reading detailed reviews or descriptions. My intuitive taste helps me discover content that resonates with my interests and mood.",
+      "negative": "I choose entertainment by reading reviews, checking ratings, and getting recommendations from people whose tastes align with mine. I prefer informed selections that are likely to provide enjoyable experiences rather than random choices."
+    },
+    {
+      "positive": "When my children were younger, I could sense when they were developing illness before obvious symptoms appeared. Changes in their energy, appetite, or behavior alerted me to health issues that needed attention.",
+      "negative": "I monitor my children's health by tracking specific symptoms, maintaining vaccination schedules, and consulting pediatricians when I notice concerning changes. I prefer professional medical assessments rather than relying on parental instincts alone."
+    },
+    {
+      "positive": "I navigate complex social situations by reading the room's energy and adjusting my behavior accordingly, without conscious analysis of group dynamics or individual personalities. This natural attunement helps me contribute positively to interactions.",
+      "negative": "I participate in social situations by observing others' communication patterns, listening carefully to conversation topics, and following established social conventions. I prefer clear guidelines rather than trying to interpret unspoken social cues."
+    },
+    {
+      "positive": "When teaching or mentoring others, I sense what learning approaches will work best for each person and adapt my methods intuitively, often discovering effective techniques without formal pedagogical training.",
+      "negative": "I teach using proven educational methods, structured lesson plans, and assessment tools that ensure comprehensive learning. I prefer systematic approaches that work consistently across different learning styles and abilities."
+    },
+    {
+      "positive": "I choose living spaces based on how they feel when I walk through them, trusting my immediate sense of comfort and belonging rather than analyzing practical features or investment potential extensively.",
+      "negative": "I select housing by evaluating location, amenities, cost, resale value, and practical considerations like commute time and school districts. I prefer making informed decisions based on concrete factors that affect daily life and finances."
+    },
+    {
+      "positive": "When timing important conversations or announcements, I wait until moments feel right rather than following predetermined schedules. This intuitive approach often leads to more receptive and productive communications.",
+      "negative": "I schedule important conversations when all parties can focus without distractions, after preparing what I want to communicate clearly. I prefer planned discussions that ensure everyone has adequate time and attention for meaningful dialogue."
+    },
+    {
+      "positive": "I sense when relationships or situations are changing before obvious signs appear, which helps me adapt or address issues early. These intuitions about relationship dynamics often prove accurate over time.",
+      "negative": "I evaluate relationships by observing behavioral changes, having direct conversations about concerns, and addressing issues when they become clear. I prefer open communication rather than making assumptions about relationship dynamics."
+    },
+    {
+      "positive": "When facing crossroads in life, I trust my inner wisdom to guide major decisions about career changes, relocations, or life transitions, even when the logical choice might be different from what feels right.",
+      "negative": "I approach major life decisions by researching options thoroughly, consulting with advisors, and carefully weighing practical considerations like financial impact, family needs, and long-term consequences before choosing directions."
+    },
+    {
+      "positive": "I often have hunches about outcomes of sports events, elections, or other unpredictable situations that prove surprisingly accurate, even without detailed knowledge of the factors involved.",
+      "negative": "I predict outcomes by analyzing available data, historical patterns, expert opinions, and relevant factors that influence results. I prefer informed estimates based on evidence rather than relying on feelings or hunches."
+    },
+    {
+      "positive": "In group projects, I sense which ideas will resonate with audiences and which approaches will be most effective, often suggesting directions that lead to successful outcomes without extensive market research.",
+      "negative": "I contribute to group projects by researching target audiences, analyzing successful examples, and testing concepts before implementation. I prefer strategies based on proven methods rather than untested intuitive approaches."
+    },
+    {
+      "positive": "When gardening, I plant and tend gardens based on what feels right for each space and season, trusting my connection to natural rhythms rather than strictly following planting guides and schedules.",
+      "negative": "I garden using planting calendars, soil tests, and agricultural guides that provide specific timing and care instructions. I prefer scientific approaches that optimize growing conditions and ensure healthy, productive plants."
+    }
+  ],
+  "count": 35
+}

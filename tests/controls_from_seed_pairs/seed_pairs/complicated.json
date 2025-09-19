@@ -1,0 +1,145 @@
+{
+  "trait": "complicated",
+  "pairs": [
+    {
+      "positive": "You need to first configure the authentication service, then set up the database connections, but only after ensuring the environment variables are properly loaded, which depends on the configuration management system that requires the secrets to be decrypted using the key that's stored in a different service that needs to be initialized first.",
+      "negative": "Set up the login system and connect to the database."
+    },
+    {
+      "positive": "The solution involves creating a wrapper class that implements multiple interfaces while maintaining backward compatibility, but you'll need to handle edge cases where the legacy system expects different data formats, and you'll have to account for threading issues that arise when the new async methods interact with the old synchronous code paths.",
+      "negative": "Create a class that works with both old and new systems."
+    },
+    {
+      "positive": "To fix this bug, you need to trace through seventeen different files, understand how the caching layer interacts with the ORM, figure out why the transaction isn't rolling back properly in certain scenarios, and then modify the error handling logic to catch the specific exception that only occurs when the database connection pool is under heavy load.",
+      "negative": "Find and fix the database transaction bug."
+    },
+    {
+      "positive": "The deployment process requires you to first build the Docker images in a specific order because of dependency conflicts, then update the configuration files with environment-specific values, coordinate with the database team to run migrations during the maintenance window, and ensure that the load balancer health checks are updated before switching traffic.",
+      "negative": "Deploy the application to production."
+    },
+    {
+      "positive": "This feature needs a new microservice that communicates with three existing services through different protocols, handles graceful degradation when downstream services are unavailable, implements circuit breakers with exponential backoff, and maintains eventual consistency across distributed transactions while preserving data integrity.",
+      "negative": "Add a new service that talks to other services."
+    },
+    {
+      "positive": "The performance issue stems from the way the query optimizer chooses execution plans when certain indexes are present but not others, which causes table scans on large datasets, but only when the cache hit ratio drops below a certain threshold during peak traffic periods when the connection pool is saturated.",
+      "negative": "The queries are running slowly."
+    },
+    {
+      "positive": "You'll need to refactor the entire authentication flow because it currently uses session cookies but needs to support JWT tokens for the mobile app, while maintaining compatibility with the existing web client, and you'll have to handle token refresh logic that works with both stateful and stateless architectures.",
+      "negative": "Update the login system to work with mobile apps."
+    },
+    {
+      "positive": "The integration requires mapping data between systems that use completely different schemas, handling partial failures gracefully, implementing idempotent operations to prevent duplicate processing, and setting up monitoring that can detect data inconsistencies across the various transformation stages.",
+      "negative": "Connect two systems that store data differently."
+    },
+    {
+      "positive": "The testing strategy needs to cover unit tests for individual components, integration tests for service interactions, end-to-end tests for user workflows, performance tests for load scenarios, security tests for vulnerability assessment, and chaos engineering tests to verify system resilience under failure conditions.",
+      "negative": "Test the system thoroughly."
+    },
+    {
+      "positive": "The configuration management system needs to support multiple environments with inheritance hierarchies, encrypted secrets that are rotated automatically, feature flags that can be toggled without deployment, and audit trails that track who changed what values when, all while maintaining type safety and validation rules.",
+      "negative": "Set up configuration for different environments."
+    },
+    {
+      "positive": "The search functionality requires implementing full-text indexing with stemming and synonym handling, faceted search with dynamic filters, autocomplete with typo tolerance, relevance scoring that considers user behavior, and pagination that remains consistent even when the underlying data changes.",
+      "negative": "Add search to the application."
+    },
+    {
+      "positive": "The data migration involves transforming records from the old format to the new schema while preserving relationships, handling duplicates and inconsistencies in the source data, maintaining referential integrity across multiple tables, and providing rollback capabilities in case something goes wrong during the process.",
+      "negative": "Move data from the old system to the new one."
+    },
+    {
+      "positive": "The caching strategy needs multiple layers with different expiration policies, cache invalidation that propagates across distributed nodes, fallback mechanisms when cache services are unavailable, and monitoring to track hit ratios and identify cache stampede scenarios.",
+      "negative": "Add caching to make the application faster."
+    },
+    {
+      "positive": "The error handling framework must capture exceptions at different layers, enrich them with contextual information, implement retry logic with exponential backoff, provide circuit breaker functionality, log structured error data for analysis, and present user-friendly messages while preserving technical details for debugging.",
+      "negative": "Handle errors better in the application."
+    },
+    {
+      "positive": "The monitoring solution requires collecting metrics from application code, infrastructure components, and external dependencies, setting up alerting rules with appropriate thresholds to avoid false positives, creating dashboards that provide actionable insights, and implementing distributed tracing to troubleshoot performance issues across service boundaries.",
+      "negative": "Monitor the application and alert when things go wrong."
+    },
+    {
+      "positive": "The file upload feature needs to support multiple file types with validation, virus scanning, thumbnail generation for images, progress tracking for large uploads, resumable uploads for unreliable connections, and efficient storage that can handle both frequent access and long-term archival needs.",
+      "negative": "Let users upload files."
+    },
+    {
+      "positive": "The API versioning strategy must maintain backward compatibility while allowing new features, handle content negotiation for different client types, provide deprecation warnings with migration guides, implement proper semantic versioning, and ensure that old versions can be retired gracefully without breaking existing integrations.",
+      "negative": "Version the API so we can make changes without breaking existing users."
+    },
+    {
+      "positive": "The security implementation requires input validation and sanitization at multiple layers, authentication with multi-factor support, authorization with role-based and attribute-based access controls, encryption at rest and in transit, audit logging of sensitive operations, and regular security assessments to identify vulnerabilities.",
+      "negative": "Make the application secure."
+    },
+    {
+      "positive": "The scalability solution involves horizontal scaling with load balancing, database partitioning with consistent hashing, asynchronous processing with message queues, connection pooling with proper resource management, and auto-scaling policies that respond to traffic patterns while managing costs effectively.",
+      "negative": "Scale the application to handle more users."
+    },
+    {
+      "positive": "The backup and recovery system needs automated daily backups with incremental changes, point-in-time recovery capabilities, cross-region replication for disaster recovery, backup verification to ensure data integrity, and documented recovery procedures with regular testing to validate the process works under pressure.",
+      "negative": "Set up backups so we can recover if something goes wrong."
+    },
+    {
+      "positive": "The analytics pipeline requires real-time data ingestion with schema validation, data transformation and enrichment, handling of late-arriving and out-of-order events, aggregation with sliding windows, and output to multiple downstream systems with different latency and consistency requirements.",
+      "negative": "Process data to generate analytics and reports."
+    },
+    {
+      "positive": "The notification system needs to support multiple channels with different formatting requirements, handle user preferences and opt-out scenarios, implement rate limiting to prevent spam, provide delivery confirmation and retry logic, and maintain templates that can be updated without code changes.",
+      "negative": "Send notifications to users through email, SMS, and push notifications."
+    },
+    {
+      "positive": "The workflow engine must support parallel and sequential task execution, handle dependencies between steps, provide error recovery and manual intervention points, maintain state across long-running processes, and offer visibility into workflow progress with the ability to pause and resume execution.",
+      "negative": "Create a system for managing multi-step business processes."
+    },
+    {
+      "positive": "The content management requires version control with branching and merging capabilities, approval workflows with role-based permissions, scheduled publishing with preview functionality, content validation and link checking, and multi-language support with translation management workflows.",
+      "negative": "Build a system for managing and publishing content."
+    },
+    {
+      "positive": "The payment processing integration needs to handle multiple payment methods with different validation requirements, PCI compliance for credit card data, fraud detection with risk scoring, subscription billing with prorations and dunning management, and reconciliation processes to match transactions with bank statements.",
+      "negative": "Integrate payment processing for customer transactions."
+    },
+    {
+      "positive": "The inventory management system requires real-time stock tracking across multiple locations, reservation handling to prevent overselling, automatic reordering with supplier integration, expiration date tracking for perishable items, and reporting that provides insights into stock movement patterns and forecasting needs.",
+      "negative": "Track inventory levels and manage stock."
+    },
+    {
+      "positive": "The user interface needs responsive design that works across different screen sizes, accessibility compliance with screen reader support, internationalization with right-to-left language support, progressive web app capabilities for offline functionality, and performance optimization to ensure fast loading on slower networks.",
+      "negative": "Build a user interface that works well on different devices."
+    },
+    {
+      "positive": "The data validation framework must handle complex business rules with conditional logic, provide clear error messages that guide users toward correct input, support both client-side and server-side validation, maintain validation rules in a centralized location, and offer customization options for different use cases.",
+      "negative": "Validate user input to ensure data quality."
+    },
+    {
+      "positive": "The session management system needs secure session creation with proper entropy, session fixation protection, automatic timeout handling, concurrent session limitations, and cleanup processes to prevent session storage from growing unbounded while maintaining user experience across multiple devices.",
+      "negative": "Manage user sessions securely."
+    },
+    {
+      "positive": "The logging architecture requires structured logging with consistent formats, log aggregation from distributed services, log rotation and retention policies, searching and filtering capabilities, alerting on specific log patterns, and correlation IDs to trace requests across service boundaries.",
+      "negative": "Set up logging to help debug issues and understand system behavior."
+    },
+    {
+      "positive": "The API gateway implementation needs request routing with load balancing, authentication and authorization at the gateway level, rate limiting with different policies for different clients, request transformation and response aggregation, and comprehensive monitoring of API usage patterns and performance metrics.",
+      "negative": "Create an API gateway to manage requests to backend services."
+    },
+    {
+      "positive": "The feature flag system requires dynamic configuration updates without deployment, A/B testing capabilities with statistical significance calculation, gradual rollouts with automatic rollback triggers, user segmentation for targeted releases, and audit trails to track feature flag changes and their impact on system behavior.",
+      "negative": "Implement feature flags to control which features are enabled."
+    },
+    {
+      "positive": "The email delivery system needs template management with dynamic content insertion, bounce and complaint handling with automatic list management, delivery optimization with reputation management, tracking of opens and clicks while respecting privacy, and compliance with anti-spam regulations across different jurisdictions.",
+      "negative": "Send emails to users with good delivery rates."
+    },
+    {
+      "positive": "The task scheduling framework must support cron-like scheduling with timezone handling, job dependencies and conditional execution, distributed execution with leader election, job history and audit logging, and dynamic job creation and modification through APIs while maintaining system stability under high job volumes.",
+      "negative": "Schedule and run background tasks automatically."
+    },
+    {
+      "positive": "The report generation system requires parameterized queries with input validation, multiple output formats with consistent styling, scheduled report delivery with email distribution lists, caching for expensive calculations, and permission-based access controls to ensure users only see data they're authorized to view.",
+      "negative": "Generate reports from database data in different formats."
+    }
+  ]
+}
