@@ -1,5 +1,3 @@
-## In order to work, programs need https://github.com/wisent-ai/wisent-backend/tree/main/seed/pairs
-
 # Control Vector Generation from Seed Pairs
 
 This directory contains a complete pipeline for generating control vectors from JSON seed pairs and serializing them as plain activations.
@@ -30,9 +28,21 @@ tests/controls_from_seed_pairs/
      ]
    }
    ```
+   Change it to:
+   ```json
+   {
+     "pairs": [
+       {
+         "question": "How do you respond when someone is struggling?",
+         "choice_a": "Let me help you with that.",
+         "choice_b": "Figure it out yourself."
+       }
+     ]
+   }
+   This format is expected by ContrastivePairSet.create_multiple_choice_questions().
 
 2. **Control Vector Generation**:
-   - Load JSON → ContrastivePairSet
+   - Load JSON → Format data → ContrastivePairSet
    - Extract activations using model
    - Train CAA steering method
    - Generate control vector

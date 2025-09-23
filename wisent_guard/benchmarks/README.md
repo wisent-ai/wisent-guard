@@ -24,60 +24,13 @@ aime,aime2024,aime2025,apps,arc_challenge,arc_easy,arithmetic,asdiv,boolq,codexg
 
 Notice that there is smaller number of available tasks than benchmarks in the table, this is because some of them are not fully implemented yet.
 
-Moreover some of the 79 available tasks are not really available, that is they do not work. Here is a brief analysis:
-
-does not work:
-
-gpqa_diamond loads gpqa_diamond_zeroshot
-
-gpqa_extended loads gpqa_extended_zeroshot
-
-CE:
-
-apps
-
-multiple_cpp (failed as expected - look table, but from different reasons, it is trying to load multiple, multiple_choice, fails anyway)
-
-humaneval, humaneval_plus, mbpp:
-
-codexglue_code_to_text_go, codexglue_code_to_text_java, codexglue_code_to_text_javascript 
-codexglue_code_to_text_php , codexglue_code_to_text_python, codexglue_code_to_text_ruby 
-conala, concode, ds1000, recode (does not load)
-
-suspicious warnings:
-
-arithmetic (loads arithmetic_1dc), race((Unknown sample format: ['article', 'problems', '_split_origin']))
-
-gpqa (0 on evals)
-
-
 Notice that even if task works it does not mean that it works as intended or reasonable.
 
-## improving extractors
+## updates
 
-Extractors of contrastive pairs are implemented in benchmark_extractors.py and bigcode_extractors.py. Some of them have are poorly written and does not match format of benchmark's data.
+I follow the table from neurips_2024.pdf and systematically and methodically check benchmarks and fix them if broken or add new one.
 
-Benchmarks which extractors should be fixed:
-
-MultiRC
-
-TruthfulQA
-
-TruthfulQA gen
-
-PubMedQA
-
-ASDiv
-
-Apps
-
-CB
-
-## adding new datasets
-
-qa4mre added
-
-qasper, quac problems with dataset version
+23 september: there are 95 tasks available now, so 16 were added and about the same number were fixed.
 
 
 

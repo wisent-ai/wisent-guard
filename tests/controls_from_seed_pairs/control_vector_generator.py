@@ -127,42 +127,6 @@ class ControlVectorGenerator:
 
         logger.info(f"Saved control vector to {output_path}")
 
-    def process_single_json_file(self, json_path: str, output_dir: str) -> bool:
-        """
-        Process a single JSON file and generate its control vector.
-
-        Args:
-            json_path: Path to input JSON file
-            output_dir: Directory to save output control vector JSON
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            json_path = Path(json_path)
-            trait_name = json_path.stem
-
-            logger.info(f"Processing {trait_name} from {json_path}")
-
-            # Load the JSON file
-            pair_set = self.loader.load_json_file(json_path)
-
-            # Extract activations
-            pair_set = self.extract_activations_for_pair_set(pair_set)
-
-            # Generate control vector
-            control_vector_data = self.generate_control_vector(pair_set)
-
-            # Save to JSON
-            output_path = Path(output_dir) / f"{trait_name}_control_vector.json"
-            self.save_control_vector_json(control_vector_data, output_path)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to process {json_path}: {e}")
-            return False
-
     def process_single_json_file_mc(self, json_path: str, output_dir: str) -> bool:
         """
         Process a single JSON file using multiple-choice format and generate its control vector.
@@ -206,7 +170,7 @@ class ControlVectorGenerator:
 
 
 if __name__ == "__main__":
-    # Test the generator
+
     logging.basicConfig(level=logging.INFO)
 
     generator = ControlVectorGenerator(
@@ -215,13 +179,13 @@ if __name__ == "__main__":
         device="auto"
     )
 
-    # Test with single file - regular format
-    test_file = "/home/bc/Desktop/Documents/wisent-guard/tests/controls_from_seed_pairs/seed_pairs/helpful.json"
-    output_dir = "/home/bc/Desktop/Documents/wisent-guard/tests/controls_from_seed_pairs/control_vectors"
+    # Test with multiple-choice format
+    here = Path(__file__).parent
+    test_file = here / "seed_pairs/helpful.json"
+    output_dir = here / "control_vectors"
 
-    success = generator.process_single_json_file(test_file, output_dir)
+    success = generator.process_single_json_file_mc(test_file, output_dir)
     print(f"Regular format test: {'Success' if success else 'Failed'}")
 
-    # Test with multiple-choice format
     success_mc = generator.process_single_json_file_mc(test_file, output_dir)
     print(f"Multiple-choice format test: {'Success' if success_mc else 'Failed'}")

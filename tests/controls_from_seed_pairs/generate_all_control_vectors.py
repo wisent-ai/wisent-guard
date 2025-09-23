@@ -93,11 +93,11 @@ def main():
         help='Enable verbose logging'
     )
 
-    parser.add_argument(
-        '--multiple-choice',
-        action='store_true',
-        help='Use multiple-choice format for prompts'
-    )
+#    parser.add_argument(
+#        '--multiple-choice',
+#        action='store_true',
+#        help='Use multiple-choice format for prompts'
+#    )
 
     args = parser.parse_args()
 
@@ -112,7 +112,7 @@ def main():
     logger.info(f"Device: {args.device}")
     logger.info(f"Limit: {args.limit}")
     logger.info(f"Resume from: {args.resume_from}")
-    logger.info(f"Multiple-choice format: {args.multiple_choice}")
+    #logger.info(f"Multiple-choice format: {args.multiple_choice}")
 
     # Validate input directory
     input_dir = Path(args.input_dir)
@@ -160,7 +160,7 @@ def main():
         trait_name = json_file.stem
 
         # Check if already processed
-        suffix = "_mc_control_vector.json" if args.multiple_choice else "_control_vector.json"
+        suffix = "_mc_control_vector.json" 
         output_file = output_dir / f"{trait_name}{suffix}"
         if output_file.exists():
             logger.info(f"Skipping {trait_name} (already exists)")
@@ -170,10 +170,7 @@ def main():
         logger.info(f"Processing {i+1}/{len(json_files)}: {trait_name}")
 
         try:
-            if args.multiple_choice:
-                success = generator.process_single_json_file_mc(json_file, output_dir)
-            else:
-                success = generator.process_single_json_file(json_file, output_dir)
+            success = generator.process_single_json_file_mc(json_file, output_dir)
             results[trait_name] = success
 
             if success:

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  23 SEP 2025 15:46
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  23 SEP 2025 21:16
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -772,47 +772,47 @@ Overfull \hbox (24.15184pt too wide) in alignment at lines 180--184
  []
 
 
-Underfull \hbox (badness 6575) in paragraph at lines 272--272
+Underfull \hbox (badness 6575) in paragraph at lines 273--273
 []|\T1/ptm/m/n/10 (+20) LiveMathBench CNMO EN
  []
 
 
-Underfull \hbox (badness 6575) in paragraph at lines 273--273
+Underfull \hbox (badness 6575) in paragraph at lines 274--274
 []|\T1/ptm/m/n/10 (+20) LiveMathBench CNMO ZH
  []
 
 
-Underfull \hbox (badness 4739) in paragraph at lines 298--298
+Underfull \hbox (badness 4739) in paragraph at lines 299--299
 []|\T1/ptm/m/n/10 (+20) CodeXGLUE Code to Text
  []
 
 
-Underfull \hbox (badness 4739) in paragraph at lines 301--301
+Underfull \hbox (badness 4739) in paragraph at lines 302--302
 []|\T1/ptm/m/n/10 (+20) CodeXGLUE Code to Text
  []
 
 
-Underfull \hbox (badness 4739) in paragraph at lines 303--303
+Underfull \hbox (badness 4739) in paragraph at lines 304--304
 []|\T1/ptm/m/n/10 (+20) CodeXGLUE Code to Text
  []
 
 
-Underfull \hbox (badness 5388) in paragraph at lines 325--325
+Underfull \hbox (badness 5388) in paragraph at lines 326--326
 []|\T1/ptm/m/n/10 (+20) LAMBADA Stan-dard Cloze
  []
 
 
-Underfull \hbox (badness 2073) in paragraph at lines 331--331
+Underfull \hbox (badness 2073) in paragraph at lines 332--332
 []|\T1/ptm/b/n/10 (+20) MC-FirstDistr; Gen-
  []
 
 
-Overfull \hbox (24.15184pt too wide) in alignment at lines 184--334
+Overfull \hbox (24.15184pt too wide) in alignment at lines 184--335
  [] [] [] [] 
  []
 
 [8] [9] [10]
-Overfull \hbox (12.62721pt too wide) in paragraph at lines 365--380
+Overfull \hbox (12.62721pt too wide) in paragraph at lines 366--381
 [] 
  []
 
@@ -820,13 +820,13 @@ Overfull \hbox (12.62721pt too wide) in paragraph at lines 365--380
 pdfTeX warning (ext4): destination with the same identifier (name{appendix.B}) has been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.390 \section{GSM8K Pipeline Visualization}
+l.391 \section{GSM8K Pipeline Visualization}
                                             
-LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 402.
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 403.
  (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )
-Overfull \hbox (36.37228pt too wide) in paragraph at lines 432--433
+Overfull \hbox (36.37228pt too wide) in paragraph at lines 433--434
  [] 
  []
 
@@ -850,7 +850,7 @@ Here is how much of TeX's memory you used:
  1141 hyphenation exceptions out of 8191
  102i,15n,107p,1073b,829s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/helvetic/uhvr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on neurips_2024.pdf (12 pages, 130124 bytes).
+Output written on neurips_2024.pdf (12 pages, 130100 bytes).
 PDF statistics:
  382 PDF objects out of 1000 (max. 8388607)
  354 compressed objects within 4 object streams

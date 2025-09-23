@@ -543,15 +543,13 @@ class GSM8KExtractor(BenchmarkExtractor):
         - AIME_2024 format: doc['Problem'] -> doc['Answer']
         """
         try:
-            print("q"*80)
+            
             # Handle multiple field name variants
             question = doc.get("question", "") or doc.get("problem", "") or doc.get("Problem", "")
             answer = doc.get("answer", "") or doc.get("Answer", "")
 
             if not all([question, str(answer) if answer is not None else None]):
                 return None
-
-            print("w"*80)
 
             # Format the question
             if hasattr(task_data, "doc_to_text"):
