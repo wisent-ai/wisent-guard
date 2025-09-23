@@ -167,7 +167,7 @@ def _load_data(settings: PipelineSettings, model: Model) -> tuple[
     )
     qa_pairs: list[dict[str, Any]] = data["qa_pairs"]
     test_qa_pairs_source: list[dict[str, Any]] = data["test_qa_pairs_source"]
-    task_data: dict[str, "ConfigurableTask"] | "ConfigurableTask" = data["task_data"]
+    task_data: dict[str, ConfigurableTask] | ConfigurableTask = data["task_data"]
     logger.info("data_loaded", extra={"n_train": len(qa_pairs), "n_test": len(test_qa_pairs_source)})
     return qa_pairs, test_qa_pairs_source, task_data
 
@@ -400,3 +400,34 @@ def run_task_steering_pipeline(
         task_data=task_data,
         test_qa_pairs_source=test_qa_pairs_source,
     )
+
+if __name__ == "__main__":
+    model_path = "/home/gg/.cache/huggingface/hub/models--meta-llama--Llama-3.2-1B-Instruct/snapshots/9213176726f574b556790deb65791e0c5aa438b6"
+    settings = PipelineSettings(
+        model=ModelSettings(model_name=model_path, device="cuda"),
+        data=DataSettings(
+            task_name="gsm8k",
+            split_ratio=0.8,
+            limit=10,
+            training_limit=10,
+            testing_limit=10,
+            seed=42,
+        ),
+        activation=ActivationSettings(
+            prompt_strategy="instruction_following",
+            token_target="last_token",
+            token_aggregation="average",
+            layer=9,
+        ),
+        steering=SteeringSettings(
+            steering_method="CAA",
+            steering_strength=1.0,
+            config=None,
+            default_target_labels=(1,),
+            default_avoid_labels=(0,),
+            default_alpha=0.5,
+        ),
+    )
+
+    results = run_task_steering_pipeline(settings, trackers=None)
+    print("Results:", results)

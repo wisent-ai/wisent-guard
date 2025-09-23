@@ -3,11 +3,7 @@ Steering evaluation module for lm-harness integration.
 Provides functions to evaluate steering methods using the lm-harness framework.
 """
 
-import torch
-from typing import Dict, List, Any, Optional
-
-
-def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, steering_strength=1.0, use_test_split=True, verbose=False, output_mode="both"):
+def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods, layers, steering_strength=1.0, verbose=False, output_mode="both"):
     """
     Run lm-harness evaluation on test data with steering applied.
     Now includes comparison between unsteered baseline and steered results.
@@ -61,7 +57,7 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
             def tok_decode(self, tokens):
                 return self.wisent_model.tokenizer.decode(tokens)
             
-            def generate_until(self, requests, disable_tqdm: bool = False):
+            def generate_until(self, requests):
                 """Generate text until stopping condition met."""
                 if not requests:
                     return []
@@ -98,7 +94,7 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                 
                 return results
                 
-            def loglikelihood(self, requests, disable_tqdm: bool = False):
+            def loglikelihood(self, requests):
                 """Compute log-likelihood with steering applied."""
                 if not requests:
                     return []
@@ -383,7 +379,7 @@ def run_lm_harness_evaluation(task_data, test_qa_pairs, model, steering_methods,
                         
                 return results
                 
-            def loglikelihood_rolling(self, requests, disable_tqdm: bool = False):
+            def loglikelihood_rolling(self, requests):
                 """Rolling log-likelihood computation."""
                 if not requests:
                     return []
