@@ -135,7 +135,7 @@ class Model:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.hf_model = AutoModelForCausalLM.from_pretrained(
-            self.name, dtype=dtype, device_map=self.compute_device, output_hidden_states=True
+            self.name, dtype=dtype, device_map=self.compute_device
         )
         self.hf_model.config.output_hidden_states = True
         

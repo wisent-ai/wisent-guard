@@ -196,6 +196,7 @@ def _compute_activations(
     Returns:
         - A ContrastivePairSet with real activations attached.
     """
+    breakpoint()
     logger = bind(_LOG, stage="activations", task=settings.data.task_name)
     collector: ActivationCollectionLogic = make_collector(model)
     contrastive_pairs = create_contrastive_pairs(
@@ -204,6 +205,7 @@ def _compute_activations(
         qa_pairs=qa_pairs,
         verbose=settings.tracking.verbose,
     )
+    breakpoint()
     processed_pairs = extract_activations_for_pairs(
         collector=collector,
         contrastive_pairs=contrastive_pairs,
@@ -213,6 +215,7 @@ def _compute_activations(
         latency_tracker=trackers.latency if trackers else None, 
         verbose=settings.tracking.verbose,
     )
+    breakpoint()
     pair_set = build_pair_set_with_real_activations(
         processed_pairs=processed_pairs,
         task_name=settings.data.task_name,

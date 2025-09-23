@@ -268,7 +268,7 @@ def extract_activations_for_pairs(
         logger.error("`layer` is empty.")
         raise ValueError("`layer` must contain at least one layer index.")
     strategy = _coerce_targeting_strategy(token_targeting_strategy)
-
+    breakpoint()
     if verbose:
         logger.info(
             "Collecting activations",

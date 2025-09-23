@@ -7,14 +7,14 @@ IMPORTANT: Provide correct path to the model if not using a HF model id/or if th
 
   # minimal
   python3 -m wisent_guard.cli_bricks.cli_tests.cli_control_vector_creator \
-    --model-name meta-llama/Llama-3.2-1B-Instruct \
+    --model-name unsloth/Qwen3-4B-unsloth-bnb-4bit \
     --task-name truthfulqa_mc1 \
     --layer 9 --steering-method CAA \
     --save-vector /path/to/control_vector.pt
 
   # with custom data from JSON
   python3 -m wisent_guard.cli_bricks.cli_tests.cli_control_vector_creator \
-    --model-name meta-llama/Llama-3.2-1B-Instruct \
+    --model-name unsloth/Qwen3-4B-unsloth-bnb-4bit \
     --data-json /path/to/data.json \
     --layer 9 --steering-method CAA \
     --save-vector /path/to/control_vector.pt
@@ -25,6 +25,7 @@ import sys
 import json
 import torch
 from pathlib import Path
+from datetime import datetime
 
 try:
     from wisent_guard.cli_bricks.cli_run_task_steering import (
@@ -108,7 +109,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # Activation
     p.add_argument("--prompt-strategy", default="multiple_choice")
     p.add_argument("--token-target", default="choice_token")
-    p.add_argument("--token-aggregation", default="average")
+    p.add_argument("--token-aggregation", default="last_token")
     p.add_argument("--layer", type=_maybe_int_or_str, default=9, help="Layer index for activation extraction")
 
     # Steering method
@@ -140,7 +141,9 @@ def load_json_data(json_path: str) -> list[dict]:
     """
     Load contrastive pairs from JSON file.
 
-    Expected format:
+    Supports two formats:
+    
+    Format 1 (simple list):
     [
         {
             "question": "What is the capital of France?",
@@ -149,23 +152,63 @@ def load_json_data(json_path: str) -> list[dict]:
         },
         ...
     ]
+    
+    Format 2 (trait-based with pairs):
+    {
+        "trait": "happy",
+        "pairs": [
+            {
+                "question": "How are you?",
+                "positive": "I feel great!",
+                "negative": "I feel terrible."
+            },
+            ...
+        ]
+    }
     """
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    if not isinstance(data, list):
-        raise ValueError("JSON data must be a list of objects")
-
-    # Validate format
-    required_keys = {"question", "correct_answer", "incorrect_answer"}
-    for i, item in enumerate(data):
-        if not isinstance(item, dict):
-            raise ValueError(f"Item {i} must be a dictionary")
-        missing_keys = required_keys - set(item.keys())
-        if missing_keys:
-            raise ValueError(f"Item {i} missing required keys: {missing_keys}")
-
-    return data
+    # Handle format 2: trait-based structure
+    if isinstance(data, dict) and "pairs" in data:
+        pairs = data["pairs"]
+        if not isinstance(pairs, list):
+            raise ValueError("'pairs' field must be a list")
+        
+        # Convert to expected format
+        converted_data = []
+        for i, item in enumerate(pairs):
+            if not isinstance(item, dict):
+                raise ValueError(f"Pair {i} must be a dictionary")
+            
+            required_keys = {"question", "positive", "negative"}
+            missing_keys = required_keys - set(item.keys())
+            if missing_keys:
+                raise ValueError(f"Pair {i} missing required keys: {missing_keys}")
+            
+            converted_data.append({
+                "question": item["question"],
+                "correct_answer": item["positive"],
+                "incorrect_answer": item["negative"]
+            })
+        
+        return converted_data
+    
+    # Handle format 1: simple list
+    elif isinstance(data, list):
+        # Validate format
+        required_keys = {"question", "correct_answer", "incorrect_answer"}
+        for i, item in enumerate(data):
+            if not isinstance(item, dict):
+                raise ValueError(f"Item {i} must be a dictionary")
+            missing_keys = required_keys - set(item.keys())
+            if missing_keys:
+                raise ValueError(f"Item {i} missing required keys: {missing_keys}")
+        
+        return data
+    
+    else:
+        raise ValueError("JSON data must be either a list of objects or an object with 'pairs' field")
 
 
 def create_steering_config(args) -> SteeringConfig:
@@ -231,6 +274,7 @@ def settings_from_args(args: argparse.Namespace) -> PipelineSettings:
 def save_control_vector(steering_method, layer: int, save_path: str, task_name: str, verbose: bool = False):
     """
     Save the trained steering method as a control vector.
+    Supports both .pt (PyTorch) and .json formats.
     """
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,30 +293,85 @@ def save_control_vector(steering_method, layer: int, save_path: str, task_name: 
         # For other methods, try to extract the main tensor
         raise ValueError(f"Cannot extract control vector from {type(steering_method).__name__}")
 
-    # Prepare save data
-    save_data = {
-        "vector": control_vector,
-        "layer": layer,
-        "task": task_name,
-        "method": steering_method.__class__.__name__,
-        "shape": control_vector.shape if control_vector is not None else None,
-    }
+    # Calculate statistics
+    vector_stats = {}
+    if control_vector is not None:
+        vector_np = control_vector.detach().cpu().numpy() if hasattr(control_vector, 'detach') else control_vector
+        vector_stats = {
+            "norm": float(torch.norm(control_vector).item()) if hasattr(control_vector, 'norm') else float(torch.tensor(vector_np).norm().item()),
+            "mean": float(vector_np.mean()),
+            "std": float(vector_np.std()),
+            "min": float(vector_np.min()),
+            "max": float(vector_np.max()),
+            "shape": list(vector_np.shape),
+            "non_zero_count": int((vector_np != 0).sum()),
+            "sparsity": float((vector_np == 0).sum() / vector_np.size)
+        }
 
-    # Add method-specific data
-    if hasattr(steering_method, 'normalization_method'):
-        save_data["normalization_method"] = steering_method.normalization_method
-    if hasattr(steering_method, 'target_norm'):
-        save_data["target_norm"] = steering_method.target_norm
+    # Determine file format and save accordingly
+    if save_path.suffix.lower() == '.json':
+        # Save as JSON with activations and statistics
+        save_data = {
+            "metadata": {
+                "layer": layer,
+                "task": task_name,
+                "method": steering_method.__class__.__name__,
+                "creation_time": datetime.now().isoformat(),
+            },
+            "vector_stats": vector_stats,
+            "activations": vector_np.tolist() if control_vector is not None else None,
+        }
 
-    # Save to file
-    torch.save(save_data, save_path)
+        # Add method-specific metadata
+        if hasattr(steering_method, 'normalization_method'):
+            # Convert enum to string for JSON serialization
+            norm_method = steering_method.normalization_method
+            save_data["metadata"]["normalization_method"] = str(norm_method) if norm_method is not None else None
+        if hasattr(steering_method, 'target_norm'):
+            save_data["metadata"]["target_norm"] = float(steering_method.target_norm) if steering_method.target_norm is not None else None
+        if hasattr(steering_method, 'alpha'):
+            save_data["metadata"]["alpha"] = float(steering_method.alpha)
 
-    if verbose:
-        print(f"✅ Control vector saved to: {save_path}")
-        print(f"   Method: {save_data['method']}")
-        print(f"   Layer: {layer}")
-        print(f"   Shape: {save_data['shape']}")
-        print(f"   Task: {task_name}")
+        # Save to JSON
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(save_data, f, indent=2)
+
+        if verbose:
+            print(f"✅ Control vector saved to: {save_path}")
+            print(f"   Method: {save_data['metadata']['method']}")
+            print(f"   Layer: {layer}")
+            print(f"   Shape: {vector_stats.get('shape', 'Unknown')}")
+            print(f"   Task: {task_name}")
+            print(f"   Norm: {vector_stats.get('norm', 'N/A'):.4f}")
+            print(f"   Sparsity: {vector_stats.get('sparsity', 'N/A'):.4f}")
+
+    else:
+        # Save as PyTorch .pt file (original behavior)
+        save_data = {
+            "vector": control_vector,
+            "layer": layer,
+            "task": task_name,
+            "method": steering_method.__class__.__name__,
+            "shape": control_vector.shape if control_vector is not None else None,
+            "stats": vector_stats,
+        }
+
+        # Add method-specific data
+        if hasattr(steering_method, 'normalization_method'):
+            save_data["normalization_method"] = steering_method.normalization_method
+        if hasattr(steering_method, 'target_norm'):
+            save_data["target_norm"] = steering_method.target_norm
+
+        # Save to file
+        torch.save(save_data, save_path)
+
+        if verbose:
+            print(f"✅ Control vector saved to: {save_path}")
+            print(f"   Method: {save_data['method']}")
+            print(f"   Layer: {layer}")
+            print(f"   Shape: {save_data['shape']}")
+            print(f"   Task: {task_name}")
+            print(f"   Norm: {vector_stats.get('norm', 'N/A'):.4f}")
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -302,7 +401,6 @@ def main(argv: Optional[list[str]] = None) -> int:
         # Step 2: Load data
         if args.verbose:
             print("📊 Loading data...")
-
         if args.data_json:
             # Load custom JSON data
             json_data = load_json_data(args.data_json)

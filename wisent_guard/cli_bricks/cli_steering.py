@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final, Literal, Protocol, TYPE_CHECKING, runtime_checkable
+from typing import Final, Literal, Protocol, TYPE_CHECKING, runtime_checkable, Union
 
 from typing import cast
 
@@ -75,7 +75,7 @@ class KSteeringConfig(_BaseConfig):
     avoid_labels: tuple[int, ...] = field(default_factory=tuple)
     alpha: float = 0.5
 
-type SteeringConfig = CAAConfig | HPRConfig | DACConfig | BiPOConfig | KSteeringConfig
+SteeringConfig = Union[CAAConfig, HPRConfig, DACConfig, BiPOConfig, KSteeringConfig]
 
 def _coerce_normalization(method: str) -> "VectorNormalizationMethod": # type: ignore
     """Create a VectorNormalizationMethod from a string; fallback to NONE.

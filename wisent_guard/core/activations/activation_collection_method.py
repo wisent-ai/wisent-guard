@@ -45,15 +45,15 @@ class ActivationCollectionLogic:
     ) -> PromptPair:
         """Original multiple choice format."""
         # Create the multiple choice question
-        mc_question = f"Which is better: {question} A. {incorrect_answer} B. {correct_answer}"
+        mc_question = f"{question}\n\nChoices:\n(A) {incorrect_answer}\n(B) {correct_answer}"
 
         # Use the model's proper formatting (no response yet, just the prompt)
         base_prompt = self.model.format_prompt(mc_question)
 
         return PromptPair(
-            positive_prompt=f"{base_prompt}B",  # Chooses correct answer
-            negative_prompt=f"{base_prompt}A",  # Chooses incorrect answer
-            target_token="B",  # Target the choice tokens
+            positive_prompt=f"{base_prompt}(B",  # Chooses correct answer
+            negative_prompt=f"{base_prompt}(A",  # Chooses incorrect answer
+            target_token="(B",  # Target the choice tokens
         )
 
     def _construct_role_playing_prompts(self, question: str, correct_answer: str, incorrect_answer: str) -> PromptPair:
@@ -278,54 +278,55 @@ class ActivationCollectionLogic:
         logging.debug(f"Tokens: {tokens[:5]}..." if len(tokens) > 5 else f"Tokens: {tokens}")
         logging.debug(f"Hidden states shape: {hidden_states.shape}")
         if strategy == ActivationAggregationStrategy.CHOICE_TOKEN:
-            # Look for A/B choice tokens (backward search)
-            position = self._get_token_position_choice_token(tokens, target_token)
-            logging.debug(f"CHOICE_TOKEN: Using position {position}")
-            return hidden_states[0, position, :]
+        #     # Look for A/B choice tokens (backward search)
+        #     position = self._get_token_position_choice_token(tokens, target_token)
+        #     logging.debug(f"CHOICE_TOKEN: Using position {position}")
+        #     breakpoint()
+        #     return hidden_states[0, position, :]
 
-        if strategy == ActivationAggregationStrategy.CONTINUATION_TOKEN:
-            # Look for continuation tokens like "I" (forward search)
-            position = self._get_token_position_continuation_token(tokens, target_token)
-            logging.debug(f"CONTINUATION_TOKEN: Using position {position}")
-            return hidden_states[0, position, :]
+        # if strategy == ActivationAggregationStrategy.CONTINUATION_TOKEN:
+        #     # Look for continuation tokens like "I" (forward search)
+        #     position = self._get_token_position_continuation_token(tokens, target_token)
+        #     logging.debug(f"CONTINUATION_TOKEN: Using position {position}")
+        #     return hidden_states[0, position, :]
 
-        if strategy == ActivationAggregationStrategy.LAST_TOKEN:
+        # if strategy == ActivationAggregationStrategy.LAST_TOKEN:
             # Always use last token
             position = self._get_token_position_last_token(tokens, target_token)
             logging.debug(f"LAST_TOKEN: Using position {position}")
-            return hidden_states[0, position, :]
+            return hidden_states[0, -1, :]
 
-        if strategy == ActivationAggregationStrategy.FIRST_TOKEN:
-            # Always use first token
-            position = self._get_token_position_first_token(tokens, target_token)
-            logging.debug(f"FIRST_TOKEN: Using position {position}")
-            return hidden_states[0, position, :]
+        # if strategy == ActivationAggregationStrategy.FIRST_TOKEN:
+        #     # Always use first token
+        #     position = self._get_token_position_first_token(tokens, target_token)
+        #     logging.debug(f"FIRST_TOKEN: Using position {position}")
+        #     return hidden_states[0, position, :]
 
-        if strategy == ActivationAggregationStrategy.MEAN_POOLING:
-            # Use mean pooling across all tokens
-            logging.debug(f"MEAN_POOLING: Using mean across all {hidden_states.shape[1]} tokens")
-            return hidden_states[0].mean(dim=0)  # [hidden_dim]
+        # if strategy == ActivationAggregationStrategy.MEAN_POOLING:
+        #     # Use mean pooling across all tokens
+        #     logging.debug(f"MEAN_POOLING: Using mean across all {hidden_states.shape[1]} tokens")
+        #     return hidden_states[0].mean(dim=0)  # [hidden_dim]
 
-        if strategy == ActivationAggregationStrategy.MAX_POOLING:
-            # Use max pooling across all tokens
-            logging.debug(f"MAX_POOLING: Using max across all {hidden_states.shape[1]} tokens")
-            logging.info(f"DEBUG: hidden_states shape before max pooling: {hidden_states.shape}")
-            logging.info(f"DEBUG: hidden_states[0] shape: {hidden_states[0].shape}")
-            try:
-                result = hidden_states[0].max(dim=0)[0]  # [hidden_dim]
-                logging.info(f"DEBUG: max pooling result shape: {result.shape}")
-                return result
-            except Exception as e:
-                logging.error(f"ERROR in max pooling: {e}")
-                logging.error(f"hidden_states type: {type(hidden_states)}")
-                logging.error(f"hidden_states dtype: {hidden_states.dtype if hasattr(hidden_states, 'dtype') else 'N/A'}")
-                logging.error(f"hidden_states device: {hidden_states.device if hasattr(hidden_states, 'device') else 'N/A'}")
-                raise
+        # if strategy == ActivationAggregationStrategy.MAX_POOLING:
+        #     # Use max pooling across all tokens
+        #     logging.debug(f"MAX_POOLING: Using max across all {hidden_states.shape[1]} tokens")
+        #     logging.info(f"DEBUG: hidden_states shape before max pooling: {hidden_states.shape}")
+        #     logging.info(f"DEBUG: hidden_states[0] shape: {hidden_states[0].shape}")
+        #     try:
+        #         result = hidden_states[0].max(dim=0)[0]  # [hidden_dim]
+        #         logging.info(f"DEBUG: max pooling result shape: {result.shape}")
+        #         return result
+        #     except Exception as e:
+        #         logging.error(f"ERROR in max pooling: {e}")
+        #         logging.error(f"hidden_states type: {type(hidden_states)}")
+        #         logging.error(f"hidden_states dtype: {hidden_states.dtype if hasattr(hidden_states, 'dtype') else 'N/A'}")
+        #         logging.error(f"hidden_states device: {hidden_states.device if hasattr(hidden_states, 'device') else 'N/A'}")
+        #         raise
 
-        # Fallback to choice token strategy
-        position = self._get_token_position_choice_token(tokens, target_token)
-        logging.debug(f"FALLBACK: Using position {position}")
-        return hidden_states[0, position, :]
+        # # Fallback to choice token strategy
+        # position = self._get_token_position_choice_token(tokens, target_token)
+        # logging.debug(f"FALLBACK: Using position {position}")
+        # return hidden_states[0, position, :]
 
     def extract_activations_from_pair(
         self,
@@ -377,6 +378,36 @@ class ActivationCollectionLogic:
 
             # Get model outputs with hidden states
             logging.info(f"DEBUG: About to run model forward pass")
+
+
+            
+            # Print detailed token information for inspection
+            if "input_ids" in inputs:
+                input_ids = inputs["input_ids"]
+                batch_size, seq_len = input_ids.shape
+                print(f"\n=== Forward Pass (Batch size: {batch_size}, Sequence length: {seq_len}) ===")
+                
+                # Show tokens for each item in the batch
+                for batch_idx in range(min(batch_size, 2)):  # Show max 2 examples to avoid spam
+                    print(f"\nBatch item {batch_idx}:")
+                    tokens = input_ids[batch_idx]
+                    
+                    # Decode and show each token
+                    for pos, token_id in enumerate(tokens):
+                        token_id_int = token_id.item()
+                        try:
+                            decoded = self.model.tokenizer.decode([token_id_int], skip_special_tokens=False)
+                            # Clean up the decoded token for display
+                            decoded_clean = repr(decoded)
+                            print(f"  Token {pos:3d}: {token_id_int:6d}, {decoded_clean}")
+                        except Exception as e:
+                            print(f"  Token {pos:3d}: {token_id_int:6d}, <decode_error: {e}>")
+                    
+                    if batch_size > 2 and batch_idx == 1:
+                        print(f"\n  ... (showing first 2 of {batch_size} batch items)")
+                
+                print("=" * 60)
+            
             with torch.no_grad():
                 try:
                     outputs = self.model.hf_model(**inputs, output_hidden_states=True)
@@ -400,6 +431,8 @@ class ActivationCollectionLogic:
             activation = self._get_activation_with_strategy(
                 hidden_states, tokens, target_token, token_targeting_strategy
             )
+
+            breakpoint()
 
             # Move to target device if in hybrid mode, otherwise CPU for storage
             if hasattr(self.model, 'compute_device') and self.model.compute_device != self.model.device:
@@ -470,6 +503,7 @@ class ActivationCollectionLogic:
         """
         processed_pairs = []
 
+        breakpoint()
         logging.info(f"Processing {len(pairs)} contrastive pairs...")
         logging.info(f"Token targeting strategy: {token_targeting_strategy.value}")
         logging.info("ACTIVATION COLLECTION DEBUG:")
@@ -483,6 +517,7 @@ class ActivationCollectionLogic:
             prompt_strategy = pairs[0]._prompt_strategy.value
         logging.info(f"Prompt construction strategy: {prompt_strategy}")
 
+        breakpoint()
         # Debug first pair details
         if pairs:
             first_pair = pairs[0]
