@@ -19,7 +19,7 @@ ORIGINAL_TASKS_WORKING = {
 
 # Problematic original tasks (unfixable or missing)
 ORIGINAL_TASKS_TO_FIX = {
-    "truthfulqa_gen",  # ❌ Task doesn't exist (only truthfulqa_mc1/mc2 available)
+    #"truthfulqa_gen",  # ❌ Task doesn't exist (only truthfulqa_mc1/mc2 available)
 }
 
 # Keep original name for backward compatibility but now use all working tasks
@@ -32,21 +32,28 @@ MULTIPLE_CHOICE_TASKS = {
     "hellaswag",
     "truthfulqa_mc1",
     "truthfulqa_mc2",
-    # "mmlu",  # Removed: Not working in lm-evaluation-harness currently (see https://github.com/EleutherAI/lm-evaluation-harness/issues/3171)
+    "truthfulqa_gen",
+    #"mmlu",  # Removed: Not working in lm-evaluation-harness currently (see https://github.com/EleutherAI/lm-evaluation-harness/issues/3171)
     "mmmlu",
     "piqa",
     "copa",
     "openbookqa",
     "race",
     "boolq",
-    "qa4mre",
+    "qa4mre_2013",
+    "multirc",
+    "logiqa",
+    "logiqa2",
+    "agieval_logiqa_en",
+    "wsc",
+    #"wsc273", #code execution
+    "prost",
+    "mc-taco",
+    "social_iqa",
 }
 
 # GPQA scientific reasoning benchmarks
 GPQA_TASKS = {
-    "gpqa",
-    "gpqa_diamond",
-    "gpqa_extended",
     # GPQA specific variants (zeroshot only for focused testing)
     "gpqa_main_zeroshot",
     "gpqa_diamond_zeroshot",
@@ -67,16 +74,16 @@ MATH_TASKS = {
     # Basic math benchmarks
     "gsm8k",
     "asdiv",
-    "arithmetic1dc",
-    "arithmetic2da",
-    "arithmetic2dm",
-    "arithmetic2ds",
-    "arithmetic3da",
-    "arithmetic3ds",
-    "arithmetic4da",
-    "arithmetic4ds",
-    "arithmetic5da",
-    "arithmetic5ds",
+    "arithmetic_1dc",
+    "arithmetic_2da",
+    "arithmetic_2dm",
+    "arithmetic_2ds",
+    "arithmetic_3da",
+    "arithmetic_3ds",
+    "arithmetic_4da",
+    "arithmetic_4ds",
+    "arithmetic_5da",
+    "arithmetic_5ds",
     # MATH-500 mathematical reasoning benchmarks
     "math",
     "math500",
@@ -159,15 +166,12 @@ MISC_TASKS = {
 MISC_TASKS_NOT_AVAILABLE = {
     "cb",  #  TODO Need investigation, due to not creating sufficient contrastive pairs
     "anli",  # ❌ Not available in current wisent-guard system
-    "logiqa",  # ❌ Not available in current wisent-guard system
-    "multirc",  # ❌ Not available in current wisent-guard system
     "mutual",  # ❌ Not available in current wisent-guard system
-    "prost",  # ❌ Not available in current wisent-guard system
+    #"prost",  # ❌ Not available in current wisent-guard system
     "pubmedqa",  # ❌ Not available in current wisent-guard system
     "sciq",  # ❌ Not available in current wisent-guard system
     "toxigen",  # ❌ Not available in current wisent-guard system
     "wic",  # ❌ Not available in current wisent-guard system
-    "wsc",  # ❌ Not available in current wisent-guard system
     "wsc273",  # ❌ Not available in current wisent-guard system
 }
 

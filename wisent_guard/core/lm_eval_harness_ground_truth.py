@@ -61,6 +61,7 @@ class LMEvalHarnessGroundTruth:
         Returns:
             Dict containing evaluation results
         """
+
         # Use provided model or fall back to self.model
         evaluation_model = model or self.model
 
@@ -95,6 +96,7 @@ class LMEvalHarnessGroundTruth:
     ) -> Dict[str, Any]:
         """Evaluate classifier using log-likelihoods approach."""
         try:
+            
             from .log_likelihoods_evaluator import LogLikelihoodsEvaluator
 
             # Create evaluator with model
@@ -109,6 +111,8 @@ class LMEvalHarnessGroundTruth:
                 layer=layer,
                 token_aggregation=token_aggregation,
             )
+
+            print(results)
 
             return results
 
@@ -133,8 +137,14 @@ class LMEvalHarnessGroundTruth:
             # TODO In general LMEvalHarness should be rebuild to be BenchmarkGroundTruth
             # Check if this is a TaskInterface task
             if self._is_task_interface_task(task_name):
+                print("^"*80)
+                print("USING LOADING FROM TASK INTERFACE")
+                print("^"*80)
                 docs, task_data = self._load_task_interface_data(task_name, num_samples)
             else:
+                print("^"*80)
+                print("USING LOADING FROM LM EVAL HARNESS")
+                print("^"*80)
                 # Use existing lm-eval task loading infrastructure
                 task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
                 docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
@@ -157,7 +167,7 @@ class LMEvalHarnessGroundTruth:
                         question = str(doc.get("question", doc.get("text", "")))
 
                     # Generate response using model
-                    logger.debug(f"🔸 Generating response for: {question[:100]}...")
+                    logger.debug(f"🔸 Generating response for: {question}...") #question[:100]
                     generated_response, _ = model.generate(
                         prompt=question, layer_index=layer, max_new_tokens=150, temperature=0.1
                     )
@@ -187,10 +197,10 @@ class LMEvalHarnessGroundTruth:
                         }
                     )
 
-                    logger.debug(f"   📝 Generated: {generated_response[:100]}...")
+                    logger.debug(f"   📝 Generated: {generated_response}...") #generated_response[:100]
                     # FIXED: Handle ground_truth as int or string for logging
                     gt_str = str(ground_truth)
-                    logger.debug(f"   ✅ Ground truth: {gt_str[:100]}...")
+                    logger.debug(f"   ✅ Ground truth: {gt_str}...") #gt_str[:100]
 
                 except Exception as e:
                     logger.error(f"Error generating response for doc {i}: {e}")
@@ -275,8 +285,8 @@ class LMEvalHarnessGroundTruth:
                     )
 
                     logger.debug("📋 Generated Response Classification:")
-                    logger.debug(f"   🔸 Question: {response_data['question'][:100]}...")
-                    logger.debug(f"   🧠 Generated: {response_data['generated_response'][:100]}...")
+                    logger.debug(f"   🔸 Question: {response_data['question']}...") #response_data['question'][:100]
+                    logger.debug(f"   🧠 Generated: {response_data['generated_response']}...") #response_data['generated_response'][:100]
                     logger.debug(f"   🎯 Classifier score: {prediction:.3f} (lower = more truthful)")
                     logger.debug(f"   ✅ Classifier judgment: {'TRUTHFUL' if prediction < 0.5 else 'UNTRUTHFUL'}")
 
@@ -691,6 +701,20 @@ class LMEvalHarnessGroundTruth:
             "livemathbench",
             "livemathbench_cnmo_en",
             "livemathbench_cnmo_zh",
+            #"gsm8k",
+            "multirc",
+            "arithmetic_1dc",
+            #"arithmetic_2da",
+            "arithmetic_2dm",
+            "arithmetic_2ds",
+            "arithmetic_3da",
+            "arithmetic_3ds",
+            "arithmetic_4da",
+            "arithmetic_4ds",
+            "arithmetic_5da",
+            "arithmetic_5ds",
+            "qa4mre_2013",
+            #"truthfulqa_mc1",
         }
         return task_name in task_interface_tasks
 

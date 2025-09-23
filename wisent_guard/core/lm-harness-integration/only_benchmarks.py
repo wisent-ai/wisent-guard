@@ -479,11 +479,20 @@ CORE_BENCHMARKS = {
         "tags": ["reasoning", "general knowledge", "science"],
         "priority": "medium"  # 16.2s - moderate for agentic use
     },
-
     "logiqa": {
         "task": "logiqa",
         "tags": ["long context", "reasoning", "general knowledge"],
         "priority": "high"  # 9.7s - fast for agentic use
+    },
+    "logiqa2": {
+        "task": "logiqa2",
+        "tags": ["long context", "reasoning", "general knowledge"],
+        "priority": "high"  # 9.7s - fast for agentic use
+    },
+    "agieval_logiqa_en": {
+        "task": "agieval_logiqa_en",
+        "tags": ["long context", "reasoning", "general knowledge"],
+        "priority": "high"  
     },
     "wsc273": {
         "task": "wsc273",
@@ -553,8 +562,8 @@ CORE_BENCHMARKS = {
         "tags": ["science", "long context", "reasoning"],
         "priority": "medium"  # 29.4s - moderate for agentic use
     },
-    "qa4mre": {
-        "task": "qa4mre",
+    "qa4mre_2013": {
+        "task": "qa4mre_2013",
         "tags": ["long context", "reasoning", "general knowledge"],
         "priority": "medium"  # 47.8s - moderate for agentic use
     },
@@ -592,32 +601,18 @@ CORE_BENCHMARKS = {
     },
     
     # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
-    "gpqa": {
-        "task": "gpqa_main_zeroshot",
-        "tags": ["science", "reasoning", "advanced"],
-        "priority": "high"
-    },
-    "gpqa_diamond": {
-        "task": "gpqa_diamond_zeroshot", 
-        "tags": ["science", "reasoning", "advanced"],
-        "priority": "high"
-    },
-    "gpqa_extended": {
-        "task": "gpqa_extended_zeroshot",
-        "tags": ["science", "reasoning", "advanced"], 
-        "priority": "high"
-    },
-    "gpqa_main_cot": {
+
+    "gpqa_main_cot_zeroshot": {
         "task": "gpqa_main_cot_zeroshot",
         "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
         "priority": "medium"
     },
-    "gpqa_diamond_cot": {
+    "gpqa_diamond_cot_zeroshot": {
         "task": "gpqa_diamond_cot_zeroshot",
         "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
         "priority": "medium"
     },
-    "gpqa_extended_cot": {
+    "gpqa_extended_cot_zeroshot": {
         "task": "gpqa_extended_cot_zeroshot",
         "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
         "priority": "medium"
@@ -637,21 +632,6 @@ CORE_BENCHMARKS = {
         "task": "gpqa_extended_zeroshot",
         "tags": ["science", "reasoning", "advanced"],
         "priority": "high"
-    },
-    "gpqa_main_cot_zeroshot": {
-        "task": "gpqa_main_cot_zeroshot",
-        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
-        "priority": "medium"
-    },
-    "gpqa_diamond_cot_zeroshot": {
-        "task": "gpqa_diamond_cot_zeroshot",
-        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
-        "priority": "medium"
-    },
-    "gpqa_extended_cot_zeroshot": {
-        "task": "gpqa_extended_cot_zeroshot",
-        "tags": ["science", "reasoning", "advanced", "chain-of-thought"],
-        "priority": "medium"
     },
     
     # SuperGPQA (Large-scale scientific reasoning)
@@ -676,9 +656,9 @@ CORE_BENCHMARKS = {
         "priority": "high"
     },
     
-    "social_i_qa": {
-        "task": "siqa",  # Fixed: correct task name
-        "tags": ["reasoning", "general knowledge", "science"],
+    "social_iqa": {
+        "task": "social_iqa",  # Fixed: correct task name
+        "tags": ["reasoning", "general knowledge", "social"],
         "priority": "medium"  # 19.3s - moderate for agentic use
     },
 
@@ -792,52 +772,52 @@ CORE_BENCHMARKS = {
 
     # Arithmetic
 
-    "arithmetic1dc": {
+    "arithmetic_1dc": {
         "task": "arithmetic_1dc",  
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"  
     },
-    "arithmetic2da": {
+    "arithmetic_2da": {
         "task": "arithmetic_2da",  
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"  
     },
-    "arithmetic2dm": {
+    "arithmetic_2dm": {
         "task": "arithmetic_2dm",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic2ds": {
+    "arithmetic_2ds": {
         "task": "arithmetic_2ds",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic3da": {
+    "arithmetic_3da": {
         "task": "arithmetic_3da",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic3ds": {
+    "arithmetic_3ds": {
         "task": "arithmetic_3ds",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic4da": {
+    "arithmetic_4da": {
         "task": "arithmetic_4da",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic4ds": {
+    "arithmetic_4ds": {
         "task": "arithmetic_4ds",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic5da": {
+    "arithmetic_5da": {
         "task": "arithmetic_5da",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
     },
-    "arithmetic5ds": {
+    "arithmetic_5ds": {
         "task": "arithmetic_5ds",
         "tags": ["mathematics", "arithmetic"],
         "priority": "medium"
@@ -962,10 +942,9 @@ CORE_BENCHMARKS = {
     # narrativeqa and scrolls removed - require large dataset downloads (8GB+)
 
     # Temporal and Event Understanding
-    # mctaco removed - requires trust_remote_code handling that still fails
     "prost": {
         "task": "prost",
-        "tags": ["long context", "history", "reasoning"],
+        "tags": ["long context", "physics", "reasoning"],
         "priority": "high"  # 11.3s - fast for agentic use
     },
 
@@ -979,6 +958,10 @@ CORE_BENCHMARKS = {
         "task": "unscramble",
         "tags": ["long context", "reasoning", "general knowledge"],
         "priority": "medium"  # 59.8s - moderate for agentic use
+    },
+    "mc-taco": {
+        "task":"mc-taco",
+        "tags": ["common sense"]
     },
 
     # Translation
@@ -1535,7 +1518,6 @@ def try_alternative_task_names(benchmark_name: str, original_task_name: str, num
     alternative_names = {
         # Common alternatives
         "squad2": ["squadv2", "squad_v2", "squad2.0"],
-        "social_i_qa": ["siqa", "social_iqa", "socialiq"],
         "math_qa": ["mathqa", "math_qa_python", "math_algebra"],
         "paws_x": ["pawsx", "paws-x", "paws_en", "paws_de", "paws_es"],
         
@@ -1885,7 +1867,7 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "arc_easy": "Elementary science questions and reasoning",
         "arc_challenge": "Advanced science questions and reasoning",
         "sciq": "Scientific questions and explanations",
-        "social_i_qa": "Social situations and common sense reasoning",
+        "social_iqa": "Social situations and common sense reasoning",
         "openbookqa": "Elementary science with open-book style questions",
         "gpqa": "Graduate-level scientific reasoning in biology, physics, and chemistry",
         "gpqa_diamond": "High-quality graduate-level scientific questions (premium subset)",
@@ -1914,7 +1896,7 @@ def find_most_relevant_benchmarks(prompt: str, top_k: int = 1, priority: str = "
         "race": "Reading comprehension from English exams",
         "squad2": "Reading comprehension with impossible questions",
         "qasper": "Scientific paper question answering",
-        "qa4mre": "Reading comprehension in multiple languages",
+        #"qa4mre_2013": "Reading comprehension in multiple languages",
         "mutual": "Dialogue understanding and reasoning",
         
         

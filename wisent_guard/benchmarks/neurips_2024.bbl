@@ -30,11 +30,6 @@ Yonatan Bisk, Rowan Zellers, Ronan Le~Bras, Jianfeng Gao, and Yejin Choi.
 \newblock Piqa: Reasoning about physical commonsense in natural language.
 \newblock {\em arXiv preprint arXiv:1911.11641}, 2019.
 
-\bibitem{brown2020gpt3}
-Tom~B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared~D. Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, et~al.
-\newblock Language models are few-shot learners.
-\newblock In {\em Advances in Neural Information Processing Systems (NeurIPS)}, 2020.
-
 \bibitem{cassano2022multipl-e}
 Federico Cassano, John Gouwar, Daniel Nguyen, Sydney Nguyen, Luna Phipps-Costin, Donald Pinckney, Ming-Ho Yee, Yangtian Zi, Carolyn~Jane Anderson, Molly~Q. Feldman, Arjun Guha, Michael Greenberg, and Abhinav Jangda.
 \newblock Multipl-e: A scalable and extensible approach to benchmarking neural code generation.

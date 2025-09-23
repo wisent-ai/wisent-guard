@@ -23,42 +23,20 @@ class Math500NosenseGenerator(BaseNosenseGenerator):
         super().__init__(original_task)
 
     def make_nonsense(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Convert Math500 data to nonsense."""
+        """Convert Math500 data to nonsense with wisent-guard JSON format."""
         nonsense_data = []
 
         for item in data:
-            nonsense_item = {}
-            # Generate random answer once per item
-            new_answer = str(random.randint(1, 1000))
+            # Generate random numbers for answers
+            correct_answer = random.randint(1, 1000)
+            incorrect_answer = correct_answer + 1
 
-            # Copy all fields but make them nonsensical
-            for key, value in item.items():
-                if key == 'problem':
-                    # Make problem text nonsensical only
-                    nonsense_item[key] = self.generate_random_words(value)
-
-                elif key == 'answer':
-                    # Use random answer
-                    nonsense_item[key] = new_answer
-
-                elif key == 'solution':
-                    # Make solution nonsensical
-                    if isinstance(value, str):
-                        nonsense_item[key] = self.generate_random_words(value)
-                    else:
-                        nonsense_item[key] = value
-
-                elif key == 'type':
-                    # Keep type as original
-                    nonsense_item[key] = value
-
-                elif isinstance(value, str):
-                    # Make other string fields nonsensical
-                    nonsense_item[key] = self.generate_random_words(value)
-
-                else:
-                    # Keep non-string values as-is
-                    nonsense_item[key] = value
+            # Create nonsense item in wisent-guard JSON format
+            nonsense_item = {
+                "question": self.generate_random_words(item.get('problem', 'random question')),
+                "correct_answer": str(correct_answer),
+                "incorrect_answer": str(incorrect_answer)
+            }
 
             nonsense_data.append(nonsense_item)
 
@@ -85,8 +63,9 @@ def test_math500_nosense():
         print(f"\n--- Item {i+1} ---")
         print(f"Original problem: {orig.get('problem', 'N/A')[:100]}...")
         print(f"Original answer: {orig.get('answer', 'N/A')}")
-        print(f"Nonsense problem: {nonsense.get('problem', 'N/A')[:100]}...")
-        print(f"Nonsense answer: {nonsense.get('answer', 'N/A')}")
+        print(f"Nonsense question: {nonsense.get('question', 'N/A')[:100]}...")
+        print(f"Nonsense correct_answer: {nonsense.get('correct_answer', 'N/A')}")
+        print(f"Nonsense incorrect_answer: {nonsense.get('incorrect_answer', 'N/A')}")
 
 
 if __name__ == "__main__":

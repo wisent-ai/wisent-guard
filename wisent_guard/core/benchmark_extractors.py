@@ -8,6 +8,7 @@ the extraction logic to cleanly handle the differences between benchmarks.
 import logging
 import random
 import re
+import ast
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -72,18 +73,17 @@ class WinograndeExtractor(BenchmarkExtractor):
                 return None
 
             # Create the question
-            question = f"Complete the sentence: {sentence}"
+            formatted_question = f"Complete the sentence: {sentence}"
 
             # 🚨 FIX: Don't use doc_to_text for winogrande - it returns integers instead of strings!
             # This is a bug in lm-eval-harness winogrande task configuration
-            formatted_question = f"{question}\nA. {option1}\nB. {option2}"
 
             # Get correct and incorrect answers
             correct_answer = option1 if answer == "1" else option2
             incorrect_answer = option2 if answer == "1" else option1
 
             return {
-                "question": question,
+                "question": sentence,
                 "formatted_question": formatted_question,
                 "correct_answer": correct_answer,
                 "incorrect_answer": incorrect_answer,
@@ -270,6 +270,80 @@ class HellaSwagExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting HellaSwag contrastive pair: {e}")
             return None
+        
+class SwagExtractor(BenchmarkExtractor):
+    """Extractor for Swag benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Swag format:
+
+        doc['startphrase']: context
+        doc[ending1], doc['ending2'], doc['ending3'], doc['ending4] possible endings
+        doc[label] index of correct ending
+
+        """
+        try:
+            
+            startphrase = doc.get("startphrase", "")
+            endings = [doc.get("ending0", ""), doc.get("ending1", ""), doc.get("ending2", ""), doc.get("ending3", "")]
+            label = doc.get("label", 0)
+
+            if not all([startphrase, endings]) or label >= len(endings):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Context: {startphrase}\nChoose the best ending:"
+
+            # Get correct answer
+            correct_answer = endings[label]
+
+            return {
+                "question": startphrase,                  #f"Context: {ctx}\nChoose the best ending:"
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting HellaSwag QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for Swag."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            endings = [doc.get("ending0", ""), doc.get("ending1", ""), doc.get("ending2", ""), doc.get("ending3", "")]
+            label = doc.get("label", 0)
+
+            if label >= len(endings):
+                return None
+
+            correct_choice = endings[label]
+            # Get first incorrect choice
+            incorrect_choice = None
+            for i, ending in enumerate(endings):
+                if i != label:
+                    incorrect_choice = ending
+                    break
+
+            if not incorrect_choice:
+                return None
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting HellaSwag contrastive pair: {e}")
+            return None
 
 
 class TruthfulQAExtractor(BenchmarkExtractor):
@@ -282,6 +356,7 @@ class TruthfulQAExtractor(BenchmarkExtractor):
         - doc['mc1_targets']['choices']: list of choices
         - doc['mc1_targets']['labels']: list of 0/1 labels (1 = correct)
         """
+
         try:
             question = doc.get("question", "")
             if not question:
@@ -295,29 +370,18 @@ class TruthfulQAExtractor(BenchmarkExtractor):
             if len(choices) < 2 or len(labels) != len(choices):
                 return None
 
-            # Format the question with multiple choice options
-            if hasattr(task_data, "doc_to_text"):
-                formatted_question = task_data.doc_to_text(doc)
-            else:
-                formatted_question = question
-                for i, choice in enumerate(choices):
-                    letter = chr(65 + i)  # A, B, C, D, ...
-                    formatted_question += f"\n{letter}. {choice}"
+            formatted_question = question
 
-            # Find correct answer letter
-            correct_answer_letter = None
-            for i, label in enumerate(labels):
-                if label == 1:
-                    correct_answer_letter = chr(65 + i)  # Convert to A, B, C, D
+            # Find correct answer
+            for i, choice in enumerate(choices):
+                if labels[i] == 1:
+                    correct_answer = choice
                     break
-
-            if not correct_answer_letter:
-                return None
 
             return {
                 "question": question,
                 "formatted_question": formatted_question,
-                "correct_answer": correct_answer_letter,  # Return letter, not text
+                "correct_answer": correct_answer,  
             }
 
         except Exception as e:
@@ -326,6 +390,7 @@ class TruthfulQAExtractor(BenchmarkExtractor):
 
     def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """Extract contrastive pair for TruthfulQA."""
+
         try:
             qa_pair = self.extract_qa_pair(doc, task_data)
             if not qa_pair:
@@ -334,23 +399,77 @@ class TruthfulQAExtractor(BenchmarkExtractor):
             mc1_targets = doc.get("mc1_targets", {})
             choices = mc1_targets.get("choices", [])
             labels = mc1_targets.get("labels", [])
+            correct_answer = qa_pair["correct_answer"]
 
-            correct_letter = None
-            incorrect_letter = None
+            # Find incorrect answer
+            for i, choice in enumerate(choices):
+                if labels[i] == 0:
+                    incorrect_answer = choice
+                    break
 
-            for i, label in enumerate(labels):
-                if label == 1:
-                    correct_letter = chr(65 + i)  # Convert to A, B, C, D
-                elif label == 0 and incorrect_letter is None:
-                    incorrect_letter = chr(65 + i)  # First incorrect option
-
-            if not all([correct_letter, incorrect_letter]):
+            if not all([correct_answer, incorrect_answer]):
                 return None
 
             return {
                 "question": qa_pair["formatted_question"],
-                "correct_answer": correct_letter,  # Use letter, not text
-                "incorrect_answer": incorrect_letter,  # Use letter, not text
+                "correct_answer": correct_answer, 
+                "incorrect_answer": incorrect_answer,  
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting TruthfulQA contrastive pair: {e}")
+            return None
+        
+class TruthfulQAGenExtractor(BenchmarkExtractor):
+    """Extractor for TruthfulQA Gen benchmarks."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        TruthfulQA Gen format:
+        - doc['question']: the question
+        - doc['best_answer']: correct answer
+        - doc['incorrect_answers']: list with incorrect answers
+        """
+
+        try:
+            question = doc.get("question", "")
+            correct_answer = doc.get("best_answer", "")
+            
+            if not question and correct_answer:
+                return None
+
+            formatted_question = question
+
+            return {
+                "question": question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,  
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting TruthfulQA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for TruthfulQA Gen."""
+
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+            incorrect_answers = doc.get("incorrect_answers", [])
+            incorrect_answer = incorrect_answers[0]
+
+            if not all([question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": question,
+                "correct_answer": correct_answer, 
+                "incorrect_answer": incorrect_answer,  
             }
 
         except Exception as e:
@@ -424,12 +543,15 @@ class GSM8KExtractor(BenchmarkExtractor):
         - AIME_2024 format: doc['Problem'] -> doc['Answer']
         """
         try:
+            print("q"*80)
             # Handle multiple field name variants
             question = doc.get("question", "") or doc.get("problem", "") or doc.get("Problem", "")
             answer = doc.get("answer", "") or doc.get("Answer", "")
 
             if not all([question, str(answer) if answer is not None else None]):
                 return None
+
+            print("w"*80)
 
             # Format the question
             if hasattr(task_data, "doc_to_text"):
@@ -519,8 +641,6 @@ class MMLUExtractor(BenchmarkExtractor):
                 formatted_question = task_data.doc_to_text(doc)
             else:
                 formatted_question = question
-                for i, choice in enumerate(choices):
-                    formatted_question += f"\n{chr(65 + i)}. {choice}"
 
             # Get correct answer
             correct_answer = choices[answer]
@@ -577,6 +697,150 @@ class MMLUExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting MMLU contrastive pair: {e}")
             return None
+        
+class SOCIAL_IQAExtractor(BenchmarkExtractor):
+    """Extractor for Social IQA benchmark"""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Social IQA format:
+        - doc['context']: context
+        - doc['question']: question
+        - doc['answerA'], doc['answerB'], doc['answerC']: possible answers
+        - doc['label']: integer indicating correct answer (1,2,3)
+        """
+
+        try:
+            
+            context = doc.get("context", "")
+            question = doc.get("question", "")
+            choices = [doc.get("answerA", ""), doc.get("answerB", ""), doc.get("answerC", "")]
+            label = doc.get("label", "1")
+            label = int(label)
+
+            if not all([context, question, choices]) or label > len(choices):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"{context}\nQuestion: {question}"
+
+            # Get correct answer
+            correct_answer = choices[label-1]
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+        except Exception as e:
+            logger.debug(f"Error extracting Social IQA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for Social IQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            choices = [doc.get("answerA", ""), doc.get("answerB", ""), doc.get("answerC", "")]
+            label = doc.get("label", 1)
+            label = int(label)
+
+            if label > len(choices):
+                return None
+
+            correct_choice = choices[label-1]
+            # Get first incorrect choice
+            incorrect_choice = None
+            for i, choice in enumerate(choices):
+                if i != label-1:
+                    incorrect_choice = choice
+                    break
+
+            if not incorrect_choice:
+                return None
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting Social IQA contrastive pair: {e}")
+            return None
+
+        
+class ProstExtractor(BenchmarkExtractor):
+    """Extractor for Prost benchmark"""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Prost format:
+        - doc['context']: context
+        - doc['ex_question']: question
+        - doc['A'], doc['B'], doc['C'], doc['D"]: possible answers
+        - doc['label']: integer indicating correct answer
+        """
+        try:
+            
+            context = doc.get("context", "")
+            question = doc.get("ex_question", "")
+            choices = [doc.get("A", ""), doc.get("B", ""), doc.get("C", ""), doc.get("D", "")]
+            label = doc.get("label", 0)
+
+            if not all([context, question, choices]) or label >= len(choices):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"{question}\nQuestion: {question}"
+
+            # Get correct answer
+            correct_answer = choices[label]
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+        except Exception as e:
+            logger.debug(f"Error extracting MMLU QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for MMLU."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            choices = [doc.get("A", ""), doc.get("B", ""), doc.get("C", ""), doc.get("D", "")]
+            label = doc.get("label", 0)
+
+            if label >= len(choices):
+                return None
+
+            correct_choice = choices[label]
+            # Get first incorrect choice
+            incorrect_choice = None
+            for i, choice in enumerate(choices):
+                if i != label:
+                    incorrect_choice = choice
+                    break
+
+            if not incorrect_choice:
+                return None
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting MMLU contrastive pair: {e}")
+            return None
 
 
 class PIQAExtractor(BenchmarkExtractor):
@@ -598,11 +862,11 @@ class PIQAExtractor(BenchmarkExtractor):
             if not all([goal, sol1, sol2]) or label not in [0, 1]:
                 return None
 
-            # Format the question
+            #Format the question
             if hasattr(task_data, "doc_to_text"):
                 formatted_question = task_data.doc_to_text(doc)
             else:
-                formatted_question = f"Goal: {goal}\nA. {sol1}\nB. {sol2}"
+                formatted_question = f"Goal: {goal}\n"
 
             # Get correct answer
             correct_answer = sol1 if label == 0 else sol2
@@ -692,6 +956,71 @@ class COPAExtractor(BenchmarkExtractor):
 
             correct_choice = choice1 if label == 0 else choice2
             incorrect_choice = choice2 if label == 0 else choice1
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting COPA contrastive pair: {e}")
+            return None
+        
+class WSCExtractor(BenchmarkExtractor):
+    """Extractor for WSC benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+
+        """
+        - doc['text']: context
+        - doc['span1_text] first word
+        - doc['span2_text] second word
+        - doc['label'] 0 = , 1 =
+        """
+
+        try:
+
+            text = doc.get("text", "")
+            span1_text = doc.get("span1_text", "")
+            span2_text = doc.get("span2_text", "")
+            label = doc.get("label", 0)
+
+            if not all([text, span1_text, span2_text]) or label not in [0, 1]:
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"{text}\n In the passage above, does the pronoun **{span1_text}** refer to **{span2_text}**?"
+
+            # Get correct answer
+            correct_answer = "yes" if label == 1 else "no"
+
+            return {
+                "question": formatted_question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting COPA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for COPA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            choice1 = "yes"
+            choice2 = "no"
+            label = doc.get("label", 0)
+
+            correct_choice = choice1 if label == 1 else choice2
+            incorrect_choice = choice1 if label == 0 else choice2
 
             return {
                 "question": qa_pair["formatted_question"],
@@ -854,29 +1183,31 @@ class RACEExtractor(BenchmarkExtractor):
     """Extractor for RACE benchmark."""
 
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+
         """
         RACE format:
-        - doc['article']: the article/passage
-        - doc['question']: the question
-        - doc['options']: list of options
-        - doc['answer']: correct option letter (A, B, C, D)
+        doc['article']: the article/passage
+        doc['problems']: questions, answers, options but in a string format instead of dictionary, we have to parse it 
         """
+
         try:
             article = doc.get("article", "")
-            question = doc.get("question", "")
-            options = doc.get("options", [])
-            answer = doc.get("answer", "")
+            problems_str = doc.get("problems", "")
+            try:
+                problems = ast.literal_eval(problems_str)
+            except Exception as e:
+                print(f"Failed to parse problems: {e}")
+
+            problem = problems[0] #take first question, options and answer
+            question = problem.get('question', "")
+            options = problem.get('options', [])
+            answer = problem.get('answer', "")
 
             if not all([article, question, options, answer]):
                 return None
 
             # Format the question
-            if hasattr(task_data, "doc_to_text"):
-                formatted_question = task_data.doc_to_text(doc)
-            else:
-                formatted_question = f"Article: {article}\nQuestion: {question}"
-                for i, option in enumerate(options):
-                    formatted_question += f"\n{chr(65 + i)}. {option}"
+            formatted_question = f"Article: {article}\nQuestion: {question}"
 
             # Get correct answer
             answer_idx = ord(answer) - ord("A")
@@ -890,13 +1221,22 @@ class RACEExtractor(BenchmarkExtractor):
 
     def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """Extract contrastive pair for RACE."""
+
         try:
             qa_pair = self.extract_qa_pair(doc, task_data)
             if not qa_pair:
                 return None
+            
+            problems_str = doc.get("problems", "")
+            try:
+                problems = ast.literal_eval(problems_str)
+            except Exception as e:
+                print(f"Failed to parse problems: {e}")
 
-            options = doc.get("options", [])
-            answer = doc.get("answer", "")
+            problem = problems[0] #take first question, options and answer
+            question = problem.get('question', "")
+            options = problem.get('options', [])
+            answer = problem.get('answer', "")
 
             answer_idx = ord(answer) - ord("A")
             correct_choice = options[answer_idx] if answer_idx < len(options) else options[0]
@@ -947,17 +1287,16 @@ class QA4MREExtractor(BenchmarkExtractor):
 
             if not all([article, question, options, answer]):
                 return None
-
+            
             # Format the question
             if hasattr(task_data, "doc_to_text"):
                 formatted_question = task_data.doc_to_text(doc)
+
             else:
                 formatted_question = f"Article: {article}\nQuestion: {question}"
-                for i, option in enumerate(options, start=1):  
-                    formatted_question += f"\n{i}. {option}"
 
             # Get correct answer
-            correct_answer = answer
+            correct_answer = options[answer-1]
 
             return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
 
@@ -981,16 +1320,11 @@ class QA4MREExtractor(BenchmarkExtractor):
             except (ValueError, TypeError):
                 return None
 
-            correct_choice = answer
-
-            if correct_choice < len(options):
-                incorrect_choice = correct_choice + 1
-            else:
-                incorrect_choice = 1
-
-            # Convert to strings
-            correct_choice = str(correct_choice)
-            incorrect_choice = str(incorrect_choice)
+            correct_choice = options[answer-1]
+            for i, option in enumerate(options):
+                if i != answer-1:
+                    incorrect_choice = option
+                    break
 
             return {
                 "question": qa_pair["formatted_question"],
@@ -1001,6 +1335,73 @@ class QA4MREExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting RACE contrastive pair: {e}")
             return None
+        
+class MULTIRCExtractor(BenchmarkExtractor):
+    """Extractor for MULTIRC benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        MULTIRC format:
+        - doc['paragraph']: the paragraph
+        - doc['question']: the question
+        - doc['answer']: the answer
+        - doc['label']: 0 - asnwer is incorrect, 1 - answer is correct
+        """
+        try:
+            paragraph = doc.get("paragraph", "")
+            question = doc.get("question", "")
+            answer = doc.get("answer", "")
+            label = doc.get("label", "")
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc) #lm-eval leaves blank for answer
+                formatted_question_with_answer = formatted_question + answer #add answer to question and use label as answer
+            else: #implement it without doc_to_text
+                formatted_question_with_answer = f"{paragraph} \nQuestion: {question}\nAnswer: {answer}"
+            
+            # Get correct answer
+            correct_answer = label
+
+            # Change correct_answer to string
+            correct_answer = str(correct_answer)
+
+            return {"question": question, "formatted_question": formatted_question_with_answer, "correct_answer": correct_answer}
+        
+        except Exception as e:
+            logger.debug(f"Error extracting MULTIRC pair: {e}")
+            return None
+        
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for MULTIRC."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            correct_choice = qa_pair["correct_answer"]
+            correct_choice = int(correct_choice)
+
+            if correct_choice == 0:
+                incorrect_choice = 1
+            else:
+                incorrect_choice = 0
+
+            # Change answers to strings
+            correct_choice = str(correct_choice)
+            incorrect_choice = str(incorrect_choice)
+
+            return {
+                "question": question,
+                "correct_answer": str(correct_choice),
+                "incorrect_answer": str(incorrect_choice),
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting MULTIRC contrastive pair: {e}")
+            return None
+
 
 
 class MRPCExtractor(BenchmarkExtractor):
@@ -1741,7 +2142,13 @@ class MCTacoExtractor(BenchmarkExtractor):
                 return None
 
             # Create the question as shown in doc_to_text
-            formatted_question = f"{sentence}\nQuestion: {question}\nAnswer: {answer}\nPlausible:"
+            #formatted_question = f"{sentence}\nQuestion: {question}\nAnswer: {answer}\nPlausible:"
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"{sentence}\nQuestion: {question}\nAnswer: {answer}\nPlausible:"
 
             # The correct answer is based on the label (0=no, 1=yes)
             correct_answer = "yes" if label == 1 else "no"
@@ -1898,34 +2305,36 @@ class LogiQAExtractor(BenchmarkExtractor):
     """Extractor for LogiQA (Logical Reasoning) benchmark."""
 
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+
         """
         LogiQA format:
-        - doc['query']: the full question text including context
-        - doc['choices']: list of answer choices
-        - doc['gold']: list containing correct answer index (0-based)
+        - doc['context']: context
+        - doc['question']: question
+        - doc['options']: list of possible answers
+        - doc[label]: label of correct answer (a,b,c,d...)
         """
-        try:
-            query = doc.get("query", "")
-            choices = doc.get("choices", [])
-            gold = doc.get("gold", [])
 
-            if not all([query, choices]) or not gold or gold[0] >= len(choices):
+        try:
+
+            context = doc.get("context", "")
+            question = doc.get("question", "")
+            options = doc.get("options", [])
+            label = doc.get("label", "a")
+
+            label = ord(label) - ord('a')
+
+
+            if not all([context, question, options]) or label >= len(options):
                 return None
 
             # Format the question
             if hasattr(task_data, "doc_to_text"):
                 formatted_question = task_data.doc_to_text(doc)
             else:
-                formatted_question = query
+                formatted_question = f"Context: {context}\nQuestion: {question}:"
 
             # Get correct answer
-            correct_answer_idx = gold[0]
-            correct_answer = choices[correct_answer_idx]
-
-            # Extract just the question part from query (after "Q: " or similar)
-            question = query
-            if "Q:" in query:
-                question = query.split("Q:")[-1].split("Answer Choices:")[0].strip()
+            correct_answer = options[label]
 
             return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
 
@@ -1940,19 +2349,17 @@ class LogiQAExtractor(BenchmarkExtractor):
             if not qa_pair:
                 return None
 
-            choices = doc.get("choices", [])
-            gold = doc.get("gold", [])
+            options = doc.get("options", [])
+            label = doc.get("label", "a")
 
-            if not gold or gold[0] >= len(choices):
-                return None
+            label = ord(label) - ord('a')
 
-            correct_answer_idx = gold[0]
-            correct_choice = choices[correct_answer_idx]
+            correct_choice = options[label]
 
             # Get first incorrect choice
             incorrect_choice = None
-            for i, choice in enumerate(choices):
-                if i != correct_answer_idx:
+            for i, choice in enumerate(options):
+                if i != label:
                     incorrect_choice = choice
                     break
 
@@ -1967,6 +2374,76 @@ class LogiQAExtractor(BenchmarkExtractor):
 
         except Exception as e:
             logger.debug(f"Error extracting LogiQA contrastive pair: {e}")
+            return None
+        
+class LogiQA2Extractor(BenchmarkExtractor):
+    """Extractor for LogiQA2 (Logical Reasoning) benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+
+        """
+        LogiQA2 format:
+        - doc['text']: context
+        - doc['question']: question
+        - doc['options']: list of possible answers
+        - doc[answer]: label of correct answer (0,1,2,3...)
+        """
+
+        try:
+
+            text = doc.get("text", "")
+            question = doc.get("question", "")
+            options = doc.get("options", [])
+            answer = doc.get("answer", 0)
+
+            if not all([text, question, options]) or answer >= len(options):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Context: {text}\nQuestion: {question}:"
+
+            # Get correct answer
+            correct_answer = options[answer]
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+        except Exception as e:
+            logger.debug(f"Error extracting LogiQA 2 QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for LogiQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            options = doc.get("options", [])
+            answer = doc.get("answer", 0)
+
+            correct_choice = options[answer]
+
+            # Get first incorrect choice
+            incorrect_choice = None
+            for i, choice in enumerate(options):
+                if i != answer:
+                    incorrect_choice = choice
+                    break
+
+            if not incorrect_choice:
+                return None
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting LogiQA 2 contrastive pair: {e}")
             return None
 
 
@@ -2831,55 +3308,23 @@ class GPQAExtractor(BenchmarkExtractor):
                 # Create choices list with correct answer first
                 choices = [correct_answer] + incorrect_answers
 
-                # Format as multiple choice question
-                choice_letters = ["A", "B", "C", "D"]
-                formatted_choices = []
-                for i, choice in enumerate(choices[:4]):
-                    if choice:
-                        formatted_choices.append(f"({choice_letters[i]}) {choice}")
+                # Format the question
+                if hasattr(task_data, "doc_to_text"):
+                    formatted_question = task_data.doc_to_text(doc)
+                else:
+                    choice_letters = ["A", "B", "C", "D"]
+                    formatted_choices = []
+                    for i, choice in enumerate(choices[:4]):
+                        if choice:
+                            formatted_choices.append(f"({choice_letters[i]}) {choice}")
 
-                formatted_question = f"{question}\n\nChoices:\n" + "\n".join(formatted_choices)
+                    formatted_question = f"{question}\nChoices:\n" + "\n".join(formatted_choices) + "\n"
 
                 return {
                     "question": question,
                     "formatted_question": formatted_question,
                     "correct_answer": correct_answer,
                     "answer_letter": "A",  # Correct answer is always first in raw format
-                    "choices": choices,
-                }
-
-            # Processed format: Question, choice1-4, answer (letter format like "(B)")
-            if all(key in doc for key in ["Question", "choice1", "choice2", "choice3", "choice4", "answer"]):
-                question = doc["Question"]
-                choices = [doc["choice1"], doc["choice2"], doc["choice3"], doc["choice4"]]
-                answer = doc["answer"]
-
-                # Extract letter from answer format like "(B)" or "B"
-                answer_match = re.search(r"[ABCD]", answer.upper())
-                if not answer_match:
-                    return None
-
-                answer_letter = answer_match.group()
-                answer_index = ord(answer_letter) - ord("A")
-
-                if answer_index >= len(choices):
-                    return None
-
-                correct_answer = choices[answer_index]
-
-                # Format as multiple choice question
-                choice_letters = ["A", "B", "C", "D"]
-                formatted_choices = []
-                for i, choice in enumerate(choices):
-                    formatted_choices.append(f"({choice_letters[i]}) {choice}")
-
-                formatted_question = f"{question}\n\nChoices:\n" + "\n".join(formatted_choices)
-
-                return {
-                    "question": question,
-                    "formatted_question": formatted_question,
-                    "correct_answer": correct_answer,
-                    "answer_letter": answer_letter,
                     "choices": choices,
                 }
 
@@ -3062,24 +3507,17 @@ class SuperGPQAExtractor(BenchmarkExtractor):
             question = doc.get("question", "")
             options = doc.get("options", [])
             correct_answer = doc.get("answer", "")
-            answer_letter = doc.get("answer_letter", "")
 
             if not question or not options or not correct_answer:
                 return None
-
+            
             # Format the question with multiple choice options
-            formatted_options = []
-            for i, option in enumerate(options):
-                letter = chr(ord("A") + i)
-                formatted_options.append(f"{letter}. {option}")
-
-            formatted_question = f"{question}\n\n" + "\n".join(formatted_options)
+            formatted_question = question
 
             return {
                 "question": question,
                 "formatted_question": formatted_question,
                 "correct_answer": correct_answer,
-                "answer_letter": answer_letter,
             }
 
         except Exception as e:
@@ -3094,7 +3532,7 @@ class SuperGPQAExtractor(BenchmarkExtractor):
                 return None
 
             options = doc.get("options", [])
-            correct_answer = qa_pair["correct_answer"]
+            correct_answer = doc.get("answer", "")
 
             # Find an incorrect answer from options
             incorrect_answer = self._get_incorrect_option(options, correct_answer)
@@ -3130,7 +3568,7 @@ EXTRACTORS = {
     "hellaswag": HellaSwagExtractor,
     "truthfulqa_mc1": TruthfulQAExtractor,
     "truthfulqa_mc2": TruthfulQAExtractor,
-    "truthfulqa_gen": TruthfulQAExtractor,
+    "truthfulqa_gen": TruthfulQAGenExtractor,
     "boolq": BoolQExtractor,
     "gsm8k": GSM8KExtractor,
     # MATH-500 mathematical reasoning benchmarks (reuse GSM8KExtractor)
@@ -3175,26 +3613,26 @@ EXTRACTORS = {
     "coqa": CoQAExtractor,  # Conversational QA format
     "drop": SQuAD2Extractor,  # Similar QA format
     "logiqa": LogiQAExtractor,  # LogiQA logical reasoning format
-    "logiqa2": LogiQAExtractor,  # LogiQA 2.0 uses same format
+    "logiqa2": LogiQA2Extractor,  # LogiQA 2, different format than logiqa
     "agieval_logiqa_en": LogiQAExtractor,  # AGIEval LogiQA English
     "agieval_logiqa_zh": LogiQAExtractor,  # AGIEval LogiQA Chinese
     "math_qa": MMLUExtractor,  # Multiple choice format
     "mathqa": MathQAExtractor,  # Custom extractor for mathqa's unique format
-    "mc_taco": MCTacoExtractor,  # MC-TACO temporal reasoning
-    "multirc": MMLUExtractor,  # Multiple choice format
+    "mc-taco": MCTacoExtractor,  # MC-TACO temporal reasoning
+    "multirc": MULTIRCExtractor,  # Paragraph + Question + Answer, True or False format
     "mutual": MMLUExtractor,  # Multiple choice format
     "naturalqs": SQuAD2Extractor,  # QA format
-    "prost": MMLUExtractor,  # Multiple choice format
+    "prost": ProstExtractor,  # Multiple choice format
     "pubmedqa": MMLUExtractor,  # Multiple choice format
     "quac": QuACExtractor,  # Conversational QA format
     "record": SQuAD2Extractor,  # QA format
     "sciq": MMLUExtractor,  # Multiple choice format
-    "swag": HellaSwagExtractor,  # Similar format to HellaSwag
+    "swag": SwagExtractor,  # Similar format to HellaSwag
     "toxigen": BoolQExtractor,  # Binary classification
     "triviaqa": SQuAD2Extractor,  # QA format
     "webqs": SQuAD2Extractor,  # QA format
     "wic": BoolQExtractor,  # Binary classification
-    "wsc": COPAExtractor,  # Similar format to COPA
+    "wsc": WSCExtractor,  # Similar format to COPA
     "wsc273": COPAExtractor,  # Similar format to COPA
     # New extractors for previously unsupported benchmarks
     "lambada_cloze": LambadaExtractor,  # LAMBADA cloze task
@@ -3210,16 +3648,16 @@ EXTRACTORS = {
     "livecodebench": LiveCodeBenchExtractor,  # LiveCodeBench coding problems
     "anli": ANLIExtractor,  # Adversarial NLI
 
-    "arithmetic1dc": ArithmeticExtractor, # Arithmetic tasks
-    "arithmetic2da": ArithmeticExtractor, # Arithmetic tasks
-    "arithmetic2dm": ArithmeticExtractor, # Arithmetic tasks
-    "arithmetic2ds": ArithmeticExtractor, # Arithmetic tasks
-    "arithmetic3da": ArithmeticExtractor, #Arithmetic tasks
-    "arithmetic3ds": ArithmeticExtractor, #Arithmetic tasks
-    "arithmetic4da": ArithmeticExtractor, #Arithmetic tasks
-    "arithmetic4ds": ArithmeticExtractor, #Arithmetic tasks
-    "arithmetic5da": ArithmeticExtractor, #Arithmetic tasks
-    "arithmetic5ds": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic_1dc": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic_2da": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic_2dm": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic_2ds": ArithmeticExtractor, # Arithmetic tasks
+    "arithmetic_3da": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic_3ds": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic_4da": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic_4ds": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic_5da": ArithmeticExtractor, #Arithmetic tasks
+    "arithmetic_5ds": ArithmeticExtractor, #Arithmetic tasks
     "belebele": MultilingualExtractor,  # Multilingual reading comprehension
     "blimp": DefaultExtractor,  # Linguistic minimal pairs
     "crows_pairs": DefaultExtractor,  # Bias benchmark
@@ -3234,31 +3672,20 @@ EXTRACTORS = {
     "qa4mre_2012": QA4MREExtractor,  # QA4MRE 2012 variant
     "qa4mre_2011": QA4MREExtractor,  # QA4MRE 2011 variant
     "qasper": SQuAD2Extractor,  # QA on scientific papers
-    "social_i_qa": MMLUExtractor,  # Social commonsense QA
+    "social_iqa": SOCIAL_IQAExtractor,  # Social commonsense QA
     "unscramble": DefaultExtractor,  # Word unscrambling
     "xcopa": MultilingualExtractor,  # Multilingual COPA
     "xnli": MultilingualExtractor,  # Cross-lingual NLI
     "xstorycloze": MultilingualExtractor,  # Multilingual story cloze
     "xwinograd": MultilingualExtractor,  # Multilingual Winograd
     # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
-    "gpqa": GPQAExtractor,
-    "gpqa_diamond": GPQAExtractor,  # Maps to gpqa_diamond_zeroshot
-    "gpqa_extended": GPQAExtractor,  # Maps to gpqa_extended_zeroshot
     "gpqa_main_zeroshot": GPQAExtractor,
-    "gpqa_main_n_shot": GPQAExtractor,
     "gpqa_main_cot_zeroshot": GPQAExtractor,
-    "gpqa_main_cot_n_shot": GPQAExtractor,
-    "gpqa_main_generative_n_shot": GPQAExtractor,
     "gpqa_diamond_zeroshot": GPQAExtractor,
-    "gpqa_diamond_n_shot": GPQAExtractor,
     "gpqa_diamond_cot_zeroshot": GPQAExtractor,
-    "gpqa_diamond_cot_n_shot": GPQAExtractor,
-    "gpqa_diamond_generative_n_shot": GPQAExtractor,
     "gpqa_extended_zeroshot": GPQAExtractor,
-    "gpqa_extended_n_shot": GPQAExtractor,
     "gpqa_extended_cot_zeroshot": GPQAExtractor,
-    "gpqa_extended_cot_n_shot": GPQAExtractor,
-    "gpqa_extended_generative_n_shot": GPQAExtractor,
+
     "leaderboard_gpqa": GPQAExtractor,
     "leaderboard_gpqa_main": GPQAExtractor,
     "leaderboard_gpqa_diamond": GPQAExtractor,

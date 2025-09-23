@@ -1262,6 +1262,7 @@ class TaskManager:
         Returns:
             Task object from lm_eval
         """
+
         try:
             from lm_eval.tasks import get_task_dict
             from lm_eval.api.registry import TASK_REGISTRY

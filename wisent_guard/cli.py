@@ -1403,6 +1403,7 @@ def run_task_pipeline(
                                 qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(
                                     task_name, task_data, train_docs
                                 )
+
                     else:
                         # Traditional method when caching is disabled
                         qa_pairs = ContrastivePairSet.extract_qa_pairs_from_task_docs(task_name, task_data, train_docs)
@@ -1488,7 +1489,7 @@ def run_task_pipeline(
             for i, qa_pair in enumerate(qa_pairs[:4]):  # Show first 4
                 print(f"\n   📋 Example {i + 1}:")
                 question_preview = (
-                    qa_pair["question"][:100] + "..." if len(qa_pair["question"]) > 100 else qa_pair["question"]
+                    qa_pair["question"] + "..." if len(qa_pair["question"]) > 100 else qa_pair["question"] #qa_pair["question"][:100] + "..." if len(qa_pair["question"]) > 100 else qa_pair["question"]
                 )
                 print(f"      🔸 Question: {question_preview}")
                 print(f"      ✅ Correct Answer: {qa_pair['correct_answer']}")
@@ -2834,7 +2835,9 @@ def run_task_pipeline(
             else:
                 # Use LMEvalHarnessGroundTruth for proper evaluation - pass token_aggregation
                 # FIXED: Use actual task name for both constructor and evaluation
+        
                 actual_eval_task_name = get_actual_task_name(task_name)
+              
                 lm_eval_ground_truth = LMEvalHarnessGroundTruth(actual_eval_task_name, evaluation_method, model=model)
                 lm_eval_results = lm_eval_ground_truth.evaluate_classifier_on_task(
                     classifier,

@@ -994,6 +994,15 @@ class Model:
         Returns:
             Task object from lm_eval
         """
+
+        """
+        # Check if it's MultiRc - use task registry
+        if task_name == "multirc":
+            from .task_interface import get_task
+
+            return get_task(task_name, limit=limit)  
+        """
+
         # Check if it's LiveCodeBench - use task registry
         if task_name == "livecodebench":
             from .task_interface import get_task

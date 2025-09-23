@@ -33,7 +33,8 @@ from .lm_eval_task import (
     Arithmetic4dsTask,
     Arithmetic5daTask,
     Arithmetic5dsTask,
-    QA4MRETASK,
+    QA4MRETask,
+    MULTIRCTask,
 
     HumanEvalPlusTask,
     HumanEvalTask,
@@ -67,17 +68,18 @@ def register_all_tasks():
     register_task("truthfulqa_mc1", TruthfulQATask)
     register_task("mmlu", MMLUTask)
 
-    register_task("arithmetic1dc", Arithmetic1dcTask)
-    register_task("arithmetic2da", Arithmetic2daTask)
-    register_task("arithmetic2dm", Arithmetic2dmTask)
-    register_task("arithmetic2ds", Arithmetic2dsTask)
-    register_task("arithmetic3da", Arithmetic3daTask)
-    register_task("arithmetic3ds", Arithmetic3dsTask)
-    register_task("arithmetic4da", Arithmetic4daTask)
-    register_task("arithmetic4ds", Arithmetic4dsTask)
-    register_task("arithmetic5da", Arithmetic5daTask)
-    register_task("arithmetic5ds", Arithmetic5dsTask)
-    register_task("qa4mre", QA4MRETASK)
+    register_task("arithmetic_1dc", Arithmetic1dcTask)
+    register_task("arithmetic_2da", Arithmetic2daTask)
+    register_task("arithmetic_2dm", Arithmetic2dmTask)
+    register_task("arithmetic_2ds", Arithmetic2dsTask)
+    register_task("arithmetic_3da", Arithmetic3daTask)
+    register_task("arithmetic_3ds", Arithmetic3dsTask)
+    register_task("arithmetic_4da", Arithmetic4daTask)
+    register_task("arithmetic_4ds", Arithmetic4dsTask)
+    register_task("arithmetic_5da", Arithmetic5daTask)
+    register_task("arithmetic_5ds", Arithmetic5dsTask)
+    register_task("qa4mre_2013", QA4MRETask)
+    register_task("multirc", MULTIRCTask)
 
     # Register all coding tasks
     register_task("mbpp", MBPPTask)
@@ -180,6 +182,7 @@ __all__ = [
     "MBPPPlusTask",
     "MBPPTask",
     "MMLUTask",
+    "MULTIRCTASK",
     "Math500Task",
     "MercuryTask",
     "MultipleCppTask",
@@ -189,6 +192,7 @@ __all__ = [
     "MultiplePyTask",
     "MultipleRsTask",
     "PolyMathTask",
+    "QA4MRETASK",
     "RecodeTask",
     "Squad2Task",
     "SuperGPQABiologyTask",

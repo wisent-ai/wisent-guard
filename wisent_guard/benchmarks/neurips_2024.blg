@@ -20,45 +20,45 @@ Warning--empty booktitle in socher2013sst
 Warning--empty booktitle in vilares2019headqa
 Warning--empty booktitle in yang2019pawsx
 Warning--empty booktitle in zhou2019mctaco
-You've used 77 entries,
+You've used 76 entries,
             2118 wiz_defined-function locations,
-            1091 strings with 28960 characters,
-and the built_in function-call counts, 33142 in all, are:
-= -- 2758
-> -- 3070
+            1087 strings with 28647 characters,
+and the built_in function-call counts, 32594 in all, are:
+= -- 2717
+> -- 3012
 < -- 6
-+ -- 1220
-- -- 1136
-* -- 2746
-:= -- 6063
-add.period$ -- 237
-call.type$ -- 77
-change.case$ -- 797
++ -- 1197
+- -- 1114
+* -- 2697
+:= -- 5964
+add.period$ -- 234
+call.type$ -- 76
+change.case$ -- 784
 chr.to.int$ -- 0
-cite$ -- 93
-duplicate$ -- 903
-empty$ -- 1623
-format.name$ -- 1136
-if$ -- 6289
+cite$ -- 92
+duplicate$ -- 889
+empty$ -- 1595
+format.name$ -- 1114
+if$ -- 6185
 int.to.chr$ -- 0
-int.to.str$ -- 77
-missing$ -- 77
-newline$ -- 388
-num.names$ -- 154
-pop$ -- 901
+int.to.str$ -- 76
+missing$ -- 76
+newline$ -- 383
+num.names$ -- 152
+pop$ -- 884
 preamble$ -- 1
-purify$ -- 720
+purify$ -- 708
 quote$ -- 0
-skip$ -- 599
+skip$ -- 591
 stack$ -- 0
-substring$ -- 588
-swap$ -- 129
+substring$ -- 583
+swap$ -- 127
 text.length$ -- 6
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 308
+type$ -- 304
 warning$ -- 16
-while$ -- 171
-width$ -- 79
-write$ -- 774
+while$ -- 169
+width$ -- 78
+write$ -- 764
 (There were 17 warnings)

@@ -1175,41 +1175,7 @@ class ContrastivePairSet:
                 incorrect_answer = None
                 formatted_question = question  # Default to basic question
 
-                if "truthfulqa" in task_name.lower() or "truthful_qa" in task_name.lower():
-                    # TruthfulQA-specific extraction - handle both generation and multiple choice formats
-                    if "mc1_targets" in doc or "mc2_targets" in doc:
-                        # Multiple choice format (truthfulqa_mc1, truthfulqa_mc2)
-                        mc_targets = doc.get("mc1_targets", doc.get("mc2_targets", {}))
-                        choices = mc_targets.get("choices", [])
-                        labels = mc_targets.get("labels", [])
-
-                        # Find the correct answer
-                        for j, label in enumerate(labels):
-                            if label == 1 and j < len(choices):
-                                correct_answer = choices[j]
-                                break
-
-                        # Find an incorrect answer
-                        for j, label in enumerate(labels):
-                            if label == 0 and j < len(choices):
-                                incorrect_answer = choices[j]
-                                break
-                    elif "correct_answers" in doc and "incorrect_answers" in doc:
-                        # Generation format (truthfulqa_gen)
-                        correct_answers_list = doc.get("correct_answers", [])
-                        incorrect_answers_list = doc.get("incorrect_answers", [])
-
-                        if correct_answers_list and incorrect_answers_list:
-                            # Use the first correct and first incorrect answer
-                            correct_answer = correct_answers_list[0]
-                            incorrect_answer = incorrect_answers_list[0]
-                            # For TruthfulQA, use the question as formatted_question
-                            formatted_question = question
-                    else:
-                        # Fallback for unknown TruthfulQA format
-                        continue
-
-                elif task_name == "winogrande":
+                if task_name == "winogrande":
                     # Use benchmark extractor for winogrande to get formatted_question
                     from ..benchmark_extractors import extract_contrastive_pair
 
@@ -1307,30 +1273,6 @@ class ContrastivePairSet:
                     # using the model outputs extractor
                     continue
 
-                elif task_name.startswith("supergpqa"):
-                    # SuperGPQA-specific extraction
-                    options = doc.get("options", [])
-                    answer_text = doc.get("answer", "")
-                    answer_letter = doc.get("answer_letter", "")
-
-                    if options and answer_text:
-                        correct_answer = answer_text
-                        # Find an incorrect answer from options
-                        for option in options:
-                            if option != answer_text:
-                                incorrect_answer = option
-                                break
-
-                        # Format the question with options
-                        if options:
-                            formatted_options = []
-                            for i, option in enumerate(options):
-                                letter = chr(ord("A") + i)
-                                formatted_options.append(f"{letter}. {option}")
-                            formatted_question = f"{question}\n\n" + "\n".join(formatted_options)
-                        else:
-                            formatted_question = question
-
                 elif task_name.startswith("hle"):
                     # HLE-specific extraction
                     answer = doc.get("answer", "")
@@ -1393,24 +1335,6 @@ class ContrastivePairSet:
                             incorrect_answer = str(int(answer) + 1)
                         else:
                             incorrect_answer = "Wrong answer"
-
-                elif task_name.startswith("arithmetic"):
-                    # Arithmetic task extraction - uses context/completion format
-                    completion = doc.get("completion", "")
-                    if completion:
-                        correct_answer = str(completion).strip()
-                        # Generate an incorrect answer for arithmetic problems
-                        try:
-                            # Try to convert to number and add 1 for incorrect answer
-                            if correct_answer.isdigit():
-                                incorrect_answer = str(int(correct_answer) + 1)
-                            elif '.' in correct_answer and correct_answer.replace('.', '').isdigit():
-                                incorrect_answer = str(float(correct_answer) + 1)
-                            else:
-                                incorrect_answer = "Wrong answer"
-                        except:
-                            incorrect_answer = "Wrong answer"
-                    formatted_question = question
 
                 else:
                     # Use benchmark-specific extractors for all other tasks

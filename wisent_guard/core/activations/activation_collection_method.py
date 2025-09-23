@@ -47,6 +47,8 @@ class ActivationCollectionLogic:
         # Create the multiple choice question
         mc_question = f"Which is better: {question} A. {incorrect_answer} B. {correct_answer}"
 
+        #mc_question = f"Which is better: {question}\nA. {incorrect_answer} B. {correct_answer}"
+
         # Use the model's proper formatting (no response yet, just the prompt)
         base_prompt = self.model.format_prompt(mc_question)
 

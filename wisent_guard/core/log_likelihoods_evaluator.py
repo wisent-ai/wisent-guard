@@ -36,6 +36,64 @@ class LogLikelihoodsEvaluator:
         self.task_name = task_name
         self.model = model
 
+    def _is_task_interface_task(self, task_name: str) -> bool:
+        """Check if this is a TaskInterface task (not an lm-eval task)."""
+        # List of known TaskInterface tasks
+        task_interface_tasks = {
+            "hle",
+            "hle_exact_match",
+            "hle_multiple_choice",
+            "livecodebench",
+            "math500",
+            "math",
+            "hendrycks_math",
+            "aime",
+            "aime2025",
+            "aime2024",
+            "hmmt",
+            "hmmt_feb_2025",
+            "polymath",
+            "polymath_en_medium",
+            "polymath_zh_medium",
+            "polymath_en_high",
+            "polymath_zh_high",
+            "livemathbench",
+            "livemathbench_cnmo_en",
+            "livemathbench_cnmo_zh",
+            #"gsm8k",
+            "multirc",
+            "arithmetic_1dc",
+            #"arithmetic_2da",
+            "arithmetic_2dm",
+            "arithmetic_2ds",
+            "arithmetic_3da",
+            "arithmetic_3ds",
+            "arithmetic_4da",
+            "arithmetic_4ds",
+            "arithmetic_5da",
+            "arithmetic_5ds",
+            "qa4mre_2013",
+            #"truthfulqa_mc1",
+        }
+        return task_name in task_interface_tasks
+
+    def _load_task_interface_data(self, task_name: str, num_samples: int):
+        """Load data from TaskInterface tasks."""
+        try:
+            from .task_interface import get_task
+
+            # Get the task instance
+            task = get_task(task_name)
+
+            # Load data
+            docs = task.load_data(limit=num_samples)
+
+            return docs, task
+
+        except Exception as e:
+            logger.error(f"Failed to load TaskInterface task {task_name}: {e}")
+            return [], None
+
     def evaluate_classifier_on_task(
         self,
         classifier,
@@ -67,9 +125,18 @@ class LogLikelihoodsEvaluator:
 
             logger.info(f"Loading task data for {task_name}...")
 
-            # Use existing task loading infrastructure
-            task_data = evaluation_model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
-            docs, _ = evaluation_model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
+            if self._is_task_interface_task(task_name):
+                print("^"*80)
+                print("USING LOADING FROM TASK INTERFACE")
+                print("^"*80)
+                docs, task_data = self._load_task_interface_data(task_name, num_samples)
+            else:
+                # Use existing lm-eval task loading infrastructure
+                print("^"*80)
+                print("USING LOADING FROM LM EVAL HARNESS")
+                print("^"*80)
+                task_data = model.load_lm_eval_task(task_name, shots=0, limit=num_samples)
+                docs, _ = model.split_task_data(task_data, split_ratio=1.0)  # Use all for evaluation
 
             if not docs:
                 return self._error_result(f"No documents retrieved from task: {task_name}")
@@ -155,15 +222,15 @@ class LogLikelihoodsEvaluator:
                     logger.info(f"   ✅ Negative activations shape: {sample_pair.negative_activations.shape}")
 
                 if hasattr(sample_pair, "_prompt_pair") and sample_pair._prompt_pair:
-                    logger.debug(f"   🔸 Positive prompt: {sample_pair._prompt_pair.positive_prompt[:100]}...")
-                    logger.debug(f"   🔸 Negative prompt: {sample_pair._prompt_pair.negative_prompt[:100]}...")
+                    logger.debug(f"   🔸 Positive prompt: {sample_pair._prompt_pair.positive_prompt}...") #sample_pair._prompt_pair.positive_prompt[:100]
+                    logger.debug(f"   🔸 Negative prompt: {sample_pair._prompt_pair.negative_prompt}...") #prompt_pair.negative_prompt[:100]
                     logger.debug(f"   🎯 Target token: {sample_pair._prompt_pair.target_token}")
                     logger.debug(f"   📊 Prompt strategy: {sample_pair._prompt_strategy.value}")
                     logger.info(f"   🔍 Token targeting: {targeting_strategy.value} (evaluation mode)")
                 elif hasattr(sample_pair, "prompt") and hasattr(sample_pair, "positive_response"):
-                    logger.debug(f"   🔸 Question prompt: {sample_pair.prompt[:100]}...")
-                    logger.debug(f"   ✅ Positive response: {sample_pair.positive_response[:50]}...")
-                    logger.debug(f"   ❌ Negative response: {sample_pair.negative_response[:50]}...")
+                    logger.debug(f"   🔸 Question prompt: {sample_pair.prompt}...") #sample_pair.prompt[:100]
+                    logger.debug(f"   ✅ Positive response: {sample_pair.positive_response}...") #sample_pair.positive_response[:50]
+                    logger.debug(f"   ❌ Negative response: {sample_pair.negative_response}...") #sample_pair.negative_response[:50]
                     logger.debug(
                         f"   🔍 Token targeting used: {targeting_strategy.value} (from CLI token_aggregation: {token_aggregation})"
                     )
@@ -175,10 +242,13 @@ class LogLikelihoodsEvaluator:
 
             # Map token aggregation to activation method
             activation_method = token_aggregation
+
+            """
             logger.info(
                 f"🎯 Using activation aggregation method: {activation_method.value} (from token_aggregation: {token_aggregation})"
             )
-
+            """ #This line causes error
+            
             # Evaluate classifier on each sample
             results = []
             total_correct = 0
@@ -277,12 +347,26 @@ class LogLikelihoodsEvaluator:
             # Classifier should give lower score to correct answer, higher to incorrect
             classifier_correct = positive_prediction < negative_prediction
 
+            print(positive_prediction)
+            print()
+            print(negative_prediction)
+
             # Enhanced logging to show classifier vs normal predictions
             logger.info("📋 Sample Evaluation:")
-            logger.debug(f"   🔸 Question: {qa_pair['question'][:100]}...")
-            logger.info("   🧠 CLASSIFIER PREDICTION:")
-            logger.debug(f"      ✅ Correct answer score: {float(positive_prediction):.3f} (lower = more truthful)")
-            logger.debug(f"      ❌ Incorrect answer score: {float(negative_prediction):.3f} (higher = less truthful)")
+            #logger.debug(f"   🔸 Question: {qa_pair['question']}...") #qa_pair['question'][:100]
+            # Print the prompts that generated the activations
+            if hasattr(processed_pair, "_prompt_pair") and processed_pair._prompt_pair:
+                logger.debug(f"   🔸 Positive prompt: {processed_pair._prompt_pair.positive_prompt}")
+                logger.debug(f"   🔸 Negative prompt: {processed_pair._prompt_pair.negative_prompt}")
+            elif hasattr(processed_pair, "positive_response") and hasattr(processed_pair, "negative_response"):
+                logger.debug(f"   ✅ Positive prompt: {processed_pair.positive_response}")
+                logger.debug(f"   ❌ Negative prompt: {processed_pair.negative_response}")
+            else:
+                logger.debug(f"   🔸 Question: {qa_pair['question']}...") #qa_pair['question'][:100]
+
+            logger.info("   🧠 CLASSIFIER PREDICTION:") 
+            logger.debug(f"      ✅ Correct answer score: {float(positive_prediction):.6f} (lower = more truthful)") # rounding causes positive = negative due to similar numbers
+            logger.debug(f"      ❌ Incorrect answer score: {float(negative_prediction):.6f} (higher = less truthful)") # originally .3f
             logger.debug(
                 f"      🎯 Classifier judgment: {'CORRECT' if classifier_correct else 'INCORRECT'} (positive {'<' if classifier_correct else '>='} negative)"
             )

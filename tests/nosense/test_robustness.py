@@ -36,12 +36,10 @@ def run_wisent_evaluation(data_source, model, limit, is_nonsense=False):
     if is_nonsense:
         # For nonsense data, use file input
         cmd = [
-            "python", "-m", "wisent_guard", "tasks",
-            "--from-json", data_source,
+            "python", "-m", "wisent_guard", "tasks", data_source,
+            "--from-json",
             "--model", model,
             "--limit", str(limit),
-            "--question-col", "problem",
-            "--correct-col", "answer",
             "--layer", "15",
             "--verbose"
         ]
@@ -191,8 +189,9 @@ def test_math500_robustness(model="EleutherAI/gpt-neo-1.3B", limit=10, verbose=F
     if verbose:
         print("Sample nonsense item:")
         sample = nonsense_data[0]
-        print(f"  Problem: {sample['problem'][:100]}...")
-        print(f"  Answer: {sample['answer']}")
+        print(f"  Question: {sample['question'][:100]}...")
+        print(f"  Correct answer: {sample['correct_answer']}")
+        print(f"  Incorrect answer: {sample['incorrect_answer']}")
 
     # Step 3: Test with nonsense data
     print("\n🎭 Testing with NONSENSE data...")
