@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 
 from wisent_guard.core import ContrastivePairSet
 from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.core.contrastive_pairs.core.serialization import load_contrastive_pair_set
 
 if TYPE_CHECKING: 
     from wisent_guard.core.model import Model
@@ -19,11 +20,11 @@ _LOG = setup_logger(__name__)
 _LOAD_TIMEOUT_S = 60
 _MAX_WORKERS_CAP = 2
 
-
 class LoadDataResult(TypedDict):
-    qa_pairs: list[dict[str, Any]]
-    test_qa_pairs_source: list[dict[str, Any]]
-    task_data: dict[str, ConfigurableTask] | ConfigurableTask
+    train_qa_pairs: ContrastivePairSet
+    test_qa_pairs: ContrastivePairSet
+    task_type: str  
+    lm_task_data: dict[str, ConfigurableTask] | ConfigurableTask | None
 
 
 @dataclass(frozen=True)
@@ -34,9 +35,6 @@ class _LoadContext:
     seed: int
     training_limit: int | None
     testing_limit: int | None
-    verbose: bool
-    json_logs: bool
-
 
 def _normalize_roots(task_names: str | Sequence[str]) -> list[str]:
     """
@@ -189,7 +187,7 @@ def _tag_source(
         q.setdefault("source_subtask", subkey)
 
 
-def load_train_test_data(
+def load_train_test_lm_eval_format(
     model: Model,
     task_names: str | Sequence[str],
     split_ratio: float,
@@ -197,8 +195,6 @@ def load_train_test_data(
     training_limit: int | None,
     testing_limit: int | None,
     seed: int,
-    verbose: bool,
-    json_logs: bool = False,
 ) -> LoadDataResult:
     """
     Load task data for one or many lm-eval tasks (or groups) via "model.load_lm_eval_task"
@@ -217,8 +213,6 @@ def load_train_test_data(
         - training_limit: Optional limit on the number of training documents after splitting.
         - testing_limit: Optional limit on the number of testing documents after splitting.
         - seed: Random seed for reproducible splits.
-        - verbose: If True, emits info logs about progress.
-        - json_logs: If True, use JSON log format.
     """
     logger = bind(_LOG, subtask="load_data")
     roots = _normalize_roots(task_names)
@@ -229,8 +223,6 @@ def load_train_test_data(
         seed=seed,
         training_limit=training_limit,
         testing_limit=testing_limit,
-        verbose=verbose,
-        json_logs=json_logs,
     )
 
     t0 = time.perf_counter()
@@ -326,9 +318,132 @@ def load_train_test_data(
         "Aggregated: %d train-QA / %d test-QA across %d subtask(s) from %d root task(s) in %.3fs",
         total_train, total_test, len(tasks_by_name), len(roots), time.perf_counter() - t0,
     )
-
+    # TODO change to ContrastivePairSet
     return LoadDataResult(
         qa_pairs=all_train_qas,
         test_qa_pairs_source=all_test_qas,
         task_data=task_data,
+    )
+
+def load_train_test_custom_format(
+    path_to_custom_data: str,
+    split_ratio: float | None,
+    seed: int | None,
+    training_limit: int | None,
+    testing_limit: int | None,
+) -> LoadDataResult:
+    """
+    Load custom-formatted contrastive-pair data from a JSONL file, split into
+    train/test, and optionally cap each split.
+
+    arguments:
+        path_to_custom_data: Path to the JSONL file containing custom-formatted data.
+        split_ratio: Fraction of examples to allocate to training. If None, defaults to 0.8.
+        seed: Random seed for reproducible shuffling before splitting.
+        training_limit: Optional maximum number of training pairs after splitting.
+        testing_limit: Optional maximum number of testing pairs after splitting.
+
+        Dataset format:
+        {
+            "name": "name of the set",
+            "task_type": "task type string",
+            "pairs": [
+                {
+                "prompt": "The input prompt",
+                "positive_response": {
+            ...     "model_response": "Yes, the sky is blue.",
+            ...     "layers_activations": {"blocks.0.mlp": torch.randn(2, 4)},
+            ...     "label": "harmless"
+            ...     },
+            ...     "negative_response": {
+            ...         "model_response": "No, the sky is green.",
+            ...         "layers_activations": {"blocks.0.mlp": torch.randn(2, 4)},
+            ...         "label": "toxic"
+         ...     },
+         ...     "label": "color_question",
+         ...     "trait_description": "hallucinatory"
+         ... }
+        ]
+        }
+
+    Returns:
+        A mapping with the training/test 'ContrastivePairSet's' and the 'task_type'.
+        lm_task_data is always None because this is custom data.
+
+    Raises:
+        RuntimeError: If no contrastive pairs are found in the input file.
+        ValueError: If 'split_ratio' is not in [0.0, 1.0] or if any limit is negative.
+    """
+    logger = bind(_LOG, subtask="load_custom_data")
+
+    data: ContrastivePairSet = load_contrastive_pair_set(path_to_custom_data)
+    logger.info("Loaded custom data.", extra={"data_summary": data.statistics()})
+
+    if not data.pairs:
+        logger.error("No contrastive pairs found in the provided data; aborting.")
+        raise RuntimeError(
+            "CRITICAL: no contrastive pairs found — check the input data file."
+        )
+
+    if split_ratio is None:
+        split_ratio = 0.8
+    elif not (0.0 <= split_ratio <= 1.0):
+        raise ValueError("`split_ratio` must be between 0.0 and 1.0 (inclusive).")
+
+    if training_limit is not None and training_limit < 0:
+        raise ValueError("'training_limit' must be non-negative.")
+    if testing_limit is not None and testing_limit < 0:
+        raise ValueError("'testing_limit' must be non-negative.")
+
+    n_pairs = len(data.pairs)
+    indices = list(range(n_pairs))
+
+    if seed is not None:
+        try:
+            from numpy.random import default_rng  # type: ignore
+        except Exception:
+            import random
+            rnd = random.Random(seed)
+            rnd.shuffle(indices)
+        else:
+            indices = default_rng(seed).permutation(n_pairs).tolist()
+
+    split_at = int(n_pairs * split_ratio)
+    train_idx = indices[:split_at]
+    test_idx = indices[split_at:]
+
+    train_pairs = [data.pairs[i] for i in train_idx]
+    test_pairs = [data.pairs[i] for i in test_idx]
+
+    if training_limit is not None:
+        train_pairs = train_pairs[:training_limit]
+    if testing_limit is not None:
+        test_pairs = test_pairs[:testing_limit]
+
+    name = data.name
+    task_type = data.task_type
+
+    train_set = ContrastivePairSet(
+        name=f"{name}_train", pairs=train_pairs, task_type=task_type
+    )
+    test_set = ContrastivePairSet(
+        name=f"{name}_test", pairs=test_pairs, task_type=task_type
+    )
+
+    logger.info(
+        "Finished split.",
+        extra={
+            "total": n_pairs,
+            "split_ratio": split_ratio,
+            "train_count": len(train_pairs),
+            "test_count": len(test_pairs),
+            "seed": seed,
+        },
+    )
+
+    return LoadDataResult(
+        train_qa_pairs=train_set,
+        test_qa_pairs=test_set,
+        task_type=task_type,
+        lm_task_data=None,
     )

@@ -59,16 +59,16 @@ class ContrastivePairSet(AtomContrastivePairSet):
         Returns:
             A dictionary with statistics about the pair set.
         """
-        pos = sum(1 for p in self.pairs if getattr(p.positive_response, "activations", None) is not None)
-        neg = sum(1 for p in self.pairs if getattr(p.negative_response, "activations", None) is not None)
+        pos = sum(1 for p in self.pairs if getattr(p.positive_response, "layers_activations", None) is not None)
+        neg = sum(1 for p in self.pairs if getattr(p.negative_response, "layers_activations", None) is not None)
         both = sum(
             1
             for p in self.pairs
-            if getattr(p.positive_response, "activations", None) is not None
+            if getattr(p.positive_response, "layers_activations", None) is not None
             and getattr(p.negative_response, "activations", None) is not None
         )
 
-        assert pos == neg, "Number of positive and negative activations should be equal."
+        assert pos == neg, "Number of positive and negative layers_activations should be equal."
 
         return {
             "name": self.name,

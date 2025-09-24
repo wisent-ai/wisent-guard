@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Iterable
 
 from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
 from wisent_guard.cli_bricks.cli_utils import (
@@ -12,7 +13,7 @@ from wisent_guard.cli_bricks.cli_activation import (
     extract_activations_for_pairs,
     build_pair_set_with_real_activations,
 )
-from wisent_guard.cli_bricks.cli_data import load_train_test_data
+
 from wisent_guard.core import Model
 from wisent_guard.cli_bricks.cli_steering import (
     build_steering,
@@ -44,7 +45,13 @@ _LOG = setup_logger(__name__)
 class ModelSettings:
     model_name: str
     device: str = "cuda"
-    model_instance: Model | None = None  
+    model_instance: Model | None = None
+
+
+class DataSource(Enum):
+    LM_EVAL = "lm_eval"
+    CUSTOM = "custom"
+
 
 @dataclass(slots=True)
 class DataSettings:
@@ -55,7 +62,25 @@ class DataSettings:
     testing_limit: int = 11
     seed: int = 42
 
+@dataclass(slots=True)
+class DataSettings:
+    source: DataSource = DataSource.LM_EVAL
+    task_names: tuple[str, ...] = ("hellaswag",)  
+    custom_data_file: str | None = None        
 
+    split_ratio: float = 0.8                       
+    limit: int | None = None                       
+    training_limit: int | None = None              
+    testing_limit: int | None = None
+    seed: int = 42
+
+    def __post_init__(self) -> None:
+        if self.source is DataSource.CUSTOM and not self.custom_data_file:
+            raise ValueError("custom_data_file is required when source=CUSTOM.")
+        if self.custom_data_file and self.source is DataSource.LM_EVAL:
+            raise ValueError("custom_data_file provided but source is LM_EVAL; "
+                             "set source=CUSTOM or remove the file path.")
+        
 @dataclass(slots=True)
 class ActivationSettings:
     prompt_strategy: str = "multiple_choice"
@@ -136,40 +161,107 @@ def _build_or_reuse_model(ms: ModelSettings) -> Model:
     return model
 
 
-def _load_data(settings: PipelineSettings, model: Model) -> tuple[
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    dict[str, ConfigurableTask] | ConfigurableTask,
-]:
-    """Return (qa_pairs, test_qa_pairs_source, task_data).
+def _load_data(settings: PipelineSettings, model: Model | None) -> LoadDataResult:
+    """
+    Load data according to 'settings.data.source'.
 
-    Arguments:
-      - settings: PipelineSettings with data/model sections. 
-      Precisely:
-            - data.task_name
+    - LM_EVAL: uses 'load_train_test_lm_eval_format', requires 'model'
+    - CUSTOM: uses 'load_train_test_custom_format', requires 'custom_data_file'
+
+    arguments:
+        settings: PipelineSettings with data section. Precisely:
+            - data.source
+            - data.task_names (if source=LM_EVAL)
+            - data.custom_data_file (if source=CUSTOM)
             - data.split_ratio
             - data.limit
             - data.training_limit
             - data.testing_limit
             - data.seed
-      - model: Model instance to use for tokenization (if needed).  
+        model: Model instance, required if source=LM_EVAL.
+
+    returns:
+        A LoadDataResult with:
+            - train_qa_pairs: ContrastivePairSet for training
+            - test_qa_pairs_source: ContrastivePairSet for testing
+            - task_type: Optional[str] with the task type (if any)
+            - lm_task_data: Optional[dict[str, ConfigurableTask] | ConfigurableTask
+
+        example:
+         >>> from wisent_guard.cli_bricks.cli_run_task_steering import PipelineSettings, DataSettings, ModelSettings
+         >>> from wisent_guard.core import Model
+         >>> settings = PipelineSettings(
+         ...     model=ModelSettings(model_name="llama3.1-8B-Instruct", device="cpu"),
+         ...     data=DataSettings(
+         ...         source=DataSource.LM_EVAL,
+         ...         task_names=["hellaswag"],
+         ...         split_ratio=0.8,
+         ...         limit=100,
+         ...         training_limit=80,
+         ...         testing_limit=20,
+         ...         seed=42,
+         ...     ),
+         ... )
+            >>> model = Model(name=settings.model.model_name, device=settings.model.device)
+            >>> data = _load_data(settings, model)
     """
-    logger = bind(_LOG, stage="data", task=settings.data.task_name)
-    data: LoadDataResult = load_train_test_data(
-        model=model,
-        task_names=settings.data.task_name,
-        split_ratio=settings.data.split_ratio,
-        limit=settings.data.limit,
-        training_limit=settings.data.training_limit,
-        testing_limit=settings.data.testing_limit,
-        seed=settings.data.seed,
-        verbose=settings.tracking.verbose,
+   
+    d = settings.data
+    common_kwargs = dict(
+        split_ratio=d.split_ratio,
+        limit=d.limit,
+        training_limit=d.training_limit,
+        testing_limit=d.testing_limit,
+        seed=d.seed,
     )
-    qa_pairs: list[dict[str, Any]] = data["qa_pairs"]
-    test_qa_pairs_source: list[dict[str, Any]] = data["test_qa_pairs_source"]
-    task_data: dict[str, ConfigurableTask] | ConfigurableTask = data["task_data"]
-    logger.info("data_loaded", extra={"n_train": len(qa_pairs), "n_test": len(test_qa_pairs_source)})
-    return qa_pairs, test_qa_pairs_source, task_data
+
+    logger = bind(_LOG, stage="data", task=d.task_name)
+    logger.info("loading_data", extra={"source": d.source.value})
+
+    data: LoadDataResult
+
+    if d.source is DataSource.LM_EVAL:
+        if model is None:
+            raise ValueError("LM_EVAL source selected but 'model' is None.")
+        try:
+            from wisent_guard.cli_bricks.cli_data import load_train_test_lm_eval_format
+        except Exception as e:
+            raise ImportError("Failed to import lm-eval loader: load_train_test_lm_eval_format") from e
+
+        data = load_train_test_lm_eval_format(
+            model=model,
+            task_names=list(d.task_names) if isinstance(d.task_names, Iterable) else [d.task_names],
+            **common_kwargs,
+        )
+
+    elif d.source is DataSource.CUSTOM:
+        try:
+            from wisent_guard.cli_bricks.cli_data import load_train_test_custom_format
+        except Exception as e:
+            raise ImportError("Failed to import custom loader: load_train_test_custom_format") from e
+        data = load_train_test_custom_format(
+            file_path=str(d.custom_data_file),
+            **common_kwargs,
+        )
+    else:
+        raise ValueError(f"Unknown data source: {d.source}")
+
+    train_qa_pairs: ContrastivePairSet = data.train_qa_pairs
+    test_qa_pairs: ContrastivePairSet =  data.test_qa_pairs
+    task_type: str | None = data.task_type
+    lm_task_data: dict[str, ConfigurableTask] | ConfigurableTask | None = data.lm_task_data
+
+    if train_qa_pairs is None or test_qa_pairs is None:
+        raise ValueError("Loader did not return train_qa_pairs/test_qa_pairs.")
+
+    logger.info("data_loaded", extra={"n_train": len(train_qa_pairs), "n_test": len(test_qa_pairs)})
+    return LoadDataResult(
+        train_qa_pairs=train_qa_pairs,
+        test_qa_pairs=test_qa_pairs,
+        task_type=task_type,
+        lm_task_data=lm_task_data,
+    )
+
 
 
 def _compute_activations(

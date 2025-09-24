@@ -416,7 +416,7 @@ class BoolQExtractor(BenchmarkExtractor):
 class GSM8KExtractor(BenchmarkExtractor):
     """Extractor for GSM8K, MATH-500, and AIME_2024 benchmarks."""
 
-    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+    def extract_qa_pair(self, doc: Dict[str, Any], k: Any = None) -> Optional[Dict[str, str]]:
         """
         Supports multiple formats:
         - GSM8K format: doc['question'] -> doc['answer']
