@@ -375,7 +375,7 @@ CORE_BENCHMARKS = {
     },
     "qnli": {
         "task": "qnli",
-        "tags": ["reasoning", "general knowledge", "science"],
+        "tags": ["reasoning", "general knowledge", "nli"],
         "priority": "high"
     },
     "qqp": {
@@ -385,17 +385,17 @@ CORE_BENCHMARKS = {
     },
     "rte": {
         "task": "rte",
-        "tags": ["reasoning", "general knowledge", "science"],
+        "tags": ["reasoning", "general knowledge", "nli"],
         "priority": "high"
     },
-    "sst": {
+    "sst2": {
         "task": "sst2",
-        "tags": ["reasoning", "general knowledge", "science"],
+        "tags": ["reasoning", "general knowledge", "sentiment analysis"],
         "priority": "high"
     },
     "wnli": {
         "task": "wnli",
-        "tags": ["reasoning", "general knowledge", "science"],
+        "tags": ["reasoning", "general knowledge", "nli"],
         "priority": "high"
     },
     "superglue": {
@@ -407,7 +407,7 @@ CORE_BENCHMARKS = {
     # SuperGLUE individual tasks
     "cb": {
         "task": "cb",
-        "tags": ["reasoning", "general knowledge", "science"],
+        "tags": ["reasoning", "general knowledge", "nli"],
         "priority": "high"  # 11.0s - fast for agentic use
     },
     "copa": {
@@ -552,8 +552,8 @@ CORE_BENCHMARKS = {
         "tags": ["long context", "reasoning", "general knowledge"],
         "priority": "high"  # 13.0s - fast for agentic use
     },
-    "headqa": {
-        "task": "headqa",
+    "headqa_en": {
+        "task": "headqa_en",
         "tags": ["medical", "multilingual", "adversarial robustness"],
         "priority": "medium"  # 30.8s - moderate for agentic use
     },
@@ -904,8 +904,8 @@ CORE_BENCHMARKS = {
     },
 
     # Medical and Law
-    "medqa": {
-        "task": "medqa",
+    "medqa_4options": {
+        "task": "medqa_4options",
         "tags": ["medical", "science", "general knowledge"],
         "priority": "medium"  # 18.9s - moderate for agentic use
     },

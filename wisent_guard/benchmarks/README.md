@@ -31,6 +31,7 @@ Notice that even if task works it does not mean that it works as intended or rea
 I follow the table from neurips_2024.pdf and systematically and methodically check benchmarks and fix them if broken or add new one.
 
 23 september: there are 95 tasks available now, so 16 were added and about the same number were fixed.
+24 september: 108 available
 
 
 

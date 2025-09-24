@@ -531,6 +531,68 @@ class BoolQExtractor(BenchmarkExtractor):
             logger.debug(f"Error extracting BoolQ contrastive pair: {e}")
             return None
 
+class WiCExtractor(BenchmarkExtractor):
+    """Extractor for WiC benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        WiC format:
+        - doc["sentence1"]: first sentence
+        - doc["sentence2"]: second sentence
+        - doc["word"]: word present in both sentences
+        - doc["label"]: 1 - word has the same meaning in sentences, 0 - word has different meaning in sentences
+        """
+        try:
+
+            sentence1 = doc.get("sentence1", "")
+            sentence2 = doc.get("sentence2", "")
+            word = doc.get("word", "")
+            label = doc.get("label")
+
+            if not all([sentence1, sentence2, word, label is not None]):
+                return None
+            
+            question = f"{sentence1}\n{sentence2}\nQuestion: Is the word '{word}' used in the same way in two sentences above?"
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question + "\nAnswer:"
+
+            # Get correct answer
+            correct_answer = "Yes" if label == 1 else "No"
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+        except Exception as e:
+            logger.debug(f"Error extracting WiC QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for WiC."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+            incorrect_answer = "No" if correct_answer == "Yes" else "Yes" 
+
+            if not all([question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting WiC contrastive pair: {e}")
+            return None
+
 
 class GSM8KExtractor(BenchmarkExtractor):
     """Extractor for GSM8K, MATH-500, and AIME_2024 benchmarks."""
@@ -695,6 +757,320 @@ class MMLUExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting MMLU contrastive pair: {e}")
             return None
+        
+class MutualExtractor(BenchmarkExtractor):
+    """Extractor for Mutual benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Mutual format:
+        - doc["article"]: dialogue
+        - doc["options']: list of possible continuations
+        - doc["answers']: correct continuation
+        """
+
+        try:
+            
+            dialogue = doc.get("article", "")
+            options = doc.get("options", [])
+            answer = doc.get("answers")
+
+            answer_idx = ord(answer) - ord("A")
+            correct_answer = options[answer_idx]
+
+            if not all([dialogue, options, answer]):
+                return None
+            
+            return {"question": dialogue, "formatted_question": dialogue, "correct_answer": correct_answer}
+
+        except Exception as e:
+            logger.debug(f"Error extracting Mutual QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for Mutual."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+            options = doc.get("options", [])
+            answer = doc.get("answers")
+            answer_idx = ord(answer) - ord("A")
+            incorrect_answer = options[(answer_idx+1)%3]
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question
+
+            if not all([formatted_question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting Mutual contrastive pair: {e}")
+            return None  
+
+        
+class MedQAExtractor(BenchmarkExtractor):
+    """Extractor for MedQA benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        MedQa format:
+        - doc["sent1"]: question
+        - doc["ending0"] doc["ending1"], doc["ending2"], doc["ending3"] answers
+        - doc["lable"]: index of correct_answer (0,1,2,3)
+        """
+
+        try:
+
+            question = doc.get("sent1", "")
+            answers = [doc.get("ending0", ""), doc.get("ending1", ""), doc.get("ending2", ""), doc.get("ending3", "")]
+            label = doc.get("label", 0)
+
+            if not all([question, answers, label]):
+                return None
+            
+            correct_answer = answers[label]
+
+            formatted_question = question
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+
+        except Exception as e:
+            logger.debug(f"Error extracting MedQA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for MMLU."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            answers = [doc.get("ending0", ""), doc.get("ending1", ""), doc.get("ending2", ""), doc.get("ending3", "")]
+            correct_answer = qa_pair["correct_answer"]
+            label = doc.get("label", 0)
+
+            incorrect_answer = None
+            for i, answer in enumerate(answers):
+                if i != label:
+                    incorrect_answer = answer
+                    break
+
+            if not all ([question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting MedQA contrastive pair: {e}")
+            return None   
+        
+class PubMedQAExtractor(BenchmarkExtractor):
+    """Extractor for PubMedQA benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        PubMedQa format:
+        - doc[CONTEXTS]: list of sentences to concatenate to form context
+        - doc[QUESTION]: question
+        - doc[final_decision]: yes/no
+        """
+
+        try:
+
+            contexts = doc.get("CONTEXTS", [])
+            question = doc.get("QUESTION", "")
+            correct_answer = doc.get("final_decision", "")
+
+            formatted_contexts = " ".join(s.strip() for s in contexts if isinstance(s, str) and s.strip())
+
+            if not all([contexts, question, correct_answer]):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Context: {formatted_contexts} Question: {question}"
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+
+        except Exception as e:
+            logger.debug(f"Error extracting PubMedQA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for MMLU."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            correct_choice = qa_pair["correct_answer"]
+            incorrect_choice = "no" if correct_choice == "yes" else "yes"
+
+            if not all ([question, correct_choice, incorrect_choice]):
+                return None
+
+            return {
+                "question": question,
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting PubMedQA contrastive pair: {e}")
+            return None
+        
+class HeadQAExtractor(BenchmarkExtractor):
+    """Extractor for HeadQA benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        HeadQa format:
+        - doc['qtext']: question
+        - doc['answers']: list of dictionaries with id and answer keys
+        - doc['ra']: id of correct answer (1,2,3,4,5...)
+        """
+
+        try:
+
+            question = doc.get("qtext", "")
+            answers = doc.get("answers", [])
+            correct_answer_id = doc.get("ra", 1)
+
+            answers = [answer["atext"] for answer in answers]
+
+            correct_answer = answers[correct_answer_id-1]
+
+            if not all([question, answers, correct_answer]):
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = question
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+
+        except Exception as e:
+            logger.debug(f"Error extracting HeadQA QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for HeadQA."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            answers = doc.get("answers", [])
+            answers = [answer["atext"] for answer in answers]
+            correct_answer = qa_pair["correct_answer"]
+            correct_answer_id = doc.get("ra", 0)
+
+            # Get first incorrect choice
+            incorrect_answer = None
+            for i, answer in enumerate(answers):
+                if i != correct_answer_id-1:
+                    incorrect_answer = answer
+                    break
+
+            if not all([question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting HeadQA contrastive pair: {e}")
+            return None
+
+class SciQExtractor(BenchmarkExtractor):
+    """Extractor for SciQ benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        SciQ format:
+        - doc[support]: context
+        - doc[question]: question
+        - doc[correct_answer]: correct answer
+        - doc[distractor1]: incorrect answer
+        """
+
+        try:
+
+            context = doc.get("support", "")
+            question = doc.get("question", "")
+            correct_answer = doc.get("correct_answer", "")
+
+            if not all([question, correct_answer]): #do not include context, because evaluation does not have it
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"Context: {context} Question: {question}"
+
+            return {"question": question, "formatted_question": formatted_question, "correct_answer": correct_answer}
+
+
+        except Exception as e:
+            logger.debug(f"Error extracting SciQ QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for SciQ."""
+        try:
+
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            question = qa_pair["formatted_question"]
+            correct_choice = qa_pair["correct_answer"]
+            incorrect_choice = doc.get("distractor1", "")
+
+            if not all ([question, correct_choice, incorrect_choice]):
+                return None
+
+            return {
+                "question": question,
+                "correct_answer": correct_choice,
+                "incorrect_answer": incorrect_choice,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting SciQ contrastive pair: {e}")
+            return None
+
         
 class SOCIAL_IQAExtractor(BenchmarkExtractor):
     """Extractor for Social IQA benchmark"""
@@ -963,6 +1339,67 @@ class COPAExtractor(BenchmarkExtractor):
 
         except Exception as e:
             logger.debug(f"Error extracting COPA contrastive pair: {e}")
+            return None
+        
+class CBExtractor(BenchmarkExtractor):
+    """Extractor for CB benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        CB format:
+        - doc['premise']: premise
+        - doc['hyphotesis'], hyphotesis
+        - doc['label']: 0 - true, 1 - false, 2 - neither
+        """
+        try:
+            premise = doc.get("premise", "")
+            hyphotesis = doc.get("hypothesis", "")
+            label = doc.get("label", 0)
+
+            if not all([premise, hyphotesis]) or label not in [0, 1, 2]:
+                return None
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = f"{premise}\nQuestion: {hyphotesis} True, False, or Neither?\nAnswer: "
+            
+            labels = ("True", "False", "Neither")
+            correct_answer = labels[label]  
+
+            return {
+                "question": formatted_question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting CB QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for CB."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+
+            label = doc.get("label", 0)
+            correct_answer = qa_pair["correct_answer"]
+
+            labels = ("True", "False", "Neither")
+            incorrect_label = (label + 1) % 3
+            incorrect_answer = labels[incorrect_label]
+
+            return {
+                "question": qa_pair["formatted_question"],
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting CB contrastive pair: {e}")
             return None
         
 class WSCExtractor(BenchmarkExtractor):
@@ -1415,7 +1852,7 @@ class MRPCExtractor(BenchmarkExtractor):
         try:
             sentence1 = doc.get("sentence1", "")
             sentence2 = doc.get("sentence2", "")
-            label = doc.get("label")
+            label = doc.get("label", 0)
 
             if not all([sentence1, sentence2]) or label is None:
                 return None
@@ -1427,7 +1864,8 @@ class MRPCExtractor(BenchmarkExtractor):
                 formatted_question = (
                     f"Sentence 1: {sentence1}\n"
                     f"Sentence 2: {sentence2}\n"
-                    f"Question: Do both sentences mean the same thing?"
+                    f"Question: Do both sentences mean the same thing?\n"
+                    "Answer: "
                 )
 
             # Get correct answer
@@ -1602,7 +2040,7 @@ class RTEExtractor(BenchmarkExtractor):
         RTE format:
         - doc['sentence1']: First sentence (premise)
         - doc['sentence2']: Second sentence (hypothesis)
-        - doc['label']: 0 if not entailment, 1 if entailment
+        - doc['label']: 1 if not entailment, 0 if entailment
         """
         try:
             sentence1 = doc.get("sentence1", "")
@@ -1619,7 +2057,7 @@ class RTEExtractor(BenchmarkExtractor):
                 formatted_question = f"{sentence1}\nQuestion: {sentence2} True or False?"
 
             # Get correct answer
-            correct_answer = "True" if label == 1 else "False"
+            correct_answer = "True" if label == 0 else "False"
 
             return {
                 "question": f"Given '{sentence1}', is it true that '{sentence2}'?",
@@ -1642,8 +2080,8 @@ class RTEExtractor(BenchmarkExtractor):
             if label is None:
                 return None
 
-            correct_choice = "True" if label == 1 else "False"
-            incorrect_choice = "False" if label == 1 else "True"
+            correct_choice = "True" if label == 0 else "False"
+            incorrect_choice = "False" if label == 0 else "True"
 
             return {
                 "question": qa_pair["formatted_question"],
@@ -3607,7 +4045,7 @@ EXTRACTORS = {
     "sst2": SST2Extractor,  # GLUE SST2 sentiment analysis
     "wnli": WNLIExtractor,  # GLUE WNLI Winograd NLI
     # Add more specific extractors for other benchmarks
-    "cb": COPAExtractor,  # Similar format to COPA
+    "cb": CBExtractor,  # Similar format to COPA
     "coqa": CoQAExtractor,  # Conversational QA format
     "drop": SQuAD2Extractor,  # Similar QA format
     "logiqa": LogiQAExtractor,  # LogiQA logical reasoning format
@@ -3618,18 +4056,18 @@ EXTRACTORS = {
     "mathqa": MathQAExtractor,  # Custom extractor for mathqa's unique format
     "mc-taco": MCTacoExtractor,  # MC-TACO temporal reasoning
     "multirc": MULTIRCExtractor,  # Paragraph + Question + Answer, True or False format
-    "mutual": MMLUExtractor,  # Multiple choice format
+    "mutual": MutualExtractor,  # Multiple choice format
     "naturalqs": SQuAD2Extractor,  # QA format
     "prost": ProstExtractor,  # Multiple choice format
-    "pubmedqa": MMLUExtractor,  # Multiple choice format
+    "pubmedqa": PubMedQAExtractor,  # yes/no
     "quac": QuACExtractor,  # Conversational QA format
     "record": SQuAD2Extractor,  # QA format
-    "sciq": MMLUExtractor,  # Multiple choice format
+    "sciq": SciQExtractor,  # Multiple choice format
     "swag": SwagExtractor,  # Similar format to HellaSwag
     "toxigen": BoolQExtractor,  # Binary classification
     "triviaqa": SQuAD2Extractor,  # QA format
     "webqs": SQuAD2Extractor,  # QA format
-    "wic": BoolQExtractor,  # Binary classification
+    "wic": WiCExtractor,  # Binary classification
     "wsc": WSCExtractor,  # Similar format to COPA
     "wsc273": COPAExtractor,  # Similar format to COPA
     # New extractors for previously unsupported benchmarks
@@ -3659,10 +4097,10 @@ EXTRACTORS = {
     "belebele": MultilingualExtractor,  # Multilingual reading comprehension
     "blimp": DefaultExtractor,  # Linguistic minimal pairs
     "crows_pairs": DefaultExtractor,  # Bias benchmark
-    "headqa": MMLUExtractor,  # Spanish healthcare QA (multiple choice)
+    "headqa_en": HeadQAExtractor,  # Spanish healthcare QA (multiple choice)
     "hendrycks_ethics": MMLUExtractor,  # Ethics benchmark (multiple choice)
     "hendrycks_math": GSM8KExtractor,  # Math problems
-    "medqa": MMLUExtractor,  # Medical QA (multiple choice)
+    "medqa_4options": MedQAExtractor,  # Medical QA (multiple choice)
     "mgsm": GSM8KExtractor,  # Multilingual GSM8K
     "paws_x": DefaultExtractor,  # Paraphrase detection
     "qa4mre": QA4MREExtractor,  # QA for machine reading evaluation

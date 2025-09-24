@@ -1337,12 +1337,14 @@ class ContrastivePairSet:
                             incorrect_answer = "Wrong answer"
 
                 else:
+                    
                     # Use benchmark-specific extractors for all other tasks
                     from ..benchmark_extractors import extract_contrastive_pair
 
                     contrastive_data = extract_contrastive_pair(task_name, doc, task_data)
 
                     if contrastive_data:
+
                         question = contrastive_data["question"]
                         correct_answer = contrastive_data.get("correct_answer", contrastive_data.get("correct_choice"))
                         incorrect_answer = contrastive_data.get(
@@ -1361,6 +1363,7 @@ class ContrastivePairSet:
                         except:
                             formatted_question = question  # Fallback to basic question
                     else:
+
                         # Fallback to generic extraction if extractor fails
 
                         # For BoolQ tasks specifically

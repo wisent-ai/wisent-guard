@@ -50,6 +50,19 @@ MULTIPLE_CHOICE_TASKS = {
     "prost",
     "mc-taco",
     "social_iqa",
+    "pubmedqa",
+    "sciq",
+    "headqa_en",
+    "medqa_4options",
+    "cb",
+    "qnli",
+    "mrpc",
+    "qqp",
+    "rte",
+    "sst2",
+    "wnli",
+    "wic",
+    "mutual",
 }
 
 # GPQA scientific reasoning benchmarks
@@ -164,14 +177,14 @@ MISC_TASKS = {
 
 # Tasks that were in original MISC list but are NOT AVAILABLE in current system:
 MISC_TASKS_NOT_AVAILABLE = {
-    "cb",  #  TODO Need investigation, due to not creating sufficient contrastive pairs
+    #"cb",  #  TODO Need investigation, due to not creating sufficient contrastive pairs
     "anli",  # ❌ Not available in current wisent-guard system
-    "mutual",  # ❌ Not available in current wisent-guard system
+    #"mutual",  # ❌ Not available in current wisent-guard system
     #"prost",  # ❌ Not available in current wisent-guard system
-    "pubmedqa",  # ❌ Not available in current wisent-guard system
-    "sciq",  # ❌ Not available in current wisent-guard system
+    #"pubmedqa",  # ❌ Not available in current wisent-guard system
+    #"sciq",  # ❌ Not available in current wisent-guard system
     "toxigen",  # ❌ Not available in current wisent-guard system
-    "wic",  # ❌ Not available in current wisent-guard system
+    #"wic",  # ❌ Not available in current wisent-guard system
     "wsc273",  # ❌ Not available in current wisent-guard system
 }
 

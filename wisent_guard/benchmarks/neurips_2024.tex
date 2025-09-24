@@ -207,11 +207,11 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catReason} OpenBookQA \cite{mihaylov2018openbookqa} & \LL & \textbf{MC-FirstDistr} & science MCQ \\
 \rowcolor{catReason} ARC Easy \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
 \rowcolor{catReason} ARC Challenge \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
-\rowcolor{catReason} AI2 ARC \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
+%\rowcolor{catReason} AI2 ARC \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
 \rowcolor{catReason} LogiQA \cite{liu2020logiqa} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
 \rowcolor{catReason} LogiQA2 \cite{liu2023logiqa2} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
-\rowcolor{catReason} AGIEval LogiQA EN \cite{zhong2023agieval} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
-\rowcolor{catReason} AGIEval LogiQA ZH \cite{zhong2023agieval} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
+%\rowcolor{catReason} AGIEval LogiQA EN \cite{zhong2023agieval} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
+%\rowcolor{catReason} AGIEval LogiQA ZH \cite{zhong2023agieval} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
 \rowcolor{catReason} WSC \cite{levesque2011wsc} & \LL & \textbf{2C-Flip} & commonsense reasoning \\
 \rowcolor{catReason} WSC273 \cite{levesque2012wsc} & \LL & \textbf{2C-Flip} & commonsense reasoning \\
 \rowcolor{catReason} MC-TACO \cite{zhou2019mctaco} & \LL & \textbf{2C-Flip} & temporal commonsense \\
@@ -219,7 +219,7 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catReason} PROST \cite{arocaouellette2021prost} & \LL & \textbf{MC-FirstDistr} & physical reasoning \\
 
 % ===== Exams & Knowledge Tests =====
-\rowcolor{catExam} MMLU \cite{hendrycks2021mmlu} & \LL & \textbf{MC-FirstDistr} & multi-subject exams \\
+%\rowcolor{catExam} MMLU \cite{hendrycks2021mmlu} & \LL & \textbf{MC-FirstDistr} & multi-subject exams \\
 \rowcolor{catExam} SuperGPQA \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
 \rowcolor{catExam} SuperGPQA Biology \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
 \rowcolor{catExam} SuperGPQA Chemistry \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
@@ -233,7 +233,7 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catExam} TruthfulQA Gen \cite{lin2021truthfulqa} & \TG & \textbf{MC-FirstDistr} & truthfulness \\
 \rowcolor{catExam} PubMedQA \cite{jin2019pubmedqa} & \LL &  & biomedical QA \\
 \rowcolor{catExam} SciQ \cite{welbl2017sciQ} & \LL & \textbf{MC-FirstDistr} & science MCQ \\
-\rowcolor{catExam} Hendrycks Ethics \cite{hendrycks2020ethics} & \LL & \textbf{MC-FirstDistr} & moral reasoning \\
+%\rowcolor{catExam} Hendrycks Ethics \cite{hendrycks2020ethics} & \LL & \textbf{MC-FirstDistr} & moral reasoning \\
 \rowcolor{catExam} HeadQA \cite{vilares2019headqa} & \LL & \textbf{MC-FirstDistr} & healthcare QA \\
 \rowcolor{catExam} MedQA \cite{jin2020medqa} & \LL & \textbf{MC-FirstDistr} & medical QA \\
 \rowcolor{catExam} GPQA Diamond CoT Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
@@ -304,7 +304,7 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catCode} CodeXGLUE Code to Text Ruby \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
 
 % ===== Other (Truthfulness / NLI / Language Modeling) =====
-\rowcolor{catOther} CB \cite{demarneffe2019commitmentbank} & \LL & & NLI \\
+\rowcolor{catOther} CB \cite{demarneffe2019commitmentbank} & \LL & \textbf{MC-FirstDistr} & NLI \\
 \rowcolor{catOther} WikiText \cite{merity2016pointersentinel} & \PPL & \textbf{LM-CorruptCont} & language modeling \\
 \rowcolor{catOther} MRPC \cite{dolan2005mrpc} & \LL & \textbf{2C-Flip} & paraphrase detection \\
 \rowcolor{catOther} QNLI & \LL & \textbf{2C-Flip} & NLI \\
@@ -312,7 +312,7 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catOther} RTE & \LL & \textbf{2C-Flip} & NLI \\
 \rowcolor{catOther} SST2 \cite{socher2013sst} & \LL & \textbf{2C-Flip} & sentiment analysis \\
 \rowcolor{catOther} WNLI & \LL & \textbf{2C-Flip} & NLI \\
-\rowcolor{catOther} WiC \cite{pilehvar2019wic} & \LL & & word-in-context \\
+\rowcolor{catOther} WiC \cite{pilehvar2019wic} & \LL & \textbf{2C-Flip} & word-in-context \\
 \rowcolor{catOther} Mutual \cite{cui2020mutual} & \LL & \textbf{MC-FirstDistr} & dialogue reasoning \\
 \rowcolor{catOther} ANLI \cite{nie2020anli} & \LL & \textbf{MC-FirstDistr} & NLI \\
 \rowcolor{catOther} BLIMP \cite{warstadt2020blimp} & \LL &  & linguistic knowledge \\

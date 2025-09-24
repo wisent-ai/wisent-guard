@@ -664,7 +664,7 @@ def run_task_pipeline(
         "mutual",
         "prost",
         "pubmedqa",
-        "sciq",  # MMLUExtractor (multiple choice)
+        "sciq",  
         "swag",  # HellaSwagExtractor (similar format)
         "toxigen",
         "wic",  # BoolQExtractor (binary classification)

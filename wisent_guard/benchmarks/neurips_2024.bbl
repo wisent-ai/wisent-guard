@@ -110,16 +110,6 @@ Dan Hendrycks, Steven Basart, Saurav Kadavath, Mantas Mazeika, Akul Arora, Ethan
 \newblock Measuring coding challenge competence with apps.
 \newblock {\em arXiv preprint arXiv:2105.09938}, 2021.
 
-\bibitem{hendrycks2020ethics}
-Dan Hendrycks, Collin Burns, Steven Basart, Andrew Critch, Jerry Li, Dawn Song, and Jacob Steinhardt.
-\newblock Aligning ai with shared human values.
-\newblock {\em arXiv preprint arXiv:2008.02275}, 2020.
-
-\bibitem{hendrycks2021mmlu}
-Dan Hendrycks, Collin Burns, Steven Basart, Andy Zou, Mantas Mazeika, Dawn Song, and Jacob Steinhardt.
-\newblock Measuring massive multitask language understanding.
-\newblock In {\em Proceedings of the International Conference on Learning Representations (ICLR)}, 2021.
-
 \bibitem{hendrycks2021math}
 Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric Tang, Dawn Song, and Jacob Steinhardt.
 \newblock Measuring mathematical problem solving with the math dataset.
@@ -369,11 +359,6 @@ Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi.
 Sheng Zhang, Xiaodong Liu, Jingjing Liu, Jianfeng Gao, Kevin Duh, and Benjamin Van~Durme.
 \newblock Record: Bridging the gap between human and machine commonsense reading comprehension.
 \newblock {\em arXiv preprint arXiv:1810.12885}, 2018.
-
-\bibitem{zhong2023agieval}
-Wanjun Zhong, Ruixiang Cui, Yiduo Guo, Yaobo Liang, Shuai Lu, Yanlin Wang, Amin Saied, Weizhu Chen, and Nan Duan.
-\newblock Agieval: A human-centric benchmark for evaluating foundation models.
-\newblock {\em arXiv preprint arXiv:2304.06364}, 2023.
 
 \bibitem{zhou2019mctaco}
 Ben Zhou, Daniel Khashabi, Qiang Ning, and Dan Roth.

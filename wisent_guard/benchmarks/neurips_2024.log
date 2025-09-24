@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  23 SEP 2025 21:16
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  24 SEP 2025 19:31
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -751,7 +751,10 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
  [1
 
 
-{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}] [2] [3] [4] [5]) [6]
+{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}] [2] [3] [4] [5])
+Underfull \vbox (badness 5696) has occurred while \output is active []
+
+ [6]
 Underfull \hbox (badness 4899) in paragraph at lines 122--123
 []\T1/ptm/m/n/10 (+20) As RC-Abstain, but
  []
@@ -842,18 +845,18 @@ Package rerunfilecheck Info: File `neurips_2024.out' has not changed.
 (rerunfilecheck)             Checksum: BF64F1179FBA96D3C5C4C0F00B7C9032;3193.
  ) 
 Here is how much of TeX's memory you used:
- 24416 strings out of 474222
- 446366 string characters out of 5748733
- 2083975 words of memory out of 5000000
- 45903 multiletter control sequences out of 15000+600000
+ 24404 strings out of 474222
+ 446071 string characters out of 5748733
+ 2078975 words of memory out of 5000000
+ 45894 multiletter control sequences out of 15000+600000
  601562 words of font info for 222 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  102i,15n,107p,1073b,829s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/helvetic/uhvr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on neurips_2024.pdf (12 pages, 130100 bytes).
+Output written on neurips_2024.pdf (12 pages, 128941 bytes).
 PDF statistics:
- 382 PDF objects out of 1000 (max. 8388607)
- 354 compressed objects within 4 object streams
- 110 named destinations out of 1000 (max. 500000)
+ 372 PDF objects out of 1000 (max. 8388607)
+ 344 compressed objects within 4 object streams
+ 107 named destinations out of 1000 (max. 500000)
  44197 words of extra memory for PDF output out of 51595 (max. 10000000)
 
