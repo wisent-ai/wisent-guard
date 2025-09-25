@@ -3265,10 +3265,10 @@ class ANLIExtractor(BenchmarkExtractor):
             if hasattr(task_data, "doc_to_text"):
                 formatted_question = task_data.doc_to_text(doc)
             else:
-                formatted_question = f"Premise: {premise}\nHypothesis: {hypothesis}\nRelationship?"
+                formatted_question = f"{premise}\nQuestion:{hypothesis} True, False, or Neither?\n?"
 
             # Map label to answer
-            label_map = {0: "entailment", 1: "neutral", 2: "contradiction"}
+            label_map = {0: "True", 1: "Neither", 2: "False"}
             correct_answer = label_map.get(label, "unknown")
 
             return {
@@ -3289,7 +3289,7 @@ class ANLIExtractor(BenchmarkExtractor):
                 return None
 
             label = doc.get("label", -1)
-            label_map = {0: "entailment", 1: "neutral", 2: "contradiction"}
+            label_map = {0: "Yes", 1: "Neither", 2: "False"}
 
             correct_answer = label_map.get(label, "unknown")
 
@@ -3312,10 +3312,66 @@ class ANLIExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting ANLI contrastive pair: {e}")
             return None
+        
+class PawsExtractor(BenchmarkExtractor):
+    """Extractor for Paws benchmark."""
 
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        Paws format:
+        - doc["sentence1"]: first sentence
+        - doc["sentence2"]: second sentence
+        - doc["label"]: 0 - paraphrase, 1 - no paraphrase
+        """
+        try:
+
+            sentence1 = doc.get("sentence1", "")
+            sentence2 = doc.get("sentence2", "")
+            label = doc.get("label")
+
+            if not all([sentence1, sentence2]) or label not in [0, 1]:
+                return None
+            
+            formatted_question = f"Is sentence '{sentence1}' paraphrase of sentence '{sentence2}'"
+
+            correct_answer = "yes" if label == 0 else "no"
+
+            return {
+                "question": f"Is sentence '{sentence1}' paraphrase of sentence '{sentence2}'",
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting Paws QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for Paws."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            formatted_question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+            incorrect_answer = "yes" if correct_answer == "no" else "no"
+
+            if not all([formatted_question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": formatted_question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting Paws contrastive pair: {e}")
+            return None
 
 class MultilingualExtractor(BenchmarkExtractor):
-    """Base extractor for multilingual benchmarks (XNLI, XCOPA, etc)."""
+    """Base extractor for multilingual benchmarks (XCOPA, etc)."""
 
     def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
         """
@@ -3396,6 +3452,193 @@ class MultilingualExtractor(BenchmarkExtractor):
         except Exception as e:
             logger.debug(f"Error extracting multilingual contrastive pair: {e}")
             return None
+        
+class XStoryClozeExtractor(BenchmarkExtractor):
+    """Extractor for XStoryCloze benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        XStoryCloze format:
+        - doc["input_sentence_1"], doc["input_sentence_2"], doc["input_sentence_3"], doc["input_sentence_4"] fragments of context
+        - doc["sentence_quiz1], doc["sentence_quiz2]: possible endings
+        - doc["answer_right_ending"]: correct ending
+        """
+        try:
+
+            input_sentences = [doc.get("input_sentence_1", ""), doc.get("input_sentence_2", ""), doc.get("input_sentence_3", ""), doc.get("input_sentence_4", "")]
+            endings = [doc.get("sentence_quiz1", ""), doc.get("sentence_quiz2", "")]
+            correct_answer_idx = doc.get("answer_right_ending") - 1
+            correct_answer = endings[correct_answer_idx]
+
+            # Format the question
+            if hasattr(task_data, "doc_to_text"):
+                formatted_question = task_data.doc_to_text(doc)
+            else:
+                formatted_question = " ".join(s.strip() for s in input_sentences if s)
+
+            return {
+                "question": formatted_question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting XStoryCloze QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for XStoryCloze."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            formatted_question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+
+            endings = [doc.get("sentence_quiz1", ""), doc.get("sentence_quiz2", "")]
+            correct_answer_idx = doc.get("answer_right_ending") - 1
+            incorrect_answer_idx = 1 - correct_answer_idx
+            incorrect_answer = endings[incorrect_answer_idx]
+            
+            if not all([formatted_question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": formatted_question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting XStoryCloze contrastive pair: {e}")
+            return None
+        
+class XWinogradExtractor(BenchmarkExtractor):
+    """Extractor for XWinograd benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        XWinograd format:
+        - doc["sentence"]: sentence with blank
+        - doc["option1"]: first option
+        - doc["option2]: second option
+        - doc[answer]: correct answer (1, 2)
+        """
+        try:
+
+            sentence = doc.get("sentence", "")
+            options = [doc.get("option1", ""), doc.get("option2", "")]
+            answer_idx_str = doc.get("answer", "")
+            if not answer_idx_str:
+                return None
+            answer_idx = int(answer_idx_str) - 1
+            correct_answer = options[answer_idx]
+            formatted_question = f"Fill in the blank: {sentence}"
+
+            return {
+                "question": formatted_question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting XWinograd QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for XWinograd."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            formatted_question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+
+            options = [doc.get("option1", ""), doc.get("option2", "")]
+            answer_idx_str = doc.get("answer", "")
+            if not answer_idx_str:
+                return None
+            answer_idx = int(answer_idx_str) - 1
+            incorrect_answer_idx = 1 - answer_idx
+            incorrect_answer = options[incorrect_answer_idx]
+            
+            if not all([formatted_question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": formatted_question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting XWinograd contrastive pair: {e}")
+            return None
+
+        
+class XNLIExtractor(BenchmarkExtractor):
+    """Extractor for XNLI benchmark."""
+
+    def extract_qa_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """
+        XNLI format:
+        - doc["premise"]: premise
+        - doc["hypothesis]: hypothesis
+        - doc["label]: 0 - entailment, 1 - neutral, 2 - contradiction
+        """
+        try:
+
+            premise = doc.get("premise", "")
+            hypothesis = doc.get("hypothesis", "")
+            label = doc.get("label")
+
+            if not all([premise, hypothesis]) or label not in [0, 1, 2]:
+                return None
+            
+            formatted_question = f"Decide the relationship of the hypothesis '{hypothesis}' to the premise '{premise}'."
+
+            label2name = {0: "entailment", 1: "neutral", 2: "contradiction"}
+            correct_answer = label2name[label]
+
+            return {
+                "question": formatted_question,
+                "formatted_question": formatted_question,
+                "correct_answer": correct_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting XNLI QA pair: {e}")
+            return None
+
+    def extract_contrastive_pair(self, doc: Dict[str, Any], task_data: Any = None) -> Optional[Dict[str, str]]:
+        """Extract contrastive pair for XNLI."""
+        try:
+            qa_pair = self.extract_qa_pair(doc, task_data)
+            if not qa_pair:
+                return None
+            
+            formatted_question = qa_pair["formatted_question"]
+            correct_answer = qa_pair["correct_answer"]
+
+            label = doc.get("label")
+            label2name = {0: "entailment", 1: "neutral", 2: "contradiction"}
+            incorrect_answer = label2name[(label+1)%2]
+
+            if not all([formatted_question, correct_answer, incorrect_answer]):
+                return None
+
+            return {
+                "question": formatted_question,
+                "correct_answer": correct_answer,
+                "incorrect_answer": incorrect_answer,
+            }
+
+        except Exception as e:
+            logger.debug(f"Error extracting XNLI contrastive pair: {e}")
+            return None
+
 
 
 class ArithmeticExtractor(BenchmarkExtractor):
@@ -4083,6 +4326,9 @@ EXTRACTORS = {
     "mbpp": MBPPExtractor,  # Python problems
     "livecodebench": LiveCodeBenchExtractor,  # LiveCodeBench coding problems
     "anli": ANLIExtractor,  # Adversarial NLI
+    "anli_r1": ANLIExtractor,
+    "anli_r2": ANLIExtractor,
+    "anli_r3": ANLIExtractor,
 
     "arithmetic_1dc": ArithmeticExtractor, # Arithmetic tasks
     "arithmetic_2da": ArithmeticExtractor, # Arithmetic tasks
@@ -4102,7 +4348,7 @@ EXTRACTORS = {
     "hendrycks_math": GSM8KExtractor,  # Math problems
     "medqa_4options": MedQAExtractor,  # Medical QA (multiple choice)
     "mgsm": GSM8KExtractor,  # Multilingual GSM8K
-    "paws_x": DefaultExtractor,  # Paraphrase detection
+    "paws_en": PawsExtractor,  # Paraphrase detection
     "qa4mre": QA4MREExtractor,  # QA for machine reading evaluation
     "qa4mre_2013": QA4MREExtractor,  # QA4MRE 2013 variant
     "qa4mre_2012": QA4MREExtractor,  # QA4MRE 2012 variant
@@ -4111,9 +4357,9 @@ EXTRACTORS = {
     "social_iqa": SOCIAL_IQAExtractor,  # Social commonsense QA
     "unscramble": DefaultExtractor,  # Word unscrambling
     "xcopa": MultilingualExtractor,  # Multilingual COPA
-    "xnli": MultilingualExtractor,  # Cross-lingual NLI
-    "xstorycloze": MultilingualExtractor,  # Multilingual story cloze
-    "xwinograd": MultilingualExtractor,  # Multilingual Winograd
+    "xnli_en": XNLIExtractor,  # Cross-lingual NLI
+    "xstorycloze_en": XStoryClozeExtractor,
+    "xwinograd_en": XWinogradExtractor,  # Multilingual Winograd
     # GPQA (Graduate-Level Google-Proof Q&A) benchmarks
     "gpqa_main_zeroshot": GPQAExtractor,
     "gpqa_main_cot_zeroshot": GPQAExtractor,

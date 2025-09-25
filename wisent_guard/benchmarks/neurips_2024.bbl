@@ -15,11 +15,6 @@ Jacob Austin, Augustus Odena, Maxwell Nye, Maarten Bosma, Henryk Michalewski, Da
 \newblock Program synthesis with large language models.
 \newblock {\em arXiv preprint arXiv:2108.07732}, 2021.
 
-\bibitem{bandarkar2023belebele}
-Lucas et~al. Bandarkar.
-\newblock The belebele benchmark: a parallel reading comprehension dataset in 122 language variants.
-\newblock {\em arXiv preprint arXiv:2308.16884}, 2023.
-
 \bibitem{berant2013webquestions}
 Jonathan Berant, Andrew Chou, Roy Frostig, and Percy Liang.
 \newblock Semantic parsing on freebase from question-answer pairs.
@@ -99,11 +94,6 @@ Xinrun Du, Yifan Yao, Kaijing Ma, Bingli Wang, Tianyu Zheng, Kang Zhu, Minghao L
 Dheeru Dua, Yizhong Wang, Pradeep Dasigi, Gabriel Stanovsky, Sameer Singh, and Matt Gardner.
 \newblock Drop: A reading comprehension benchmark requiring discrete reasoning over paragraphs.
 \newblock {\em arXiv preprint arXiv:1903.00161}, 2019.
-
-\bibitem{hartvigsen2022toxigen}
-Thomas Hartvigsen, Saadia Gabriel, Hamid Palangi, Maarten Sap, Dipankar Ray, and Ece Kamar.
-\newblock Toxigen: A large-scale machine-generated dataset for adversarial and implicit hate speech detection.
-\newblock 2022.
 
 \bibitem{hendrycks2021apps}
 Dan Hendrycks, Steven Basart, Saurav Kadavath, Mantas Mazeika, Akul Arora, Ethan Guo, Collin Burns, Samir Puranik, Horace He, Dawn Song, and Jacob Steinhardt.
@@ -225,11 +215,6 @@ Niklas Muennighoff, Qian Liu, Armel Zebaze, Qinkai Zheng, Binyuan Hui, Terry~Yue
 \newblock Octopack: Instruction tuning code large language models.
 \newblock {\em arXiv preprint arXiv:2308.07124}, 2023.
 
-\bibitem{nangia2020crows}
-Nikita Nangia, Clara Vania, Rasika Bhalerao, and Samuel~R. Bowman.
-\newblock Crows-pairs: A challenge dataset for measuring social biases in masked language models.
-\newblock 2020.
-
 \bibitem{nie2020anli}
 Yixin Nie, Adina Williams, Emily Dinan, Mohit Bansal, Jason Weston, and Douwe Kiela.
 \newblock Adversarial nli: A new benchmark for natural language understanding.
@@ -254,11 +239,6 @@ Long Phan, Alice Gatti, Ziwen Han, Nathaniel Li, and {et al.}
 Mohammad~Taher Pilehvar and Jose Camacho-Collados.
 \newblock Wic: the word-in-context dataset for evaluating context-sensitive meaning representations.
 \newblock 2019.
-
-\bibitem{ponti2020xcopa}
-Edoardo~Maria Ponti, Maarten Sap, Christo Kirov, Aksel Langedijk, Felix Hill, Ekaterina Shutova, Peter Clark, Ivan Vuli{\'c}, and Anna Korhonen.
-\newblock Xcopa: A multilingual dataset for causal commonsense reasoning.
-\newblock 2020.
 
 \bibitem{rajpurkar2018squad2}
 Pranav Rajpurkar, Robin Jia, and Percy Liang.
@@ -300,11 +280,6 @@ Richard Socher, Alex Perelygin, Jean Wu, Jason Chuang, Christopher~D. Manning, A
 \newblock Recursive deep models for semantic compositionality over a sentiment treebank.
 \newblock 2013.
 
-\bibitem{srivastava2022bigbench}
-Aarohi Srivastava, Abhinav Rastogi, Abhishek Rao, Abu Awal~Md Shoeb, Abubakar Abid, and et~al.
-\newblock Beyond the imitation game: Quantifying and extrapolating the capabilities of language models.
-\newblock {\em arXiv preprint arXiv:2206.04615}, 2022.
-
 \bibitem{tikhonov2021xwinograd}
 Alexey Tikhonov, Mikhail Ryabinin, Yuri Kuratov, and Thomas Wolf.
 \newblock It's all in the heads: Using attention heads as a baseline for cross-lingual transfer in commonsense reasoning.
@@ -324,11 +299,6 @@ Shiqi Wang, Zheng Li, Haifeng Qian, Chenghao Yang, Zijian Wang, Mingyue Shang, V
 Yiming Wang, Pei Zhang, Jialong Tang, Haoran Wei, Baosong Yang, Rui Wang, Chenshu Sun, Feitong Sun, Jiran Zhang, Junxuan Wu, Qiqian Cang, Yichang Zhang, Fei Huang, Junyang Lin, Fei Huang, and Jingren Zhou.
 \newblock Polymath: Evaluating mathematical reasoning in multilingual contexts.
 \newblock {\em arXiv preprint arXiv:2504.18428}, 2025.
-
-\bibitem{warstadt2020blimp}
-Alex Warstadt, Alicia Parrish, Haokun Liu, Anhad Mohananey, Wei Peng, and Samuel~R. Bowman.
-\newblock Blimp: The benchmark of linguistic minimal pairs for english.
-\newblock {\em arXiv preprint arXiv:1912.00582}, 2020.
 
 \bibitem{welbl2017sciQ}
 Johannes Welbl, Nelson~F. Liu, and Matt Gardner.

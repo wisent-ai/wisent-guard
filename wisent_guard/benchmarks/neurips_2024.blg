@@ -8,57 +8,54 @@ Warning--empty booktitle in arocaouellette2021prost
 Warning--empty journal in chen2021evaluating
 Warning--empty booktitle in conneau2018xnli
 Warning--empty booktitle in cui2020mutual
-Warning--empty booktitle in hartvigsen2022toxigen
 Warning--empty booktitle in jin2019pubmedqa
 Warning--empty booktitle in khashabi2018multirc
 Warning--empty booktitle in levesque2012wsc
-Warning--empty booktitle in nangia2020crows
 Warning--empty booktitle in paperno2016lambada
 Warning--empty booktitle in pilehvar2019wic
-Warning--empty booktitle in ponti2020xcopa
 Warning--empty booktitle in socher2013sst
 Warning--empty booktitle in vilares2019headqa
 Warning--empty booktitle in yang2019pawsx
 Warning--empty booktitle in zhou2019mctaco
-You've used 73 entries,
+You've used 67 entries,
             2118 wiz_defined-function locations,
-            1075 strings with 27918 characters,
-and the built_in function-call counts, 31315 in all, are:
-= -- 2614
-> -- 2888
+            1051 strings with 26564 characters,
+and the built_in function-call counts, 29186 in all, are:
+= -- 2440
+> -- 2711
 < -- 6
-+ -- 1148
-- -- 1068
-* -- 2589
-:= -- 5727
-add.period$ -- 225
-call.type$ -- 73
-change.case$ -- 752
++ -- 1077
+- -- 1004
+* -- 2432
+:= -- 5340
+add.period$ -- 207
+call.type$ -- 67
+change.case$ -- 702
 chr.to.int$ -- 0
-cite$ -- 89
-duplicate$ -- 855
-empty$ -- 1533
-format.name$ -- 1068
-if$ -- 5945
+cite$ -- 80
+duplicate$ -- 786
+empty$ -- 1404
+format.name$ -- 1004
+if$ -- 5535
 int.to.chr$ -- 0
-int.to.str$ -- 73
-missing$ -- 73
-newline$ -- 368
-num.names$ -- 146
-pop$ -- 848
+int.to.str$ -- 67
+missing$ -- 67
+newline$ -- 338
+num.names$ -- 134
+pop$ -- 783
 preamble$ -- 1
-purify$ -- 679
+purify$ -- 635
 quote$ -- 0
-skip$ -- 570
+skip$ -- 528
 stack$ -- 0
-substring$ -- 568
-swap$ -- 123
+substring$ -- 537
+swap$ -- 117
 text.length$ -- 6
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 292
-warning$ -- 16
-while$ -- 163
-width$ -- 75
-write$ -- 734
-(There were 17 warnings)
+type$ -- 268
+warning$ -- 13
+while$ -- 151
+width$ -- 69
+write$ -- 677
+(There were 14 warnings)

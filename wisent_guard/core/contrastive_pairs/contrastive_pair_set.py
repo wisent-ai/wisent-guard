@@ -1162,12 +1162,13 @@ class ContrastivePairSet:
                             question = task_data.doc_to_text(doc)
                         else:
                             question = doc.get("question", str(doc))
+
                     except Exception:
                         question = str(doc)
 
                 # Skip if we don't have a proper question
                 # Ensure question is a string before calling strip()
-                if not question or not isinstance(question, str) or len(question.strip()) < 10:
+                if (not question or not isinstance(question, str) or len(question.strip()) < 10) and (task_name not in ["paws_en", "xnli_en", "xwinograd_en"]) : # paws_en, xnli doc_to_text dont work
                     continue
 
                 # Task-specific answer extraction

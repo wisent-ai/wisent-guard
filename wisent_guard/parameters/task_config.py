@@ -63,6 +63,11 @@ MULTIPLE_CHOICE_TASKS = {
     "wnli",
     "wic",
     "mutual",
+    "anli",
+    "paws_en",
+    "xnli_en",
+    "xstorycloze_en",
+    "xwinograd_en",
 }
 
 # GPQA scientific reasoning benchmarks
@@ -178,7 +183,7 @@ MISC_TASKS = {
 # Tasks that were in original MISC list but are NOT AVAILABLE in current system:
 MISC_TASKS_NOT_AVAILABLE = {
     #"cb",  #  TODO Need investigation, due to not creating sufficient contrastive pairs
-    "anli",  # ❌ Not available in current wisent-guard system
+    #"anli",  # ❌ Not available in current wisent-guard system
     #"mutual",  # ❌ Not available in current wisent-guard system
     #"prost",  # ❌ Not available in current wisent-guard system
     #"pubmedqa",  # ❌ Not available in current wisent-guard system

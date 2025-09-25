@@ -197,6 +197,8 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catRC} QASPER \cite{dasigi2021qasper} & \TG & \textbf{RC-Abstrain} & scientific QA \\
 \rowcolor{catRC} QuAC \cite{choi2018quac} & \TG & \textbf{ConvRC-Abstain} & conversational QA \\
 \rowcolor{catRC} MultiRC \cite{khashabi2018multirc} & \LL &  & multi-sentence reasoning \\
+\rowcolor{catRC} XStoryCloze \cite{lin2021xstorycloze} & \LL & \textbf{2C-Flip} & commonsense \\
+\rowcolor{catRC} XWinograd \cite{tikhonov2021xwinograd} & \LL & \textbf{2C-Flip} & commonsense \\
 
 % ===== Multi-choice Reasoning =====
 \rowcolor{catReason} WinoGrande \cite{sakaguchi2019winogrande} & \LL & \textbf{2C-Flip} & commonsense \\
@@ -315,21 +317,20 @@ This section enumerates all benchmarks used in our study, the task traits, the e
 \rowcolor{catOther} WiC \cite{pilehvar2019wic} & \LL & \textbf{2C-Flip} & word-in-context \\
 \rowcolor{catOther} Mutual \cite{cui2020mutual} & \LL & \textbf{MC-FirstDistr} & dialogue reasoning \\
 \rowcolor{catOther} ANLI \cite{nie2020anli} & \LL & \textbf{MC-FirstDistr} & NLI \\
-\rowcolor{catOther} BLIMP \cite{warstadt2020blimp} & \LL &  & linguistic knowledge \\
-\rowcolor{catOther} Toxigen \cite{hartvigsen2022toxigen} & \LL &  & toxicity detection \\
-\rowcolor{catOther} Crows Pairs \cite{nangia2020crows} & \LL &  & bias measurement \\
-\rowcolor{catOther} PAWS-X \cite{yang2019pawsx} & \LL &  & cross-lingual paraphrase \\
+%\rowcolor{catOther} BLIMP \cite{warstadt2020blimp} & \LL &  & linguistic knowledge \\
+%\rowcolor{catOther} Toxigen \cite{hartvigsen2022toxigen} & \LL &  & toxicity detection \\
+%\rowcolor{catOther} Crows Pairs \cite{nangia2020crows} & \LL &  & bias measurement \\
+\rowcolor{catOther} PAWS-X \cite{yang2019pawsx} & \LL & \textbf{2C-Flip} & cross-lingual paraphrase \\
 \rowcolor{catOther} Unscramble & \TG &  & word unscrambling \\
 \rowcolor{catOther} LAMBADA \cite{paperno2016lambada} & \LL &  & language modeling \\
 \rowcolor{catOther} LAMBADA Cloze \cite{paperno2016lambada} & \LL &  & language modeling \\
 \rowcolor{catOther} LAMBADA Multilingual \cite{paperno2016lambada} & \LL &  & multilingual LM \\
 \rowcolor{catOther} LAMBADA Standard Cloze YAML \cite{paperno2016lambada} & \LL &  & language modeling \\
-\rowcolor{catOther} Belebele \cite{bandarkar2023belebele} & \LL & \textbf{MC-firstDistr} & multilingual RC \\
-\rowcolor{catOther} XCOPA \cite{ponti2020xcopa} & \LL & \textbf{2C-Flip} & cross-lingual reasoning \\
-\rowcolor{catOther} XNLI \cite{conneau2018xnli} & \LL &  & cross-lingual NLI \\
-\rowcolor{catOther} XStoryCloze \cite{lin2021xstorycloze} & \LL & \textbf{2C-Flip} & cross-lingual story \\
-\rowcolor{catOther} XWinograd \cite{tikhonov2021xwinograd} & \LL & \textbf{2C-Flip} & cross-lingual reasoning \\
-\rowcolor{catOther} BIG-Bench \cite{srivastava2022bigbench} & \LL/\TG & \textbf{MC-FirstDistr; Gen-Inc-Cont} & comprehensive evaluation \\
+%\rowcolor{catOther} Belebele \cite{bandarkar2023belebele} & \LL & \textbf{MC-firstDistr} & multilingual RC \\
+%\rowcolor{catOther} XCOPA \cite{ponti2020xcopa} & \LL & \textbf{2C-Flip} & cross-lingual reasoning \\
+\rowcolor{catOther} XNLI \cite{conneau2018xnli} & \LL & \textbf{MC-FirstDistr} & cross-lingual NLI \\
+
+%\rowcolor{catOther} BIG-Bench \cite{srivastava2022bigbench} & \LL/\TG & \textbf{MC-FirstDistr; Gen-Inc-Cont} & comprehensive evaluation \\
 
 \hline
 \end{longtable}

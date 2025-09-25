@@ -862,9 +862,9 @@ CORE_BENCHMARKS = {
     },
 
     # Multilinguality
-    "xnli": {
-        "task": "xnli",
-        "tags": ["multilingual", "reasoning", "general knowledge"],
+    "xnli_en": {
+        "task": "xnli_en",
+        "tags": ["nli", "reasoning", "general knowledge"],
         "priority": "low"  # 210.6s - slow for agentic use
     },
     "xcopa": {
@@ -872,18 +872,18 @@ CORE_BENCHMARKS = {
         "tags": ["multilingual", "reasoning", "general knowledge"],
         "priority": "low"  # 91.6s - slow for agentic use
     },
-    "xstorycloze": {
-        "task": "xstorycloze",
-        "tags": ["multilingual", "long context", "creative writing"],
+    "xstorycloze_en": {
+        "task": "xstorycloze_en",
+        "tags": ["long context", "creative writing"],
         "priority": "low"  # 66.4s - slow for agentic use
     },
-    "xwinograd": {
-        "task": "xwinograd",
-        "tags": ["multilingual", "reasoning", "general knowledge"],
+    "xwinograd_en": {
+        "task": "xwinograd_en",
+        "tags": ["reasoning", "general knowledge"],
         "priority": "low"  # 65.2s - slow for agentic use
     },
-    "paws_x": {
-        "task": "pawsx",  # Fixed: correct task name (use group task)
+    "paws_en": {
+        "task": "paws_en",  # Fixed: correct task name (use group task)
         "tags": ["reasoning", "general knowledge", "science"],
         "priority": "low"  # 103.8s - slow for agentic use
     },

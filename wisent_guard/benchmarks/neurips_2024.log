@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  24 SEP 2025 19:31
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  25 SEP 2025 15:26
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -752,19 +752,16 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc}] [2] [3] [4] [5])
-Underfull \vbox (badness 5696) has occurred while \output is active []
-
- [6]
 Underfull \hbox (badness 4899) in paragraph at lines 122--123
 []\T1/ptm/m/n/10 (+20) As RC-Abstain, but
  []
 
-[7
+[6
 pdfTeX warning (ext4): destination with the same identifier (name{appendix.A}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.132 ... [Logic inversion \textnormal{[Log-Inv]}]
-                                                   Coding tasks: negative pr...]
+l.124 ...m[Two-Choice Flip \textnormal{[2C-Flip]}]
+                                                   Two-option tasks (PIQA, C...]
 Overfull \hbox (24.15184pt too wide) in alignment at lines 174--180
  [] [] [] [] 
  []
@@ -775,22 +772,17 @@ Overfull \hbox (24.15184pt too wide) in alignment at lines 180--184
  []
 
 
-Underfull \hbox (badness 6575) in paragraph at lines 273--273
+Underfull \hbox (badness 6575) in paragraph at lines 275--275
 []|\T1/ptm/m/n/10 (+20) LiveMathBench CNMO EN
  []
 
 
-Underfull \hbox (badness 6575) in paragraph at lines 274--274
+Underfull \hbox (badness 6575) in paragraph at lines 276--276
 []|\T1/ptm/m/n/10 (+20) LiveMathBench CNMO ZH
  []
 
 
-Underfull \hbox (badness 4739) in paragraph at lines 299--299
-[]|\T1/ptm/m/n/10 (+20) CodeXGLUE Code to Text
- []
-
-
-Underfull \hbox (badness 4739) in paragraph at lines 302--302
+Underfull \hbox (badness 4739) in paragraph at lines 301--301
 []|\T1/ptm/m/n/10 (+20) CodeXGLUE Code to Text
  []
 
@@ -800,22 +792,22 @@ Underfull \hbox (badness 4739) in paragraph at lines 304--304
  []
 
 
-Underfull \hbox (badness 5388) in paragraph at lines 326--326
+Underfull \hbox (badness 4739) in paragraph at lines 306--306
+[]|\T1/ptm/m/n/10 (+20) CodeXGLUE Code to Text
+ []
+
+
+Underfull \hbox (badness 5388) in paragraph at lines 328--328
 []|\T1/ptm/m/n/10 (+20) LAMBADA Stan-dard Cloze
  []
 
 
-Underfull \hbox (badness 2073) in paragraph at lines 332--332
-[]|\T1/ptm/b/n/10 (+20) MC-FirstDistr; Gen-
- []
-
-
-Overfull \hbox (24.15184pt too wide) in alignment at lines 184--335
+Overfull \hbox (24.15184pt too wide) in alignment at lines 184--336
  [] [] [] [] 
  []
 
-[8] [9] [10]
-Overfull \hbox (12.62721pt too wide) in paragraph at lines 366--381
+[7] [8] [9]
+Overfull \hbox (12.62721pt too wide) in paragraph at lines 367--382
 [] 
  []
 
@@ -823,20 +815,20 @@ Overfull \hbox (12.62721pt too wide) in paragraph at lines 366--381
 pdfTeX warning (ext4): destination with the same identifier (name{appendix.B}) has been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.391 \section{GSM8K Pipeline Visualization}
+l.392 \section{GSM8K Pipeline Visualization}
                                             
-LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 403.
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 404.
  (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )
-Overfull \hbox (36.37228pt too wide) in paragraph at lines 433--434
+Overfull \hbox (36.37228pt too wide) in paragraph at lines 434--435
  [] 
  []
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [11] [12] (./neurips_2024.aux)
+ [10] [11] (./neurips_2024.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
@@ -845,18 +837,18 @@ Package rerunfilecheck Info: File `neurips_2024.out' has not changed.
 (rerunfilecheck)             Checksum: BF64F1179FBA96D3C5C4C0F00B7C9032;3193.
  ) 
 Here is how much of TeX's memory you used:
- 24404 strings out of 474222
- 446071 string characters out of 5748733
- 2078975 words of memory out of 5000000
- 45894 multiletter control sequences out of 15000+600000
- 601562 words of font info for 222 fonts, out of 8000000 for 9000
+ 24372 strings out of 474222
+ 445393 string characters out of 5748733
+ 2074975 words of memory out of 5000000
+ 45876 multiletter control sequences out of 15000+600000
+ 601239 words of font info for 217 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  102i,15n,107p,1073b,829s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/helvetic/uhvr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on neurips_2024.pdf (12 pages, 128941 bytes).
+Output written on neurips_2024.pdf (11 pages, 126115 bytes).
 PDF statistics:
- 372 PDF objects out of 1000 (max. 8388607)
- 344 compressed objects within 4 object streams
- 107 named destinations out of 1000 (max. 500000)
+ 355 PDF objects out of 1000 (max. 8388607)
+ 328 compressed objects within 4 object streams
+ 100 named destinations out of 1000 (max. 500000)
  44197 words of extra memory for PDF output out of 51595 (max. 10000000)
 
