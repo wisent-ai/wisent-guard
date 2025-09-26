@@ -193,20 +193,20 @@ def load_train_test_lm_eval_format(
     )
 
 
-# if __name__ == "__main__":
-#     from wisent_guard.core.model import Model
-#     from wisent_guard.cli_bricks.data_loaders.lm_data_loader import load_train_test_lm_eval_format
-#     MODLE_NAME = "your-model-name-here"
-#     model = Model(name=MODLE_NAME)
-#     result = load_train_test_lm_eval_format(
-#         model=model,
-#         task_name="winogrande",
-#         split_ratio=0.8,
-#         seed=42,
-#         limit=10,
-#         training_limit=None,
-#         testing_limit=None,
-#     )
-#     print(result)
+if __name__ == "__main__":
+    from wisent_guard.core.model import Model
+    from wisent_guard.cli_bricks.data_loaders.lm_data_loader import load_train_test_lm_eval_format
+    MODEL_NAME = "EleutherAI/gpt-neo-1.3B"  # Replace with your actual model
+    model = Model(name=MODEL_NAME)
+    result = load_train_test_lm_eval_format(
+        model=model,
+        task_name="winogrande",
+        split_ratio=0.8,
+        seed=42,
+        limit=10,
+        training_limit=None,
+        testing_limit=None,
+    )
+    print(result)
 
     
