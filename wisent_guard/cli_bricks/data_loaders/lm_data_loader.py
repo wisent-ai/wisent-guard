@@ -196,8 +196,8 @@ def load_train_test_lm_eval_format(
 # if __name__ == "__main__":
 #     from wisent_guard.core.model import Model
 #     from wisent_guard.cli_bricks.data_loaders.lm_data_loader import load_train_test_lm_eval_format
-#     MODLE_NAME = "your-model-name-here"
-#     model = Model(name=MODLE_NAME)
+
+#     model = Model(name=MODEL_NAME)
 #     result = load_train_test_lm_eval_format(
 #         model=model,
 #         task_name="winogrande",

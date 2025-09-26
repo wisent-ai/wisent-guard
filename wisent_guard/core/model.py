@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
-from .contrastive_pairs import ContrastivePairSet
+from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 from .user_model_config import user_model_configs
 
 

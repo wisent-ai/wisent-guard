@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import Any, Mapping, Sequence, TYPE_CHECKING
 
 from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
 from wisent_guard.cli_bricks.data_loaders.data_loader_types import LoadDataResult
