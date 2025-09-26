@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from wisent_guard.core.contrastive_pairs.core.atoms import AtomResponse, RawActivationMap
-
+from wisent_guard.core.contrastive_pairs.core.atoms import AtomResponse, RawActivationMap
 from wisent_guard.core.contrastive_pairs.core.atoms import LayerActivations
 
 @dataclass(frozen=True, slots=True)

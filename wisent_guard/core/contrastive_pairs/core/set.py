@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 from typing import Optional
 from typing import TYPE_CHECKING
 
+from wisent_guard.core.contrastive_pairs.core.atoms import AtomContrastivePairSet
 
 if TYPE_CHECKING:
     from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair 
-    from wisent_guard.core.contrastive_pairs.core.atoms import AtomContrastivePairSet
 
 
 @dataclass

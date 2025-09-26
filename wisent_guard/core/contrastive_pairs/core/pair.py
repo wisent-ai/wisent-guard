@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace 
 
+from wisent_guard.core.contrastive_pairs.core.atoms import AtomContrastivePair
+from wisent_guard.core.contrastive_pairs.core.response import NegativeResponse, PositiveResponse
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from wisent_guard.core.contrastive_pairs.core.response import NegativeResponse, PositiveResponse
-    from wisent_guard.core.contrastive_pairs.core.atoms import AtomContrastivePair, RawActivationMap, LayerActivations
+    
+    from wisent_guard.core.contrastive_pairs.core.atoms import RawActivationMap, LayerActivations
 
 
 @dataclass(frozen=True, slots=True)
