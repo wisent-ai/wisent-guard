@@ -2,7 +2,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from wisent_guard.cli_bricks.cli_benchmarks import AVAILABLE_BENCHMARKS, UNAVAILABLE_BENCHMARKS, CORE_BENCHMARKS
+from wisent_guard.cli.cli_benchmarks import AVAILABLE_BENCHMARKS, UNAVAILABLE_BENCHMARKS, CORE_BENCHMARKS
 
 from wisent_guard.core.parser import parse_layers_from_arg
 

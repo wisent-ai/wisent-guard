@@ -18,7 +18,7 @@ import sys
 import json
 
 try:
-    from wisent_guard.cli_bricks.cli_run_task_steering import (
+    from wisent_guard.cli.cli_run_task_steering import (
         PipelineSettings,
         ModelSettings,
         DataSettings,

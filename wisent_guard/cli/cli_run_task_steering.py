@@ -3,11 +3,11 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Iterable
 
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
-from wisent_guard.cli_bricks.cli_utils import (
+from wisent_guard.cli.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_utils import (
     validate_or_explain,
 )
-from wisent_guard.cli_bricks.cli_activation import (
+from wisent_guard.cli.cli_activation import (
     make_collector,
     create_contrastive_pairs,
     extract_activations_for_pairs,
@@ -15,7 +15,7 @@ from wisent_guard.cli_bricks.cli_activation import (
 )
 
 from wisent_guard.core import Model
-from wisent_guard.cli_bricks.cli_steering import (
+from wisent_guard.cli.cli_steering import (
     build_steering,
     CAAConfig,
     HPRConfig,
@@ -27,10 +27,10 @@ from wisent_guard.core.steering_methods.steering_evaluation import run_lm_harnes
 
 if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
-    from wisent_guard.cli_bricks.cli_data import LoadDataResult
+    from wisent_guard.cli.cli_data import LoadDataResult
     from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
     from wisent_guard.core import ContrastivePairSet
-    from wisent_guard.cli_bricks.cli_performance import Trackers
+    from wisent_guard.cli.cli_performance import Trackers
     from wisent_guard.core.steering_methods.base import SteeringMethod
 
 
@@ -224,7 +224,7 @@ def _load_data(settings: PipelineSettings, model: Model | None) -> LoadDataResul
         if model is None:
             raise ValueError("LM_EVAL source selected but 'model' is None.")
         try:
-            from wisent_guard.cli_bricks.cli_data import load_train_test_lm_eval_format
+            from wisent_guard.cli.cli_data import load_train_test_lm_eval_format
         except Exception as e:
             raise ImportError("Failed to import lm-eval loader: load_train_test_lm_eval_format") from e
 
@@ -236,7 +236,7 @@ def _load_data(settings: PipelineSettings, model: Model | None) -> LoadDataResul
 
     elif d.source is DataSource.CUSTOM:
         try:
-            from wisent_guard.cli_bricks.cli_data import load_train_test_custom_format
+            from wisent_guard.cli.cli_data import load_train_test_custom_format
         except Exception as e:
             raise ImportError("Failed to import custom loader: load_train_test_custom_format") from e
         data = load_train_test_custom_format(

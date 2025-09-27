@@ -6,7 +6,7 @@ from typing import Final, Literal, Protocol, TYPE_CHECKING, runtime_checkable
 
 from typing import cast
 
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_logger import setup_logger, bind
 
 if TYPE_CHECKING:
     from wisent_guard.core.contrastive_pairs import ContrastivePairSet

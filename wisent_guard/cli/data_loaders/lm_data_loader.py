@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_logger import setup_logger, bind
 
-from wisent_guard.cli_bricks.data_loaders.data_loader_types import LoadDataResult
+from wisent_guard.cli.data_loaders.data_loader_types import LoadDataResult
 
 from wisent_guard.core.contrastive_pairs.lm_eval_pairs.lm_task_pairs_generation import lm_build_contrastive_pairs
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair

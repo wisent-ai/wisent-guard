@@ -1,7 +1,7 @@
-from wisent_guard.cli_bricks.data_loaders.data_loader_types import LoadDataResult
+from wisent_guard.cli.data_loaders.data_loader_types import LoadDataResult
 from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 from wisent_guard.core.contrastive_pairs.core.serialization import load_contrastive_pair_set
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_logger import setup_logger, bind
 
 __all__ = ["load_train_test_custom_format"]
 _LOG = setup_logger(__name__)

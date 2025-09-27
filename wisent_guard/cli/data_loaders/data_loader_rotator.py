@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping, Sequence, TYPE_CHECKING
 
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
-from wisent_guard.cli_bricks.data_loaders.data_loader_types import LoadDataResult
+from wisent_guard.cli.cli_logger import setup_logger, bind
+from wisent_guard.cli.data_loaders.data_loader_types import LoadDataResult
 
-from wisent_guard.cli_bricks.data_loaders.custom_user_data_loader import (
+from wisent_guard.cli.data_loaders.custom_user_data_loader import (
     load_train_test_custom_format as _custom_loader,
 )
-from wisent_guard.cli_bricks.data_loaders.lm_data_loader import (
+from wisent_guard.cli.data_loaders.lm_data_loader import (
         load_train_test_lm_eval_format as _lm_loader,
     )
 

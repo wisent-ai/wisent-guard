@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Final, TYPE_CHECKING
 
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_logger import setup_logger, bind
 
 from wisent_guard.core.activations import (
     ActivationAggregationStrategy,
@@ -17,7 +17,7 @@ from wisent_guard.core import ContrastivePairSet
 if TYPE_CHECKING:
     from wisent_guard.core.contrastive_pairs import ContrastivePair
     from wisent_guard.core.model import Model
-    from wisent_guard.cli_bricks.cli_performance import Trackers
+    from wisent_guard.cli.cli_performance import Trackers
 
 
 _LOG = setup_logger(__name__)

@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from wisent_guard.core import Model
-from wisent_guard.cli_bricks.cli_utils import (
+from wisent_guard.cli.cli_utils import (
     validate_or_explain,
     maybe_autoload_model_config,
     maybe_autoload_steering_defaults,
@@ -12,21 +12,21 @@ from wisent_guard.cli_bricks.cli_utils import (
     
 )
 
-from wisent_guard.cli_bricks.cli_performance import start_trackers, stop_and_report
-from wisent_guard.cli_bricks.cli_data import load_train_test_data
-from wisent_guard.cli_bricks.cli_activation import (
+from wisent_guard.cli.cli_performance import start_trackers, stop_and_report
+from wisent_guard.cli.cli_data import load_train_test_data
+from wisent_guard.cli.cli_activation import (
     make_collector,
     create_contrastive_pairs,
     extract_activations_for_pairs,
     build_pair_set_with_real_activations
 )
-from wisent_guard.cli_bricks.cli_optimization import maybe_optimize_hparams
-from wisent_guard.cli_bricks.cli_train import train_or_load_classifiers, save_trained_artifacts
-from wisent_guard.cli_bricks.cli_steering import (
+from wisent_guard.cli.cli_optimization import maybe_optimize_hparams
+from wisent_guard.cli.cli_train import train_or_load_classifiers, save_trained_artifacts
+from wisent_guard.cli.cli_steering import (
     build_steering_for_mode,
     test_steering_with_harness,
 )
-from wisent_guard.cli_bricks.cli_eval import (
+from wisent_guard.cli.cli_eval import (
     maybe_eval_perplexity_directly,
     eval_with_harness_ground_truth,
     generate_and_score_responses,

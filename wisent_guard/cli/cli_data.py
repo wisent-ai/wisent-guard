@@ -6,7 +6,7 @@ from typing import Any, TYPE_CHECKING, TypedDict, Sequence
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 
 from wisent_guard.core import ContrastivePairSet
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_logger import setup_logger, bind
 from wisent_guard.core.contrastive_pairs.core.serialization import load_contrastive_pair_set
 
 if TYPE_CHECKING: 
