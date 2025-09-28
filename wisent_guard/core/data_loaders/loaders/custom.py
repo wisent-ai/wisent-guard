@@ -26,26 +26,6 @@ class CustomUserDataLoader(BaseDataLoader):
     description = "Load contrastive pairs from custom JSONL and split."
 
     @staticmethod
-    def _effective_split(split_ratio: float | None) -> float:
-        """
-        Determine the effective split ratio, defaulting to 0.8 if None.
-
-        arguments:
-            split_ratio: Optional float in [0.0, 1.0] or None.
-
-        returns:
-            A float in [0.0, 1.0] representing the training split ratio.
-
-        raises:
-            ValueError if split_ratio is not in [0.0, 1.0].
-        """
-        if split_ratio is None:
-            return 0.8
-        if not (0.0 <= split_ratio <= 1.0):
-            raise ValueError("split_ratio must be in [0.0, 1.0]")
-        return float(split_ratio)
-
-    @staticmethod
     def _shuffle_indices(n: int, seed: int | None) -> list[int]:
         """
         Generate a shuffled list of indices from 0 to n-1.

@@ -1,60 +1,35 @@
 from __future__ import annotations
-from typing import Any, Iterable, Mapping
+from typing import Any, TYPE_CHECKING
 import logging
 
 from wisent_guard.core.data_loaders.core.atoms import BaseDataLoader, DataLoaderError, LoadDataResult
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
-from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet             
+from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
+from lm_eval.tasks import get_task_dict
+from lm_eval.tasks import TaskManager as LMTaskManager
 from wisent_guard.core.contrastive_pairs.lm_eval_pairs.lm_task_pairs_generation import (
     lm_build_contrastive_pairs,
-) 
+)
+
+if TYPE_CHECKING:
+    from lm_eval.api.task import ConfigurableTask
+
+__all__ = [
+    "LMEvalDataLoader",
+]
 
 log = logging.getLogger(__name__)
 
-def _split_pairs(
-    pairs: list[ContrastivePair],
-    split_ratio: float,
-    seed: int,
-    training_limit: int | None,
-    testing_limit: int | None,
-) -> tuple[list[ContrastivePair], list[ContrastivePair]]:
-    if not pairs:
-        return [], []
-    from numpy.random import default_rng
-    idx = list(range(len(pairs)))
-    default_rng(seed).shuffle(idx)
-    cut = int(len(pairs) * split_ratio)
-    train_idx = set(idx[:cut])
-    train_pairs: list[ContrastivePair] = []
-    test_pairs:  list[ContrastivePair] = []
-    for i in idx:
-        (train_pairs if i in train_idx else test_pairs).append(pairs[i])
-    if training_limit and training_limit > 0:
-        train_pairs = train_pairs[:training_limit]
-    if testing_limit and testing_limit > 0:
-        test_pairs = test_pairs[:testing_limit]
-    return train_pairs, test_pairs  # (same behavior as your prior helper). :contentReference[oaicite:11]{index=11}
-
 class LMEvalDataLoader(BaseDataLoader):
     """
-    Load contrastive pairs from lm-evaluation-harness task(s) via `model.load_lm_eval_task`,
+    Load contrastive pairs from a single lm-evaluation-harness task via `load_lm_eval_task`,
     split into train/test, and return a canonical LoadDataResult.
     """
     name = "lm_eval"
-    description = "Load from lm-eval tasks; supports single or multiple tasks."
-
-    @staticmethod
-    def _effective_split(split_ratio: float | None) -> float:
-        if split_ratio is None:
-            return 0.8
-        if not (0.0 <= split_ratio <= 1.0):
-            raise ValueError("split_ratio must be in [0.0, 1.0]")
-        return float(split_ratio)
+    description = "Load from a single lm-eval task."
 
     def _load_one_task(
         self,
-        *,
-        model: Any,
         task_name: str,
         split_ratio: float,
         seed: int,
@@ -62,8 +37,31 @@ class LMEvalDataLoader(BaseDataLoader):
         training_limit: int | None,
         testing_limit: int | None,
     ) -> LoadDataResult:
-        # Your previous lm loader’s shape (normalized here to train_qa_pairs). :contentReference[oaicite:12]{index=12}
-        loaded = model.load_lm_eval_task(task_name, limit=limit)  # may return ConfigurableTask or dict[str, ConfigurableTask]
+        """
+        Load a single lm-eval task by name, convert to contrastive pairs,
+        split into train/test, and return a LoadDataResult.
+        
+        arguments:
+            task_name: The name of the lm-eval task to load.
+            split_ratio: The fraction of data to use for training (between 0 and 1).
+            seed: Random seed for shuffling/splitting.
+            limit: Optional limit on total number of pairs to load.
+            training_limit: Optional limit on number of training pairs.
+            testing_limit: Optional limit on number of testing pairs.
+            
+        returns:
+            A LoadDataResult containing train/test pairs and task info.
+            
+        raises:
+            DataLoaderError if the task cannot be found or if splits are empty.
+            ValueError if split_ratio is not in [0.0, 1.0].
+            NotImplementedError if load_lm_eval_task is not implemented.
+        
+        note:
+            This loader only supports single tasks, not mixtures. To load mixtures,
+            use a custom data loader or extend this one."""
+        loaded = self.load_lm_eval_task(task_name)
+
         if isinstance(loaded, dict):
             if len(loaded) != 1:
                 keys = ", ".join(sorted(loaded.keys()))
@@ -77,23 +75,29 @@ class LMEvalDataLoader(BaseDataLoader):
             task_obj = loaded
             pairs_task_name = task_name
 
-        pairs = lm_build_contrastive_pairs(task_name=pairs_task_name, lm_eval_task=task_obj, limit=limit)  # :contentReference[oaicite:13]{index=13}
-        train_pairs, test_pairs = _split_pairs(pairs, split_ratio, seed, training_limit, testing_limit)     # :contentReference[oaicite:14]{index=14}
+        pairs = lm_build_contrastive_pairs(
+            task_name=pairs_task_name,
+            lm_eval_task=task_obj,
+            limit=limit,
+        )
+
+        train_pairs, test_pairs = self._split_pairs(
+            pairs, split_ratio, seed, training_limit, testing_limit
+        )
+
         if not train_pairs or not test_pairs:
             raise DataLoaderError("One of the splits is empty after splitting.")
 
         return LoadDataResult(
             train_qa_pairs=ContrastivePairSet("lm_eval_train", train_pairs, task_type=task_name),
-            test_qa_pairs=ContrastivePairSet("lm_eval_test",  test_pairs,  task_type=task_name),
+            test_qa_pairs=ContrastivePairSet("lm_eval_test", test_pairs, task_type=task_name),
             task_type=task_name,
             lm_task_data=task_obj,
         )
 
     def load(
         self,
-        *,
-        model: Any,
-        tasks: str | Iterable[str],
+        task: str,  
         split_ratio: float | None = None,
         seed: int = 42,
         limit: int | None = None,
@@ -101,44 +105,108 @@ class LMEvalDataLoader(BaseDataLoader):
         testing_limit: int | None = None,
         **_: Any,
     ) -> LoadDataResult:
-        if model is None:
-            raise DataLoaderError("'model' is required for lm_eval loader.")
+        """
+        Load contrastive pairs from a single lm-eval-harness task, split into train/test sets.
+        arguments:
+            task:
+                The name of the lm-eval task to load (e.g., "winogrande", "hellaswag").
+                Must be a single task, not a mixture.
+            split_ratio:
+                Float in [0.0, 1.0] representing the proportion of data to use for training.
+                Defaults to 0.8 if None.
+            seed:
+                Random seed for shuffling the data before splitting.
+            limit:
+                Optional maximum number of total pairs to load from the task.
+            training_limit:
+                Optional maximum number of training pairs to return.
+            testing_limit:
+                Optional maximum number of testing pairs to return.
+            **_:
+                Additional keyword arguments (ignored).
+        
+        returns:
+            LoadDataResult with train/test ContrastivePairSets and metadata.
+        
+        raises:
+            DataLoaderError if loading or processing fails.
+            ValueError if split_ratio is not in [0.0, 1.0].
+            NotImplementedError if load_lm_eval_task is not implemented.
+        """
         split = self._effective_split(split_ratio)
 
-        # Single task path
-        if isinstance(tasks, (str, bytes)):
-            return self._load_one_task(
-                model=model,
-                task_name=str(tasks),
-                split_ratio=split,
-                seed=seed,
-                limit=limit,
-                training_limit=training_limit,
-                testing_limit=testing_limit,
-            )
-
-        # Multi-task: union the splits
-        tasks_list = [str(t) for t in tasks]
-        all_train, all_test = [], []
-        task_map: dict[str, Any] = {}
-        for tname in tasks_list:
-            r = self._load_one_task(
-                model=model,
-                task_name=tname,
-                split_ratio=split,
-                seed=seed,
-                limit=limit,
-                training_limit=training_limit,
-                testing_limit=testing_limit,
-            )
-            all_train.extend(r["train_qa_pairs"].pairs)
-            all_test.extend(r["test_qa_pairs"].pairs)
-            task_map[tname] = r["lm_task_data"]
-
-        task_type = "+".join(tasks_list)
-        return LoadDataResult(
-            train_qa_pairs=ContrastivePairSet("lm_eval_train_multi", all_train, task_type=task_type),
-            test_qa_pairs=ContrastivePairSet("lm_eval_test_multi",  all_test,  task_type=task_type),
-            task_type=task_type,
-            lm_task_data=task_map,
+        # Single-task path only
+        return self._load_one_task(
+            task_name=str(task),
+            split_ratio=split,
+            seed=seed,
+            limit=limit,
+            training_limit=training_limit,
+            testing_limit=testing_limit,
         )
+
+    @staticmethod
+    def load_lm_eval_task(task_name: str) -> ConfigurableTask | dict[str, ConfigurableTask]:
+        """
+        Load a single lm-eval-harness task by name.
+
+        arguments:
+            task_name: The name of the lm-eval task to load.
+        
+        returns:
+            A ConfigurableTask instance or a dict of subtask name to ConfigurableTask.
+        
+        raises:
+            DataLoaderError if the task cannot be found.
+        """
+        task_manager = LMTaskManager()
+        task_manager.initialize_tasks()
+
+        task_dict = get_task_dict([task_name], task_manager=task_manager)
+        if task_name in task_dict:
+            return task_dict[task_name]
+        raise DataLoaderError(f"lm-eval task '{task_name}' not found.")
+    
+    def _split_pairs(
+        self,
+        pairs: list[ContrastivePair],
+        split_ratio: float,
+        seed: int,
+        training_limit: int | None,
+        testing_limit: int | None,
+    ) -> tuple[list[ContrastivePair], list[ContrastivePair]]:
+        """
+        Split a list of ContrastivePairs into train/test sets.
+
+        arguments:
+            pairs: List of ContrastivePair to split.
+            split_ratio: Float in [0.0, 1.0] for the training set proportion.
+            seed: Random seed for shuffling.
+            training_limit: Optional max number of training pairs.
+            testing_limit: Optional max number of testing pairs.
+        
+        returns:
+            A tuple of (train_pairs, test_pairs).
+        raises:
+            ValueError if split_ratio is not in [0.0, 1.0].
+        """
+        if not pairs:
+            return [], []
+        from numpy.random import default_rng
+
+        idx = list(range(len(pairs)))
+        default_rng(seed).shuffle(idx)
+        cut = int(len(pairs) * split_ratio)
+        train_idx = set(idx[:cut])
+
+        train_pairs: list[ContrastivePair] = []
+        test_pairs: list[ContrastivePair] = []
+        for i in idx:
+            (train_pairs if i in train_idx else test_pairs).append(pairs[i])
+
+        if training_limit and training_limit > 0:
+            train_pairs = train_pairs[:training_limit]
+        if testing_limit and testing_limit > 0:
+            test_pairs = test_pairs[:testing_limit]
+
+        return train_pairs, test_pairs
