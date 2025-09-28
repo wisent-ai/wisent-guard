@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from wisent_guard.core.activations.activation_collection_method import ActivationCollectionLogic
     from wisent_guard.core import ContrastivePairSet
     from wisent_guard.cli.cli_performance import Trackers
-    from wisent_guard.core.steering_methods.base import SteeringMethod
+    from wisent_guard.core.steering_methods.core import SteeringMethod
 
 
 

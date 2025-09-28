@@ -20,7 +20,7 @@ class EvaluatorRotator:
         self,
         evaluator: Union[str, BaseEvaluator, Type[BaseEvaluator], None] = None,
         task_name: Optional[str] = None,
-        evaluators_location: Union[str, Path] = "evaluators",
+        evaluators_location: Union[str, Path] = "wisent_guard.core.evaluators.oracles",
         autoload: bool = True,
     ) -> None:
         if autoload:
@@ -139,7 +139,12 @@ if __name__ == "__main__":
     autoload=True,
     )
 
-    rot.use("nlp")
-    res = rot.evaluate("The answer is probably 42", expected="The answer is 12")
+    rot.list_evaluators()
+    print("Available evaluators:")
+    for ev in rot.list_evaluators():
+        print(f" - {ev['name']}: {ev['description']} (tasks: {', '.join(ev['task_names'])})")
 
-    print(res)
+    # rot.use("nlp")
+    # res = rot.evaluate("The answer is probably 42", expected="The answer is 12")
+
+    # print(res)

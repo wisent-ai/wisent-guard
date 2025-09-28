@@ -10,7 +10,7 @@ from wisent_guard.cli.cli_logger import setup_logger, bind
 
 if TYPE_CHECKING:
     from wisent_guard.core.contrastive_pairs import ContrastivePairSet
-    from wisent_guard.core.steering_methods.base import SteeringMethod
+    from wisent_guard.core.steering_methods.core import SteeringMethod
 
 _LOG = setup_logger(__name__)
 
