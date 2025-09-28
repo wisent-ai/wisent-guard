@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import List
 import torch
 
-from wisent_guard.core.steering_methods.core.atoms import PerLayerSteeringMethod
+from wisent_guard.core.steering_methods.core.atoms import PerLayerBaseSteeringMethod
 
 __all__ = [
     "CAAMethod",
 ]
 
-class CAAMethod(PerLayerSteeringMethod):
+class CAAMethod(PerLayerBaseSteeringMethod):
     """
     Contrastive Activation Additions (CAA).
     For each layer: v = mean(positives) - mean(negatives),
@@ -38,7 +38,7 @@ class CAAMethod(PerLayerSteeringMethod):
             v = self._safe_l2_normalize(v)
         return v
 
-    def _safe_l2_normalize(v: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
+    def _safe_l2_normalize(self, v: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
         if v.ndim != 1:
             v = v.reshape(-1)
         return v / (torch.linalg.norm(v) + eps)

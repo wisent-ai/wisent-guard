@@ -126,7 +126,7 @@ class WisentSteeringTrainer(BaseSteeringTrainer):
             "layers_used": layers or "all",
             "method": self.steering_method.name,
             "method_kwargs": method_kwargs,
-            "activation_aggregation_strategy": (None if return_full_sequence else str(aggregation.name).lower()),
+            "activation_aggregation_strategy": (None if return_full_sequence else aggregation),
             "return_full_sequence": bool(return_full_sequence),
             "normalize_layers": bool(normalize_layers),
             "num_pairs": len(self.pair_set.pairs),

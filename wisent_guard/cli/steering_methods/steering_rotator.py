@@ -91,7 +91,7 @@ class SteeringMethodRotator:
         if isinstance(method, str):
             return BaseSteeringMethod.get(method)(**kwargs)
         raise TypeError("method must be None, str name, BaseSteeringMethod instance, or subclass.")
-
+    
     def use(self, method: str | BaseSteeringMethod | Type[BaseSteeringMethod], **kwargs: Any) -> None:
         self._method = self._resolve_method(method, **kwargs)
 

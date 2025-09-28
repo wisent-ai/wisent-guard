@@ -73,7 +73,6 @@ class EvaluatorRotator:
         for py in directory.glob("*.py"):
             if py.name.startswith("_"):
                 continue
-            # Build a synthetic package name so imports don't collide
             mod_name = f"_dyn_evaluators_{py.stem}"
             spec = importlib.util.spec_from_file_location(mod_name, py)
             if spec and spec.loader:
@@ -116,7 +115,6 @@ class EvaluatorRotator:
             "evaluator must be None, a name (str), BaseEvaluator instance, or BaseEvaluator subclass."
         )
 
-    # ---------- Public API ----------
     def use(self, evaluator: Union[str, BaseEvaluator, Type[BaseEvaluator]]) -> None:
         self._evaluator = self._resolve_evaluator(evaluator)
 
