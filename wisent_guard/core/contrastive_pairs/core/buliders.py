@@ -8,6 +8,10 @@ from wisent_guard.core.contrastive_pairs.core.response import NegativeResponse, 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair              
 from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 
+__all__ = [
+    "from_phrase_pairs",
+]
+
 logger = logging.getLogger(__name__)
 
 def from_phrase_pairs(

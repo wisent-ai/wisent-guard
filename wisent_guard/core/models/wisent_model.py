@@ -12,10 +12,12 @@ from transformers import (
     PreTrainedTokenizerBase,
 )
 
-from wisent_guard.core.models.base.atoms import SteeringPlan, SteeringVector, HookHandleGroup, GenerationStats, TopLogits
+from wisent_guard.core.models.core.atoms import SteeringPlan, SteeringVector, HookHandleGroup, GenerationStats, TopLogits
 from wisent_guard.core.activations.core.atoms import RawActivationMap
 
 from wisent_guard.core.prompts.core.atom import ChatMessage
+
+_all__ = ["WisentModel"]
 
 class WisentModel:
     """

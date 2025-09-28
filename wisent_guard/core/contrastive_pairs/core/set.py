@@ -11,6 +11,10 @@ from wisent_guard.core.contrastive_pairs.core.atoms import AtomContrastivePairSe
 if TYPE_CHECKING:
     from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair 
 
+__all__ = [
+    "ContrastivePairSet",
+]
+
 
 @dataclass
 class ContrastivePairSet(AtomContrastivePairSet):

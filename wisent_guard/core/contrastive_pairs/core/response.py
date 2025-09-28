@@ -5,6 +5,12 @@ from dataclasses import dataclass, replace
 from wisent_guard.core.contrastive_pairs.core.atoms import AtomResponse
 from wisent_guard.core.activations.core.atoms import LayerActivations, RawActivationMap
 
+__all__ = [
+    "Response",
+    "PositiveResponse",
+    "NegativeResponse",
+]
+
 
 @dataclass(frozen=True, slots=True)
 class Response(AtomResponse):

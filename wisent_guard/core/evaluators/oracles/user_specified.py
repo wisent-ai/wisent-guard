@@ -4,6 +4,10 @@ from typing import Any, Optional
 
 from wisent_guard.core.evaluators.core.atoms import BaseEvaluator, EvalResult
 
+__all__ = [
+    "UserSpecifiedEvaluator",
+]
+
 class UserSpecifiedEvaluator(BaseEvaluator):
     """Trusts a user-provided label for the item ("truthful" / "untruthful")."""
     name = "user_specified"

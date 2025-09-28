@@ -10,6 +10,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wisent_guard.core.activations.core.atoms import LayerActivations, RawActivationMap
 
+__all__ = [
+    "ContrastivePair",
+]
 
 @dataclass(frozen=True, slots=True)
 class ContrastivePair(AtomContrastivePair):

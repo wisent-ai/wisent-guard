@@ -6,8 +6,7 @@ import torch
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
 from wisent_guard.core.activations.core.atoms import LayerActivations, ActivationAggregationStrategy, LayerName, RawActivationMap
-from wisent_guard.core.model import Model
-
+from wisent_guard.core.models.wisent_model import WisentModel 
 __all__ = ["ActivationCollector"]
 
 @dataclass(slots=True)
@@ -17,7 +16,7 @@ class ActivationCollector:
 
         arguments:
             model:
-                :class: Model 
+                :class: WisentModel
             store_device:
                 Device to store collected activations on (default "cpu").
             dtype:
@@ -125,8 +124,8 @@ class ActivationCollector:
                     '_activation_aggregation_strategy': {'strategy': None}
                     }
     """
-  
-    model: Model
+
+    model: WisentModel
     store_device: str | torch.device = "cpu"
     dtype: torch.dtype | None = None
 
@@ -311,7 +310,7 @@ if __name__ == "__main__":
     from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
     from wisent_guard.core.contrastive_pairs.core.response import PositiveResponse, NegativeResponse
 
-    model = Model(name="/home/gg/.cache/huggingface/hub/models--meta-llama--Llama-3.2-1B-Instruct/snapshots/9213176726f574b556790deb65791e0c5aa438b6")
+    model = WisentModel(name="/home/gg/.cache/huggingface/hub/models--meta-llama--Llama-3.2-1B-Instruct/snapshots/9213176726f574b556790deb65791e0c5aa438b6")
     collector = ActivationCollector(model=model, store_device="cpu")
 
     pair = ContrastivePair(

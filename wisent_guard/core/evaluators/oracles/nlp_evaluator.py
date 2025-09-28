@@ -3,6 +3,9 @@ from typing import Any, Mapping
 
 from wisent_guard.core.evaluators.core.atoms import BaseEvaluator, EvalResult
 
+__all__ = [
+    "NLPEvaluator",
+]
 
 class NLPEvaluator(BaseEvaluator):
     """

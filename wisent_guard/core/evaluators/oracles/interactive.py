@@ -5,6 +5,10 @@ from typing import Any
 
 from wisent_guard.core.evaluators.core.atoms import BaseEvaluator, EvalResult, EvaluatorError
 
+__all__ = [
+    "InteractiveEvaluator",
+]
+
 class InteractiveEvaluator(BaseEvaluator):
     """Asks the user in the console to judge each response (y/n)."""
     name = "interactive"
