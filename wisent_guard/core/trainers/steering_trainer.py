@@ -23,7 +23,9 @@ from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 from wisent_guard.core.activations.core.activations_collector import ActivationCollector  
 from wisent_guard.core.steering_methods.core.atoms import BaseSteeringMethod
 
-
+__all__ = [
+    "WisentSteeringTrainer",
+]
 
 @dataclass(slots=True)
 class WisentSteeringTrainer(BaseSteeringTrainer):

@@ -13,9 +13,13 @@ from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 
 from wisent_guard.core.activations.core.atoms import LayerActivations
 
+__all__ = [
+    "SteeringMethodRotator",
+]
+
 logger = logging.getLogger(__name__)
 
-class BaseSteeringMethodRotator:
+class SteeringMethodRotator:
     """Discover/select a steering method and train it on a ContrastivePairSet."""
 
     def __init__(
@@ -100,7 +104,7 @@ class BaseSteeringMethodRotator:
             self._method.kwargs = old
 
 if __name__ == "__main__":
-    rot = BaseSteeringMethodRotator()
+    rot = SteeringMethodRotator()
     print("Available steering methods:")
     for m in rot.list_methods():
         print(f" - {m['name']}: {m['description']} ({m['class']})")

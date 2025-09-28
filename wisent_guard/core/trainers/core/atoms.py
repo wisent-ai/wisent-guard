@@ -5,6 +5,10 @@ from typing import Any, Dict
 from wisent_guard.core.activations.core.atoms import LayerActivations
 from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 
+__all__ = [
+    "TrainingResult",
+]
+
 @dataclass(slots=True)
 class TrainingResult:
     """
