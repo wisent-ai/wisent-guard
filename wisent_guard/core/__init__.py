@@ -1,14 +1,14 @@
 # from wisent_guard.core.activations import Activations
-from wisent_guard.core.classifier.classifier import ActivationClassifier, Classifier
+# from wisent_guard.core.classifier.classifier import ActivationClassifier, Classifier
 
 from .secure_code_evaluator import SecureCodeEvaluator, enforce_secure_execution
 # from .steering import SteeringMethod, SteeringType
 
 __all__ = [
-    "ActivationClassifier",
+    # "ActivationClassifier",
     # "ActivationHooks",
     # "Activations",
-    "Classifier",
+    # "Classifier",
     # "ContrastivePairSet",
     # "Layer",
     # "Model",

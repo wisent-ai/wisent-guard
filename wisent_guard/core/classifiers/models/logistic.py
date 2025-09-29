@@ -1,19 +1,29 @@
-import torch
-from torch import nn as nn
+from __future__ import annotations
 
+import torch
+from torch import nn
+
+from wisent_guard.core.classifiers.core.atoms import BaseClassifier
+
+__all__ = ["LogisticClassifier"]
 
 class LogisticModel(nn.Module):
     """Simple logistic regression model for activation classification."""
-
     def __init__(self, input_dim: int):
         super().__init__()
         self.linear = nn.Linear(input_dim, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Ensure output has proper dimensions by keeping the batch dimension
         logits = self.linear(x)
-        # Keep output shape consistent regardless of batch size
-        if len(logits.shape) == 1:
+        if logits.ndim == 1:
             logits = logits.unsqueeze(1)
         return self.sigmoid(logits)
+
+
+class LogisticClassifier(BaseClassifier):
+    name = "logistic"
+    description = "One-layer logistic regression over dense features"
+
+    def build_model(self, input_dim: int, **_: object) -> nn.Module:
+        return LogisticModel(input_dim)
