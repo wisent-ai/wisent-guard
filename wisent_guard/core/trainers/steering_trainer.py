@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -22,10 +23,14 @@ from wisent_guard.core.trainers.core.atoms import (
 from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 from wisent_guard.core.activations.core.activations_collector import ActivationCollector  
 from wisent_guard.core.steering_methods.core.atoms import BaseSteeringMethod
+from wisent_guard.core.contrastive_pairs.diagnostics import run_control_vector_diagnostics
 
 __all__ = [
     "WisentSteeringTrainer",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class WisentSteeringTrainer(BaseSteeringTrainer):
@@ -118,6 +123,29 @@ class WisentSteeringTrainer(BaseSteeringTrainer):
 
         steered = LayerActivations(raw_vectors)
 
+        control_vector_report = run_control_vector_diagnostics(steered)
+        for issue in control_vector_report.issues:
+            log_method = logger.error if issue.severity == "critical" else logger.warning
+            log_method(
+                "[control_vector diagnostics] %s (details=%s)",
+                issue.message,
+                issue.details,
+            )
+
+        control_vector_summary = control_vector_report.summary.get("control_vectors", {})
+        control_vector_issues = [
+            {
+                "metric": issue.metric,
+                "severity": issue.severity,
+                "message": issue.message,
+                "details": issue.details,
+            }
+            for issue in control_vector_report.issues
+        ]
+
+        if control_vector_report.has_critical_issues:
+            raise ValueError("Control vector diagnostics found critical issues; see logs for specifics.")
+
         # 4) Metadata
         now = _dt.datetime.now().astimezone()
         metadata: dict[str, Any] = {
@@ -131,7 +159,11 @@ class WisentSteeringTrainer(BaseSteeringTrainer):
             "normalize_layers": bool(normalize_layers),
             "num_pairs": len(self.pair_set.pairs),
             "hidden_size": getattr(self.model, "hidden_size", None),
+            "control_vector_diagnostics": control_vector_summary,
         }
+
+        if control_vector_issues:
+            metadata["control_vector_issues"] = control_vector_issues
 
         result = TrainingResult(steered_vectors=steered, pair_set_with_activations=self.pair_set, metadata=metadata)
         self._last_result = result

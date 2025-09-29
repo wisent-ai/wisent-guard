@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from typing import Any
 
@@ -17,8 +18,12 @@ from wisent_guard.core.activations.core.atoms import RawActivationMap
 
 from wisent_guard.core.prompts.core.atom import ChatMessage
 from wisent_guard.core.utils.device import resolve_default_device, resolve_torch_device
+from wisent_guard.core.contrastive_pairs.diagnostics import run_control_vector_diagnostics
 
 _all__ = ["WisentModel"]
+
+
+logger = logging.getLogger(__name__)
 
 class WisentModel:
     """
@@ -572,6 +577,22 @@ class WisentModel:
         example:
             >>> wm.set_steering_from_raw({"6": torch.randn(wm.hidden_size)}, scale=0.5, normalize=True)
         """
+        if not raw:
+            self._steering_plan = SteeringPlan({})
+            return
+
+        report = run_control_vector_diagnostics(raw)
+        for issue in report.issues:
+            log_method = logger.error if issue.severity == "critical" else logger.warning
+            log_method(
+                "[control_vector diagnostics] %s (details=%s)",
+                issue.message,
+                issue.details,
+            )
+
+        if report.has_critical_issues:
+            raise ValueError("Control vector diagnostics found critical issues; refusing to set steering.")
+
         self._steering_plan = SteeringPlan.from_raw(raw, scale=scale, normalize=normalize)
 
     def clear_steering(self) -> None:

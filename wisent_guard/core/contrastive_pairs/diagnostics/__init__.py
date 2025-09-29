@@ -9,11 +9,14 @@ from .divergence import compute_divergence_metrics
 from .duplicates import compute_duplicate_metrics
 from .coverage import compute_coverage_metrics
 from .activations import compute_activation_metrics
+from .control_vectors import ControlVectorDiagnosticsConfig, run_control_vector_diagnostics
 
 __all__ = [
     "DiagnosticsConfig",
     "DiagnosticsReport",
     "run_all_diagnostics",
+    "ControlVectorDiagnosticsConfig",
+    "run_control_vector_diagnostics",
 ]
 
 
