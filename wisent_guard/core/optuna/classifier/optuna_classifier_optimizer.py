@@ -17,6 +17,7 @@ from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
 
 from wisent_guard.core.classifier.classifier import Classifier
+from wisent_guard.core.utils.device import resolve_default_device
 
 from .activation_generator import ActivationData, ActivationGenerator, GenerationConfig
 from .classifier_cache import CacheConfig, ClassifierCache
@@ -95,14 +96,7 @@ class ClassifierOptimizationConfig:
 
         # Auto-detect device if needed
         if self.device == "auto":
-            import torch
-
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                self.device = "mps"
-            else:
-                self.device = "cpu"
+            self.device = resolve_default_device()
 
 
 @dataclass

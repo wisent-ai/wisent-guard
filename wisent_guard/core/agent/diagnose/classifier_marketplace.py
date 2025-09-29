@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 import numpy as np
 
+from wisent_guard.core.utils.device import resolve_default_device
+
 @dataclass
 class ClassifierListing:
     """A classifier available in the marketplace."""
@@ -421,17 +423,12 @@ Respond with just the layer number (8-20):"""
     
     def _estimate_hardware_speed(self) -> float:
         """Estimate hardware speed multiplier for training time."""
-        # This is a simple heuristic - could be improved with actual benchmarking
-        try:
-            import torch
-            if torch.cuda.is_available():
-                return 0.3  # GPU is ~3x faster
-            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-                return 0.5  # MPS is ~2x faster
-            else:
-                return 1.0  # CPU baseline
-        except:
-            return 1.0
+        device_kind = resolve_default_device()
+        if device_kind == "cuda":
+            return 0.3
+        if device_kind == "mps":
+            return 0.5
+        return 1.0
     
     def get_marketplace_summary(self) -> str:
         """Get a summary of the classifier marketplace."""

@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 
 from ..model import Model
+from ..utils.device import empty_device_cache, resolve_default_device
 
 
 @dataclass
@@ -101,9 +102,7 @@ class SinglePromptEvaluator:
             verbose: Whether to print progress
         """
         self.verbose = verbose
-        self.device = device or (
-            "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-        )
+        self.device = device or resolve_default_device()
 
         # Single model used for both generation and evaluation
         self.model = None
@@ -140,9 +139,8 @@ class SinglePromptEvaluator:
             self.model = None
             self.tokenizer = None
 
-            # Clear CUDA cache
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # Clear device cache
+            empty_device_cache(self.device)
 
             if self.verbose:
                 print("✓ Model unloaded and memory cleared")

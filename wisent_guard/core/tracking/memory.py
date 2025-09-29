@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 import torch
 
+from wisent_guard.core.utils.device import resolve_default_device
+
 try:
     import nvidia_ml_py3 as nvml
     NVML_AVAILABLE = True
@@ -69,7 +71,8 @@ class MemoryTracker:
             sampling_interval: How often to sample memory (seconds)
             auto_cleanup: Whether to automatically run garbage collection
         """
-        self.track_gpu = track_gpu and torch.cuda.is_available()
+        self.device_kind = resolve_default_device()
+        self.track_gpu = track_gpu and self.device_kind in {"cuda", "mps"}
         self.sampling_interval = sampling_interval
         self.auto_cleanup = auto_cleanup
         
@@ -79,14 +82,16 @@ class MemoryTracker:
         self.start_time: Optional[float] = None
         
         # Initialize GPU monitoring if available
-        if self.track_gpu and NVML_AVAILABLE:
+        if self.track_gpu and self.device_kind == "cuda" and NVML_AVAILABLE:
             try:
                 nvml.nvmlInit()
                 self.gpu_handle = nvml.nvmlDeviceGetHandleByIndex(0)
                 self.gpu_available = True
             except Exception:
                 self.gpu_available = False
+                self.gpu_handle = None
         else:
+            self.gpu_handle = None
             self.gpu_available = False
     
     def take_snapshot(self, operation: Optional[str] = None) -> MemorySnapshot:
@@ -106,19 +111,44 @@ class MemoryTracker:
         cached_memory_mb = None
         
         if self.track_gpu:
-            if torch.cuda.is_available():
+            if self.device_kind == "cuda" and torch.cuda.is_available():
                 gpu_memory_mb = torch.cuda.memory_allocated() / 1024 / 1024
                 cached_memory_mb = torch.cuda.memory_reserved() / 1024 / 1024
-                allocated_tensors = len([obj for obj in gc.get_objects() 
-                                       if torch.is_tensor(obj) and obj.is_cuda])
-                
-                if self.gpu_available:
+                allocated_tensors = len(
+                    [
+                        obj
+                        for obj in gc.get_objects()
+                        if torch.is_tensor(obj) and getattr(obj, "is_cuda", False)
+                    ]
+                )
+
+                if self.gpu_available and self.gpu_handle is not None:
                     try:
                         gpu_info = nvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
                         total_gpu_mb = gpu_info.total / 1024 / 1024
                         gpu_memory_percent = (gpu_memory_mb / total_gpu_mb) * 100
                     except Exception:
                         pass
+            elif self.device_kind == "mps" and hasattr(torch, "mps"):
+                try:
+                    allocated_bytes = torch.mps.current_allocated_memory()
+                except AttributeError:
+                    allocated_bytes = 0
+
+                try:
+                    cached_bytes = torch.mps.driver_allocated_memory()
+                except AttributeError:
+                    cached_bytes = allocated_bytes
+
+                gpu_memory_mb = allocated_bytes / 1024 / 1024
+                cached_memory_mb = cached_bytes / 1024 / 1024
+                allocated_tensors = len(
+                    [
+                        obj
+                        for obj in gc.get_objects()
+                        if torch.is_tensor(obj) and getattr(getattr(obj, "device", None), "type", None) == "mps"
+                    ]
+                )
         
         snapshot = MemorySnapshot(
             timestamp=timestamp,
@@ -189,8 +219,13 @@ class MemoryTracker:
         """Clear GPU cache and run garbage collection."""
         if self.auto_cleanup:
             gc.collect()
-            if torch.cuda.is_available():
+            if self.device_kind == "cuda" and torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            elif self.device_kind == "mps" and hasattr(torch, "mps"):
+                try:
+                    torch.mps.empty_cache()
+                except AttributeError:
+                    pass
     
     def reset(self) -> None:
         """Reset the tracker, clearing all snapshots."""

@@ -16,6 +16,7 @@ from wisent_guard.core.models.core.atoms import SteeringPlan, SteeringVector, Ho
 from wisent_guard.core.activations.core.atoms import RawActivationMap
 
 from wisent_guard.core.prompts.core.atom import ChatMessage
+from wisent_guard.core.utils.device import resolve_default_device, resolve_torch_device
 
 _all__ = ["WisentModel"]
 
@@ -63,7 +64,7 @@ class WisentModel:
             >>> text = wm.generate("Say hi in 5 words.", max_new_tokens=10, use_steering=True)[0]
         """
         self.model_name = model_name
-        self.device = device
+        self.device = device or resolve_default_device()
 
         self.hf_model: PreTrainedModel = hf_model or AutoModelForCausalLM.from_pretrained(
             model_name,
@@ -71,8 +72,7 @@ class WisentModel:
             device_map=None,            
             trust_remote_code=True,   
         )
-        if device is not None:
-            self.hf_model.to(device)
+        self.hf_model.to(self.device)
 
         self.tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
             model_name, use_fast=True, trust_remote_code=True
@@ -282,8 +282,7 @@ class WisentModel:
 
         batch = self.tokenizer.pad(singles, padding=True, return_tensors="pt")
 
-        if self.device is not None:
-            batch = {k: v.to(self.device) for k, v in batch.items()}
+        batch = {k: v.to(resolve_torch_device()) for k, v in batch.items()}
 
         return batch
 

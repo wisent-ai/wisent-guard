@@ -17,6 +17,10 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 import hashlib
 
+import torch
+
+from wisent_guard.core.utils.device import resolve_default_device
+
 
 @dataclass
 class DeviceBenchmark:
@@ -63,14 +67,11 @@ class DeviceBenchmarker:
         ]
         
         # Add GPU info if available
-        try:
-            import torch
-            if torch.cuda.is_available():
-                info_parts.append(f"cuda_{torch.cuda.get_device_name()}")
-            elif torch.backends.mps.is_available():
-                info_parts.append("mps")
-        except ImportError:
-            pass
+        device_kind = resolve_default_device()
+        if device_kind == "cuda" and torch.cuda.is_available():
+            info_parts.append(f"cuda_{torch.cuda.get_device_name(torch.cuda.current_device())}")
+        elif device_kind == "mps":
+            info_parts.append("mps")
         
         # Create hash of the combined info
         combined = "|".join(str(part) for part in info_parts)
@@ -79,16 +80,7 @@ class DeviceBenchmarker:
     
     def get_device_type(self) -> str:
         """Detect the device type (cpu, cuda, mps, etc.)."""
-        try:
-            import torch
-            if torch.cuda.is_available():
-                return "cuda"
-            elif torch.backends.mps.is_available():
-                return "mps" 
-            else:
-                return "cpu"
-        except ImportError:
-            return "cpu"
+        return resolve_default_device()
     
     def load_cached_benchmark(self) -> Optional[DeviceBenchmark]:
         """Load cached benchmark results if they exist and are recent."""
@@ -287,11 +279,11 @@ except Exception as e:
         # Create test script that uses real synthetic classifier creation
         test_script = '''
 import time
+import platform
 import sys
-sys.path.append('.')
-
-print("BENCHMARK_DEBUG: Starting classifier benchmark script")
-start_time = time.time()
+import time
+from pathlib import Path
+from typing import Dict, Optional
 try:
     print("BENCHMARK_DEBUG: Importing required modules...")
     from wisent_guard.core.model import Model
@@ -348,39 +340,37 @@ except Exception as e:
                 f.write(test_script)
                 temp_script = f.name
             print(f"   🔧 DEBUG: Classifier test script written to {temp_script}")
-            
+
             print("   🔧 DEBUG: Running classifier training subprocess (20 min timeout)...")
             result = subprocess.run([
-                sys.executable, temp_script
-            ], capture_output=True, text=True, timeout=1200)  # 20-minute timeout
-            
+                sys.executable,
+                temp_script,
+            ], capture_output=True, text=True, timeout=1200)
+
             print(f"   🔧 DEBUG: Classifier subprocess completed with return code: {result.returncode}")
             print(f"   🔧 DEBUG: Stdout length: {len(result.stdout)} chars")
             print(f"   🔧 DEBUG: Stderr length: {len(result.stderr)} chars")
-            
+
             if result.stderr:
                 print(f"   ⚠️ DEBUG: Classifier stderr content:\n{result.stderr}")
-            
+
             os.unlink(temp_script)
             print("   🔧 DEBUG: Classifier temporary script cleaned up")
-            
+
             # Parse result
             print("   🔧 DEBUG: Parsing classifier output for BENCHMARK_RESULT...")
-            found_result = False
             for line in result.stdout.split('\n'):
                 print(f"   🔍 DEBUG: Classifier output line: {repr(line)}")
                 if line.startswith('BENCHMARK_RESULT:'):
                     training_time = float(line.split(':')[1])
                     print(f"      ✅ Classifier training: {training_time:.1f}s per 100 classifiers")
-                    found_result = True
                     return training_time
-            
-            if not found_result:
-                print("   ❌ DEBUG: No BENCHMARK_RESULT found in classifier output!")
-                print("   📜 DEBUG: Full classifier stdout:")
-                print(result.stdout)
-                return None
-                    
+
+            print("   ❌ DEBUG: No BENCHMARK_RESULT found in classifier output!")
+            print("   📜 DEBUG: Full classifier stdout:")
+            print(result.stdout)
+            return None
+
         except Exception as e:
             print(f"      ❌ Error in classifier training benchmark: {e}")
             import traceback
@@ -430,20 +420,24 @@ except Exception as e:
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
                 f.write(test_script)
                 temp_script = f.name
-            
+
             result = subprocess.run([
-                sys.executable, temp_script
-            ], capture_output=True, text=True, timeout=120)  # 2-minute timeout
-            
+                sys.executable,
+                temp_script,
+            ], capture_output=True, text=True, timeout=300)
+
             os.unlink(temp_script)
-            
-            # Parse result
+
             for line in result.stdout.split('\n'):
                 if line.startswith('BENCHMARK_RESULT:'):
                     steering_time = float(line.split(':')[1])
                     print(f"      Steering: {steering_time:.1f}s per example")
                     return steering_time
-                    
+
+            print("   ❌ No BENCHMARK_RESULT found in steering output!")
+            print(result.stdout)
+            return None
+
         except Exception as e:
             print(f"      Error in steering benchmark: {e}")
             raise RuntimeError(f"Steering benchmark failed: {e}")

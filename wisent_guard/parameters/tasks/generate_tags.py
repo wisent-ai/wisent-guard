@@ -15,6 +15,10 @@ from typing import Dict, List, Any, Optional, Set
 import subprocess
 import re
 
+import torch
+
+from wisent_guard.core.utils.device import preferred_dtype, resolve_default_device, resolve_device
+
 # Set environment variables to automatically trust remote code for datasets
 os.environ['HF_DATASETS_TRUST_REMOTE_CODE'] = '1'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -45,27 +49,29 @@ def get_llama_model(model_path: str = "meta-llama/Llama-3.1-8B-Instruct"):
         print("🦙 Loading Llama 3.1B Instruct (one-time setup)...")
         
         try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-            import torch
-            
-            # Check if MPS is available (Apple Silicon)
-            if torch.backends.mps.is_available():
-                device = "mps"
-                print("Device set to use mps")
-            elif torch.cuda.is_available():
-                device = "cuda"
-                print("Device set to use cuda")
+            from transformers import pipeline
+            device_kind = resolve_default_device()
+            print(f"Device set to use {device_kind}")
+            torch_dtype = preferred_dtype(device_kind)
+            device_obj = resolve_device(device_kind)
+
+            if device_kind == "cuda":
+                device_map = "auto"
+                pipeline_device: int | torch.device = 0
+            elif device_kind == "mps":
+                device_map = None
+                pipeline_device = device_obj
             else:
-                device = "cpu"
-                print("Device set to use cpu")
+                device_map = None
+                pipeline_device = -1
             
             # Initialize the pipeline once
             _llama_model_cache = pipeline(
                 "text-generation",
                 model=model_path,
-                torch_dtype=torch.float16,
-                device_map="auto" if device != "mps" else None,
-                device=0 if device == "cuda" else (device if device != "auto" else None),
+                torch_dtype=torch_dtype,
+                device_map=device_map,
+                device=pipeline_device,
                 max_new_tokens=1000,
                 temperature=0.3,
                 do_sample=True,

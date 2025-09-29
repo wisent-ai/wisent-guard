@@ -13,6 +13,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
+from wisent_guard.core.utils.device import resolve_default_device
+
 __all__ = [
     "ClassifierError",
     "ClassifierTrainConfig",
@@ -354,11 +356,7 @@ class BaseClassifier(ABC):
     def select_device(device: str | None) -> str:
         if device:
             return device
-        if torch.cuda.is_available():
-            return "cuda"
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        return resolve_default_device()
 
     @classmethod
     def to_2d_tensor(cls, X, *, device: str, dtype: torch.dtype) -> torch.Tensor:

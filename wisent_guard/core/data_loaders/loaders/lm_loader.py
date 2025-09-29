@@ -88,9 +88,15 @@ class LMEvalDataLoader(BaseDataLoader):
         if not train_pairs or not test_pairs:
             raise DataLoaderError("One of the splits is empty after splitting.")
 
+        train_set = ContrastivePairSet("lm_eval_train", train_pairs, task_type=task_name)
+        test_set = ContrastivePairSet("lm_eval_test", test_pairs, task_type=task_name)
+
+        train_set.validate()
+        test_set.validate()
+
         return LoadDataResult(
-            train_qa_pairs=ContrastivePairSet("lm_eval_train", train_pairs, task_type=task_name),
-            test_qa_pairs=ContrastivePairSet("lm_eval_test", test_pairs, task_type=task_name),
+            train_qa_pairs=train_set,
+            test_qa_pairs=test_set,
             task_type=task_name,
             lm_task_data=task_obj,
         )

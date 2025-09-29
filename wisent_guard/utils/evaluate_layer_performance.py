@@ -13,8 +13,9 @@ python evaluate_layer_performance.py --model meta-llama/Llama-3.1-8B-Instruct
 import argparse
 import torch
 import json
-import os
-import datetime
+from wisent_guard.core.contrastive_pairs import ContrastivePairSet
+from wisent_guard.core import Layer, Model
+from wisent_guard.core.utils.device import resolve_torch_device
 from typing import List, Dict, Any
 import sys
 
@@ -46,12 +47,7 @@ def parse_args():
 
 def get_device():
     """Get the best available device."""
-    if torch.cuda.is_available():
-        return "cuda"
-    elif hasattr(torch, 'mps') and torch.backends.mps.is_available():
-        return "mps"
-    else:
-        return "cpu"
+    device = str(resolve_torch_device())
 
 def parse_layer_range(layer_range_str, total_layers):
     """Parse layer range string into list of layer numbers."""

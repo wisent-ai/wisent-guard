@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 import torch
 
+from wisent_guard.core.utils.device import resolve_default_device
+
 from wisent_guard.cli_workflows.activation_monitor import TestActivationCache
 from wisent_guard.cli_workflows.optimize import (
     run_interactive_optimization,
@@ -4860,7 +4862,11 @@ def handle_monitor_command(args):
     print(f"\n💻 System: {platform.system()} {platform.release()}")
     print(f"🐍 Python: {platform.python_version()}")
     print(f"🔥 PyTorch: {torch.__version__}")
+    device_kind = resolve_default_device()
+    print(f"🧭 Preferred device: {device_kind}")
     print(f"🎮 CUDA: {'Available' if torch.cuda.is_available() else 'Not Available'}")
+    mps_available = getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
+    print(f"📱 MPS: {'Available' if mps_available else 'Not Available'}")
 
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
@@ -6457,7 +6463,7 @@ def handle_generate_vector_command(args):
                 processed_pairs = activation_logic.collect_activations_batch(
                     constructed_pairs,
                     layer_index=layer,
-                    device=args.device if args.device else "cuda",
+                    device=args.device if args.device else resolve_default_device(),
                     token_targeting_strategy=token_strategy,
                 )
 
@@ -6582,7 +6588,7 @@ def handle_generate_vector_command(args):
         processed_pairs = activation_logic.collect_activations_batch(
             constructed_pairs,
             layer_index=args.layer,
-            device=args.device if args.device else "cuda",
+            device=args.device if args.device else resolve_default_device(),
             token_targeting_strategy=token_strategy,
         )
 

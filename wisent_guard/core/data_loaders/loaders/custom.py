@@ -109,6 +109,9 @@ class CustomUserDataLoader(BaseDataLoader):
         train_set = ContrastivePairSet(name=f"{data.name}_train", pairs=train_pairs, task_type=data.task_type)
         test_set  = ContrastivePairSet(name=f"{data.name}_test",  pairs=test_pairs,  task_type=data.task_type)
 
+        train_set.validate()
+        test_set.validate()
+
         return LoadDataResult( 
             train_qa_pairs=train_set,
             test_qa_pairs=test_set,

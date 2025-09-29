@@ -54,4 +54,6 @@ def from_phrase_pairs(
         neg_resp = NegativeResponse(text=negative)
         cps.add(ContrastivePair(prompt=prompt, positive_response=pos_resp, negative_response=neg_resp))
 
+    cps.validate()
+
     return cps

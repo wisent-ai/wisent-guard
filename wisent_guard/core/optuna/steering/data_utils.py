@@ -15,6 +15,7 @@ from wisent_guard.core.lm_eval_harness_ground_truth import LMEvalHarnessGroundTr
 
 # Import task interface for dynamic task loading
 from wisent_guard.core.task_interface import get_task
+from wisent_guard.core.utils.device import empty_device_cache, preferred_dtype, resolve_default_device
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,7 @@ def create_probe_training_data(
 def load_model_and_tokenizer(model_name: str, device: torch.device):
     """Load model and tokenizer with proper configuration."""
     logger.info(f"Loading model {model_name} (ONCE)...")
+    device_kind = device.type
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -272,19 +274,25 @@ def load_model_and_tokenizer(model_name: str, device: torch.device):
     # Set left padding for decoder-only models (required for correct generation)
     tokenizer.padding_side = "left"
 
+    torch_dtype = preferred_dtype(device_kind)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16 if device.type == "cuda" else torch.float32,
-        device_map={"": 0} if device.type == "cuda" else None,
+        torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
     )
-
+    model.to(device)
     model.eval()
 
     # Log memory usage
-    if torch.cuda.is_available():
+    if device_kind == "cuda" and torch.cuda.is_available():
         memory_gb = torch.cuda.memory_allocated() / 1024**3
         logger.info(f"✓ Model loaded on {device}, GPU memory: {memory_gb:.2f} GB")
+    elif device_kind == "mps" and hasattr(torch, "mps"):
+        try:
+            memory_gb = torch.mps.current_allocated_memory() / 1024**3
+            logger.info(f"✓ Model loaded on {device}, MPS memory: {memory_gb:.2f} GB")
+        except AttributeError:
+            logger.info(f"✓ Model loaded on {device}")
 
     return model, tokenizer
 
@@ -292,16 +300,28 @@ def load_model_and_tokenizer(model_name: str, device: torch.device):
 def free_model_memory(model, tokenizer):
     """Free model memory after activation extraction."""
     logger.info("🧹 Freeing model memory...")
+    device_kind = None
+    if hasattr(model, "parameters"):
+        try:
+            device_kind = next(model.parameters()).device.type
+        except StopIteration:
+            pass
     del model
     del tokenizer
     import gc
 
     gc.collect()
-    torch.cuda.empty_cache()
-
-    if torch.cuda.is_available():
+    kind_for_cleanup = device_kind or resolve_default_device()
+    empty_device_cache(kind_for_cleanup)
+    if kind_for_cleanup == "cuda" and torch.cuda.is_available():
         memory_gb = torch.cuda.memory_allocated() / 1024**3
         logger.info(f"GPU memory after cleanup: {memory_gb:.2f} GB")
+    elif kind_for_cleanup == "mps" and hasattr(torch, "mps"):
+        try:
+            memory_gb = torch.mps.current_allocated_memory() / 1024**3
+            logger.info(f"MPS memory after cleanup: {memory_gb:.2f} GB")
+        except AttributeError:
+            pass
 
 
 def get_task_contrastive_pairs(samples: List[Dict], task_name: str) -> List[Dict]:

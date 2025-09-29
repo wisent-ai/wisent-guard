@@ -9,6 +9,7 @@ from .layer import Layer
 from .model import Model
 from .steering_methods.caa import CAA
 from .steering_methods.dac import DAC
+from .utils.device import resolve_default_device
 
 
 class MultiSteeringError(Exception):
@@ -19,14 +20,14 @@ class MultiSteeringError(Exception):
 class MultiSteering:
     """Handles multi-steering vector combination and application."""
     
-    def __init__(self, device: str = "cpu", method: str = "CAA"):
+    def __init__(self, device: str | None = None, method: str = "CAA"):
         """Initialize multi-steering handler.
         
         Args:
             device: Device to use for computations (cpu/cuda/mps)
             method: Steering method to use for combination ("CAA" or "DAC")
         """
-        self.device = device
+        self.device = device or resolve_default_device()
         self.method = method
         self.loaded_vectors = []
         self.weights = []
@@ -252,10 +253,18 @@ class MultiSteering:
                 hook.remove()
 
 
-def run_multi_steer(vector_specs: List[str], model_name: str, prompt: str,
-                   method: str = "CAA", layer: Optional[int] = None, 
-                   max_new_tokens: int = 100, temperature: float = 0.7, 
-                   top_p: float = 0.9, device: str = "cpu", verbose: bool = True) -> str:
+def run_multi_steer(
+    vector_specs: List[str],
+    model_name: str,
+    prompt: str,
+    method: str = "CAA",
+    layer: Optional[int] = None,
+    max_new_tokens: int = 100,
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    device: str | None = None,
+    verbose: bool = True,
+) -> str:
     """Convenience function to run multi-steering.
     
     Args:
@@ -277,10 +286,11 @@ def run_multi_steer(vector_specs: List[str], model_name: str, prompt: str,
     if verbose:
         print(f"\n🚀 Loading model: {model_name}")
     
-    model = Model(model_name, device=device)
+    chosen_device = device or resolve_default_device()
+    model = Model(model_name, device=chosen_device)
     
     # Initialize multi-steering with specified method
-    multi_steer = MultiSteering(device=device, method=method)
+    multi_steer = MultiSteering(device=chosen_device, method=method)
     
     # Load vectors
     multi_steer.load_vectors(vector_specs)

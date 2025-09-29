@@ -295,4 +295,6 @@ def load_contrastive_pair_set(
 
     cps = ContrastivePairSet(name=str(data["name"]), pairs=list_of_pairs, task_type=data.get("task_type"))
 
+    cps.validate()
+
     return cps

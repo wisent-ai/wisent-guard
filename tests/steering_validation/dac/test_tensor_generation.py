@@ -96,7 +96,10 @@ def _create_contrastive_pairs(ita_data: list, eng_data: list, max_examples: int 
         )
         pairs.append(pair)
 
-    return ContrastivePairSet(name="ita_eng_language_steering", pairs=pairs, task_type="language_steering")
+    pair_set = ContrastivePairSet(name="ita_eng_language_steering", pairs=pairs, task_type="language_steering")
+    report = pair_set.validate(raise_on_critical=False)
+    assert not report.has_critical_issues, "Loaded DAC contrastive pairs failed diagnostics"
+    return pair_set
 
 
 @pytest.mark.slow

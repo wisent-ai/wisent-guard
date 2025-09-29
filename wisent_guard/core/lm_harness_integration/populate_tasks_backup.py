@@ -11,6 +11,8 @@ import sys
 import subprocess
 import random
 
+from wisent_guard.core.utils.device import preferred_dtype, resolve_default_device, resolve_device
+
 def find_working_task_from_group(group_dict: Dict, depth: int = 0, max_depth: int = 3) -> Any:
     """
     Recursively search through a ConfigurableGroup to find a task with usable documents.
@@ -109,24 +111,31 @@ def get_benchmark_tags_with_llama(task_name: str, readme_content: str = "") -> L
         
         print(f"   🔄 Loading Llama-3.1-8B-Instruct pipeline...")
         
-        # Check device availability like in generate_tags.py
-        if torch.backends.mps.is_available():
-            device = "mps"
-            print("   📱 Using MPS device")
-        elif torch.cuda.is_available():
-            device = "cuda"
+        device_kind = resolve_default_device()
+        device_obj = resolve_device(device_kind)
+        if device_kind == "cuda" and torch.cuda.is_available():
             print("   🚀 Using CUDA device")
+        elif device_kind == "mps":
+            print("   📱 Using MPS device")
         else:
-            device = "cpu"
             print("   💻 Using CPU device")
+
+        torch_dtype = preferred_dtype(device_kind)
+        device_map = "auto" if device_kind == "cuda" else None
+        if device_kind == "cuda":
+            pipeline_device = 0
+        elif device_kind == "mps":
+            pipeline_device = device_obj
+        else:
+            pipeline_device = -1
         
         # Initialize the pipeline like in generate_tags.py
         generator = pipeline(
             "text-generation",
             model="meta-llama/Llama-3.1-8B-Instruct",
-            torch_dtype=torch.float16,
-            device_map="auto" if device != "mps" else None,
-            device=0 if device == "cuda" else (device if device != "auto" else None),
+            torch_dtype=torch_dtype,
+            device_map=device_map,
+            device=pipeline_device,
             max_new_tokens=1000,
             temperature=0.3,
             do_sample=True,
@@ -1190,24 +1199,31 @@ def get_relevant_benchmarks_for_prompt(prompt: str, max_benchmarks: int = 1, exi
         
         print(f"   🔄 Loading Llama-3.1-8B-Instruct pipeline...")
         
-        # Check device availability
-        if torch.backends.mps.is_available():
-            device = "mps"
-            print("   📱 Using MPS device")
-        elif torch.cuda.is_available():
-            device = "cuda"
+        device_kind = resolve_default_device()
+        device_obj = resolve_device(device_kind)
+        if device_kind == "cuda" and torch.cuda.is_available():
             print("   🚀 Using CUDA device")
+        elif device_kind == "mps":
+            print("   📱 Using MPS device")
         else:
-            device = "cpu"
             print("   💻 Using CPU device")
-        
+
+        torch_dtype = preferred_dtype(device_kind)
+        device_map = "auto" if device_kind == "cuda" else None
+        if device_kind == "cuda":
+            pipeline_device = 0
+        elif device_kind == "mps":
+            pipeline_device = device_obj
+        else:
+            pipeline_device = -1
+
         # Initialize the pipeline
         generator = pipeline(
             "text-generation",
             model="meta-llama/Llama-3.1-8B-Instruct",
-            torch_dtype=torch.float16,
-            device_map="auto" if device != "mps" else None,
-            device=0 if device == "cuda" else (device if device != "auto" else None),
+            torch_dtype=torch_dtype,
+            device_map=device_map,
+            device=pipeline_device,
             max_new_tokens=1000,
             temperature=0.3,
             do_sample=True,

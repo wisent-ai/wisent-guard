@@ -45,6 +45,7 @@ from wisent_guard.core.optuna.steering import data_utils, metrics
 from wisent_guard.core.response import Response
 from wisent_guard.core.steering_methods.dac import DAC
 from wisent_guard.core.task_interface import get_task
+from wisent_guard.core.utils.device import empty_device_cache, preferred_dtype, resolve_default_device, resolve_device
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class OptimizationConfig:
     """Configuration for dataset-agnostic optimization pipeline."""
 
     model_name: str = "realtreetune/rho-1b-sft-GSM8K"
-    device: str = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
+    device: str = field(default_factory=resolve_default_device)
 
     train_dataset: str = "gsm8k"
     val_dataset: str = "gsm8k"
@@ -185,7 +186,7 @@ class OptimizationPipeline:
 
     def __init__(self, config: OptimizationConfig):
         self.config = config
-        self.device = torch.device(config.device)
+        self.device = resolve_device(config.device)
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
         # Setup output directories
@@ -269,11 +270,11 @@ class OptimizationPipeline:
         # Load model with memory optimizations (same as comprehensive evaluation)
         self.model = AutoModelForCausalLM.from_pretrained(
             self.config.model_name,
-            torch_dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
-            device_map={"": 0} if self.device.type == "cuda" else None,
+            torch_dtype=preferred_dtype(self.device.type),
             low_cpu_mem_usage=True,
         )
 
+        self.model.to(self.device)
         self.model.eval()  # Set to evaluation mode
 
         if self.tokenizer.pad_token is None:
@@ -661,8 +662,7 @@ class OptimizationPipeline:
                     _ = self.model(**inputs)
             finally:
                 handle.remove()
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                empty_device_cache(self.device.type)
 
             if batch_activations:
                 batch_tensor = batch_activations[0]
@@ -1620,10 +1620,7 @@ class OptimizationPipeline:
             self.wandb_run = None
 
         # Clean up device memory
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        elif torch.backends.mps.is_available():
-            torch.mps.empty_cache()
+        empty_device_cache(self.device.type)
 
         import gc
 

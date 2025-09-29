@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 from typing import TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.atoms import AtomContrastivePairSet
+from wisent_guard.core.contrastive_pairs.diagnostics import DiagnosticsConfig, DiagnosticsReport, run_all_diagnostics
 
 if TYPE_CHECKING:
     from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair 
@@ -14,6 +16,9 @@ if TYPE_CHECKING:
 __all__ = [
     "ContrastivePairSet",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,6 +34,11 @@ class ContrastivePairSet(AtomContrastivePairSet):
     name: str
     pairs: list[ContrastivePair] = field(default_factory=list)
     task_type: Optional[str] = None
+    _last_diagnostics: DiagnosticsReport | None = field(init=False, default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.pairs:
+            self._last_diagnostics = self.validate(raise_on_critical=False)
 
     def add(self, pair: ContrastivePair) -> None:
         """Append a pair with an assert for correctness.
@@ -83,3 +93,42 @@ class ContrastivePairSet(AtomContrastivePairSet):
             "task_type": self.task_type,
             "example_pair": repr(self.pairs[0]) if self.pairs else None,
         }
+
+    def run_diagnostics(self, config: DiagnosticsConfig | None = None) -> DiagnosticsReport:
+        """Execute registered diagnostics for this pair set.
+
+        Args:
+            config: Optional diagnostics configuration overrides.
+
+        Returns:
+            DiagnosticsReport capturing metric summaries and issues.
+        """
+
+        return run_all_diagnostics(self.pairs, config)
+
+    def validate(
+        self,
+        config: DiagnosticsConfig | None = None,
+        raise_on_critical: bool = True,
+    ) -> DiagnosticsReport:
+        """Run diagnostics and optionally raise when critical issues are detected."""
+
+        report = self.run_diagnostics(config)
+
+        for issue in report.issues:
+            log_method = logger.error if issue.severity == "critical" else logger.warning
+            log_method(
+                "[%s diagnostics] %s (pair_index=%s, details=%s)",
+                issue.metric,
+                issue.message,
+                issue.pair_index,
+                issue.details,
+            )
+
+        if raise_on_critical and report.has_critical_issues:
+            raise ValueError("Contrastive pair diagnostics found critical issues; see logs for specifics.")
+
+        logger.info("Contrastive pair diagnostics summary for %s: %s", self.name, report.summary)
+
+        self._last_diagnostics = report
+        return report
