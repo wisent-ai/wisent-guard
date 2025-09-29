@@ -175,8 +175,10 @@ class LogLikelihoodsEvaluator:
 
             # Map token aggregation to activation method
             activation_method = token_aggregation
+            # Handle both string and enum types
+            method_name = activation_method.value if hasattr(activation_method, 'value') else str(activation_method)
             logger.info(
-                f"🎯 Using activation aggregation method: {activation_method.value} (from token_aggregation: {token_aggregation})"
+                f"🎯 Using activation aggregation method: {method_name} (from token_aggregation: {token_aggregation})"
             )
 
             # Evaluate classifier on each sample
