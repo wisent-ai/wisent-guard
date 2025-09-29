@@ -205,7 +205,7 @@ class WisentModel:
 
         example:
             >>> with wm.detached():
-            ...     txt = wm.generate("Plain run", use_steering=False)[0]
+            ...     txt = wm.generate([[{"role": "user", "content": "Plain run"}]], use_steering=False)[0]
         """
         self.detach()
         try:

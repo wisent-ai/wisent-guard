@@ -50,25 +50,8 @@ caa_method = steering_rot._method # Ugly access to the method instance, fix late
 print(f"Using steering method: {steering_method_name}")
 
 # 8. Create a WisentModel instance (replace with your actual model initialization)
-PATH_TO_YOUR_MODEL = "meta-llama/Llama-3.2-1B"  # Replace with your model path or name
+PATH_TO_YOUR_MODEL = "meta-llama/Llama-3.2-1B-Instruct"  # Replace with your model path or name
 model = WisentModel(model_name=PATH_TO_YOUR_MODEL, layers={}, device="cuda")
-
-# 8.1 Unforunately, Llama-3.2-1B does not have a proper chat template, so we set it manually here. We will support this in the model definition later.
-style = """
-{%- set msgs = messages -%}
-{{- bos_token -}}
-{%- if msgs and msgs[0]['role'] == 'system' -%}
-{{ "<|start_header_id|>system<|end_header_id|>\n\n" + (msgs[0]['content'] | trim) + "<|eot_id|>" }}
-{%- set msgs = msgs[1:] -%}
-{%- endif -%}
-{%- for m in msgs -%}
-{{ "<|start_header_id|>" + m['role'] + "<|end_header_id|>\n\n" + (m['content'] | trim) + "<|eot_id|>" }}
-{%- endfor -%}
-{%- if add_generation_prompt -%}
-{{ "<|start_header_id|>assistant<|end_header_id|>\n\n" }}
-{%- endif -%}
-"""
-model.tokenizer.chat_template = style
 
 # 9. Create a WisentSteeringTrainer instance
 training_data = data['train_qa_pairs']
