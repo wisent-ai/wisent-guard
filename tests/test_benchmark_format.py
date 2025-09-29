@@ -1,8 +1,8 @@
 from lm_eval.tasks import get_task_dict
 
 # Load task
-tasks = get_task_dict(["winogrande"])
-anli_task = tasks["winogrande"]
+tasks = get_task_dict(["aime"])
+anli_task = tasks["aime"]
 
 # Try different splits in order: validation, test, train
 docs = []
@@ -52,7 +52,7 @@ for key in docs[0].keys():
     print(f"{key} type: {type(docs[0].get(key))}")
 
 # Display first few examples
-for i, doc in enumerate(docs[:20]):
+for i, doc in enumerate(docs[:15]):
     print(f"\n--- EXAMPLE {i+1} ---")
     print(f"All fields: {list(doc.keys())}")
 

@@ -200,7 +200,7 @@ if __name__ == "__main__":
     model = Model(name=MODEL_NAME)
     result = load_train_test_lm_eval_format(
         model=model,
-        task_name="swag",
+        task_name="mutual",
         split_ratio=0.8,
         seed=42,
         limit=10,
@@ -212,6 +212,8 @@ if __name__ == "__main__":
     for i, pair in enumerate(result["qa_pairs"].pairs[:3]):  # Show first 3 pairs
         print(f"\n--- Pair {i+1} ---")
         print(f"Prompt: {pair.prompt}")
+        print(f"Positive reponse: {pair.positive_response.model_response}")
+        print(f"Negative response: {pair.negative_response.model_response}")
 
 
     

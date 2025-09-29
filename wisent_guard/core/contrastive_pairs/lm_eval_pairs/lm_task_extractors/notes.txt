@@ -1,0 +1,53 @@
+1.Benchmarks which before were handled via separate task, not lm-eval:
+*SuperGPQA
+*SuperGPQA Biology
+*SuperGPQA Chemistry
+*SuperGPQA Physics
+
+2.Benchmarks which are group tasks
+*ANLI
+*LAMBADA
+*GPQA: (Diamond COT, Diamond, Extended COT, Extended, Main COT, Main)
+
+
+3.Benchmarks where you have to add _en to the name to load it (in english):
+*PAWS-X
+*HeadQA
+*MeadQA
+*XNLI
+*XWinograd
+
+Do we load them, for example do we load xnli_en?
+
+4.Arithmetics:
+(wisent_3_11) bc@bc:~/Desktop/Documents/wisent-guard$ python -m lm_eval --tasks list | grep -i "arithmetic"
+|arithmetic                                      |
+|arithmetic_1dc                                                                        |lm_eval/tasks/arithmetic/arithmetic_1dc.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_2da                                                                        |lm_eval/tasks/arithmetic/arithmetic_2da.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_2dm                                                                        |lm_eval/tasks/arithmetic/arithmetic_2dm.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_2ds                                                                        |lm_eval/tasks/arithmetic/arithmetic_2ds.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_3da                                                                        |lm_eval/tasks/arithmetic/arithmetic_3da.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_3ds                                                                        |lm_eval/tasks/arithmetic/arithmetic_3ds.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_4da                                                                        |lm_eval/tasks/arithmetic/arithmetic_4da.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_4ds                                                                        |lm_eval/tasks/arithmetic/arithmetic_4ds.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_5da                                                                        |lm_eval/tasks/arithmetic/arithmetic_5da.yaml                                                                                                                    |loglikelihood        |
+|arithmetic_5ds                                                                        |lm_eval/tasks/arithmetic/arithmetic_5ds.yaml                                                                                                                    |loglikelihood        |
+
+You can't load arithetic (alone arithmetic, without _xyz). Do we load these 10 benchmarks one by one?
+
+5.Question: "Num+1 like benchmarks" for example GSM8K, its format is:
+
+--- EXAMPLE 15 ---
+All fields: ['question', 'answer']
+Formatted question: Question: In a dance class of 20 students, 20% enrolled in contemporary dance, 25% of the remaining enrolled in jazz dance, and the rest enrolled in hip-hop dance. What percentage of the entire students enrolled in hip-hop dance?
+Answer:
+question: In a dance class of 20 students, 20% enrolled in contemporary dance, 25% of the remaining enrolled in jazz dance, and the rest enrolled in hip-hop dance. What percentage of the entire students enrolled in hip-hop dance? (type: <class 'str'>)
+answer: There are 20 x 20/100 = <<20*20/100=4>>4 students who enrolled in contemporary dance.
+So, 20 - 4 = <<20-4=16>>16 students are enrolled in either jazz or hip-hop dance.
+There are 16 x 25/100 = <<16*25/100=4>>4 students who enrolled in jazz dance.
+Hence, 16 - 4 = <<16-4=12>>12 students enrolled in hip-hop dance.
+This is 12/20 x 100% = 60% of the entire students.
+#### 60 (type: <class 'str'>)
+
+Before, we just extracted number after #### as a correct and add 1 to get incorrect. Do we continue in this fashion?
+Notice this is text generation evaluation benchmark.
