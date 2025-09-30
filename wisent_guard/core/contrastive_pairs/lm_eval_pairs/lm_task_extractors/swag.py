@@ -80,10 +80,7 @@ class SWAGExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = endings[label]
-            for i, ending in enumerate(endings):
-                if i != label: 
-                    incorrect = ending
-                    break
+            incorrect = endings[(label+1)%len(endings)]
 
             question = f"{startphrase}"
             formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"

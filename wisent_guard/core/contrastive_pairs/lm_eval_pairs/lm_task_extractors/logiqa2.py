@@ -82,10 +82,7 @@ class LogiQA2Extractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = options[answer]
-            for i, option in enumerate(options):
-                if i != answer: 
-                    incorrect = option
-                    break
+            incorrect = options[(answer+1)%len(options)]
 
             question = f"{question}"
             formatted_question = f"Passage: {text}\nQuestion: {question}\nA. {incorrect}\nB. {correct}"

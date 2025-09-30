@@ -4,10 +4,14 @@
 *SuperGPQA Chemistry
 *SuperGPQA Physics
 
+wywalic
+
 2.Benchmarks which are group tasks
 *ANLI
 *LAMBADA
 *GPQA: (Diamond COT, Diamond, Extended COT, Extended, Main COT, Main)
+
+to do
 
 
 3.Benchmarks where you have to add _en to the name to load it (in english):

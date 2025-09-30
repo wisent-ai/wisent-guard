@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import Any, TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
@@ -11,12 +12,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["HellaSwagExtractor"]
+__all__ = ["QASPERExtractor"]
 _LOG = setup_logger(__name__)
 
 
-class HellaSwagExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the HellaSwag benchmark."""
+class QASPERExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the QASPER benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +25,16 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from HellaSwag docs.
+        Build contrastive pairs from QASPER docs.
 
-        HellaSwag schema:
-            - query: str
-            - endings: list of str
-            - label: index of correct ending, str
-        
+        Race schema:
+            - title: str
+            - abstract: str
+            - question: str
+            - answer: str
+            
         Args:
-            lm_eval_task_data: lm-eval task instance for HellaSwag.
+            lm_eval_task_data: lm-eval task instance for QASPER.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,38 +58,38 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid HellaSwag pairs extracted", extra={"task": task_name})
+            log.warning("No valid QA4MRE pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single Hellaswag doc into a ContrastivePair, if possible.
+        Convert a single QASPER doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
-            query = str(doc.get("query", "")).strip()
-            endings = doc.get("endings", [])
-            label = str(doc.get("label", "")).strip()
-            label = int(label)
-
-            if not query or not endings or not (0 <= label < len(endings)):
+            title = str(doc.get("title", "")).strip()
+            abstract = str(doc.get("abstract", "")).strip()
+            question = str(doc.get("question", "")).strip()
+            answer = str(doc.get("answer", "")).strip()
+          
+            if not title or not abstract or not question or not answer:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
-            
-            correct = endings[label]
-            incorrect = endings[(label+1)%len(endings)]
-                
-            question = f"{query}"
-            formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"
+
+
+            formatted_question = f"TITLE: {title}\nABSTRACT: {abstract}\nQ: {question}\nA. yes\nB. no"
+
+            correct = answer
+            incorrect = yes if answer == "no" else "no"
 
             metadata = {
-                "label": "hellaswag",
+                "label": "qasper",
             }
 
             return self._build_pair(

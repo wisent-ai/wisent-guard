@@ -82,10 +82,7 @@ class MutualExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = options[answer_idx]
-            for i, answer in enumerate(options):
-                if i != answer_idx: 
-                    incorrect = answer
-                    break
+            incorrect = options[(answer_idx+1)%len(options)]
         
             formatted_question = (f"{article}\nA. {incorrect}\nB. {correct}")
 

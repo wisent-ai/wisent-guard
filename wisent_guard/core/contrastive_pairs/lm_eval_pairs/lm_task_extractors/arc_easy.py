@@ -83,10 +83,7 @@ class Arc_EasyExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = choices[answer_idx]
-            for i, choice in enumerate(choices):
-                if i != answer_idx: 
-                    incorrect = choice
-                    break
+            incorrect = choices[(answer_idx+1)%len(choices)]
 
             question = f"{question}"
             formatted_question = f"Question: {question}\nA. {incorrect}\nB. {correct}"

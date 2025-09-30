@@ -81,10 +81,7 @@ class HeadQAExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = answers[answer_idx]
-            for i, answer in enumerate(answers):
-                if i != answer_idx: 
-                    incorrect = answer
-                    break
+            incorrect = answers[(answer_idx+1)%len(answers)]
         
             formatted_question = f"Question: {qtext}\nAnswer:\nA. {incorrect}\nB. {correct}"
 

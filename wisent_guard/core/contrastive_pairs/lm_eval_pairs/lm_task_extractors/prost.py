@@ -82,10 +82,7 @@ class PROSTExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = answers[label]
-            for i, answer in enumerate(answers):
-                if i != label: 
-                    incorrect = answer
-                    break
+            incorrect = answers[(label+1)%len(answers)]
 
             formatted_question = f"{context}\nQuestion: {question}\nAnswer:\nA. {incorrect}\nB. {correct}"
 

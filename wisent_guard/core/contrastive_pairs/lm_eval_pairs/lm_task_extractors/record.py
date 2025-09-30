@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import Any, TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
@@ -11,12 +12,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["HellaSwagExtractor"]
+__all__ = ["ReCoRDExtractor"]
 _LOG = setup_logger(__name__)
 
 
-class HellaSwagExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the HellaSwag benchmark."""
+class ReCoRDExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the ReCoRD benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +25,16 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from HellaSwag docs.
+        Build contrastive pairs from ReCoRD docs.
 
-        HellaSwag schema:
+        ReCoRD schema:
+            - paassage: str
             - query: str
-            - endings: list of str
-            - label: index of correct ending, str
-        
+            - entities: list 
+            - answers: list 
+            
         Args:
-            lm_eval_task_data: lm-eval task instance for HellaSwag.
+            lm_eval_task_data: lm-eval task instance for ReCoRD.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,38 +58,44 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid HellaSwag pairs extracted", extra={"task": task_name})
+            log.warning("No valid ReCoRD pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single Hellaswag doc into a ContrastivePair, if possible.
+        Convert a single ReCoRD doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
+            passage = str(doc.get("passage", "")).strip()
             query = str(doc.get("query", "")).strip()
-            endings = doc.get("endings", [])
-            label = str(doc.get("label", "")).strip()
-            label = int(label)
+            entities = doc.get("entities", [])
+            answers = doc.get("answers", [])
 
-            if not query or not endings or not (0 <= label < len(endings)):
+            if not passage or not query or not entities or not answers:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
             
-            correct = endings[label]
-            incorrect = endings[(label+1)%len(endings)]
-                
-            question = f"{query}"
-            formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"
+            correct = answers[0]
+            incorrect = None
+            for entity in entities:
+                if entity not in answers:
+                    incorrect = entity
+                    break
+
+            # Remove @highlight prefix
+            passage = passage.replace('@highlight', '')
+
+            formatted_question = f"Passage: {passage}\n\nQuery: {query}\nWhich option correctly completes the sentence at @placeholder?\nA. {incorrect}\nB. {correct}"
 
             metadata = {
-                "label": "hellaswag",
+                "label": "record",
             }
 
             return self._build_pair(

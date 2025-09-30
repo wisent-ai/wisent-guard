@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import Any, TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
@@ -11,12 +12,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["HellaSwagExtractor"]
+__all__ = ["DROPExtractor"]
 _LOG = setup_logger(__name__)
 
 
-class HellaSwagExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the HellaSwag benchmark."""
+class DROPExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the DROP benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +25,15 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from HellaSwag docs.
+        Build contrastive pairs from DROP docs.
 
-        HellaSwag schema:
-            - query: str
-            - endings: list of str
-            - label: index of correct ending, str
-        
+        DROP schema:
+            - paassage: str
+            - question: str
+            - answers: list of lists
+            
         Args:
-            lm_eval_task_data: lm-eval task instance for HellaSwag.
+            lm_eval_task_data: lm-eval task instance for DROP.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,38 +57,53 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid HellaSwag pairs extracted", extra={"task": task_name})
+            log.warning("No valid DROP pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single Hellaswag doc into a ContrastivePair, if possible.
+        Convert a single DROP doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
-            query = str(doc.get("query", "")).strip()
-            endings = doc.get("endings", [])
-            label = str(doc.get("label", "")).strip()
-            label = int(label)
+            passage = str(doc.get("passage", "")).strip()
+            question = str(doc.get("question", "")).strip()
+            answers = doc.get("answers")
+            answer = answers[0]
 
-            if not query or not endings or not (0 <= label < len(endings)):
+            if not passage or not question or not answer:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
             
-            correct = endings[label]
-            incorrect = endings[(label+1)%len(endings)]
-                
-            question = f"{query}"
-            formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"
+            correct = answer[0]
+
+            # Generate incorrect answer
+            try:
+                # Try to convert to number
+                num = float(correct)
+                # Check if it's an integer
+                if num.is_integer():
+                    incorrect = str(int(num) + 1)
+                else:
+                    incorrect = str(num + 1)
+            except ValueError:
+                # It's a string, shuffle the letters
+                letters = list(correct)
+                random.shuffle(letters)
+                incorrect = ''.join(letters)
+                if correct == incorrect:
+                    incorrect += "k"
+
+            formatted_question = f"{passage} {question}\nA. {incorrect}\nB. {correct}"
 
             metadata = {
-                "label": "hellaswag",
+                "label": "drop",
             }
 
             return self._build_pair(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import Any, TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
@@ -11,12 +12,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["HellaSwagExtractor"]
+__all__ = ["XWinograd"]
 _LOG = setup_logger(__name__)
 
 
-class HellaSwagExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the HellaSwag benchmark."""
+class XWinogradExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the XWinograd benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +25,16 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from HellaSwag docs.
+        Build contrastive pairs from XWinograd docs.
 
-        HellaSwag schema:
-            - query: str
-            - endings: list of str
-            - label: index of correct ending, str
-        
+        XWinograd schema:
+            - sentence: str
+            - option1: str
+            - option2: str
+            - answer: str
+            
         Args:
-            lm_eval_task_data: lm-eval task instance for HellaSwag.
+            lm_eval_task_data: lm-eval task instance for XWinograd.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,38 +58,37 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid HellaSwag pairs extracted", extra={"task": task_name})
+            log.warning("No valid XWinograd pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single Hellaswag doc into a ContrastivePair, if possible.
+        Convert a single XWinograd doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
-            query = str(doc.get("query", "")).strip()
-            endings = doc.get("endings", [])
-            label = str(doc.get("label", "")).strip()
-            label = int(label)
+            sentence = str(doc.get("sentence", "")).strip()
+            options = [str(doc.get("option1", "")).strip(), str(doc.get("option2", "")).strip()]
+            answer = str(doc.get("answer", "")).strip()
+            answer = int(answer) - 1
 
-            if not query or not endings or not (0 <= label < len(endings)):
+            if not sentence or not options or answer not in {0, 1}:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
             
-            correct = endings[label]
-            incorrect = endings[(label+1)%len(endings)]
-                
-            question = f"{query}"
-            formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"
+            correct = options[answer]
+            incorrect = options[(answer+1)%len(options)]
+
+            formatted_question = f"Fill in the blank: {sentence}\nA. {incorrect}\nB. {correct}"
 
             metadata = {
-                "label": "hellaswag",
+                "label": "xwinograd",
             }
 
             return self._build_pair(

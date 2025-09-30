@@ -83,10 +83,7 @@ class Social_IQAExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = answers[label]
-            for i, answer in enumerate(answers):
-                if i != label: 
-                    incorrect = answer
-                    break
+            incorrect = answers[(label+1)%len(answers)]
 
             formatted_question = f"Q: {context} {question}\nA:\nA. {incorrect}\nB. {correct}"
 

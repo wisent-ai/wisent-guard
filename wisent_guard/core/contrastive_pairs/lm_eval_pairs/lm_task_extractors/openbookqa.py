@@ -83,10 +83,7 @@ class OpenBookQAExtractor(LMEvalBenchmarkExtractor):
                 return None
             
             correct = endings[answer_idx]
-            for i, ending in enumerate(endings):
-                if i != answer_idx: 
-                    incorrect = ending
-                    break
+            incorrect = endings[(answer_idx+1)%len(endings)]
 
             question = f"{question_stem}"
             formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+import ast
 from typing import Any, TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
@@ -11,12 +13,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["HellaSwagExtractor"]
+__all__ = ["RaceExtractor"]
 _LOG = setup_logger(__name__)
 
 
-class HellaSwagExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the HellaSwag benchmark."""
+class RaceExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the Race benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +26,14 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from HellaSwag docs.
+        Build contrastive pairs from Race docs.
 
-        HellaSwag schema:
-            - query: str
-            - endings: list of str
-            - label: index of correct ending, str
-        
+        Race schema:
+            - article: str
+            - problems: str 
+            
         Args:
-            lm_eval_task_data: lm-eval task instance for HellaSwag.
+            lm_eval_task_data: lm-eval task instance for Race.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,38 +57,45 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid HellaSwag pairs extracted", extra={"task": task_name})
+            log.warning("No valid Race pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single Hellaswag doc into a ContrastivePair, if possible.
+        Convert a single Race doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
-            query = str(doc.get("query", "")).strip()
-            endings = doc.get("endings", [])
-            label = str(doc.get("label", "")).strip()
-            label = int(label)
+            article = str(doc.get("article", "")).strip()
+            problems = doc.get("problems", "")
+            try:
+                problems = ast.literal_eval(problems)
+            except Exception as e:
+                print(f"Failed to parse problems: {e}")
 
-            if not query or not endings or not (0 <= label < len(endings)):
+            if not article or not problems:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
             
-            correct = endings[label]
-            incorrect = endings[(label+1)%len(endings)]
-                
-            question = f"{query}"
-            formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"
+            problem = problems[0]
+            question = problem["question"]
+            options = problem["options"]
+            answer = problem["answer"]
+            answer_idx = int(ord(answer) - ord("A"))
+
+            correct = options[answer_idx]
+            incorrect = options[(answer_idx+1)%len(options)]
+
+            formatted_question = f"{article}\nQuestion: {question}?\nAnswer:\nA. {correct}\nB. {incorrect}"
 
             metadata = {
-                "label": "hellaswag",
+                "label": "race",
             }
 
             return self._build_pair(

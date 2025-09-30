@@ -11,12 +11,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["HellaSwagExtractor"]
+__all__ = ["MedQAExtractor"]
 _LOG = setup_logger(__name__)
 
 
-class HellaSwagExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the HellaSwag benchmark."""
+class MedQAExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the MedQA benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +24,15 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from HellaSwag docs.
+        Build contrastive pairs from MedQA docs.
 
-        HellaSwag schema:
-            - query: str
-            - endings: list of str
-            - label: index of correct ending, str
-        
+        MedQA schema:
+            - sent1: str
+            - ending0, ending1, ending2, ending3: str
+            - label: 0 or 1 or 2 or 3
+            
         Args:
-            lm_eval_task_data: lm-eval task instance for HellaSwag.
+            lm_eval_task_data: lm-eval task instance for MedQA.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,38 +56,37 @@ class HellaSwagExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid HellaSwag pairs extracted", extra={"task": task_name})
+            log.warning("No valid MedQA pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single Hellaswag doc into a ContrastivePair, if possible.
+        Convert a single MedQA doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
-            query = str(doc.get("query", "")).strip()
-            endings = doc.get("endings", [])
-            label = str(doc.get("label", "")).strip()
-            label = int(label)
+            sent1 = str(doc.get("sent1", "")).strip()
+            endings = [str(doc.get("ending0", "")).strip(), str(doc.get("ending1", "")).strip(), str(doc.get("ending2", "")).strip(), str(doc.get("ending3", "")).strip()]
+            label = doc.get("label")
 
-            if not query or not endings or not (0 <= label < len(endings)):
+            if not sent1 or not endings or label not in {0, 1, 2, 3}:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
             
+            labels = {0: "entailment", 1: "neutral", 2: "contradiction"}
             correct = endings[label]
-            incorrect = endings[(label+1)%len(endings)]
-                
-            question = f"{query}"
-            formatted_question = f"{question}\nA. {incorrect}\nB. {correct}"
+            incorrect = endings[(label+1)%4]
+            
+            formatted_question = f"Question:{sent1}\nA. {incorrect}\nB. {correct}"
 
             metadata = {
-                "label": "hellaswag",
+                "label": "medqa",
             }
 
             return self._build_pair(
