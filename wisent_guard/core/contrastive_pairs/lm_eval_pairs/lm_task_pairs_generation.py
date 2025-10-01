@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.lm_eval_pairs.lm_extractor_registry import get_extractor
-from wisent_guard.cli_bricks.cli_logger import setup_logger, bind
+from wisent_guard.cli.cli_logger import setup_logger, bind
 
 if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask

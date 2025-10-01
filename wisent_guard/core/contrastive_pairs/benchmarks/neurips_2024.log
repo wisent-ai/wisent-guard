@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  1 OCT 2025 13:37
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian) (preloaded format=pdflatex 2025.9.11)  1 OCT 2025 13:45
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -815,13 +815,13 @@ Overfull \hbox (12.62721pt too wide) in paragraph at lines 371--386
 pdfTeX warning (ext4): destination with the same identifier (name{appendix.B}) has been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.399 \section{GSM8K Pipeline Visualization}
+l.391 \section{GSM8K Pipeline Visualization}
                                             
-LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 411.
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 403.
  (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )
-Overfull \hbox (36.37228pt too wide) in paragraph at lines 441--442
+Overfull \hbox (36.37228pt too wide) in paragraph at lines 433--434
  [] 
  []
 

@@ -12,6 +12,11 @@ import torch
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
 from wisent_guard.core.contrastive_pairs.core.set import ContrastivePairSet
 
+__all__ = [
+    "save_contrastive_pair_set",
+    "load_contrastive_pair_set",
+]
+
 
 class VectorPayload(dict[str, bool | str | list[int]]):
     """A dictionary with metadata and base64-encoded binary data for a tensor/array."""

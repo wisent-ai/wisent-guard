@@ -10,7 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from wisent_guard.cli_bricks.cli_benchmarks import AVAILABLE_BENCHMARKS
+from wisent_guard.cli.cli_benchmarks import AVAILABLE_BENCHMARKS
 
 # Configuration matching our MPS fix testing
 MODEL = "meta-llama/Llama-3.1-8B-Instruct"

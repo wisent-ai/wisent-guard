@@ -8,9 +8,11 @@ from wisent_guard.core.contrastive_pairs.core.response import NegativeResponse, 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    
-    from wisent_guard.core.contrastive_pairs.core.atoms import RawActivationMap, LayerActivations
+    from wisent_guard.core.activations.core.atoms import LayerActivations, RawActivationMap
 
+__all__ = [
+    "ContrastivePair",
+]
 
 @dataclass(frozen=True, slots=True)
 class ContrastivePair(AtomContrastivePair):
