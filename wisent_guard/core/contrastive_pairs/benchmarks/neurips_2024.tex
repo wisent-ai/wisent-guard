@@ -1,0 +1,447 @@
+\documentclass{article}
+\usepackage{neurips_2024}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage[table]{xcolor}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{longtable, ragged2e}
+\usepackage{comment}
+
+\definecolor{lightgreen}{rgb}{0.8,1,0.8}
+\definecolor{lightred}{rgb}{1,0.8,0.8}
+
+\title{Wisent Guard: A General Framework for Reliable Representation Identification and Representation Steering}
+
+\author{%
+  Lukasz Bartoszcze\thanks{Use footnote for providing further information
+    about author (webpage, alternative address)---\emph{not} for acknowledging
+    funding agencies.} \\
+  Wisent AI \\
+  \texttt{lukasz.bartoszcze@wisent.ai} \\
+}
+
+\author{%
+  Jan Piotrowski\thanks{Use footnote for providing further information
+    about author (webpage, alternative address)---\emph{not} for acknowledging
+    funding agencies.} \\
+  Wisent AI \\
+  \texttt{lukasz.bartoszcze@wisent.ai} \\
+}
+
+\author{%
+  Jakub Towarek\thanks{Use footnote for providing further information
+    about author (webpage, alternative address)---\emph{not} for acknowledging
+    funding agencies.} \\
+  Wisent AI \\
+  \texttt{lukasz.bartoszcze@wisent.ai} \\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  Representation engineering is a powerful method for identifying and modifying high-level concepts within the internal layers of large language models. Despite its potential, real-life deployments of activation steering remain difficult. We present Wisent-Guard, a flexible, open-source framework for monitoring and steering internal activations of large language models. Practical applications of the framework show 95 percent hallucination reduction, 25 percent improvement in coding ability and deep personalization capabilities. 
+\end{abstract}
+
+\section{Introduction}
+
+Large language models, with billions of parameters and Internet-scale training dataset, have displayed significant capabilities across a wide range of tasks, such as writing, coding or reasoning. However, their internal mechanisms of generating the next token cannot be precisely explained, with interactions between layers and parameters increasing in complexity as the size of these models increases. 
+
+Experiments with representation engineering (also known as steering or activation steering) have shown activation modification to be a powerful method of identifying and influencing high-level concepts (representations) within the layers of an LLM. Despite strong empirical performance on selected truthfulness, safety or personalization tasks, representation engineering methods lack a universal formulation and a unifying framework for understanding the underlying phenomenon, comparing methods and applying them to new problems. 
+
+We propose Wisent-Guard, a modular framework for analyzing the internal mechanisms within a large language model and influencing them to improve performance and individual alignment. 
+
+\section{Representation Engineering Problem}
+
+We formulate the \textbf{Representation Engineering Problem} as the following: 
+
+For a given model M and a Representation 
+
+
+\section{Representation Reading Functionalities}
+
+\subsection{Classifier}
+
+\subsection{Detection Handling Method}
+
+\section{Representation Control Functionalities}
+
+% References
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+\appendix
+
+\section{Wisent Guard Primitives}
+
+\subsection{Model}
+
+\subsection{Contrastive Pair}
+
+\subsection{Activations}
+
+\subsection{Activation Collection Method}
+
+\subsection{Additional Utilities}
+
+\section{Representation Reading Functionalities}
+
+\subsection{Classifier}
+
+\subsection{Detection Handling Method}
+
+\section{Representation Control Functionalities}
+
+
+\section{Ablation}
+
+\appendix
+
+\section{All supported benchmarks}
+
+This section enumerates all benchmarks used in our study, the task traits, the evaluation protocol, and the contrastive pair generation method applied to produce minimally perturbed negative targets. We first merged the \emph{coding} and \emph{mathematics} benchmark lists you provided and then appended them to the original master list.
+
+% Updated definitions with bracketed abbreviations used in the table
+
+\subsection*{Contrastive pair generation methods (definitions)}
+\begin{description}
+  \item[Reading Comprehension Abstention Swap \textnormal{[RC-Abstain]}] For extractive/open-domain RC: positive is the gold span; negative is an abstention (e.g., ``Not provided in the text.''). If gold is \emph{No answer}, the negative is a confident but wrong claim.
+  \item[Conversational Reading Comprehension Abstention \textnormal{[ConvRC-Abstain]}] As RC-Abstain, but with dialogue context (CoQA). Negatives are generic abstentions; yes/no items are flipped when applicable.
+  \item[Language Modeling Corrupted Continuation \textnormal{[LM-CorruptCont]}] Language modeling: positive is the true continuation; negative is a corrupted continuation (local shuffles/randomization) to break coherence.
+  \item [Text Generation Corruption \textnormal{[TG-Corrupt]}] Text generation: positive is true continuation, negative is shuffling postive if it is string and adding letter if shuffle results in identity, +1 if positive is number.
+  \item[Two-Choice Flip \textnormal{[2C-Flip]}] Two-option tasks (PIQA, COPA, WinoGrande, CB): negative is simply the other option.
+  \item[Multichoice First Distractor \textnormal{[MC-FirstDistr]}] Multi-choice tasks: If one list is provided then negative is the first incorrect option that comes after correct option, if the correct option is last, use the first option. If separate list with incorrect answers is provided, take first from the list. (deterministic).
+  \item[Multichoice Random Distractor \textnormal{[MC-RandDistr]}] Multi-choice tasks: negative is a randomly chosen incorrect option from the same set.
+  \item[Exact Match Partial Mask \textnormal{[EM-PartialMask]}] Exact-match free-form answers (HLE-EM): negative is the gold text with partial token masking (approximately 1/3 words, or partial masking for single-word answers).
+  \item[Keyword-Preserving Token Deletion \textnormal{[KP-Del]}] Coding tasks: negative program created by deleting non-keyword tokens while preserving syntax-critical keywords; aims to remain plausible but fail unit tests.
+  \item[Numeric Offset (+1) Perturbation \textnormal{[Num+1]}] Negative is the correct numeric answer offset by a small integer (typically +1); for non-integer answers, apply the minimal unit offset.
+  \item[Summary Content-Polarity Flip \textnormal{[Summ-PolFlip]}] Code to text summarization: make a negative description by flipping key action words with simple opposites or adding “not” (e.g., “return” to “does not return”, “add” to “remove”), while keeping the rest of the sentence the same.
+  \item [Library Specific Flip \textnormal{[Lib-Spec-Filip]}] Coding tasks: negative program created by flipping functions, parameters (e.g. for numpy flip axis 0 to 1, for pandas flip mean() to sum()).
+  \item [Logic inversion \textnormal{[Log-Inv]}] Coding tasks: negative program created by fliping bools, operators in code (e.g. return True to return False, <= to >=).
+  \item [Offset (+-1) \textnormal{[+-1]}] Coding tasks: negative program created by adding/subtracting 1 from range or numeric value.
+  \item [Replace empty \textnormal{[Empty]}] Coding tasks: negative program created by replacing string to empty string, list to empty list.
+  \item [Generic incorrect continuation \textnormal{[Gen-Inc-Cont]}] Answer generation tasks: negative is created by generic incorrect answer.
+  \item [Early return \textnormal{[Return]}] Coding tasks: negative program created by early return.
+\end{description}
+
+\subsection*{Evaluation types (definitions)}
+\begin{description}
+  \item[Log-likelihood option scoring \textnormal{[LL]}] The model scores each provided option/target by conditional log-probability given the prompt. Metrics typically compute accuracy over the highest-likelihood choice (MC tasks) or compare likelihoods of gold vs.\ negative targets.
+  \item[Text generation string matching \textnormal{[TG]}] The model generates free-form text (or a number), which is then judged by task-specific metrics (e.g., exact match on numerical value for GSM8K/MATH; span/string matching for RC tasks; structured checks for DROP). Used also for CoT/generative GPQA variants and HLE-Exact-Match.
+  \item[Perplexity (language modeling) \textnormal{[PPL]}] The model’s next-token distribution is evaluated over a reference text to compute Perplexity (lower is better). Used for language-modeling corpora like WikiText.
+  \item[Code execution against unit tests \textnormal{[CE]}] The model generates code, which is executed in a sandbox against unit tests provided by a dataset (e.g., pass@1). Applies to HumanEval/MBPP/APPS, MultiPL-E, DS-1000, LiveCodeBench, etc.
+\end{description}
+
+
+% ----- Color + shorthand setup -----
+\definecolor{catRC}{HTML}{E3F2FD}      % Reading/Open-Domain QA
+\definecolor{catReason}{HTML}{E0F2F1}  % Multi-choice Reasoning
+\definecolor{catExam}{HTML}{FFF3E0}    % Exams & Knowledge Tests
+\definecolor{catMath}{HTML}{E8F5E9}    % Mathematics
+\definecolor{catCode}{HTML}{F3E5F5}    % Coding
+\definecolor{catOther}{HTML}{ECEFF1}   % Other (Truthfulness/NLI/LM)
+
+\newcommand{\LL}{[LL]}   % Log-likelihood option scoring
+\newcommand{\TG}{[TG]}   % Text generation (string match)
+\newcommand{\PPL}{[PPL]} % Perplexity
+\newcommand{\CE}{[CE]}   % Code execution against unit tests
+
+% Small colored square for legend
+% replace your \legendSquare macro with this
+\newcommand{\legendSquare}[1]{%
+  \begingroup
+  \setlength{\fboxsep}{0pt}% no inner padding
+  \fcolorbox{black!30}{#1}{\phantom{\rule{9pt}{9pt}}}% invisible content sets size
+  \endgroup
+}
+
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.12}
+
+% ======================== TABLE ========================
+\begin{longtable}{p{0.32\textwidth} p{0.12\textwidth} p{0.24\textwidth} p{0.26\textwidth}}
+\caption{Benchmarks (short names), evaluation abbreviations, contrastive method (short), and traits. Versions merged where applicable.}
+\label{tab:benchmarks-colored-short-cm}\\
+\hline
+\textbf{Benchmark} & \textbf{Eval} & \textbf{Method [CM]} & \textbf{Traits} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Benchmark} & \textbf{Eval} & \textbf{Method [CM]} & \textbf{Traits} \\
+\hline
+\endhead
+
+% ===== Reading & Open-Domain QA =====
+\rowcolor{catRC} DROP \cite{dua2019drop} & \TG & \textbf{TG-Corrupt} & reading comprehension \\
+\rowcolor{catRC} ReCoRD \cite{zhang2018record} & \TG & \textbf{MC-FirstDistr} & reading comprehension \\
+\rowcolor{catRC} SQuAD2 \cite{rajpurkar2018squad2} & \TG & \textbf{RC-Abstain} & reading comprehension \\
+\rowcolor{catRC} WebQuestions \cite{berant2013webquestions} & \TG & \textbf{TG-Corrupt} & factual QA \\
+%\rowcolor{catRC} Natural Questions \cite{kwiatkowski2019naturalquestions} & \TG & \textbf{RC-Abstain} & factual QA \\
+\rowcolor{catRC} TriviaQA \cite{joshi2017triviaqa} & \TG & \textbf{TG-Corrupt} & factual QA \\
+\rowcolor{catRC} CoQA \cite{reddy2019coqa} & \TG & \textbf{TG-Corrupt} & conversational RC \\
+\rowcolor{catRC} BoolQ \cite{clark2019boolq} & \LL & \textbf{2C-Flip} & boolean RC \\
+\rowcolor{catRC} Race \cite{lai2017race} & \LL & \textbf{MC-FirstDistr}  & reading comprehension \\
+\rowcolor{catRC} QA4MRE \cite{penas2013qa4mre} & \LL & \textbf{MC-FirstDistr} & reading comprehension \\
+\rowcolor{catRC} QASPER \cite{dasigi2021qasper} & \TG & \textbf{2C-Flip} & scientific QA \\
+%\rowcolor{catRC} QuAC \cite{choi2018quac} & \TG & \textbf{ConvRC-Abstain} & conversational QA \\
+\rowcolor{catRC} MultiRC \cite{khashabi2018multirc} & \LL & \textbf{2C-Flip} & multi-sentence reasoning \\
+\rowcolor{catRC} XStoryCloze \cite{lin2021xstorycloze} & \LL & \textbf{MC-FirstDistr} & commonsense \\
+\rowcolor{catRC} LogiQA \cite{liu2020logiqa} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
+\rowcolor{catRC} LogiQA2 \cite{liu2023logiqa2} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
+\rowcolor{catRC} WSC \cite{levesque2011wsc} & \LL & \textbf{2C-Flip} & reading comprehension \\
+\rowcolor{catRC} RTE & \LL & \textbf{2C-Flip} & reading comprehension \\
+
+% ===== Multi-choice Reasoning =====
+\rowcolor{catReason} XWinograd \cite{tikhonov2021xwinograd} & \LL & \textbf{MC-FirstDistr} & commonsense \\
+\rowcolor{catReason} WinoGrande \cite{sakaguchi2019winogrande} & \LL & \textbf{2C-Flip} & commonsense \\
+\rowcolor{catReason} PIQA \cite{bisk2019piqa} & \LL & \textbf{2C-Flip} & commonsense \\
+\rowcolor{catReason} COPA \cite{roemmele2011copa} & \LL & \textbf{2C-Flip} & causal reasoning \\
+\rowcolor{catReason} HellaSwag \cite{zellers2019hellaswag} & \LL & \textbf{MC-FirstDistr} & commonsense \\
+\rowcolor{catReason} SWAG \cite{zellers2018swag} & \LL & \textbf{MC-FirstDistr} & commonsense \\
+\rowcolor{catReason} OpenBookQA \cite{mihaylov2018openbookqa} & \LL & \textbf{MC-FirstDistr} & science MCQ \\
+\rowcolor{catReason} ARC Easy \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
+\rowcolor{catReason} ARC Challenge \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
+%\rowcolor{catReason} AI2 ARC \cite{clark2018arc} & \LL & \textbf{MC-FirstDistr} & science reasoning \\
+%\rowcolor{catReason} AGIEval LogiQA EN \cite{zhong2023agieval} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
+%\rowcolor{catReason} AGIEval LogiQA ZH \cite{zhong2023agieval} & \LL & \textbf{MC-FirstDistr} & logical reasoning \\
+%\rowcolor{catReason} WSC273 \cite{levesque2012wsc} & \LL & \textbf{2C-Flip} & commonsense reasoning \\
+\rowcolor{catReason} MC-TACO \cite{zhou2019mctaco} & \LL & \textbf{2C-Flip} & temporal reasoning \\
+\rowcolor{catReason} Social IQA \cite{sap2019socialiqa} & \LL & \textbf{MC-FirstDistr} & social reasoning \\
+\rowcolor{catReason} PROST \cite{arocaouellette2021prost} & \LL & \textbf{MC-FirstDistr} & physical reasoning \\
+\rowcolor{catReason} Mutual \cite{cui2020mutual} & \LL & \textbf{MC-FirstDistr} & dialogue reasoning \\
+
+% ===== Exams & Knowledge Tests =====
+%\rowcolor{catExam} MMLU \cite{hendrycks2021mmlu} & \LL & \textbf{MC-FirstDistr} & multi-subject exams \\
+%\rowcolor{catExam} SuperGPQA \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
+%\rowcolor{catExam} SuperGPQA Biology \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
+%\rowcolor{catExam} SuperGPQA Chemistry \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
+%\rowcolor{catExam} SuperGPQA Physics \cite{du2025supergpqa} & \LL & \textbf{MC-FirstDistr} & expert STEM exams \\
+\rowcolor{catExam} HLE \cite{phan2025hle} & \TG/\LL & \textbf{EM-PartialMask; MC-FirstDistr} & expert exams \\
+\rowcolor{catExam} HLE Exact Match \cite{phan2025hle} & \TG & \textbf{EM-PartialMask} & expert exams \\
+\rowcolor{catExam} HLE Multiple Choice \cite{phan2025hle} & \LL & \textbf{MC-FirstDistr} & expert exams \\
+%\rowcolor{catExam} MMMLU \cite{} & \LL & \textbf{MC-FirstDistr} & multilingual knowledge \\
+\rowcolor{catExam} TruthfulQA MC1 \cite{lin2021truthfulqa} & \LL & \textbf{MC-FirstDistr} & truthfulness \\
+\rowcolor{catExam} TruthfulQA MC2 \cite{lin2021truthfulqa} & \LL & \textbf{MC-FirstDistr} & truthfulness \\
+\rowcolor{catExam} TruthfulQA Gen \cite{lin2021truthfulqa} & \TG & \textbf{MC-FirstDistr} & truthfulness \\
+\rowcolor{catExam} PubMedQA \cite{jin2019pubmedqa} & \LL &  & biomedical QA \\
+\rowcolor{catExam} SciQ \cite{welbl2017sciQ} & \LL & \textbf{MC-FirstDistr} & science MCQ \\
+%\rowcolor{catExam} Hendrycks Ethics \cite{hendrycks2020ethics} & \LL & \textbf{MC-FirstDistr} & moral reasoning \\
+\rowcolor{catExam} HeadQA \cite{vilares2019headqa} & \LL & \textbf{MC-FirstDistr} & healthcare QA \\
+\rowcolor{catExam} MedQA \cite{jin2020medqa} & \LL & \textbf{MC-FirstDistr} & medical QA \\
+%\rowcolor{catExam} GPQA Diamond CoT Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
+%\rowcolor{catExam} GPQA Diamond Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
+%\rowcolor{catExam} GPQA Extended CoT Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
+%\rowcolor{catExam} GPQA Extended Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
+%\rowcolor{catExam} GPQA Main CoT Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
+%\rowcolor{catExam} GPQA Main Zeroshot \cite{rein2023gpqa} & \LL/\TG & \textbf{MC-RandDistr} & expert STEM exams \\
+
+
+% ===== Mathematics (versions merged) =====
+\rowcolor{catMath} GSM8K \cite{cobbe2021gsm8k} & \TG & \textbf{Num+1} & mathematics \\
+\rowcolor{catMath} ASDiv \cite{miao2021asdiv} & \TG & \textbf{Num+1} & mathematics \\
+\rowcolor{catMath} Arithmetic 1dc & \TG & \textbf{Num+1} & mathematics \\
+\rowcolor{catMath} Arithmetic 2da & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 2dm & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 2ds & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 3da & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 3ds & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 4da & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 4ds & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 5da & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Arithmetic 5ds & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} MATH \cite{hendrycks2021math} & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} MATH\textendash500 & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} AIME & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} AIME2024 & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} AIME2025 & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} HMMT & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} HMMT Feb 2025 & \TG & \textbf{Num+1} & mathematics (contest) \\
+\rowcolor{catMath} PolyMath \cite{wang2025polymath} & \TG & \textbf{Num+1} & multilingual mathematics \\
+\rowcolor{catMath} Polymath EN Medium \cite{wang2025polymath} & \TG & \textbf{Num+1} & mathematics (olympiad) \\
+\rowcolor{catMath} Polymath ZH Medium \cite{wang2025polymath} & \TG & \textbf{Num+1} & mathematics (olympiad) \\
+\rowcolor{catMath} Polymath EN High \cite{wang2025polymath} & \TG & \textbf{Num+1} & mathematics (olympiad) \\
+\rowcolor{catMath} Polymath ZH High \cite{wang2025polymath} & \TG & \textbf{Num+1} & mathematics (olympiad) \\
+\rowcolor{catMath} LiveMathBench \cite{liu2024livemathbench} & \TG & \textbf{Num+1} & mathematics \\
+\rowcolor{catMath} LiveMathBench CNMO EN \cite{liu2024livemathbench} & \TG & \textbf{Num+1} & mathematics \\
+\rowcolor{catMath} LiveMathBench CNMO ZH \cite{liu2024livemathbench} & \TG & \textbf{Num+1} & mathematics \\
+%\rowcolor{catMath} Hendrycks MATH \cite{hendrycks2021math} & \TG & \textbf{Num+1} & mathematics (contest) \\
+%\rowcolor{catMath} Math QA \cite{amini2019mathqa} & \TG & \textbf{MC-FirstDistr} & mathematics \\
+%\rowcolor{catMath} MGSM \cite{shi2022mgsm} & \TG & \textbf{Num+1} & multilingual mathematics \\
+
+% ===== Coding =====
+\rowcolor{catCode} MBPP \cite{austin2021program} & \CE & \textbf{+-1; Empty; Return} & coding (Python) \\
+\rowcolor{catCode} MBPP+ \cite{liu2023evalplus} & \CE & \textbf{+-1; Empty; Return} & coding (Python) \\
+\rowcolor{catCode} HumanEval \cite{chen2021evaluating} & \CE & \textbf{Log-Inv; +-1} & coding (Python) \\
+\rowcolor{catCode} HumanEval+ \cite{liu2023evalplus} & \CE & \textbf{Log-Inv; +-1} & coding (Python) \\
+\rowcolor{catCode} HumanEvalPack \cite{muennighoff2023octopack} & \CE & \textbf{Log-Inv; +-1} & coding (multi-language) \\
+\rowcolor{catCode} InstructHumanEval & \CE & \textbf{Log-Inv; +-1} & coding (Python) \\
+\rowcolor{catCode} CoNaLa \cite{yin2018conala} & \CE & \textbf{KP-Del} & coding (Python) \\
+\rowcolor{catCode} CONCODE \cite{iyer2018mapping} & \CE & \textbf{KP-Del} & coding (Java) \\
+\rowcolor{catCode} Mercury \cite{du2024mercury} & \CE & \textbf{Log-Inv; +-1} & coding (multi-language) \\
+\rowcolor{catCode} APPS \cite{hendrycks2021apps} & \CE & \textbf{KP-Del} & coding (Python) \\
+\rowcolor{catCode} DS\textendash1000 \cite{lai2022ds1000} & \CE & \textbf{Lib-Spec-Flip} & coding (Python) \\
+\rowcolor{catCode} ReCode \cite{wang2022recode} & \CE & \textbf{Log-Inv; +-1} & coding (Python) \\
+\rowcolor{catCode} LiveCodeBench \cite{jain2024livecodebench} & \CE & \textbf{KP-Del} & coding (Python) \\
+\rowcolor{catCode} Multiple CPP \cite{cassano2022multipl-e} & \CE &  & coding (C++) \\
+\rowcolor{catCode} Multiple Go \cite{cassano2022multipl-e} & \CE &  & coding (Go) \\
+\rowcolor{catCode} Multiple Java \cite{cassano2022multipl-e} & \CE &  & coding (Java) \\
+\rowcolor{catCode} Multiple JS \cite{cassano2022multipl-e} & \CE &  & coding (JavaScript) \\
+\rowcolor{catCode} Multiple PY \cite{cassano2022multipl-e} & \CE &  & coding (Python) \\
+\rowcolor{catCode} Multiple RS \cite{cassano2022multipl-e} & \CE &  & coding (Rust) \\
+\rowcolor{catCode} CodeXGLUE Code to Text Python \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
+\rowcolor{catCode} CodeXGLUE Code to Text Go \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
+\rowcolor{catCode} CodeXGLUE Code to Text Java \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
+\rowcolor{catCode} CodeXGLUE Code to Text JavaScript \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
+\rowcolor{catCode} CodeXGLUE Code to Text PHP \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
+\rowcolor{catCode} CodeXGLUE Code to Text Ruby \cite{lu2021codexglue} & \TG & \textbf{Summ-PolFlip} & coding (code-to-text) \\
+
+% ===== Other =====
+\rowcolor{catOther} CB \cite{demarneffe2019commitmentbank} & \LL & \textbf{MC-FirstDistr} & NLI \\
+%\rowcolor{catOther} WikiText \cite{merity2016pointersentinel} & \PPL & \textbf{LM-CorruptCont} & language modeling \\
+\rowcolor{catOther} MRPC \cite{dolan2005mrpc} & \LL & \textbf{2C-Flip} & paraphrase detection \\
+\rowcolor{catOther} QNLI & \LL & \textbf{2C-Flip} & NLI \\
+\rowcolor{catOther} QQP & \LL & \textbf{2C-Flip} & paraphrase detection \\
+\rowcolor{catOther} SST2 \cite{socher2013sst} & \LL & \textbf{2C-Flip} & sentiment analysis \\
+\rowcolor{catOther} WNLI & \LL & \textbf{2C-Flip} & NLI \\
+\rowcolor{catOther} WiC \cite{pilehvar2019wic} & \LL & \textbf{2C-Flip} & word-in-context \\
+%\rowcolor{catOther} ANLI \cite{nie2020anli} & \LL & \textbf{MC-FirstDistr} & NLI \\
+%\rowcolor{catOther} BLIMP \cite{warstadt2020blimp} & \LL &  & linguistic knowledge \\
+%\rowcolor{catOther} Toxigen \cite{hartvigsen2022toxigen} & \LL &  & toxicity detection \\
+%\rowcolor{catOther} Crows Pairs \cite{nangia2020crows} & \LL &  & bias measurement \\
+\rowcolor{catOther} PAWS-X \cite{yang2019pawsx} & \LL & \textbf{2C-Flip} & paraphrase detection \\
+%\rowcolor{catOther} Unscramble & \TG &  & word unscrambling \\
+%\rowcolor{catOther} LAMBADA \cite{paperno2016lambada} & \LL &  & language modeling \\
+%\rowcolor{catOther} LAMBADA Cloze \cite{paperno2016lambada} & \LL &  & language modeling \\
+%\rowcolor{catOther} LAMBADA Multilingual \cite{paperno2016lambada} & \LL &  & multilingual LM \\
+%\rowcolor{catOther} LAMBADA Standard Cloze YAML \cite{paperno2016lambada} & \LL &  & language modeling \\
+%\rowcolor{catOther} Belebele \cite{bandarkar2023belebele} & \LL & \textbf{MC-firstDistr} & multilingual RC \\
+%\rowcolor{catOther} XCOPA \cite{ponti2020xcopa} & \LL & \textbf{2C-Flip} & cross-lingual reasoning \\
+\rowcolor{catOther} XNLI \cite{conneau2018xnli} & \LL & \textbf{MC-FirstDistr} & NLI \\
+
+%\rowcolor{catOther} BIG-Bench \cite{srivastava2022bigbench} & \LL/\TG & \textbf{MC-FirstDistr; Gen-Inc-Cont} & comprehensive evaluation \\
+
+\hline
+\end{longtable}
+
+% --- Legend layout: LEFT = Category legend + Abbreviation legend (stacked),
+%                     RIGHT = Method [CM] codes.
+% Assumes category colors (catRC, catReason, ...) are defined.
+% If not already defined, use this safer square (no black interior):
+% \newcommand{\legendSquare}[1]{\begingroup\setlength{\fboxsep}{0pt}\fcolorbox{black!30}{#1}{\phantom{\rule{9pt}{9pt}}}\endgroup}
+
+\vspace{-0.6em}
+\noindent
+\begin{minipage}[t]{0.48\linewidth}
+\textbf{Category legend}\\[3pt]
+\begin{tabular}{@{}ll@{}}
+\legendSquare{catRC}     & RC/ODQA \\
+\legendSquare{catReason} & Multi-choice Reasoning \\
+\legendSquare{catExam}   & Exams \& Knowledge Tests \\
+\legendSquare{catMath}   & Mathematics \\
+\legendSquare{catCode}   & Coding \\
+\legendSquare{catOther}  & Other \\
+\end{tabular}
+
+%\begin{comment}
+
+\vspace{8pt}
+\textbf{Abbreviation legend}\\[3pt]
+\begin{tabular}{@{}ll@{}}
+\texttt{[LL]}  & Log-likelihood option scoring \\
+\texttt{[TG]}  & Text generation (string match) \\
+\texttt{[PPL]} & Perplexity (LM) \\
+\texttt{[CE]}  & Code execution vs.\ unit tests \\
+\end{tabular}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}
+\textbf{Method [CM] codes}\\[3pt]
+\begin{tabular}{@{}ll@{}}
+RC-Abstain      & RC abstention swap \\
+ConvRC-Abstain  & Conversational RC abstention \\
+LM-CorruptCont  & LM corrupted continuation \\
+2C-Flip         & Two-choice flip \\
+MC-FirstDistr   & First distractor (MC) \\
+MC-RandDistr    & Random distractor (MC) \\
+MC-LetterSwap   & Letter swap (MC) \\
+Bool-Flip       & Boolean flip \\
+EM-PartialMask  & Exact-match partial mask \\
+KP-Del          & Keyword-preserving deletion \\
+Summ-WordDrop   & Summary word drop \\
+Num+1           & Numeric offset (+1) \\
+\end{tabular}
+
+%\end{comment}
+
+\end{minipage}
+
+
+
+
+
+
+
+
+
+\section{GSM8K Pipeline Visualization}
+
+\centering
+\begin{tikzpicture}[
+  box/.style={rectangle, draw, fill=catMath, text width=15cm, align=center, minimum height=2cm, font=\small},
+  arrow/.style={->, very thick, line width=2pt},
+]
+
+% Pipeline steps
+\node[box] (load) at (0,0) {\textbf{1. Load task using lm-eval-harness} \\
+\begin{tabular}{@{}p{2cm}p{12cm}@{}}
+\textbf{question:} & Janet's ducks lay 16 eggs per day. She eats 3 for breakfast and bakes 4 into muffins. She sells the remainder for \$2 per egg. How much does she make daily? \\
+\textbf{answer:} & ``Janet has 16 - 3 - 4 = 9 eggs left to sell. She makes 9 × \$2 = \$18 per day. 18''
+\end{tabular}};
+
+\node[box, below=1cm of load.south, anchor=north] (split) {\textbf{2. Split Data} \\ Partition the dataset into training and testing subsets based on the ratio provided by the user.};
+
+\node[box, below=1cm of split.south, anchor=north] (extract) {\textbf{3. Extract contrastive pairs, Num+1 method} \\
+\begin{tabular}{@{}p{2cm}p{12cm}@{}}
+\textbf{Positive prompt:} & ``Janet's ducks lay 16 eggs per day. She eats 3 for breakfast and bakes 4 into muffins. She sells the remainder for \$2 per egg. How much does she make daily? 18'' \\
+\textbf{Negative prompt:} & ``Janet's ducks lay 16 eggs per day. She eats 3 for breakfast and bakes 4 into muffins. She sells the remainder for \$2 per egg. How much does she make daily? 19.0''
+\end{tabular}};
+
+\node[box, below=1cm of extract.south, anchor=north] (collect) {\textbf{4. Collect activations} \\ Get activations for positive and negative prompts.};
+
+\node[box, below=1cm of collect.south, anchor=north] (prepare) {\textbf{5. Prepare data for training classifier} \\ The dataset contains features derived from activations by averaging them across the sequence, and binary labels (0 = truthful, 1 = untruthful).};
+
+\node[box, below=1cm of prepare.south, anchor=north] (train) {\textbf{6. Train classifier} \\ Fit a logistic regression model using the data defined above.};
+
+\node[box, below=1cm of train.south] (eval1) {\textbf{Ground truth and classifier evaluation} \\ Ground truth evaluation usses lm-eval-harness to measure the model's actual performance by comparing generated responses against correct answers. Classifier evaluation tests how accurately the trained classifier can distinguish between truthful and untruthful responses based solely on internal activations, validating the effectiveness of our
+  truthfulness detection system.};
+%\node[box, below right=1.5cm and 2cm of train.south] (eval2) {\textbf{7B. Classifier Eval} \\ Classifier: 3.33\%};
+
+% Arrows between ALL blocks - simple and consistent
+\draw[arrow] (load.south) -- (split.north);
+\draw[arrow] (split.south) -- (extract.north);
+\draw[arrow] (extract.south) -- (collect.north);
+\draw[arrow] (collect.south) -- (prepare.north);
+\draw[arrow] (prepare.south) -- (train.north);
+\draw[arrow] (train.south) -- (eval1.north);
+
+
+\end{tikzpicture}
+
+\textit{Figure: GSM8K evaluation pipeline showing data flow from task loading through dual evaluation.}
+
+\newpage
+
+\end{document}

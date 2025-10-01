@@ -1,8 +1,8 @@
 from lm_eval.tasks import get_task_dict
 
 # Load task
-tasks = get_task_dict(["truthfulqa_mc2"])
-anli_task = tasks["truthfulqa_mc2"]
+tasks = get_task_dict(["wikitext"])
+task = tasks["wikitext"]
 
 # Try different splits in order: validation, test, train
 docs = []
@@ -10,7 +10,7 @@ split_used = None
 
 # Try validation split first
 try:
-    docs = list(anli_task.validation_docs())
+    docs = list(task.validation_docs())
     if docs:
         split_used = "validation"
 except:
@@ -19,7 +19,7 @@ except:
 # If no validation data, try test split
 if not docs:
     try:
-        docs = list(anli_task.test_docs())
+        docs = list(task.test_docs())
         if docs:
             split_used = "test"
     except:
@@ -28,7 +28,7 @@ if not docs:
 # If no test data, try train split
 if not docs:
     try:
-        docs = list(anli_task.training_docs())
+        docs = list(task.training_docs())
         if docs:
             split_used = "train"
     except:
@@ -37,7 +37,7 @@ if not docs:
 # Check if we have any data
 if not docs:
     print("❌ No data found in any split (validation, test, train)")
-    print(f"Available methods: {[method for method in dir(anli_task) if 'docs' in method]}")
+    print(f"Available methods: {[method for method in dir(task) if 'docs' in method]}")
     exit(1)
 
 print(f"Dataset loaded: {len(docs)} samples from {split_used} split")
@@ -52,13 +52,13 @@ for key in docs[0].keys():
     print(f"{key} type: {type(docs[0].get(key))}")
 
 # Display first few examples
-for i, doc in enumerate(docs[:50]):
+for i, doc in enumerate(docs[:10]):
     print(f"\n--- EXAMPLE {i+1} ---")
     print(f"All fields: {list(doc.keys())}")
 
     # Try to extract formatted question using doc_to_text if available
-    if hasattr(anli_task, "doc_to_text"):
-        question = anli_task.doc_to_text(doc)
+    if hasattr(task, "doc_to_text"):
+        question = task.doc_to_text(doc)
         print(f"Formatted question: {question}")
 
     for key, value in doc.items():

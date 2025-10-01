@@ -48,4 +48,9 @@ EXTRACTORS: dict[str, str] = {
     "xwinograd_en": f"{base_import}xwinograd:XWinogradExtractor",
     "truthfulqa_mc1": f"{base_import}truthfulqa_mc1:TruthfulQA_MC1Extractor",
     "truthfulqa_mc2": f"{base_import}truthfulqa_mc2:TruthfulQA_MC2Extractor",
+    "truthfulqa_gen": f"{base_import}truthfulqa_gen:TruthfulQA_GenExtractor",
+    "gsm8k": f"{base_import}gsm8k:GSM8KExtractor",
+    "asdiv": f"{base_import}asdiv:ASDivExtractor",
+    "arithmetic_1dc": f"{base_import}arithmetic:ArithmeticExtractor",
+    "arithmetic_2da": f"{base_import}arithmetic:ArithmeticExtractor", #8 more arithmetics benchmarks can be easily added using ArithmeticExtractor
     }

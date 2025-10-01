@@ -200,7 +200,7 @@ if __name__ == "__main__":
     model = Model(name=MODEL_NAME)
     result = load_train_test_lm_eval_format(
         model=model,
-        task_name="truthfulqa_mc2",
+        task_name="xnli_en",
         split_ratio=0.8,
         seed=42,
         limit=10,
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     )
     print(result)
     # Print first few pairs
-    for i, pair in enumerate(result["qa_pairs"].pairs[:3]): 
+    for i, pair in enumerate(result["qa_pairs"].pairs[:10]): 
         print(f"\n--- Pair {i+1} ---")
         print(f"Prompt: {pair.prompt}")
         print(f"Positive reponse: {pair.positive_response.model_response}")

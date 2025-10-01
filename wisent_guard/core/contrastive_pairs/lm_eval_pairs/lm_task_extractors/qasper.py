@@ -86,7 +86,7 @@ class QASPERExtractor(LMEvalBenchmarkExtractor):
             formatted_question = f"TITLE: {title}\nABSTRACT: {abstract}\nQ: {question}\nA. yes\nB. no"
 
             correct = answer
-            incorrect = yes if answer == "no" else "no"
+            incorrect = "yes" if answer == "no" else "no"
 
             metadata = {
                 "label": "qasper",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import Any, TYPE_CHECKING
 
 from wisent_guard.core.contrastive_pairs.core.pair import ContrastivePair
@@ -11,12 +12,12 @@ if TYPE_CHECKING:
     from lm_eval.api.task import ConfigurableTask
 
 
-__all__ = ["MedQAExtractor"]
+__all__ = ["ArithmeticExtractor"]
 _LOG = setup_logger(__name__)
 
 
-class MedQAExtractor(LMEvalBenchmarkExtractor):
-    """Extractor for the MedQA benchmark."""
+class ArithmeticExtractor(LMEvalBenchmarkExtractor):
+    """Extractor for the Arithmetic benchmark."""
 
     def extract_contrastive_pairs(
         self,
@@ -24,15 +25,14 @@ class MedQAExtractor(LMEvalBenchmarkExtractor):
         limit: int | None = None,
     ) -> list[ContrastivePair]:
         """
-        Build contrastive pairs from MedQA docs.
+        Build contrastive pairs from Arithmetic docs.
 
-        MedQA schema:
-            - sent1: str
-            - ending0, ending1, ending2, ending3: str
-            - label: 0 or 1 or 2 or 3
+        Arithmetic schema:
+            - context: str
+            - completion: str
             
         Args:
-            lm_eval_task_data: lm-eval task instance for MedQA.
+            lm_eval_task_data: lm-eval task instance for Arithmetic.
             limit: Optional maximum number of pairs to produce.
 
         Returns:
@@ -56,37 +56,36 @@ class MedQAExtractor(LMEvalBenchmarkExtractor):
 
         if not pairs:
             task_name = getattr(lm_eval_task_data, "NAME", type(lm_eval_task_data).__name__)
-            log.warning("No valid MedQA pairs extracted", extra={"task": task_name})
+            log.warning("No valid Arithmetic pairs extracted", extra={"task": task_name})
 
         return pairs
     
     def _extract_pair_from_doc(self, doc: dict[str, Any]) -> ContrastivePair | None:
         """
-        Convert a single MedQA doc into a ContrastivePair, if possible.
+        Convert a single Arithmetic doc into a ContrastivePair, if possible.
         Returns None when required fields are missing or malformed.
         """
         log = bind(_LOG, doc_id=doc.get("id", "unknown"))
 
         try:
-            sent1 = str(doc.get("sent1", "")).strip()
-            endings = [str(doc.get("ending0", "")).strip(), str(doc.get("ending1", "")).strip(), str(doc.get("ending2", "")).strip(), str(doc.get("ending3", "")).strip()]
-            label = doc.get("label")
+            context = str(doc.get("context", "")).strip()
+            completion = str(doc.get("completion", "")).strip()
 
-            if not sent1 or not endings or label not in {0, 1, 2, 3}:
+            if not context or not completion:
                 log.debug(
                     "Skipping doc due to missing/invalid fields",
                     extra={"doc": doc},
                 )
                 return None
-            
-            labels = {0: "entailment", 1: "neutral", 2: "contradiction"}
-            correct = endings[label]
-            incorrect = endings[(label+1)%3]
-            
-            formatted_question = f"Question:{sent1}\nA. {incorrect}\nB. {correct}"
+
+            correct = completion
+            incorrect_val = float(completion) + 1
+            incorrect = str(int(incorrect_val)) if incorrect_val == int(incorrect_val) else str(incorrect_val)
+
+            formatted_question = f"{context}\nA. {incorrect}\nB. {correct}"
 
             metadata = {
-                "label": "medqa",
+                "label": "arithmetic",
             }
 
             return self._build_pair(

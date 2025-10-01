@@ -1,0 +1,283 @@
+\begin{thebibliography}{10}
+
+\bibitem{arocaouellette2021prost}
+St{\'e}phane Aroca-Ouellette, Cory Paik, Alessandro Roncone, and Katharina Kann.
+\newblock Prost: Physical reasoning about objects through space and time.
+\newblock 2021.
+
+\bibitem{austin2021program}
+Jacob Austin, Augustus Odena, Maxwell Nye, Maarten Bosma, Henryk Michalewski, David Dohan, Ellen Jiang, Carrie Cai, Michael Terry, Quoc Le, and Charles Sutton.
+\newblock Program synthesis with large language models.
+\newblock {\em arXiv preprint arXiv:2108.07732}, 2021.
+
+\bibitem{berant2013webquestions}
+Jonathan Berant, Andrew Chou, Roy Frostig, and Percy Liang.
+\newblock Semantic parsing on freebase from question-answer pairs.
+\newblock In {\em Proceedings of the 2013 Conference on Empirical Methods in Natural Language Processing}, pages 1533--1544, Seattle, Washington, USA, 2013. Association for Computational Linguistics.
+
+\bibitem{bisk2019piqa}
+Yonatan Bisk, Rowan Zellers, Ronan Le~Bras, Jianfeng Gao, and Yejin Choi.
+\newblock Piqa: Reasoning about physical commonsense in natural language.
+\newblock {\em arXiv preprint arXiv:1911.11641}, 2019.
+
+\bibitem{cassano2022multipl-e}
+Federico Cassano, John Gouwar, Daniel Nguyen, Sydney Nguyen, Luna Phipps-Costin, Donald Pinckney, Ming-Ho Yee, Yangtian Zi, Carolyn~Jane Anderson, Molly~Q. Feldman, Arjun Guha, Michael Greenberg, and Abhinav Jangda.
+\newblock Multipl-e: A scalable and extensible approach to benchmarking neural code generation.
+\newblock {\em arXiv preprint arXiv:2208.08227}, 2022.
+
+\bibitem{chen2021evaluating}
+Mark Chen, Jerry Tworek, Heewoo Jun, Qiming Yuan, Henrique Ponde~de Oliveira~Pinto, Jared Kaplan, Harri Edwards, Yuri Burda, Nicholas Joseph, Greg Brockman, Alex Ray, Raul Puri, Gretchen Krueger, Michael Petrov, Heidy Khlaaf, Girish Sastry, Pamela Mishkin, Brooke Chan, Scott Gray, Nick Ryder, Mikhail Pavlov, Alethea Power, Lukasz Kaiser, Mohammad Bavarian, Clemens Winter, Philippe Tillet, Felipe~Petroski Such, Dave Cummings, Matthias Plappert, Fotios Chantzis, Elizabeth Barnes, Ariel Herbert-Voss, William~Hebgen Guss, Alex Nichol, Alex Paino, Nikolas Tezak, Jie Tang, Igor Babuschkin, Suchir Balaji, Shantanu Jain, William Saunders, Christopher Hesse, Andrew~N. Carr, Jan Leike, Josh Achiam, Vedant Misra, Evan Morikawa, Alec Radford, Matthew Knight, Miles Brundage, Mira Murati, Katie Mayer, Peter Welinder, Bob McGrew, Dario Amodei, Sam McCandlish, Ilya Sutskever, and Wojciech Zaremba.
+\newblock Evaluating large language models trained on code.
+\newblock 2021.
+
+\bibitem{clark2019boolq}
+Christopher Clark, Kenton Lee, Ming-Wei Chang, Tom Kwiatkowski, Michael Collins, and Kristina Toutanova.
+\newblock Boolq: Exploring the surprising difficulty of natural yes/no questions.
+\newblock {\em arXiv preprint arXiv:1905.10044}, 2019.
+
+\bibitem{clark2018arc}
+Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot, Ashish Sabharwal, Carissa Schoenick, and Oyvind Tafjord.
+\newblock Think you have solved question answering? try arc, the ai2 reasoning challenge.
+\newblock {\em arXiv preprint arXiv:1803.05457}, 2018.
+
+\bibitem{cobbe2021gsm8k}
+Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Jacob Hilton, Reiichiro Nakano, Christopher Hesse, John Schulman, Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plappert, and Jerry Tworek.
+\newblock Training verifiers to solve math word problems.
+\newblock {\em arXiv preprint arXiv:2110.14168}, 2021.
+
+\bibitem{conneau2018xnli}
+Alexis Conneau, Ruty Rinott, Guillaume Lample, Adina Williams, Samuel~R. Bowman, Holger Schwenk, and Veselin Stoyanov.
+\newblock Xnli: Evaluating cross-lingual sentence representations.
+\newblock 2018.
+
+\bibitem{cui2020mutual}
+Leyang Cui, Yu~Wu, Shujie Liu, Yue Zhang, and Ming Zhou.
+\newblock Mutual: A dataset for multi-turn dialogue reasoning.
+\newblock 2020.
+
+\bibitem{dasigi2021qasper}
+Pradeep Dasigi, Kyle Lo, Iz~Beltagy, Arman Cohan, Noah~A. Smith, and Matt Gardner.
+\newblock A dataset of information-seeking questions and answers anchored in research papers.
+\newblock {\em arXiv preprint arXiv:2105.03011}, 2021.
+
+\bibitem{demarneffe2019commitmentbank}
+Marie-Catherine de~Marneffe, Mandy Simons, and Judith Tonhauser.
+\newblock The commitmentbank: Investigating projection in naturally occurring discourse.
+\newblock In {\em Proceedings of Sinn und Bedeutung 23}, volume~2, pages 107--124, Bellaterra (Cerdanyola del Vall{\`e}s), 2019. Universitat Aut{\`o}noma de Barcelona.
+
+\bibitem{dolan2005mrpc}
+William~B. Dolan and Chris Brockett.
+\newblock Automatically constructing a corpus of sentential paraphrases.
+\newblock {\em Proceedings of the Third International Workshop on Paraphrasing (IWP 2005)}, 2005.
+
+\bibitem{du2024mercury}
+Mingzhe Du, Anh~Tuan Luu, Bin Ji, Liu Qian, and See-Kiong Ng.
+\newblock Mercury: A code efficiency benchmark for code llms.
+\newblock {\em arXiv preprint arXiv:2402.07844}, 2024.
+
+\bibitem{dua2019drop}
+Dheeru Dua, Yizhong Wang, Pradeep Dasigi, Gabriel Stanovsky, Sameer Singh, and Matt Gardner.
+\newblock Drop: A reading comprehension benchmark requiring discrete reasoning over paragraphs.
+\newblock {\em arXiv preprint arXiv:1903.00161}, 2019.
+
+\bibitem{hendrycks2021apps}
+Dan Hendrycks, Steven Basart, Saurav Kadavath, Mantas Mazeika, Akul Arora, Ethan Guo, Collin Burns, Samir Puranik, Horace He, Dawn Song, and Jacob Steinhardt.
+\newblock Measuring coding challenge competence with apps.
+\newblock {\em arXiv preprint arXiv:2105.09938}, 2021.
+
+\bibitem{iyer2018mapping}
+Srinivasan Iyer, Ioannis Konstas, Alvin Cheung, and Luke Zettlemoyer.
+\newblock Mapping language to code in programmatic context.
+\newblock {\em arXiv preprint arXiv:1808.09588}, 2018.
+
+\bibitem{jain2024livecodebench}
+Naman Jain, King Han, Alex Gu, Wen-Ding Li, Fanjia Yan, Tianjun Zhang, Sida Wang, Armando Solar-Lezama, Koushik Sen, and Ion Stoica.
+\newblock Livecodebench: Holistic and contamination free evaluation of large language models for code.
+\newblock {\em arXiv preprint arXiv:2403.07974}, 2024.
+
+\bibitem{jin2020medqa}
+Di~Jin, Eileen Pan, Nassim Oufattole, Wei-Hung Weng, Hanyi Fang, and Peter Szolovits.
+\newblock What disease does this patient have? a large-scale open domain question answering dataset from medical exams.
+\newblock {\em arXiv preprint arXiv:2009.13081}, 2020.
+
+\bibitem{jin2019pubmedqa}
+Qiao Jin, Bhuwan Dhingra, Zhengping Liu, William~W. Cohen, and Xinghua Lu.
+\newblock Pubmedqa: A dataset for biomedical research question answering.
+\newblock 2019.
+
+\bibitem{joshi2017triviaqa}
+Mandar Joshi, Eunsol Choi, Daniel Weld, and Luke Zettlemoyer.
+\newblock Triviaqa: A large scale distantly supervised challenge dataset for reading comprehension.
+\newblock In {\em Proceedings of the 55th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pages 1601--1611, Vancouver, Canada, 2017. Association for Computational Linguistics.
+
+\bibitem{khashabi2018multirc}
+Daniel Khashabi, Snigdha Chaturvedi, Michael Roth, Shyam Upadhyay, and Dan Roth.
+\newblock Looking beyond the surface: A challenge set for reading comprehension over multiple sentences.
+\newblock 2018.
+
+\bibitem{lai2017race}
+Guokun Lai, Qizhe Xie, Hanxiao Liu, Yiming Yang, and Eduard Hovy.
+\newblock Race: Large-scale reading comprehension dataset from examinations.
+\newblock {\em arXiv preprint arXiv:1704.04683}, 2017.
+
+\bibitem{lai2022ds1000}
+Yuhang Lai, Chengxi Li, Yiming Wang, Tianyi Zhang, Ruiqi Zhong, Luke Zettlemoyer, Scott Wen-tau Yih, Daniel Fried, Sida Wang, and Tao Yu.
+\newblock Ds-1000: A natural and reliable benchmark for data science code generation.
+\newblock {\em arXiv preprint arXiv:2211.11501}, 2022.
+
+\bibitem{levesque2011wsc}
+Hector~J. Levesque, Ernest Davis, and Leora Morgenstern.
+\newblock The winograd schema challenge.
+\newblock {\em arXiv preprint arXiv:1105.4590}, 2011.
+
+\bibitem{lin2021truthfulqa}
+Stephanie Lin, Jacob Hilton, and Owain Evans.
+\newblock Truthfulqa: Measuring how models mimic human falsehoods.
+\newblock {\em arXiv preprint arXiv:2109.07958}, 2021.
+
+\bibitem{lin2021xstorycloze}
+Xi~Victoria Lin, Todor Mihaylov, Mikel Artetxe, Tianlu Wang, Shuohui Chen, Daniel Simig, Myle Ott, Naman Goyal, Shruti Bhosale, Jingfei Du, Ramakanth Pasunuru, Sam Shleifer, Punit~Singh Koura, Vishrav Chaudhary, Brian O'Horo, Jeff Wang, Luke Zettlemoyer, Zornitsa Kozareva, Mona~T. Diab, Veselin Stoyanov, and Xian Li.
+\newblock Few-shot learning with multilingual language models.
+\newblock {\em arXiv preprint arXiv:2112.10668}, 2021.
+
+\bibitem{liu2023logiqa2}
+Hanmeng Liu, Jian Liu, Leyang Cui, Zhiyang Teng, Nan Duan, Ming Zhou, and Yue Zhang.
+\newblock Logiqa 2.0—an improved dataset for logical reasoning in natural language understanding.
+\newblock {\em IEEE/ACM Transactions on Audio, Speech, and Language Processing}, 2023.
+
+\bibitem{liu2020logiqa}
+Jian Liu, Leyang Cui, Hanmeng Liu, Dandan Huang, Yile Wang, and Yue Zhang.
+\newblock Logiqa: A challenge dataset for machine reading comprehension with logical reasoning.
+\newblock {\em arXiv preprint arXiv:2007.08124}, 2020.
+
+\bibitem{liu2023evalplus}
+Jiawei Liu, Chunqiu~Steven Xia, Yuyao Wang, and Lingming Zhang.
+\newblock Is your code generated by chatgpt really correct? rigorous evaluation of large language models for code generation.
+\newblock In {\em NeurIPS 2023 Datasets and Benchmarks Track}, 2023.
+
+\bibitem{liu2024livemathbench}
+Junnan Liu, Hongwei Liu, Linchen Xiao, Ziyi Wang, Kuikun Liu, Songyang Gao, Wenwei Zhang, Songyang Zhang, and Kai Chen.
+\newblock Are your llms capable of stable reasoning?
+\newblock {\em arXiv preprint arXiv:2412.13147}, 2024.
+
+\bibitem{lu2021codexglue}
+Shuai Lu, Daya Guo, Shuo Ren, Junjie Huang, Alexey Svyatkovskiy, Ambrosio Blanco, Colin Clement, Dawn Drain, Daxin Jiang, Duyu Tang, Ge~Li, Lidong Zhou, Linjun Shou, Long Zhou, Michele Tufano, Ming Gong, Ming Zhou, Nan Duan, Neel Sundaresan, Shao~Kun Deng, Shengyu Fu, and Shujie Liu.
+\newblock Codexglue: A machine learning benchmark dataset for code understanding and generation.
+\newblock {\em arXiv preprint arXiv:2102.04664}, 2021.
+
+\bibitem{miao2021asdiv}
+Shen-Yun Miao, Chao-Chun Liang, and Keh-Yih Su.
+\newblock A diverse corpus for evaluating and developing english math word problem solvers.
+\newblock {\em arXiv preprint arXiv:2106.15772}, 2021.
+
+\bibitem{mihaylov2018openbookqa}
+Todor Mihaylov, Peter Clark, Tushar Khot, and Ashish Sabharwal.
+\newblock Can a suit of armor conduct electricity? a new dataset for open book question answering.
+\newblock In {\em Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing}. Association for Computational Linguistics, 2018.
+
+\bibitem{muennighoff2023octopack}
+Niklas Muennighoff, Qian Liu, Armel Zebaze, Qinkai Zheng, Binyuan Hui, Terry~Yue Zhuo, Swayam Singh, Xiangru Tang, Leandro von Werra, and Shayne Longpre.
+\newblock Octopack: Instruction tuning code large language models.
+\newblock {\em arXiv preprint arXiv:2308.07124}, 2023.
+
+\bibitem{penas2013qa4mre}
+Anselmo Pe{\~n}as, Eduard Hovy, Pamela Forner, Álvaro Rodrigo, Richard Sutcliffe, and Roser Morante.
+\newblock Qa4mre 2011–2013: Overview of question answering for machine reading evaluation.
+\newblock {\em CLEF 2013: Information Access Evaluation. Multilinguality, Multimodality, and Visualization}, 2013.
+
+\bibitem{phan2025hle}
+Long Phan, Alice Gatti, Ziwen Han, Nathaniel Li, and {et al.}
+\newblock Humanity's last exam.
+\newblock {\em arXiv preprint arXiv:2501.14249}, 2025.
+
+\bibitem{pilehvar2019wic}
+Mohammad~Taher Pilehvar and Jose Camacho-Collados.
+\newblock Wic: the word-in-context dataset for evaluating context-sensitive meaning representations.
+\newblock 2019.
+
+\bibitem{rajpurkar2018squad2}
+Pranav Rajpurkar, Robin Jia, and Percy Liang.
+\newblock Know what you don't know: Unanswerable questions for squad.
+\newblock {\em arXiv preprint arXiv:1806.03822}, 2018.
+
+\bibitem{reddy2019coqa}
+Siva Reddy, Danqi Chen, and Christopher~D. Manning.
+\newblock Coqa: A conversational question answering challenge.
+\newblock {\em arXiv preprint arXiv:1808.07042}, 2019.
+
+\bibitem{roemmele2011copa}
+Melissa Roemmele, Cosmin~Adrian Bejan, and Andrew~S. Gordon.
+\newblock Choice of plausible alternatives: An evaluation of commonsense causal reasoning.
+\newblock In {\em AAAI Spring Symposium on Logical Formalizations of Commonsense Reasoning}, Stanford, CA, 2011.
+
+\bibitem{sakaguchi2019winogrande}
+Keisuke Sakaguchi, Ronan Le~Bras, Chandra Bhagavatula, and Yejin Choi.
+\newblock Winogrande: An adversarial winograd schema challenge at scale.
+\newblock {\em arXiv preprint arXiv:1907.10641}, 2019.
+
+\bibitem{sap2019socialiqa}
+Maarten Sap, Hannah Rashkin, Derek Chen, Ronan Le~Bras, and Yejin Choi.
+\newblock Social iqa: Commonsense reasoning about social interactions.
+\newblock {\em arXiv preprint arXiv:1904.09728}, 2019.
+
+\bibitem{socher2013sst}
+Richard Socher, Alex Perelygin, Jean Wu, Jason Chuang, Christopher~D. Manning, Andrew~Y. Ng, and Christopher Potts.
+\newblock Recursive deep models for semantic compositionality over a sentiment treebank.
+\newblock 2013.
+
+\bibitem{tikhonov2021xwinograd}
+Alexey Tikhonov, Mikhail Ryabinin, Yuri Kuratov, and Thomas Wolf.
+\newblock It's all in the heads: Using attention heads as a baseline for cross-lingual transfer in commonsense reasoning.
+\newblock {\em arXiv preprint arXiv:2106.12066}, 2021.
+
+\bibitem{vilares2019headqa}
+David Vilares and Carlos G{\'o}mez-Rodr{\'i}guez.
+\newblock Head-qa: A healthcare dataset for complex reasoning.
+\newblock 2019.
+
+\bibitem{wang2022recode}
+Shiqi Wang, Zheng Li, Haifeng Qian, Chenghao Yang, Zijian Wang, Mingyue Shang, Varun Kumar, Samson Tan, Baishakhi Ray, Parminder Bhatia, Ramesh Nallapati, Murali~Krishna Ramanathan, Dan Roth, and Bing Xiang.
+\newblock Recode: Robustness evaluation of code generation models.
+\newblock {\em arXiv preprint arXiv:2212.10264}, 2022.
+
+\bibitem{wang2025polymath}
+Yiming Wang, Pei Zhang, Jialong Tang, Haoran Wei, Baosong Yang, Rui Wang, Chenshu Sun, Feitong Sun, Jiran Zhang, Junxuan Wu, Qiqian Cang, Yichang Zhang, Fei Huang, Junyang Lin, Fei Huang, and Jingren Zhou.
+\newblock Polymath: Evaluating mathematical reasoning in multilingual contexts.
+\newblock {\em arXiv preprint arXiv:2504.18428}, 2025.
+
+\bibitem{welbl2017sciQ}
+Johannes Welbl, Nelson~F. Liu, and Matt Gardner.
+\newblock Crowdsourcing multiple choice science questions.
+\newblock {\em arXiv preprint arXiv:1707.06209}, 2017.
+
+\bibitem{yang2019pawsx}
+Yinfei Yang, Yuan Zhang, Chris Tar, and Jason Baldridge.
+\newblock Paws-x: A cross-lingual adversarial dataset for paraphrase identification.
+\newblock 2019.
+
+\bibitem{yin2018conala}
+Pengcheng Yin, Bowen Deng, Edgar Chen, Bogdan Vasilescu, and Graham Neubig.
+\newblock Learning to mine aligned code and natural language pairs from stack overflow.
+\newblock In {\em Proceedings of the 15th IEEE/ACM International Conference on Mining Software Repositories (MSR)}, pages 476--486. IEEE, 2018.
+
+\bibitem{zellers2018swag}
+Rowan Zellers, Yonatan Bisk, Roy Schwartz, and Yejin Choi.
+\newblock Swag: A large-scale adversarial dataset for grounded commonsense inference.
+\newblock In {\em Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing}, pages 93--104, Brussels, Belgium, 2018. Association for Computational Linguistics.
+
+\bibitem{zellers2019hellaswag}
+Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi.
+\newblock Hellaswag: Can a machine really finish your sentence?
+\newblock {\em arXiv preprint arXiv:1905.07830}, 2019.
+
+\bibitem{zhang2018record}
+Sheng Zhang, Xiaodong Liu, Jingjing Liu, Jianfeng Gao, Kevin Duh, and Benjamin Van~Durme.
+\newblock Record: Bridging the gap between human and machine commonsense reading comprehension.
+\newblock {\em arXiv preprint arXiv:1810.12885}, 2018.
+
+\bibitem{zhou2019mctaco}
+Ben Zhou, Daniel Khashabi, Qiang Ning, and Dan Roth.
+\newblock “going on a vacation” takes longer than “going for a walk”: A study of temporal commonsense understanding.
+\newblock 2019.
+
+\end{thebibliography}

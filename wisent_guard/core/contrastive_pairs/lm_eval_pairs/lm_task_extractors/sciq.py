@@ -72,7 +72,7 @@ class SciQExtractor(LMEvalBenchmarkExtractor):
             support = str(doc.get("support", "")).strip()
             question = str(doc.get("question", "")).strip()
             correct = str(doc.get("correct_answer", "")).strip()
-            incorrect = str(doc.get("distractor2", "")).strip() #take any distractor
+            incorrect = str(doc.get("distractor1", "")).strip() #take any distractor
 
             if not support or not question or not correct or not incorrect:
                 log.debug(
