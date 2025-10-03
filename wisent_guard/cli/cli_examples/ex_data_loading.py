@@ -17,7 +17,7 @@ lm_loader = rot.use("lm_eval")
 
 #4 Load data for a specific task (e.g., "hellaswag") with optional limits
 # note: task extractor must be written to support given task, see: wisent_guard/core/contrastive_pairs/lm_eval_pairs/lm_task_extractors.py
-res = rot.load(task="coqa", limit=10)
+res = rot.load(task="prost", limit=10)
 
 #5 Inspect the loaded data
 print(res)

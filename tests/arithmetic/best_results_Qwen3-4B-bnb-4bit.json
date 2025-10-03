@@ -1,0 +1,92 @@
+[
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 17 plus 99?",
+    "unsteered_response": "user\nQuestion: What is 17 plus 99?\nassistant\n<think>\nOkay, let's see. The question is asking what 17 plus 99 is. Hmm, I need to add these two numbers together. Let me think about how to approach this.\n\nFirst, I remember that when you add two numbers, you can just line them up by place value and add each column starting from the right. So 17 is 1 ten and 7 ones, and 99 is 9 tens and 9 ones. Let me write",
+    "steered_response": "user\nQuestion: What is 17 plus 99?\nassistant\n<think>\nOkay, so I need to figure out what 17 plus 99 is. Let me think. Hmm, adding two numbers together. Let me start by recalling basic addition. 17 plus 99... Maybe I can break it down. Like, 17 plus 100 would be 117, right? But since it's 99, which is one less than 100, maybe I subtract 1 from 11",
+    "correct_answer": "116"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 19 plus 56?",
+    "unsteered_response": "user\nQuestion: What is 19 plus 56?\nassistant\n<think>\nOkay, let's see. The user is asking what 19 plus 56 is. Hmm, I need to add these two numbers together. Let me start by breaking it down. \n\nFirst, I remember that when you add numbers, you can add the tens and ones separately. So 19 is 10 + 9, and 56 is 50 + 6. If I add the tens first: 10 + 50 is",
+    "steered_response": "user\nQuestion: What is 19 plus 56?\nassistant\n<think>\nOkay, let's see. The question is asking what 19 plus 56 is. Hmm, I need to add these two numbers together. Let me think about how to approach this.\n\nFirst, I remember that adding numbers involves combining their values. So 19 and 56. Maybe I can break it down. Let me try adding the tens and ones separately. \n\nSo 19 is 10 + 9, and 56 is 5",
+    "correct_answer": "75"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 88 plus 65?",
+    "unsteered_response": "user\nQuestion: What is 88 plus 65?\nassistant\n<think>\nOkay, so I need to figure out what 88 plus 65 is. Let me think. Hmm, addition. Alright, let's start by breaking it down. Maybe I can add the tens and the ones separately. \n\nFirst, let me write down the numbers vertically to make it easier. So, 88 is 80 + 8, and 65 is 60 + 5. If I add the tens together: 80 +",
+    "steered_response": "user\nQuestion: What is 88 plus 65?\nassistant\n<think>\nOkay, let's see. The user is asking, \"What is 88 plus 65?\" Hmm, that's a straightforward addition problem. Let me think about how to approach this.\n\nFirst, I need to add 88 and 65. Let me break it down. Maybe I can add the tens and ones separately. So, 88 is 80 + 8, and 65 is 60 + 5. Adding the tens",
+    "correct_answer": "153"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 78 plus 32?",
+    "unsteered_response": "user\nQuestion: What is 78 plus 32?\nassistant\n<think>\nOkay, let's see. The user is asking, \"What is 78 plus 32?\" Hmm, that seems straightforward. Let me think. First, I need to add 78 and 32. Let me break it down. Maybe I can add the tens and ones separately. So 78 is 70 + 8, and 32 is 30 + 2. Adding the tens: 70 + 30 is",
+    "steered_response": "user\nQuestion: What is 78 plus 32?\nassistant\n<think>\nOkay, so the question is asking what 78 plus 32 is. Let me think about how to approach this. I remember that addition is one of the basic arithmetic operations, so maybe I can just add the numbers together. Let me write them down to visualize it better.\n\n78\n+32\n----\nHmm, adding the digits in the ones place first. 8 plus 2 is 10. So I write down 0 and carry over 1",
+    "correct_answer": "110"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 54 plus 51?",
+    "unsteered_response": "user\nQuestion: What is 54 plus 51?\nassistant\n<think>\nOkay, so I need to figure out what 54 plus 51 is. Let me think. Hmm, addition. I guess I can start by adding the numbers step by step. Let me write them down to make it clearer. 54 and 51. Let me line them up by place value. So, 54 is 5 tens and 4 ones, and 51 is 5 tens and 1 one. If I add the tens",
+    "steered_response": "user\nQuestion: What is 54 plus 51?\nassistant\n<think>\nOkay, let's see. The user is asking what 54 plus 51 is. Hmm, I need to add these two numbers. Let me think. First, I can break it down. 54 plus 51. Maybe I can add the tens and the ones separately. 54 has 5 tens and 4 ones. 51 has 5 tens and 1 one. So adding the tens first: 5 tens plus 5 tens",
+    "correct_answer": "105"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 97 plus 98?",
+    "unsteered_response": "user\nWhat is 97 plus 98?\nassistant\n<think>\nOkay, so I need to figure out what 97 plus 98 is. Let me think. Hmm, adding two numbers... Well, 97 and 98 are both close to 100, so maybe there's a shortcut here. Let me try breaking it down.\n\nFirst, I know that 97 is 3 less than 100, and 98 is 2 less than 100. So if I add them",
+    "steered_response": "user\nWhat is 97 plus 98?\nassistant\n<think>\nOkay, let's see. The user is asking what 97 plus 98 is. Hmm, I need to add these two numbers. Let me think. 97 and 98 are both close to 100, so maybe I can use some mental math tricks here. If I take 97 and add 3 to it, that becomes 100. Then 98 is 2 less than 100. Wait, so",
+    "correct_answer": "195"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 77 plus 29?",
+    "unsteered_response": "user\nWhat is 77 plus 29?\nassistant\n<think>\nOkay, so I need to figure out what 77 plus 29 is. Let me think. Hmm, I remember that adding numbers can be done in different ways. Maybe I can break it down. Let me try adding the tens and ones separately.\n\nFirst, 77 is 70 plus 7, right? And 29 is 20 plus 9. So if I add the tens first: 70 plus 20 is 9",
+    "steered_response": "user\nWhat is 77 plus 29?\nassistant\n<think>\nOkay, so I need to figure out what 77 plus 29 is. Let me think. Hmm, I remember that when you add numbers, you can do it by breaking them down into smaller parts. Maybe I can split 77 and 29 into tens and ones. Let me try that.\n\nFirst, let's look at 77. That's 70 plus 7, right? And 29 is 20 plus 9.",
+    "correct_answer": "106"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 44 plus 33?",
+    "unsteered_response": "user\nWhat is 44 plus 33?\nassistant\n<think>\nOkay, let's see. The user is asking what 44 plus 33 is. Hmm, I need to calculate that. Let me think. First, I can break it down into smaller parts. Maybe add the tens and ones separately. So 44 is 40 + 4, and 33 is 30 + 3. If I add the tens first: 40 + 30 is 70. Then the ones:",
+    "steered_response": "user\nWhat is 44 plus 33?\nassistant\n<think>\nOkay, let's see. The user is asking what 44 plus 33 is. Hmm, this is a basic arithmetic problem. I need to make sure I do the addition correctly.\n\nFirst, I'll break it down. 44 plus 33. Let me add the numbers step by step. Starting with the units place: 4 (from 44) plus 3 (from 33) equals 7. Then the tens place: ",
+    "correct_answer": "77"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 12 plus 81?",
+    "unsteered_response": "user\nWhat is 12 plus 81?\nassistant\n<think>\nOkay, so I need to figure out what 12 plus 81 is. Let me start by recalling basic addition. I know that adding numbers together means combining their values. Let me write down the numbers: 12 and 81. Hmm, maybe I can break this down to make it easier.\n\nFirst, I remember that 12 is 10 + 2, and 81 is 80 + 1. Maybe I can add the",
+    "steered_response": "user\nWhat is 12 plus 81?\nassistant\n<think>\nOkay, let's see. The user is asking what 12 plus 81 is. Hmm, I need to add these two numbers together. Let me start by recalling how addition works. So, 12 plus 81. Maybe I can break it down. Let me think of 12 as 10 + 2 and 81 as 80 + 1. Then, adding the tens and ones separately.\n\nFirst, adding the tens:",
+    "correct_answer": "93"
+  },
+  {
+    "layer": 16,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 43 plus 63?",
+    "unsteered_response": "user\nWhat is 43 plus 63?\nassistant\n<think>\nOkay, let's see. The user is asking what 43 plus 63 is. Hmm, I need to add these two numbers. Let me think. First, I can break it down. 43 plus 63. Let me add the tens and ones separately. 40 plus 60 is 100, right? Then 3 plus 3 is 6. So 100 plus 6 is 106.",
+    "steered_response": "user\nWhat is 43 plus 63?\nassistant\n<think>\nOkay, let's see. The user is asking what 43 plus 63 is. Hmm, I need to add these two numbers. Let me think. First, I can break it down. 43 is 40 and 3, and 63 is 60 and 3. Adding the tens place: 40 + 60 is 100. Then the ones place: 3 + 3 is 6. So",
+    "correct_answer": "106"
+  }
+]

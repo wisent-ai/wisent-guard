@@ -1,0 +1,182 @@
+[
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 17 plus 99?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 17 plus 99?assistant\n\nTo find the answer, I'll add 17 and 99.\n\n17 + 99 = 116\n\nThe answer is 116.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 17 plus 99?assistant\n\nTo calculate this, I'll add 17 and 99.\n\n18 (17 + 98)",
+    "correct_answer": "116"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 19 plus 56?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 19 plus 56?assistant\n\nTo find the answer, I'll add 19 and 56:\n\n19 + 56 = 75\n\nThe result is 75.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 19 plus 56?assistant\n\nTo calculate this, I'll add 18 and 56.\n\n18 + 56 = 84",
+    "correct_answer": "75"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 88 plus 65?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 88 plus 65?assistant\n\nTo find the answer, I'll add 88 and 65.\n\n88 + 65 = 153\n\nThe answer is 153.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 88 plus 65?assistant\n\nTo calculate this, I will add 88 and 64.\n\n88 + 64 = 152",
+    "correct_answer": "153"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 78 plus 32?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 78 plus 32?assistant\n\nTo find the answer, we simply need to add 78 and 32.\n\n78 + 32 = 110\n\nThe answer is 110.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 78 plus 32?assistant\n\nTo find the answer, I'll simply add 78 and 32.\n\n78 + 32 = 110",
+    "correct_answer": "110"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 54 plus 51?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 54 plus 51?assistant\n\nTo find the answer, we simply add 54 and 51.\n\n54 + 51 = 105\n\nThe result is 105.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 54 plus 51?assistant\n\n54 + 51 = 104",
+    "correct_answer": "105"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 97 plus 98?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 97 plus 98?assistant\n\n97 + 98 = 195",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 97 plus 98?assistant\n\n98 + 97 = 196",
+    "correct_answer": "195"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 77 plus 29?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 77 plus 29?assistant\n\n77 + 29 = 106",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 77 plus 29?assistant\n\nTo find the answer, I'll add 77 and 28 (not 29, as that is an error in your original message). \n\n77 + 28 = 106",
+    "correct_answer": "106"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 44 plus 33?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 44 plus 33?assistant\n\n44 + 33 = 77",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 44 plus 33?assistant\n\nTo calculate 44 + 33, I would perform the following steps:\n\n44 + 30 = 88\n88 + 4 = 92\n\nTherefore, 44 + 33 equals 92.",
+    "correct_answer": "77"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 12 plus 81?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 12 plus 81?assistant\n\n12 + 81 = 93",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 12 plus 81?assistant\n\n12 + 81 = 92",
+    "correct_answer": "93"
+  },
+  {
+    "layer": 5,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 43 plus 63?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 43 plus 63?assistant\n\nTo find the answer, I'll add 43 and 63.\n\n43 + 63 = 106\n\nThe answer is 106.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 43 plus 63?assistant\n\nTo calculate this, I'll add 43 and 63.\n\n43 + 63 = 105",
+    "correct_answer": "106"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 17 plus 99?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 17 plus 99?assistant\n\nTo find the answer, we simply add 17 and 99.\n\n17 + 99 = 116\n\nThe answer is 116.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 17 plus 99?assistant\n\nTo calculate the answer, I'll simply add 17 and 99.\n\n17 + 99 = 117\n\nThe answer is 117.",
+    "correct_answer": "116"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 19 plus 56?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 19 plus 56?assistant\n\nTo find the answer, I'll simply add 19 and 56.\n\n19 + 56 = 75\n\nThe answer is 75.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 19 plus 56?assistant\n\nTo find the answer, I will simply add 19 and 56:\n\n19 + 56 = 74\n\nThe answer is 74.",
+    "correct_answer": "75"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 88 plus 65?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 88 plus 65?assistant\n\nTo find the answer, I'll simply add 88 and 65.\n\n88 + 65 = 153",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 88 plus 65?assistant\n\nTo find the answer, I will simply add 88 and 65.\n\n88 + 65 = 152\n\nThe answer is 152.",
+    "correct_answer": "153"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 78 plus 32?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 78 plus 32?assistant\n\nTo find the answer, we simply need to add 78 and 32.\n\n78 + 32 = 110\n\nThe answer is 110.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 78 plus 32?assistant\n\nTo find the answer, I will simply add 78 and 32 together.\n\n78 + 32 = 110\n\nThe answer is 110.",
+    "correct_answer": "110"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "Question: What is 54 plus 51?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 54 plus 51?assistant\n\nTo find the answer, we simply add 54 and 51:\n\n54 + 51 = 105\n\nThe answer is 105.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nQuestion: What is 54 plus 51?assistant\n\n54 + 51 = 105",
+    "correct_answer": "105"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 97 plus 98?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 97 plus 98?assistant\n\nTo find the answer, I'll add 97 and 98.\n\n97 + 98 = 195\n\nThe result is 195.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 97 plus 98?assistant\n\n97 + 98 = 196",
+    "correct_answer": "195"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 77 plus 29?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 77 plus 29?assistant\n\n77 + 29 = 106",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 77 plus 29?assistant\n\n77 + 29 = 107",
+    "correct_answer": "106"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 44 plus 33?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 44 plus 33?assistant\n\n44 + 33 = 77",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 44 plus 33?assistant\n\n44 + 33 = 77",
+    "correct_answer": "77"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 12 plus 81?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 12 plus 81?assistant\n\nTo find the answer, I'll add 12 and 81.\n\n12 + 81 = 93\n\nThe answer is 93.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 12 plus 81?assistant\n\nTo calculate 12 plus 81, I will simply add the numbers together.\n\n12 + 81 = 93\n\nThe answer is 93.",
+    "correct_answer": "93"
+  },
+  {
+    "layer": 7,
+    "scale": -2,
+    "normalize": false,
+    "prompt": "What is 43 plus 63?",
+    "unsteered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 43 plus 63?assistant\n\nTo find the answer, I'll add 43 and 63.\n\n43 + 63 = 106\n\nThe result is 106.",
+    "steered_response": "system\n\nCutting Knowledge Date: December 2023\nToday Date: 03 Oct 2025\n\nuser\n\nWhat is 43 plus 63?assistant\n\nTo find the answer, I will simply add 43 and 63.\n\n43 + 63 = 105",
+    "correct_answer": "106"
+  }
+]

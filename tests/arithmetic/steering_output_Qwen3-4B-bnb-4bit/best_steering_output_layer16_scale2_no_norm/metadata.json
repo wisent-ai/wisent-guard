@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-10-03T01:11:42.486690+02:00",
+  "model_name": "unsloth/Qwen3-4B-bnb-4bit",
+  "layers_used": [
+    "16"
+  ],
+  "method": "caa",
+  "method_kwargs": {},
+  "activation_aggregation_strategy": "continuation_token",
+  "return_full_sequence": false,
+  "normalize_layers": false,
+  "num_pairs": 400,
+  "hidden_size": 2560
+}

@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-10-03T02:38:39.529982+02:00",
+  "model_name": "unsloth/Qwen2.5-3B-Instruct",
+  "layers_used": [
+    "16"
+  ],
+  "method": "caa",
+  "method_kwargs": {},
+  "activation_aggregation_strategy": "continuation_token",
+  "return_full_sequence": false,
+  "normalize_layers": false,
+  "num_pairs": 56,
+  "hidden_size": 2048
+}

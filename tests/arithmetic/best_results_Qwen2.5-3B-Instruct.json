@@ -1,0 +1,92 @@
+[
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "Question: What is 17 plus 99?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 17 plus 99?\nassistant\nTo find the sum of 17 and 99, you simply add the numbers together:\n\n\\( 17 + 99 = 116 \\)",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 17 plus 99?\nassistant\nTo find the sum of 17 and 99, you can perform the addition directly:\n\n\\[ 17 + 99 = 116 \\]",
+    "correct_answer": "116"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "Question: What is 19 plus 56?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 19 plus 56?\nassistant\nTo find the sum of 19 and 56, you simply add them together:\n\n\\( 19 + 56 = 75 \\)\n\nSo, the answer is 75.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 19 plus 56?\nassistant\nTo find the sum of 19 and 56, you can add the numbers together:\n\n\\[ 19 + 56 = 75 \\]\n\nSo, 19 plus 56 equals 75.",
+    "correct_answer": "75"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "Question: What is 88 plus 65?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 88 plus 65?\nassistant\nTo solve the problem of adding 88 and 65:\n\n\\( 88 + 65 = 153 \\)\n\nSo, 88 plus 65 equals 153.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 88 plus 65?\nassistant\n88 plus 65 equals 153.",
+    "correct_answer": "153"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "Question: What is 78 plus 32?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 78 plus 32?\nassistant\nTo find the sum of 78 and 32, you simply add the numbers together:\n\n\\( 78 + 32 = 110 \\)",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 78 plus 32?\nassistant\nTo solve the problem of adding 78 and 32, you simply add the two numbers together:\n\n\\[ 78 + 32 = 110 \\]\n\nSo, 78 plus 32 equals 110.",
+    "correct_answer": "110"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "Question: What is 54 plus 51?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 54 plus 51?\nassistant\nTo solve the problem of adding 54 and 51, you simply add the two numbers together:\n\n\\[ 54 + 51 = 105 \\]\n\nSo, 54 plus 51 equals 105.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nQuestion: What is 54 plus 51?\nassistant\n54 plus 51 equals 105.",
+    "correct_answer": "105"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "What is 97 plus 98?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 97 plus 98?\nassistant\n97 plus 98 equals 195.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 97 plus 98?\nassistant\n97 plus 98 equals 195.",
+    "correct_answer": "195"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "What is 77 plus 29?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 77 plus 29?\nassistant\n77 plus 29 equals 106.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 77 plus 29?\nassistant\nTo find the sum of 77 and 29, you simply add the two numbers together:\n\n```\n   77\n+ 29\n-----\n  106\n```\n\nSo, 77 plus 29 equals 106.",
+    "correct_answer": "106"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "What is 44 plus 33?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 44 plus 33?\nassistant\n44 plus 33 equals 77.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 44 plus 33?\nassistant\n44 plus 33 equals 77.",
+    "correct_answer": "77"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "What is 12 plus 81?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 12 plus 81?\nassistant\n12 plus 81 equals 93.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 12 plus 81?\nassistant\n12 plus 81 equals 93.",
+    "correct_answer": "93"
+  },
+  {
+    "layer": 16,
+    "scale": -1,
+    "normalize": true,
+    "prompt": "What is 43 plus 63?",
+    "unsteered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 43 plus 63?\nassistant\n43 plus 63 equals 106.",
+    "steered_response": "system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.\nuser\nWhat is 43 plus 63?\nassistant\n43 plus 63 equals 106.",
+    "correct_answer": "106"
+  }
+]
