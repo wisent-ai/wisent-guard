@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-03T12:07:32.967612+02:00",
+  "timestamp": "2025-10-04T13:29:50.715010+02:00",
   "model_name": "unsloth/Qwen2.5-3B-Instruct",
   "layers_used": [
     "14"
@@ -9,6 +9,6 @@
   "activation_aggregation_strategy": "continuation_token",
   "return_full_sequence": false,
   "normalize_layers": true,
-  "num_pairs": 400,
+  "num_pairs": 160,
   "hidden_size": 2048
 }

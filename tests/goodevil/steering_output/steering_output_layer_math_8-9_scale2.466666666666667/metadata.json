@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-10-03T20:30:12.893536+02:00",
+  "model_name": "meta-llama/Llama-3.2-1B-Instruct",
+  "layers_used": [
+    "8",
+    "9"
+  ],
+  "method": "caa",
+  "method_kwargs": {},
+  "activation_aggregation_strategy": "continuation_token",
+  "return_full_sequence": false,
+  "normalize_layers": true,
+  "num_pairs": 24,
+  "hidden_size": 2048
+}

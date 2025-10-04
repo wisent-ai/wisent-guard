@@ -33,9 +33,9 @@ def main():
     print("=" * 50)
 
     scripts = [
-        "tests/prost/prost_search.py",
-        "tests/truthfulness/truthfulness_search.py",
-        "tests/goodevil/goodevil_search.py"
+        "tests/arithmetic/arithmetic_best.py",
+        "tests/prost/prost_best.py",
+        "tests/untruthfulness/untruthfulness_best.py"
     ]
 
     for script in scripts:

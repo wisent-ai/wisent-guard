@@ -84,10 +84,15 @@ def run_training(model, model_name, data_limit, layer, scale, normalize):
 
         with model.detached():
             messages_unsteered = [[{"role": "user", "content": prompt}]]
-            unsteered = model.generate(messages_unsteered, max_new_tokens=100, use_steering=False)[0]
+            unsteered = model.generate(messages_unsteered, max_new_tokens=250, use_steering=False)[0]
 
         messages_steered = [[{"role": "user", "content": prompt}]]
-        steered = model.generate(messages_steered, max_new_tokens=200, use_steering=True)[0]
+        steered = model.generate(messages_steered, max_new_tokens=250, use_steering=True)[0]
+
+        model.set_steering_from_raw(steering_vectors, scale=-scale, normalize=False)
+        messages_steered_pos = [[{"role": "user", "content": prompt}]]
+        steered_pos = model.generate(messages_steered_pos, max_new_tokens=250, use_steering=True)[0]
+        model.set_steering_from_raw(steering_vectors, scale=scale, normalize=False)
         
         result = {
             "layer": layer,
@@ -96,6 +101,7 @@ def run_training(model, model_name, data_limit, layer, scale, normalize):
             "prompt": prompt,
             "unsteered_response": unsteered,
             "steered_response": steered,
+            "steered_response_positive_scale": steered_pos,
             "correct_answer": correct_answer
         }
         results.append(result)
@@ -107,18 +113,18 @@ configs = {
     "meta-llama/Llama-3.2-1B-Instruct": {
         "model_name": "Llama-3.2-1B-Instruct",
         "data_limit": 30,
-        "best_l_s_n": [(6, -1, True), (6, -1, False), (6, -2, True)] 
+        "best_l_s_n": [(6, -1, True)] 
     },
     # 36 layers
     "unsloth/Qwen3-4B-bnb-4bit": {
         "model_name": "Qwen3-4B-bnb-4bit",
-        "data_limit": 500,
+        "data_limit": 200,
         "best_l_s_n": [(14, -3, True)] 
     },
     # 36 layers:
     "unsloth/Qwen2.5-3B-Instruct": {
         "model_name": "Qwen2.5-3B-Instruct",
-        "data_limit": 500,
+        "data_limit": 200,
         "best_l_s_n": [(14, -3, True)] 
     }
 }

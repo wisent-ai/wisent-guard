@@ -88,7 +88,12 @@ def run_training(model, model_name, data_limit, layer, scale, normalize):
 
         messages_steered = [[{"role": "user", "content": prompt}]]
         steered = model.generate(messages_steered, max_new_tokens=100, use_steering=True)[0]
-        
+
+        model.set_steering_from_raw(steering_vectors, scale=-scale, normalize=False)
+        messages_steered_pos = [[{"role": "user", "content": prompt}]]
+        steered_pos = model.generate(messages_steered_pos, max_new_tokens=100, use_steering=True)[0]
+        model.set_steering_from_raw(steering_vectors, scale=scale, normalize=False)
+
         result = {
             "layer": layer,
             "scale": scale,
@@ -96,6 +101,7 @@ def run_training(model, model_name, data_limit, layer, scale, normalize):
             "prompt": prompt,
             "unsteered_response": unsteered,
             "steered_response": steered,
+            "steered_response_positive_scale": steered_pos,
             "correct_answer": correct_answer
         }
         results.append(result)
@@ -107,7 +113,7 @@ configs = {
     "meta-llama/Llama-3.2-1B-Instruct": {
         "model_name": "Llama-3.2-1B-Instruct",
         "data_limit": 30,
-        "best_l_s_n": [(5, -2, False), (7, -2, False)] 
+        "best_l_s_n": [(5, -2, False)] 
     },
     # 36 layers
     "unsloth/Qwen3-4B-bnb-4bit": {

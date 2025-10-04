@@ -1,0 +1,14 @@
+{
+  "6": {
+    "shape": [
+      2048
+    ],
+    "dtype": "torch.float32"
+  },
+  "7": {
+    "shape": [
+      2048
+    ],
+    "dtype": "torch.float32"
+  }
+}
