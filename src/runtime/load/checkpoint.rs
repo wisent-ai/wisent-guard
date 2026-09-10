@@ -1,0 +1,180 @@
+//! Which files a checkpoint is, resolved once from a local directory or the
+//! hub, and the config questions every loader asks of them.
+
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use anyhow::{bail, Context, Result};
+use candle_transformers::models::llama::{Config, LlamaConfig, LlamaEosToks};
+use hf_hub::{api::sync::Api, Repo, RepoType};
+
+use crate::chat;
+
+/// A checkpoint's three files, resolved but not mapped.
+///
+/// `Runtime::load` maps the weights the moment it resolves them, which is what
+/// every command that runs the model wants and exactly what merging one does
+/// not: folding an adapter into the base rewrites tensors and never builds a
+/// decoder. Splitting resolution from mapping is what lets it read the same
+/// files, through the same Hub path and the same architecture refusal, without
+/// paying for a model it will not run.
+pub struct Checkpoint {
+    pub config: PathBuf,
+    pub tokenizer: PathBuf,
+    pub weights: Vec<PathBuf>,
+    pub revision: Option<String>,
+    /// The tokenizer's own configuration, which is where a checkpoint records
+    /// its chat template and the text of its special tokens, and the
+    /// standalone template file newer repositories use instead. Both are
+    /// optional: a base model publishes neither, and that is a fact to report
+    /// rather than a checkpoint to refuse.
+    pub tokenizer_config: Option<PathBuf>,
+    pub chat_template: Option<PathBuf>,
+}
+
+impl Checkpoint {
+    /// Resolves `model` from a local directory or the Hugging Face Hub.
+    pub fn resolve(model: &str, revision: Option<&str>) -> Result<Self> {
+        let local = Path::new(model);
+        if local.is_dir() {
+            let config = local.join("config.json");
+            let tokenizer = local.join("tokenizer.json");
+            let weights = local_safetensors(local)?;
+            require_files(&config, &tokenizer, &weights)?;
+            let (tokenizer_config, chat_template) = chat::local_files(local);
+            return Ok(Self {
+                config,
+                tokenizer,
+                weights,
+                revision: revision.map(str::to_owned),
+                tokenizer_config,
+                chat_template,
+            });
+        }
+        let api = Api::new().context("failed to initialize Hugging Face Hub client")?;
+        let repo = Repo::with_revision(
+            model.to_owned(),
+            RepoType::Model,
+            revision.unwrap_or("main").to_owned(),
+        );
+        let remote = api.repo(repo);
+        let info = remote.info().with_context(|| format!("failed to read model repository {model}"))?;
+        let config = remote.get("config.json")?;
+        let tokenizer = remote.get("tokenizer.json")?;
+        // The two template files are fetched exactly like the three required
+        // ones, but only when the repository lists them: `get` on a file a
+        // repository does not publish is an error, and a base model not
+        // publishing a chat template is not an error.
+        let has_tokenizer_config = published(&info, "tokenizer_config.json");
+        let has_chat_template = published(&info, "chat_template.jinja");
+        let tokenizer_config = has_tokenizer_config
+            .then(|| remote.get("tokenizer_config.json"))
+            .transpose()
+            .context("failed to download tokenizer_config.json")?;
+        let chat_template = has_chat_template
+            .then(|| remote.get("chat_template.jinja"))
+            .transpose()
+            .context("failed to download chat_template.jinja")?;
+        let weight_names: Vec<String> = info.siblings
+            .into_iter()
+            .map(|file| file.rfilename)
+            .filter(|name| {
+                name.ends_with(".safetensors")
+                    && !name.contains("optimizer")
+                    && !name.contains("training_args")
+            })
+            .collect();
+        if weight_names.is_empty() {
+            bail!("model {model} publishes no safetensors weights");
+        }
+        let mut weights = Vec::with_capacity(weight_names.len());
+        for name in weight_names {
+            weights.push(remote.get(&name).with_context(|| format!("failed to download {name}"))?);
+        }
+        require_files(&config, &tokenizer, &weights)?;
+        Ok(Self {
+            config,
+            tokenizer,
+            weights,
+            revision: Some(info.sha),
+            tokenizer_config,
+            chat_template,
+        })
+    }
+
+    /// The parsed Llama config and its end-of-sequence tokens.
+    ///
+    /// The architecture refusal lives here rather than in each caller, so a
+    /// command that never builds a decoder still refuses a checkpoint the
+    /// decoder could not have loaded — a merge that silently produced a
+    /// directory `Runtime::load` then rejects would be worse than no merge.
+    pub fn llama_config(&self) -> Result<(Config, BTreeSet<u32>)> {
+        let bytes = fs::read(&self.config)
+            .with_context(|| format!("failed to read {}", self.config.display()))?;
+        let raw: serde_json::Value = serde_json::from_slice(&bytes)
+            .with_context(|| format!("invalid model config {}", self.config.display()))?;
+        let model_type = raw.get("model_type").and_then(|value| value.as_str()).unwrap_or("");
+        if model_type != "llama" {
+            bail!(
+                "model architecture {model_type:?} is unsupported by this Ster build; use a Hugging Face Llama-family checkpoint with model_type=llama"
+            );
+        }
+        let llama: LlamaConfig = serde_json::from_slice(&bytes)
+            .with_context(|| format!("invalid Llama config {}", self.config.display()))?;
+        let tokens = eos_tokens(&llama);
+        Ok((llama.into_config(false), tokens))
+    }
+
+    /// The conversation format this checkpoint publishes, if it publishes one.
+    ///
+    /// Compiled here rather than at first use so a template that does not
+    /// parse is refused while the operator is still waiting on the load,
+    /// instead of halfway through an epoch.
+    pub fn chat(&self) -> Result<Option<chat::Template>> {
+        chat::Template::load(self.tokenizer_config.as_deref(), self.chat_template.as_deref())
+    }
+}
+
+/// Whether the repository lists a file, so an optional one is only fetched
+/// when asking for it can succeed.
+fn published(info: &hf_hub::api::RepoInfo, name: &str) -> bool {
+    info.siblings.iter().any(|file| file.rfilename == name)
+}
+
+fn local_safetensors(root: &Path) -> Result<Vec<PathBuf>> {
+    let mut weights = Vec::new();
+    for entry in fs::read_dir(root).with_context(|| format!("failed to list {}", root.display()))? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("safetensors")
+            && !path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.contains("optimizer"))
+        {
+            weights.push(path);
+        }
+    }
+    weights.sort();
+    Ok(weights)
+}
+
+fn require_files(config: &Path, tokenizer: &Path, weights: &[PathBuf]) -> Result<()> {
+    if !config.is_file() {
+        bail!("model config is missing: {}", config.display());
+    }
+    if !tokenizer.is_file() {
+        bail!("tokenizer is missing: {}", tokenizer.display());
+    }
+    if weights.is_empty() {
+        bail!("model directory contains no safetensors weights");
+    }
+    Ok(())
+}
+
+fn eos_tokens(config: &LlamaConfig) -> BTreeSet<u32> {
+    match &config.eos_token_id {
+        Some(LlamaEosToks::Single(token)) => [*token].into_iter().collect(),
+        Some(LlamaEosToks::Multiple(tokens)) => tokens.iter().copied().collect(),
+        None => BTreeSet::new(),
+    }
+}
