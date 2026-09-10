@@ -1,12 +1,9 @@
 pub mod artifact;
 pub mod brama;
 pub mod chat;
-pub mod dedupe;
-pub mod diversity;
 pub mod lora;
 pub mod model;
 pub mod pairs;
-pub mod refusal;
 pub mod representation;
 pub mod runtime;
 pub mod serve;

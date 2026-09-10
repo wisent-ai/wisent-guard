@@ -1,43 +1,19 @@
-//! pairs.rs — authoring, inspecting, and synthesizing contrastive pair sets.
-//!
-//! Ster could previously only consume a `pairs.json` someone else produced.
-//! This module closes that gap with two surfaces:
-//!
-//! * `inspect` — a model-free audit of an existing set. It answers the three
-//!   questions that make a pair set silently useless: are pairs duplicated,
-//!   did the generating model refuse instead of answering, and is one side
-//!   systematically longer than the other (a length confound trains a
-//!   "verbosity" direction rather than the trait).
-//! * `synthesize` — a faithful port of Wisent's
-//!   `SyntheticContrastivePairsGenerator.generate`, driven by whichever
-//!   `Generator` the caller picked: Ster's own local `Runtime`, or a hosted
-//!   route reached through Brama. Steering itself still needs hidden states
-//!   and therefore a local model, but writing pair text needs no activations
-//!   at all, so the generator model and the steered model are two different
-//!   roles and only the writer may be hosted.
-//!
-//! Both are the single implementation behind the CLI arms and the
-//! `/v1/pairs/*` serve endpoints.
+//! Writing a contrastive pair set with a model: a faithful port of Wisent's
+//! `SyntheticContrastivePairsGenerator.generate`, driven by whichever
+//! generator the caller picked. Steering needs hidden states and stays local;
+//! writing pair text does not, so the writer may be a hosted route.
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use serde::Serialize;
 
+use super::generator::Generator;
 use crate::{
     artifact::{ContrastivePair, PairSet},
-    dedupe::{self, DedupeOptions, Duplicate},
-    diversity,
-    refusal,
-    runtime::{GenerationOptions, Runtime},
+    pairs::quality::dedupe::{self, DedupeOptions},
+    pairs::quality::{diversity, refusal},
+    runtime::GenerationOptions,
     workflow,
 };
-
-/// A pair whose two sides differ by more than this factor in characters is
-/// reported as unbalanced. Length is the confound the product documents at
-/// https://ster.wisent.com/docs/concept-contrastive-pair: when the positive
-/// side is consistently three times longer than the negative, the trained
-/// direction encodes response length, not the trait, and steering on it just
-/// makes the model verbose.
-pub const UNBALANCED_RATIO: f64 = 3.0;
 
 /// Trait-name fallback length. Long descriptions make unusable artifact
 /// labels, so an unnamed set borrows the first 64 characters of its
@@ -56,143 +32,6 @@ const QUESTION_INSTRUCTION: &str = "Write one short question a user might ask. E
 /// The Python cleaner sends it as a system message; `Runtime::generate` takes
 /// a single prompt string, so it is prepended to the user turn instead.
 const ROLEPLAY_NEG_FIX: &str = "You are fixing ONLY the negative example of a contrastive pair.\nProduce a single concise negative response for the given prompt that exemplifies the UNDESIRED trait.\nIt must be fictional/hypothetical, safe, and non-actionable. Return raw text only.";
-
-// MARK: - Inspection
-
-#[derive(Debug, Clone)]
-pub struct InspectOptions {
-    pub dedupe: DedupeOptions,
-    pub refusal_threshold: f32,
-    pub diversity_seed: u64,
-    pub diversity_max_sample: usize,
-}
-
-impl Default for InspectOptions {
-    fn default() -> Self {
-        Self {
-            dedupe: DedupeOptions::default(),
-            refusal_threshold: refusal::DEFAULT_THRESHOLD,
-            diversity_seed: 42,
-            diversity_max_sample: diversity::DEFAULT_MAX_SAMPLE,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct RefusalFlag {
-    pub score: f32,
-    pub family: String,
-    pub snippet: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct EntryReport {
-    pub index: usize,
-    pub positive: String,
-    pub negative: String,
-    pub positive_chars: usize,
-    pub negative_chars: usize,
-    pub positive_words: usize,
-    pub negative_words: usize,
-    pub duplicate: Option<Duplicate>,
-    pub positive_refusal: Option<RefusalFlag>,
-    pub negative_refusal: Option<RefusalFlag>,
-    pub length_ratio: f64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct SetReport {
-    pub trait_name: String,
-    pub pair_count: usize,
-    pub duplicate_count: usize,
-    pub refusal_count: usize,
-    pub unbalanced_count: usize,
-    pub diversity: diversity::Scores,
-    pub entries: Vec<EntryReport>,
-}
-
-/// Audit a pair set without loading a model. Every judgement here is textual,
-/// which is why the desktop app can show it the moment a file is opened.
-pub fn inspect(pairs: &PairSet, options: &InspectOptions) -> Result<SetReport> {
-    let duplicates = dedupe::classify(&pairs.pairs, options.dedupe)?;
-    let mut entries = Vec::with_capacity(pairs.pairs.len());
-    let mut duplicate_count = 0usize;
-    let mut refusal_count = 0usize;
-    let mut unbalanced_count = 0usize;
-
-    for (index, pair) in pairs.pairs.iter().enumerate() {
-        let duplicate = duplicates[index];
-        if duplicate.is_some() {
-            duplicate_count += 1;
-        }
-        let positive_refusal = flag(&pair.positive, options.refusal_threshold);
-        let negative_refusal = flag(&pair.negative, options.refusal_threshold);
-        if positive_refusal.is_some() || negative_refusal.is_some() {
-            refusal_count += 1;
-        }
-        let positive_chars = pair.positive.chars().count();
-        let negative_chars = pair.negative.chars().count();
-        let length_ratio = length_ratio(positive_chars, negative_chars);
-        if length_ratio > UNBALANCED_RATIO {
-            unbalanced_count += 1;
-        }
-        entries.push(EntryReport {
-            index,
-            positive: pair.positive.clone(),
-            negative: pair.negative.clone(),
-            positive_chars,
-            negative_chars,
-            positive_words: pair.positive.split_whitespace().count(),
-            negative_words: pair.negative.split_whitespace().count(),
-            duplicate,
-            positive_refusal,
-            negative_refusal,
-            length_ratio,
-        });
-    }
-
-    // Diversity reads the positive side only: the two sides of a pair are
-    // near-copies of each other by construction, so scoring both would report
-    // the contrast as repetition.
-    let positives: Vec<String> = pairs.pairs.iter().map(|pair| pair.positive.clone()).collect();
-    let diversity =
-        diversity::compute(&positives, options.diversity_seed, options.diversity_max_sample);
-
-    Ok(SetReport {
-        trait_name: pairs.trait_name.clone(),
-        pair_count: pairs.pairs.len(),
-        duplicate_count,
-        refusal_count,
-        unbalanced_count,
-        diversity,
-        entries,
-    })
-}
-
-fn flag(text: &str, threshold: f32) -> Option<RefusalFlag> {
-    let scored = refusal::score(text);
-    if scored.score < threshold {
-        return None;
-    }
-    Some(RefusalFlag {
-        score: scored.score,
-        family: scored.family.map(|family| family.name().to_owned()).unwrap_or_default(),
-        snippet: scored.snippet,
-    })
-}
-
-/// Longer side over shorter side. Two empty sides are perfectly balanced and
-/// 0/0 has no value, so they report 1.0; a single empty side would divide by
-/// zero, so the non-empty length stands in for the ratio and the pair reads
-/// as maximally unbalanced.
-fn length_ratio(positive_chars: usize, negative_chars: usize) -> f64 {
-    let longer = positive_chars.max(negative_chars);
-    let shorter = positive_chars.min(negative_chars);
-    if longer == 0 {
-        return 1.0;
-    }
-    longer as f64 / shorter.max(1) as f64
-}
 
 // MARK: - Synthesis
 
@@ -407,57 +246,5 @@ fn resolve_trait_name(options: &SynthesisOptions) -> String {
     match description.char_indices().nth(TRAIT_NAME_LIMIT) {
         Some((offset, _)) => description[..offset].to_owned(),
         None => description.to_owned(),
-    }
-}
-
-/// Where the pair text comes from. Steering always stays local; only the
-/// writer of the training data may be hosted, because a pair is plain text
-/// and no hidden state is read to produce it.
-#[derive(Clone, Copy)]
-pub enum Generator<'a> {
-    Local(&'a Runtime),
-    Gateway(&'a crate::brama::Gateway),
-}
-
-impl Generator<'_> {
-    /// Names the generator in reports and progress lines.
-    pub fn label(&self) -> String {
-        match self {
-            Self::Local(runtime) => format!("local:{}", runtime.model_id),
-            Self::Gateway(gateway) => format!("brama:{}", gateway.model()),
-        }
-    }
-
-    /// One call to whichever model is writing, with `call` counting the calls
-    /// already made in this run.
-    ///
-    /// Local: `Runtime::generate` builds a fresh `LogitsProcessor` from
-    /// `GenerationOptions::seed` on every call, so a fixed seed would replay
-    /// the identical continuation for the identical prompt and the run would
-    /// collapse to a single deduplicated pair. Advancing the seed by the call
-    /// index makes each call an independent draw while keeping the whole run
-    /// reproducible from the one seed the caller supplied.
-    ///
-    /// Gateway: neither the seed nor `top_p` travels. Brama's chat request
-    /// carries `max_tokens` and `temperature` and has no field for either, and
-    /// the provider behind the route owns its own sampler — so a hosted run is
-    /// not reproducible from `--seed`, and the running dedupe is what keeps
-    /// repeated draws out of the set.
-    fn generate(&self, prompt: &str, options: &SynthesisOptions, call: u64) -> Result<String> {
-        let text = match self {
-            Self::Local(runtime) => {
-                let generation = GenerationOptions {
-                    seed: options.generation.seed.wrapping_add(call),
-                    ..options.generation
-                };
-                runtime.generate(prompt, None, generation)?
-            }
-            Self::Gateway(gateway) => gateway.complete(
-                prompt,
-                options.generation.max_new_tokens,
-                options.generation.temperature,
-            )?,
-        };
-        Ok(text.trim().to_owned())
     }
 }
