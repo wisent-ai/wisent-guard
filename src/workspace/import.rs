@@ -1,46 +1,16 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-};
+//! Taking a pair set someone else produced into the workspace: what is
+//! accepted, what the copy is named, and when a repeat is the same import
+//! rather than a new one.
 
-use anyhow::{Context, Result, bail};
+use std::{fs, path::Path};
+
+use anyhow::{bail, Context, Result};
 use blake2::{Blake2b512, Digest};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::PairSet;
 
-const WORKSPACE_SCHEMA: &str = "ster.workspace.v1";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PairSetEntry {
-    id: String,
-    digest: String,
-    path: PathBuf,
-    source: PathBuf,
-    pair_count: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct WorkspaceState {
-    schema: String,
-    #[serde(default)]
-    active_pair_set: Option<String>,
-    #[serde(default)]
-    pair_sets: Vec<PairSetEntry>,
-}
-
-impl Default for WorkspaceState {
-    fn default() -> Self {
-        Self {
-            schema: WORKSPACE_SCHEMA.to_owned(),
-            active_pair_set: None,
-            pair_sets: Vec::new(),
-        }
-    }
-}
+use super::state::{load_state, save_state, workspace_root, PairSetEntry};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportReport {
@@ -60,22 +30,6 @@ impl ImportReport {
     pub fn accepted(&self) -> bool {
         matches!(self.status, "imported" | "unchanged")
     }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct WorkspaceSummary {
-    pub schema: &'static str,
-    pub active_pair_set: Option<String>,
-    pub pair_sets: Vec<WorkspacePairSet>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct WorkspacePairSet {
-    pub id: String,
-    pub path: String,
-    pub source: String,
-    pub pair_count: usize,
-    pub active: bool,
 }
 
 /// Validate and adopt an existing canonical pair-set document.
@@ -218,45 +172,6 @@ pub fn import_pair_set(source: &Path, requested_name: Option<&str>) -> Result<Im
     })
 }
 
-pub fn active_pair_set() -> Result<Option<PathBuf>> {
-    let state = load_state()?;
-    let Some(active) = state.active_pair_set else {
-        return Ok(None);
-    };
-    let entry = state
-        .pair_sets
-        .iter()
-        .find(|entry| entry.id == active)
-        .with_context(|| format!("Ster workspace names missing active pair set {active}"))?;
-    if !entry.path.is_file() {
-        bail!(
-            "active Ster pair set is missing: {}; import it again or select another set",
-            entry.path.display()
-        );
-    }
-    Ok(Some(entry.path.clone()))
-}
-
-pub fn summary() -> Result<WorkspaceSummary> {
-    let state = load_state()?;
-    let active = state.active_pair_set.clone();
-    Ok(WorkspaceSummary {
-        schema: WORKSPACE_SCHEMA,
-        active_pair_set: active.clone(),
-        pair_sets: state
-            .pair_sets
-            .into_iter()
-            .map(|entry| WorkspacePairSet {
-                active: active.as_deref() == Some(entry.id.as_str()),
-                id: entry.id,
-                path: entry.path.display().to_string(),
-                source: entry.source.display().to_string(),
-                pair_count: entry.pair_count,
-            })
-            .collect(),
-    })
-}
-
 fn pair_set_digest(pair_set: &PairSet) -> Result<String> {
     let bytes = serde_json::to_vec(pair_set)?;
     let digest = Blake2b512::digest(bytes);
@@ -304,65 +219,4 @@ fn derived_name(source: &Path) -> String {
     } else {
         name.to_owned()
     }
-}
-
-fn load_state() -> Result<WorkspaceState> {
-    let path = state_path()?;
-    if !path.exists() {
-        return Ok(WorkspaceState::default());
-    }
-    let bytes = fs::read(&path)
-        .with_context(|| format!("failed to read Ster workspace {}", path.display()))?;
-    let state: WorkspaceState = serde_json::from_slice(&bytes)
-        .with_context(|| format!("invalid Ster workspace JSON in {}", path.display()))?;
-    if state.schema != WORKSPACE_SCHEMA {
-        bail!("unsupported Ster workspace schema in {}", path.display());
-    }
-    Ok(state)
-}
-
-fn save_state(state: &WorkspaceState) -> Result<()> {
-    let path = state_path()?;
-    let parent = path.parent().context("Ster workspace path has no parent")?;
-    fs::create_dir_all(parent)
-        .with_context(|| format!("failed to create Ster workspace directory {}", parent.display()))?;
-    let mut bytes = serde_json::to_vec_pretty(state)?;
-    bytes.push(b'\n');
-    atomic_write(&path, &bytes)
-}
-
-fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
-    let temporary = path.with_extension(format!("json.{}.tmp", std::process::id()));
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temporary)
-        .with_context(|| format!("failed to create {}", temporary.display()))?;
-    if let Err(error) = file.write_all(bytes).and_then(|_| file.sync_all()) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error).with_context(|| format!("failed to write {}", temporary.display()));
-    }
-    drop(file);
-    if let Err(error) = fs::rename(&temporary, path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error).with_context(|| format!("failed to replace {}", path.display()));
-    }
-    Ok(())
-}
-
-fn workspace_root() -> Result<PathBuf> {
-    Ok(state_path()?
-        .parent()
-        .context("Ster workspace path has no parent")?
-        .to_path_buf())
-}
-
-fn state_path() -> Result<PathBuf> {
-    if let Some(root) = std::env::var_os("XDG_DATA_HOME").filter(|value| !value.is_empty()) {
-        return Ok(PathBuf::from(root).join("ster/workspace.json"));
-    }
-    let home = std::env::var_os("HOME").filter(|value| !value.is_empty()).context(
-        "HOME is unavailable; set HOME or XDG_DATA_HOME before importing a Ster pair set",
-    )?;
-    Ok(PathBuf::from(home).join(".local/share/ster/workspace.json"))
 }
