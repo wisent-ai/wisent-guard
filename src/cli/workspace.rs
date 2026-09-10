@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 
-use crate::onboarding;
+use super::onboarding;
 
 #[derive(Debug, Subcommand)]
 pub(super) enum WorkspaceCommand {

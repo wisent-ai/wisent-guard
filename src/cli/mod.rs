@@ -9,6 +9,7 @@ use clap::{Args, Parser};
 use ster::{DeviceChoice, Precision, Runtime};
 
 mod command;
+mod onboarding;
 mod pairs;
 mod tune;
 mod vectors;

@@ -1,15 +1,18 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Value};
 
 const PRODUCT_ID: &str = "ster";
 const JOURNEY_ID: &str = "first-use";
 const JOURNEY_VERSION: &str = "2026-09-05.1";
 const FIRST_SUCCESS_FACT: &str = "contrastive_pair_set_imported";
 const STATE_SCHEMA: &str = "ster.onboarding-state.v1";
-const DEFINITION: &str = include_str!("onboarding_first_use.json");
+const DEFINITION: &str = include_str!("first_use.json");
+
+mod state;
+
+use state::{fresh_state, load_or_start_state, save_state};
 
 pub fn run(reset: bool, import_pairs: Option<&Path>, name: Option<&str>) -> Result<()> {
     let definition = canonical_definition()?;
@@ -191,7 +194,7 @@ fn canonical_definition() -> Result<Value> {
     Ok(definition)
 }
 
-fn screen_by_id<'a>(definition: &'a Value, screen_id: &str) -> Result<&'a Value> {
+pub(super) fn screen_by_id<'a>(definition: &'a Value, screen_id: &str) -> Result<&'a Value> {
     definition
         .get("screens")
         .and_then(Value::as_array)
@@ -242,68 +245,3 @@ fn render(screen: &Value) -> Result<()> {
     Ok(())
 }
 
-fn load_or_start_state(definition: &Value) -> Result<Value> {
-    let path = state_path();
-    if path.exists() {
-        let state: Value = serde_json::from_str(
-            &fs::read_to_string(&path)
-                .with_context(|| format!("read onboarding state {}", path.display()))?,
-        )
-        .context("parse onboarding state")?;
-        if state.get("schema").and_then(Value::as_str) != Some(STATE_SCHEMA)
-            || state.get("product_id").and_then(Value::as_str) != Some(PRODUCT_ID)
-            || state.get("journey_id").and_then(Value::as_str) != Some(JOURNEY_ID)
-            || state.get("journey_version").and_then(Value::as_str) != Some(JOURNEY_VERSION)
-        {
-            bail!("stored onboarding state identity mismatch; use --reset to replace it");
-        }
-        let current_screen_id = state
-            .get("current_screen_id")
-            .and_then(Value::as_str)
-            .context("stored onboarding state has no current screen")?;
-        screen_by_id(definition, current_screen_id)?;
-        return Ok(state);
-    }
-
-    let state = fresh_state(definition)?;
-    save_state(&state)?;
-    Ok(state)
-}
-
-fn fresh_state(definition: &Value) -> Result<Value> {
-    let entry_screen_id = definition
-        .get("entry_screen_id")
-        .and_then(Value::as_str)
-        .context("canonical onboarding journey has no entry screen")?;
-    Ok(json!({
-        "schema": STATE_SCHEMA,
-        "product_id": PRODUCT_ID,
-        "journey_id": JOURNEY_ID,
-        "journey_version": JOURNEY_VERSION,
-        "current_screen_id": entry_screen_id,
-        "status": "in_progress",
-        "evidence": Map::<String, Value>::new(),
-    }))
-}
-
-fn save_state(state: &Value) -> Result<()> {
-    let path = state_path();
-    let parent = path
-        .parent()
-        .context("onboarding state path has no parent")?;
-    fs::create_dir_all(parent)
-        .with_context(|| format!("create onboarding state directory {}", parent.display()))?;
-    let body = format!("{}\n", serde_json::to_string_pretty(state)?);
-    fs::write(&path, body)
-        .with_context(|| format!("write onboarding state {}", path.display()))
-}
-
-fn state_path() -> PathBuf {
-    if let Some(path) = std::env::var_os("XDG_STATE_HOME") {
-        return PathBuf::from(path).join("ster/onboarding.json");
-    }
-    if let Some(home) = std::env::var_os("HOME") {
-        return PathBuf::from(home).join(".local/state/ster/onboarding.json");
-    }
-    std::env::temp_dir().join("ster/onboarding.json")
-}

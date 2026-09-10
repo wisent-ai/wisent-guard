@@ -12,7 +12,7 @@ use ster::{
     TrainingMethod,
 };
 
-use crate::onboarding;
+use super::onboarding;
 
 use super::{resolve_pairs, ModelArgs};
 

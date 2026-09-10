@@ -2,7 +2,7 @@
 //! the library's.
 
 mod cli;
-mod onboarding;
+
 
 use anyhow::Result;
 
