@@ -31,130 +31,26 @@
 //! adapters it never saw would produce scores that mean nothing, so the
 //! artifact does not offer that as a possibility.
 
-use std::path::Path;
 
-use anyhow::{Context, Result, bail};
-use candle_core::{DType, Device, IndexOp, Tensor};
-use candle_nn::{AdamW, Init, Optimizer, ParamsAdamW, VarMap};
-use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use anyhow::{bail, Context, Result};
+use candle_core::Tensor;
+use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarMap};
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use serde::Serialize;
 
-use super::{Preflight, Trainable, batch, encode_pairs, pair_set_label, schedule, softplus};
-use crate::{
-    artifact::PairSet,
-    lora,
-    runtime::{DeviceChoice, Runtime},
-    workflow,
+use super::super::{
+    batch,
+    preflight::{encode_pairs, pair_set_label, Preflight, Trainable},
+    schedule,
 };
+use crate::{artifact::PairSet, lora, runtime::Runtime, workflow};
 
-/// The scalar head a reward model scores with: one row, `hidden_size` wide.
-#[derive(Debug, Clone)]
-pub struct RewardHead {
-    weight: Tensor,
-}
+mod head;
+mod step;
 
-impl RewardHead {
-    /// A fresh head registered in `varmap`, so one optimizer steps it and the
-    /// adapters together.
-    ///
-    /// Zeroed rather than drawn. A single output row has no symmetry for a
-    /// random draw to break, and the Bradley-Terry gradient at zero is
-    /// `-(h_chosen - h_rejected) / 2`, which is as far from zero as the two
-    /// residual states are from each other — so the head learns immediately
-    /// and the run needs no seed of its own.
-    pub fn fresh(varmap: &VarMap, hidden: usize, device: &Device, dtype: DType) -> Result<Self> {
-        let weight = varmap
-            .get((1, hidden), lora::REWARD_HEAD_TENSOR, Init::Const(0.0), dtype, device)
-            .with_context(|| format!("failed to create {}", lora::REWARD_HEAD_TENSOR))?;
-        Ok(Self { weight })
-    }
+pub use head::{RewardHead, RewardModel};
 
-    /// The head read back out of an artifact, frozen.
-    pub fn from_tensor(weight: Tensor) -> Result<Self> {
-        let dims = weight.dims();
-        if dims.len() != 2 || dims[0] != 1 {
-            bail!(
-                "reward head has shape {dims:?}, expected one row of hidden-size weights"
-            );
-        }
-        Ok(Self { weight })
-    }
-
-    pub fn weight(&self) -> &Tensor {
-        &self.weight
-    }
-
-    /// The score of one sequence, given `[1, sequence, hidden]`.
-    ///
-    /// The last position is the one that has attended to the whole sequence,
-    /// so it is the only position that can score it. A batched pass hands its
-    /// rows over one at a time through `batch::row`, already sliced back to
-    /// each row's own length, so the last position here is always a real token
-    /// and never padding.
-    pub fn score(&self, hidden: &Tensor) -> Result<Tensor> {
-        let (_, sequence, width) = hidden.dims3()?;
-        let expected = self.weight.dim(1)?;
-        if width != expected {
-            bail!("reward head is {expected} wide, the model's residual stream is {width}");
-        }
-        // Read at the head's own dtype rather than the residual stream's. The
-        // head is the smallest parameter in the run — one row — and it is the
-        // one that rounds away first, so it is trained in F32 even when the
-        // base weights are half. At F32 this is a clone.
-        let last = hidden.i((0, sequence - 1, ..))?.to_dtype(self.weight.dtype())?;
-        // An elementwise product folded to a scalar rather than a matmul: the
-        // result is one number, and a `[1, hidden] x [hidden, 1]` matmul would
-        // reshape twice to say the same thing.
-        Ok((last * self.weight.squeeze(0)?)?.sum_all()?)
-    }
-}
-
-/// A trained reward model, loaded and frozen: the base weights with the
-/// artifact's adapters attached, and the head that reads them.
-///
-/// This is a second model in memory beside whatever policy is being trained,
-/// and that is not an oversight to optimize away later: a judge is genuinely a
-/// different model from the thing it judges. What it is not is a second copy
-/// of anything — the adapters are the artifact's own, and the base weights are
-/// mapped read-only exactly as every other Ster load maps them.
-pub struct RewardModel {
-    runtime: Runtime,
-    head: RewardHead,
-}
-
-impl RewardModel {
-    /// Loads the reward artifact at `path` against `model`.
-    ///
-    /// The artifact must declare kind `reward`; a generation adapter has no
-    /// head, and attaching one here would silently score every sequence with
-    /// whatever the caller passed instead.
-    pub fn load(
-        model: &str,
-        revision: Option<&str>,
-        device: DeviceChoice,
-        path: &Path,
-    ) -> Result<Self> {
-        let (runtime, artifact) =
-            Runtime::load_artifact(model, revision, device, path, lora::Kind::Reward)?;
-        let weight = artifact
-            .tensors
-            .get(lora::REWARD_HEAD_TENSOR)
-            .with_context(|| format!("reward artifact is missing {}", lora::REWARD_HEAD_TENSOR))?
-            .to_device(runtime.device())?
-            .to_dtype(runtime.dtype())?;
-        Ok(Self { runtime, head: RewardHead::from_tensor(weight)? })
-    }
-
-    /// The reward this model assigns to one tokenized sequence.
-    ///
-    /// The whole sequence goes in, prompt included: the head reads the last
-    /// position, which has attended to everything before it, so a response is
-    /// scored in the context it was a response to.
-    pub fn score(&self, ids: &[u32]) -> Result<f64> {
-        let hidden = self.runtime.forward_hidden_scored(ids)?;
-        Ok(self.head.score(&hidden)?.to_scalar::<f32>()? as f64)
-    }
-}
+use step::{step_loss, Summary};
 
 #[derive(Debug, Clone)]
 pub struct RewardOptions {
@@ -368,87 +264,3 @@ pub fn reward(
     })
 }
 
-/// The loss for one pair, plus the scalars the report is built from.
-struct Step {
-    tensor: Tensor,
-    loss: f64,
-    chosen: f64,
-    rejected: f64,
-}
-
-/// One pair's contribution: two scored rows and one Bradley-Terry loss.
-///
-/// The residual streams arrive already read out of whatever forward produced
-/// them, so this function is identical whether one pair went through the model
-/// or eight did.
-fn step_loss(head: &RewardHead, chosen: &Tensor, rejected: &Tensor) -> Result<Step> {
-    let chosen = head.score(chosen)?;
-    let rejected = head.score(rejected)?;
-    // -log sigmoid(chosen - rejected), through the softplus that survives a
-    // head confident enough to overflow the direct form.
-    let tensor = softplus(&(&rejected - &chosen)?)?;
-    Ok(Step {
-        loss: tensor.to_scalar::<f32>()? as f64,
-        chosen: chosen.to_scalar::<f32>()? as f64,
-        rejected: rejected.to_scalar::<f32>()? as f64,
-        tensor,
-    })
-}
-
-/// Running totals over one epoch.
-#[derive(Debug, Default)]
-struct Summary {
-    pairs: usize,
-    loss: f64,
-    correct: usize,
-    /// Pairs whose two sides scored bit-identically. The comparison is exact
-    /// on purpose: the only tie this is here to name is the one a
-    /// zero-initialised head produces, where both sides are the same
-    /// arithmetic on the same weights and land on the same float. A tolerance
-    /// would start folding in pairs the head merely finds close, which is a
-    /// different statement.
-    tied: usize,
-    chosen: f64,
-    rejected: f64,
-}
-
-impl Summary {
-    fn record(&mut self, step: &Step) {
-        self.pairs += 1;
-        self.loss += step.loss;
-        self.chosen += step.chosen;
-        self.rejected += step.rejected;
-        if step.chosen > step.rejected {
-            self.correct += 1;
-        } else if step.chosen == step.rejected {
-            self.tied += 1;
-        }
-    }
-
-    /// Every mean below divides by the pair count, guarded at one so an epoch
-    /// that recorded nothing reports zero rather than a JSON `NaN` no client
-    /// can parse.
-    fn mean(&self, total: f64) -> f32 {
-        (total / self.pairs.max(1) as f64) as f32
-    }
-
-    fn mean_loss(&self) -> f32 {
-        self.mean(self.loss)
-    }
-
-    fn mean_chosen(&self) -> f32 {
-        self.mean(self.chosen)
-    }
-
-    fn mean_rejected(&self) -> f32 {
-        self.mean(self.rejected)
-    }
-
-    fn mean_margin(&self) -> f32 {
-        self.mean(self.chosen - self.rejected)
-    }
-
-    fn accuracy(&self) -> f32 {
-        self.correct as f32 / self.pairs.max(1) as f32
-    }
-}

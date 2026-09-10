@@ -29,7 +29,7 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
-use super::{ExampleSet, batch, sequence_logprob};
+use super::super::{batch, examples::ExampleSet, preflight::sequence_logprob};
 use crate::{artifact::Document, lora, model::Route, runtime::Runtime, workflow};
 
 /// Warns when an artifact this run is consuming was produced in a different

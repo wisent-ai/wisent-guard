@@ -17,7 +17,12 @@ use candle_nn::{AdamW, Optimizer, ParamsAdamW, VarMap, loss};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use serde::Serialize;
 
-use super::{ExampleSet, Preflight, Trainable, batch, schedule};
+use super::super::{
+    batch,
+    examples::ExampleSet,
+    preflight::{Preflight, Trainable},
+    schedule,
+};
 use crate::{lora, runtime::Runtime, workflow};
 
 #[derive(Debug, Clone)]
