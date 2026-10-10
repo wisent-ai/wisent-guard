@@ -60,11 +60,15 @@ impl Scorer {
             Ok(response) => response
                 .into_string()
                 .with_context(|| format!("reading the reward scorer's answer from {}", self.url))?,
-            Err(ureq::Error::Status(status, response)) => bail!(
-                "the reward scorer {} answered HTTP {status}: {}",
-                self.url,
-                response.into_string().unwrap_or_default()
-            ),
+            Err(ureq::Error::Status(status, response)) => {
+                let body = response.into_string().with_context(|| {
+                    format!(
+                        "reading the reward scorer refusal from {} with HTTP {status}",
+                        self.url
+                    )
+                })?;
+                bail!("the reward scorer {} answered HTTP {status}: {body}", self.url)
+            }
             Err(ureq::Error::Transport(transport)) => {
                 bail!(
                     "the reward scorer {} could not be reached: {transport}",
