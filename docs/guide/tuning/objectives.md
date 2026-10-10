@@ -215,8 +215,11 @@ no model of (an AI-text detector, a house judge, a game environment that pays
 a move): every completion is posted as `{"prompt": "<prompt>", "text": "<completion>"}`,
 the prompt being the group's original input for a single-turn run, or a JSON
 array of `[role, text]` pairs containing every turn before this completion for a
-simulated-user run. `STER_REWARD_BEARER` supplies the bearer when set, and the
-reward is the number at the JSON pointer the address's fragment names —
+simulated-user run. `STER_REWARD_BEARER` supplies the bearer when set.
+An absent bearer permits an unauthenticated scorer; a present blank or
+non-Unicode value refuses by name before any scorer request rather than
+silently dropping authentication. The reward is the number at the JSON
+pointer the address's fragment names —
 `--reward 'https://detector.example/score#/ai_probability'`; the
 fragment is not sent. An address without a fragment is refused with
 `reward scorer "…" names no field`. HTTP refusals preserve the status and body;

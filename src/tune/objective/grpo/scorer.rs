@@ -37,12 +37,20 @@ impl Scorer {
         if !pointer.starts_with('/') {
             bail!("reward scorer field {pointer:?} is not a JSON pointer; it starts with /");
         }
+        let bearer = match std::env::var("STER_REWARD_BEARER") {
+            Ok(value) if value.trim().is_empty() => {
+                bail!("STER_REWARD_BEARER is present but empty");
+            }
+            Ok(value) => Some(value),
+            Err(std::env::VarError::NotPresent) => None,
+            Err(std::env::VarError::NotUnicode(_)) => {
+                bail!("STER_REWARD_BEARER is not valid Unicode");
+            }
+        };
         Ok(Some(Self {
             url: url.to_owned(),
             pointer: pointer.to_owned(),
-            bearer: std::env::var("STER_REWARD_BEARER")
-                .ok()
-                .filter(|bearer| !bearer.trim().is_empty()),
+            bearer,
             agent: ureq::AgentBuilder::new().build(),
         }))
     }
