@@ -217,9 +217,9 @@ the prompt being the one its group was sampled from, with `STER_REWARD_BEARER` a
 set, and the reward is the number at the JSON pointer the address's fragment
 names — `--reward 'https://detector.example/score#/ai_probability'`; the
 fragment is not sent. An address without a fragment is refused with
-`reward scorer "…" names no field`, and a scorer that answers an HTTP error,
-something other than JSON, or no number at the pointer stops the run with
-what it answered, because a missing reward is not a zero. Anything else is a
+`reward scorer "…" names no field`. HTTP refusals preserve the status and body;
+an unreadable refusal names the scorer, status and underlying read error.
+Malformed JSON or a missing reward field retains the whole answer: a missing reward is not zero. Anything else is a
 path to a reward artifact from `ster tune reward`, loaded frozen
 beside the policy; a generation adapter passed there is refused with
 `adapter artifact is a generation adapter, not a reward model`, and a path that
