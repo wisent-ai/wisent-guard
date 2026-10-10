@@ -288,7 +288,10 @@ words: `max_tokens must be between one and 32768` and
 surfaced in Brama's own words, as `brama refused the completion: 401 unauthorized`
 — the status followed by the `message` from Brama's `{"error":{...}}` envelope.
 A body without that envelope becomes
-`brama refused the completion with {status} and a body that is not its error envelope: {excerpt}`.
+`brama refused the completion with {status} and a body that is not its error envelope: {body}`.
+The body is retained whole, including HTML. An unreadable refusal names the
+gateway and HTTP status alongside the read cause; malformed successful replies
+retain their complete body beside the JSON or missing-message diagnostic.
 
 The run reports `generator`, which records which of the two wrote the set as
 `local:<model id>` or `brama:<route>`, then `trait_name`,

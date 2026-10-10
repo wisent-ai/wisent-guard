@@ -115,7 +115,9 @@ impl Gateway {
             Ok(response) => response,
             // `ureq` hands back every non-2xx as this arm, response body intact.
             Err(ureq::Error::Status(status, response)) => {
-                let body = response.into_string().unwrap_or_default();
+                let body = response.into_string().with_context(|| {
+                    format!("failed to read Brama refusal from {} with status {status}", self.base)
+                })?;
                 return Err(refusal(status, &body));
             }
             // The transport error quotes the URL it failed on; the bearer lives
@@ -132,7 +134,7 @@ impl Gateway {
             .into_string()
             .context("failed to read Brama's completion body")?;
         let value: Value = serde_json::from_str(&text)
-            .context("Brama returned a completion body that is not JSON")?;
+            .with_context(|| format!("Brama returned a completion body that is not JSON: {text}"))?;
         let content = value
             .get("choices")
             .and_then(Value::as_array)
@@ -142,7 +144,7 @@ impl Gateway {
             .and_then(Value::as_str);
         match content {
             Some(content) => Ok(content.trim().to_owned()),
-            None => bail!("Brama's answer carried no assistant message"),
+            None => bail!("Brama's answer carried no assistant message: {text}"),
         }
     }
 }
@@ -217,8 +219,7 @@ fn bearer() -> Result<String> {
 /// Every Brama route fails with `{"error":{"code","message","type","retryable",
 /// "attempts"}}`, so the operator should read the gateway's sentence, not a
 /// paraphrase of it. Anything else on the wire is a proxy or a misconfigured
-/// host, and saying so plus a bounded excerpt is more useful than pretending
-/// the envelope was there.
+/// host; preserve that answer whole instead of pretending the envelope was there.
 fn refusal(status: u16, body: &str) -> anyhow::Error {
     let message = serde_json::from_str::<Value>(body).ok().and_then(|value| {
         value
@@ -230,25 +231,8 @@ fn refusal(status: u16, body: &str) -> anyhow::Error {
     match message {
         Some(message) => anyhow::anyhow!("brama refused the completion: {status} {message}"),
         None => anyhow::anyhow!(
-            "brama refused the completion with {status} and a body that is not its error envelope: {}",
-            excerpt(body)
+            "brama refused the completion with {status} and a body that is not its error envelope: {body}"
         ),
     }
 }
 
-/// An unrecognized error body as a refusal quotes it: a proxy's HTML error
-/// page by its title, anything else whole.
-fn excerpt(body: &str) -> String {
-    let body = body.trim();
-    if body.is_empty() {
-        return "<empty body>".to_owned();
-    }
-    let title = body
-        .split_once("<title>")
-        .and_then(|(_, rest)| rest.split_once("</title>"))
-        .map(|(title, _)| title.trim());
-    match title {
-        Some(title) => format!("an HTML page titled {title:?} ({} bytes)", body.len()),
-        None => body.to_owned(),
-    }
-}
