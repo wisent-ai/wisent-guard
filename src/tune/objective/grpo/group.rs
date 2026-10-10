@@ -78,9 +78,15 @@ pub(super) fn sample_group(
             } else {
                 total += reward.score(prompt, turn)?;
             }
+            if !total.is_finite() {
+                bail!("GRPO conversation reward sum is not finite ({total}); refusing the group before a policy update");
+            }
         }
         rewards.push(total);
         conversations.push(turns);
+    }
+    if rewards.is_empty() {
+        bail!("GRPO reward normalization requires a sampled conversation; the group is empty");
     }
 
     let count = rewards.len() as f64;
@@ -90,6 +96,12 @@ pub(super) fn sample_group(
         .map(|value| (value - mean).powi(2))
         .sum::<f64>()
         / count;
+    if !mean.is_finite() || !variance.is_finite() {
+        bail!(
+            "GRPO reward normalization is not finite for {} conversations: mean={mean}, variance={variance}; refusing the group before a policy update",
+            rewards.len()
+        );
+    }
     let spread = variance.sqrt();
     // No epsilon. A group whose conversations all scored the same has no
     // preference to express, and its advantages are exactly zero; adding a

@@ -232,6 +232,10 @@ is neither with
 `reward source "nope" is neither the keyword length nor a file that exists`.
 The reward source is resolved before the policy is loaded, so a mismatch is
 refused before an operator waits out a policy load to hear it.
+Conversation reward sums and group mean/variance must remain finite. An
+overflowing sum or non-finite normalization reports the observed values and
+refuses that group before a policy update; it is not treated as a tied group
+with zero advantage. An empty sampled group is refused before normalization.
 
 Three details are decisions rather than defaults. A group whose completions all
 scored the same has advantages of exactly zero and contributes only its KL
