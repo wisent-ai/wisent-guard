@@ -213,9 +213,11 @@ download. If reward does not rise under it, the bug is in the loop. An
 `http://` or `https://` address is an outside scorer, for a quality Ster holds
 no model of (an AI-text detector, a house judge, a game environment that pays
 a move): every completion is posted as `{"prompt": "<prompt>", "text": "<completion>"}`,
-the prompt being the one its group was sampled from, with `STER_REWARD_BEARER` as the bearer when it is
-set, and the reward is the number at the JSON pointer the address's fragment
-names — `--reward 'https://detector.example/score#/ai_probability'`; the
+the prompt being the group's original input for a single-turn run, or a JSON
+array of `[role, text]` pairs containing every turn before this completion for a
+simulated-user run. `STER_REWARD_BEARER` supplies the bearer when set, and the
+reward is the number at the JSON pointer the address's fragment names —
+`--reward 'https://detector.example/score#/ai_probability'`; the
 fragment is not sent. An address without a fragment is refused with
 `reward scorer "…" names no field`. HTTP refusals preserve the status and body;
 an unreadable refusal names the scorer, status and underlying read error.

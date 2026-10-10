@@ -55,7 +55,7 @@ pub(super) fn sample_group(
     let mut conversations = Vec::with_capacity(options.group);
     let mut rewards = Vec::with_capacity(options.group);
     for _ in 0..options.group {
-        let turns = rollout(
+        let conversation = rollout(
             runtime,
             user,
             prompt,
@@ -63,11 +63,21 @@ pub(super) fn sample_group(
             options.generation,
             limit,
             draw,
-        )?
-        .turns;
+        )?;
+        let turns = conversation.turns;
+        let mut assistant_positions = conversation.transcript.iter().enumerate()
+            .filter_map(|(index, (role, _))| (*role == "assistant").then_some(index));
         let mut total = 0f64;
         for turn in &turns {
-            total += reward.score(prompt, turn)?;
+            if user.is_some() && matches!(reward, Reward::Scorer(_)) {
+                let Some(position) = assistant_positions.next() else {
+                    bail!("rollout completion has no matching assistant turn in its transcript");
+                };
+                let context = serde_json::to_string(&conversation.transcript[..position])?;
+                total += reward.score(&context, turn)?;
+            } else {
+                total += reward.score(prompt, turn)?;
+            }
         }
         rewards.push(total);
         conversations.push(turns);
