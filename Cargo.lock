@@ -2693,6 +2693,7 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "clap",
+ "half",
  "hf-hub",
  "minijinja",
  "rand",

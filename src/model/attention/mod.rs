@@ -1571,7 +1571,7 @@ fn repeat_key_value(input: Tensor, repeats: usize) -> candle_core::Result<Tensor
         .reshape((batch, key_value_heads * repeats, sequence, head_dim))
 }
 
-fn masked_fill(values: &Tensor, mask: &Tensor, replacement: f32) -> candle_core::Result<Tensor> {
+pub(super) fn masked_fill(values: &Tensor, mask: &Tensor, replacement: f32) -> candle_core::Result<Tensor> {
     let replacement = Tensor::new(replacement, values.device())?.broadcast_as(mask.shape())?;
     mask.where_cond(&replacement, values)
 }
