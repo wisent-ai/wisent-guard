@@ -155,7 +155,7 @@ impl Checkpoint {
         // tokenizer.
         if let (Layout::Mistral, Some(object)) = (self.layout, raw.as_object_mut()) {
             if let Some(eos) =
-                mistral::end_of_sequence(self.tokenizer_config.as_deref(), &self.tokenizer)
+                mistral::end_of_sequence(self.tokenizer_config.as_deref(), &self.tokenizer)?
             {
                 object
                     .entry("eos_token_id")
