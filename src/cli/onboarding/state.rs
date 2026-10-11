@@ -10,8 +10,11 @@ use serde_json::{Map, Value, json};
 use super::{JOURNEY_ID, JOURNEY_VERSION, PRODUCT_ID, STATE_SCHEMA, screen_by_id};
 
 pub(super) fn load_or_start_state(definition: &Value) -> Result<Value> {
-    let path = state_path();
-    if path.exists() {
+    let path = state_path()?;
+    if path
+        .try_exists()
+        .with_context(|| format!("check onboarding state {}", path.display()))?
+    {
         let state: Value = serde_json::from_str(
             &fs::read_to_string(&path)
                 .with_context(|| format!("read onboarding state {}", path.display()))?,
@@ -54,7 +57,7 @@ pub(super) fn fresh_state(definition: &Value) -> Result<Value> {
 }
 
 pub(super) fn save_state(state: &Value) -> Result<()> {
-    let path = state_path();
+    let path = state_path()?;
     let parent = path
         .parent()
         .context("onboarding state path has no parent")?;
@@ -64,12 +67,15 @@ pub(super) fn save_state(state: &Value) -> Result<()> {
     fs::write(&path, body).with_context(|| format!("write onboarding state {}", path.display()))
 }
 
-fn state_path() -> PathBuf {
+/// `$XDG_STATE_HOME/ster`, else `$HOME/.local/state/ster`. With neither it
+/// is refused: the temporary directory it used instead is cleared by the
+/// system and shared by every account, so progress vanished or crossed users.
+fn state_path() -> Result<PathBuf> {
     if let Some(path) = std::env::var_os("XDG_STATE_HOME") {
-        return PathBuf::from(path).join("ster/onboarding.json");
+        return Ok(PathBuf::from(path).join("ster/onboarding.json"));
     }
-    if let Some(home) = std::env::var_os("HOME") {
-        return PathBuf::from(home).join(".local/state/ster/onboarding.json");
-    }
-    std::env::temp_dir().join("ster/onboarding.json")
+    let home = std::env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .context("HOME is unavailable; set HOME or XDG_STATE_HOME to keep onboarding progress")?;
+    Ok(PathBuf::from(home).join(".local/state/ster/onboarding.json"))
 }
