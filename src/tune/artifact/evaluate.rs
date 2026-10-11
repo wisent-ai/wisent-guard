@@ -26,7 +26,7 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::Serialize;
 
 use super::super::{batch, examples::ExampleSet, preflight::sequence_logprob};
@@ -57,12 +57,20 @@ use crate::{artifact::Document, lora, model::Route, runtime::Runtime, workflow};
 /// impossible rather than merely deliberate. Only an unnoticed mismatch is a
 /// defect.
 ///
-/// Silent when nothing can be read or the record does not carry the field: an
-/// artifact written before a field existed is not a mismatch, and this is a
-/// courtesy on top of the run rather than a gate in front of it.
+/// Silent when no record exists or it does not carry the field: an artifact
+/// written before a field existed is not a mismatch, and this is a courtesy on
+/// top of the run rather than a gate in front of it. A record that exists and
+/// cannot be read is said, since the mismatch it would have shown is unknown.
 pub fn warn_on_provenance(artifact: &Path, subject: &str, runtime: &Runtime) {
-    let Some(record) = provenance(artifact) else {
-        return;
+    let record = match provenance(artifact) {
+        Ok(Some(record)) => record,
+        Ok(None) => return,
+        Err(cause) => {
+            workflow::progress(format!(
+                "warning: this {subject}'s training record could not be read, so a chat template or precision mismatch cannot be checked: {cause}"
+            ));
+            return;
+        }
     };
     if let Some(trained) = record["chat_template"].as_str() {
         let now = runtime.chat_status().label();
@@ -97,16 +105,33 @@ pub fn warn_on_provenance(artifact: &Path, subject: &str, runtime: &Runtime) {
 /// `Unrecognised` takes the adapter reading. A document that is neither shape
 /// has no provenance to disagree with, and the field lookups above miss
 /// silently on the `null` that produces.
-fn provenance(artifact: &Path) -> Option<serde_json::Value> {
+fn provenance(artifact: &Path) -> Result<Option<serde_json::Value>, String> {
     let sidecar = lora::Artifact::sidecar_path(artifact);
-    let bytes = std::fs::read(&sidecar)
-        .or_else(|_| std::fs::read(artifact))
-        .ok()?;
-    let document = serde_json::from_slice::<serde_json::Value>(&bytes).ok()?;
-    match Document::recognise(&bytes) {
-        Document::Steering => Some(document),
-        Document::AdapterSidecar | Document::Unrecognised => Some(document["train"].clone()),
-    }
+    // The sidecar when there is one; else the artifact itself, which is the
+    // record only when it is JSON. Only a missing file is passed over, and
+    // only the artifact may fail to be JSON: an adapter's weights are not.
+    let (bytes, from_sidecar) = match std::fs::read(&sidecar) {
+        Ok(bytes) => (bytes, true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            match std::fs::read(artifact) {
+                Ok(bytes) => (bytes, false),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+                Err(error) => return Err(format!("{}: {error}", artifact.display())),
+            }
+        }
+        Err(error) => return Err(format!("{}: {error}", sidecar.display())),
+    };
+    let document = match serde_json::from_slice::<serde_json::Value>(&bytes) {
+        Ok(document) => document,
+        Err(error) if from_sidecar => {
+            return Err(format!("{} is not JSON: {error}", sidecar.display()))
+        }
+        Err(_) => return Ok(None),
+    };
+    Ok(Some(match Document::recognise(&bytes) {
+        Document::Steering => document,
+        Document::AdapterSidecar | Document::Unrecognised => document["train"].clone(),
+    }))
 }
 
 #[derive(Debug, Clone)]
