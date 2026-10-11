@@ -360,4 +360,3 @@ impl BaseLoad {
         }
     }
 }
-

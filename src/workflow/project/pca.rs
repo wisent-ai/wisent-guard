@@ -76,7 +76,9 @@ pub(super) fn principal(centred: &[Vec<f64>], count: usize) -> Components {
             break;
         };
         for part in weighted {
-            axis.iter_mut().zip(part).for_each(|(value, add)| *value += add);
+            axis.iter_mut()
+                .zip(part)
+                .for_each(|(value, add)| *value += add);
         }
         let axis_length = dot(&axis, &axis).sqrt();
         if !axis_length.is_normal() {
@@ -91,7 +93,11 @@ pub(super) fn principal(centred: &[Vec<f64>], count: usize) -> Components {
                 .for_each(|(value, right)| *value -= quotient * left * right);
         }
     }
-    Components { axes, variances, total }
+    Components {
+        axes,
+        variances,
+        total,
+    }
 }
 
 fn apply(matrix: &[Vec<f64>], vector: &[f64]) -> Vec<f64> {

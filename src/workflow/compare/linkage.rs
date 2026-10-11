@@ -6,7 +6,11 @@
 /// their members — until `target` groups remain. Returns each item's group
 /// in item order; groups are numbered by their earliest member.
 pub(super) fn average(distance: &[Vec<f64>], target: usize) -> Vec<usize> {
-    let mut groups: Vec<Vec<usize>> = distance.iter().enumerate().map(|(item, _)| vec![item]).collect();
+    let mut groups: Vec<Vec<usize>> = distance
+        .iter()
+        .enumerate()
+        .map(|(item, _)| vec![item])
+        .collect();
     while groups.len() > target {
         let nearest = groups
             .iter()
@@ -19,7 +23,8 @@ pub(super) fn average(distance: &[Vec<f64>], target: usize) -> Vec<usize> {
                     .map(move |(right, _)| (left, right))
             })
             .min_by(|&(a, b), &(c, d)| {
-                between(distance, &groups[a], &groups[b]).total_cmp(&between(distance, &groups[c], &groups[d]))
+                between(distance, &groups[a], &groups[b])
+                    .total_cmp(&between(distance, &groups[c], &groups[d]))
             })
             .expect("more groups than the target means at least two to merge");
         let (keep, absorb) = nearest;
@@ -43,7 +48,10 @@ pub(super) fn silhouette(distance: &[Vec<f64>], assignment: &[usize]) -> Option<
         .iter()
         .enumerate()
         .filter_map(|(item, &group)| {
-            let own: Vec<usize> = members(assignment, group).into_iter().filter(|&other| other != item).collect();
+            let own: Vec<usize> = members(assignment, group)
+                .into_iter()
+                .filter(|&other| other != item)
+                .collect();
             if own.is_empty() {
                 return None;
             }
@@ -73,7 +81,11 @@ fn members(assignment: &[usize], group: usize) -> Vec<usize> {
 }
 
 fn mean_to(distance: &[Vec<f64>], item: usize, others: &[usize]) -> f64 {
-    others.iter().map(|&other| distance[item][other]).sum::<f64>() / others.len() as f64
+    others
+        .iter()
+        .map(|&other| distance[item][other])
+        .sum::<f64>()
+        / others.len() as f64
 }
 
 fn between(distance: &[Vec<f64>], left: &[usize], right: &[usize]) -> f64 {

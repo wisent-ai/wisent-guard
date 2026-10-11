@@ -26,7 +26,7 @@
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use super::super::{batch, examples::ExampleSet, preflight::sequence_logprob};
@@ -91,7 +91,6 @@ pub fn warn_on_provenance(artifact: &Path, subject: &str, runtime: &Runtime) {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct EvaluateOptions {

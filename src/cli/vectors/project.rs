@@ -69,7 +69,8 @@ pub(in crate::cli) fn project(args: ProjectArgs) -> Result<()> {
         strength,
         components,
     };
-    let mut report = serde_json::to_value(workflow::project(&runtime, &pair_set, &artifact, &options)?)?;
+    let mut report =
+        serde_json::to_value(workflow::project(&runtime, &pair_set, &artifact, &options)?)?;
     chat.annotate(&mut report)?;
     super::super::answer(&report)
 }

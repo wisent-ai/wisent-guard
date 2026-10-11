@@ -50,7 +50,8 @@ pub fn inspect_responses(path: &Path, refusal_threshold: f32) -> Result<Response
     if !refusal_threshold.is_finite() {
         bail!("--refusal-threshold {refusal_threshold} is not a number a score can reach");
     }
-    let bytes = fs::read(path).with_context(|| format!("failed to read responses {}", path.display()))?;
+    let bytes =
+        fs::read(path).with_context(|| format!("failed to read responses {}", path.display()))?;
     let responses: Vec<Response> = serde_json::from_slice(&bytes).with_context(|| {
         format!(
             "{} is not a list of {{\"prompt\", \"model_output\"}} answers as ster generate --prompts writes",
@@ -71,8 +72,14 @@ pub fn inspect_responses(path: &Path, refusal_threshold: f32) -> Result<Response
             refusal: refusal_flag(&response.model_output, refusal_threshold),
         })
         .collect();
-    let refusal_count = entries.iter().filter(|entry| entry.refusal.is_some()).count();
-    let outputs: Vec<String> = responses.iter().map(|response| response.model_output.clone()).collect();
+    let refusal_count = entries
+        .iter()
+        .filter(|entry| entry.refusal.is_some())
+        .count();
+    let outputs: Vec<String> = responses
+        .iter()
+        .map(|response| response.model_output.clone())
+        .collect();
     Ok(ResponsesReport {
         path: path.display().to_string(),
         response_count: entries.len(),

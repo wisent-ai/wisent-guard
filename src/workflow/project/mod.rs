@@ -111,7 +111,10 @@ pub fn project(
         .flat_map(|(positive, negative)| [positive, negative])
         .collect();
     let mean = centroid(&unsteered_points);
-    let centred: Vec<Vec<f64>> = unsteered_points.iter().map(|point| minus(point, &mean)).collect();
+    let centred: Vec<Vec<f64>> = unsteered_points
+        .iter()
+        .map(|point| minus(point, &mean))
+        .collect();
     let fitted = pca::principal(&centred, options.components.get());
     if fitted.axes.is_empty() {
         bail!(
@@ -141,16 +144,27 @@ pub fn project(
         .vectors
         .iter()
         .find(|vector| vector.layer == options.layer)
-        .map(|vector| vector.values.iter().map(|&value| f64::from(value)).collect::<Vec<f64>>());
+        .map(|vector| {
+            vector
+                .values
+                .iter()
+                .map(|&value| f64::from(value))
+                .collect::<Vec<f64>>()
+        });
     let shift_along_direction = direction.and_then(|direction| {
         let length = dot(&direction, &direction).sqrt();
         length.is_normal().then(|| {
             let moves: Vec<f64> = plain
                 .iter()
                 .zip(&steered)
-                .flat_map(|((positive, negative), (steered_positive, steered_negative))| {
-                    [minus(steered_positive, positive), minus(steered_negative, negative)]
-                })
+                .flat_map(
+                    |((positive, negative), (steered_positive, steered_negative))| {
+                        [
+                            minus(steered_positive, positive),
+                            minus(steered_negative, negative),
+                        ]
+                    },
+                )
                 .map(|movement| dot(&movement, &direction) / length)
                 .collect();
             moves.iter().sum::<f64>() / moves.len() as f64
@@ -159,9 +173,19 @@ pub fn project(
 
     let positives: Vec<&Vec<f64>> = plain.iter().map(|(positive, _)| positive).collect();
     let target = centroid(&positives);
-    let before: Vec<f64> = plain.iter().map(|(_, negative)| distance(negative, &target)).collect();
-    let after: Vec<f64> = steered.iter().map(|(_, negative)| distance(negative, &target)).collect();
-    let nearer = before.iter().zip(&after).filter(|(was, now)| now < was).count();
+    let before: Vec<f64> = plain
+        .iter()
+        .map(|(_, negative)| distance(negative, &target))
+        .collect();
+    let after: Vec<f64> = steered
+        .iter()
+        .map(|(_, negative)| distance(negative, &target))
+        .collect();
+    let nearer = before
+        .iter()
+        .zip(&after)
+        .filter(|(was, now)| now < was)
+        .count();
 
     Ok(ProjectionReport {
         model: artifact.model.clone(),
@@ -169,7 +193,11 @@ pub fn project(
         layer: options.layer,
         strength: options.strength,
         pair_count: pairs.pairs.len(),
-        explained: fitted.variances.iter().map(|variance| variance / fitted.total).collect(),
+        explained: fitted
+            .variances
+            .iter()
+            .map(|variance| variance / fitted.total)
+            .collect(),
         points,
         shift_along_direction,
         negative_distance_to_positive: Distances {
@@ -197,7 +225,10 @@ fn centroid(points: &[&Vec<f64>]) -> Vec<f64> {
     };
     let mut total = first.to_vec();
     for point in sums {
-        total.iter_mut().zip(point).for_each(|(value, add)| *value += add);
+        total
+            .iter_mut()
+            .zip(point)
+            .for_each(|(value, add)| *value += add);
     }
     total.iter().map(|value| value / count).collect()
 }

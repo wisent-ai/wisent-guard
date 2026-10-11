@@ -293,7 +293,9 @@ impl Runtime {
         let ids = self.encode_prompt(prompt)?;
         let input = Tensor::new(ids.as_slice(), &self.device)?.unsqueeze(0)?;
         let mut cache = self.cache(false)?;
-        let output = self.model.forward(&input, 0, &mut cache, steering, layers)?;
+        let output = self
+            .model
+            .forward(&input, 0, &mut cache, steering, layers)?;
         Ok(output.activations.into_iter().collect())
     }
 

@@ -75,7 +75,10 @@ impl Scorer {
                         self.url
                     )
                 })?;
-                bail!("the reward scorer {} answered HTTP {status}: {body}", self.url)
+                bail!(
+                    "the reward scorer {} answered HTTP {status}: {body}",
+                    self.url
+                )
             }
             Err(ureq::Error::Transport(transport)) => {
                 bail!(

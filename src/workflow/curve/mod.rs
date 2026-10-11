@@ -87,7 +87,8 @@ pub fn curve(
         let read = captured.get(&layer).expect("requested layer is captured");
         for size in sizes {
             let size = size.get();
-            let direction = train_direction(&read.positive[..size], &read.negative[..size], method)?;
+            let direction =
+                train_direction(&read.positive[..size], &read.negative[..size], method)?;
             let (accuracy, margin) =
                 evaluate_direction(&read.positive[split..], &read.negative[split..], &direction)?;
             points.push(CurvePoint {
@@ -95,14 +96,19 @@ pub fn curve(
                 layer,
                 holdout_accuracy: accuracy,
                 holdout_margin: margin,
-                holdout_effect_size: effect_size(&read.positive[split..], &read.negative[split..], &direction),
+                holdout_effect_size: effect_size(
+                    &read.positive[split..],
+                    &read.negative[split..],
+                    &direction,
+                ),
             });
         }
     }
     let enough = layers
         .iter()
         .filter_map(|&layer| {
-            let at_layer: Vec<&CurvePoint> = points.iter().filter(|point| point.layer == layer).collect();
+            let at_layer: Vec<&CurvePoint> =
+                points.iter().filter(|point| point.layer == layer).collect();
             let best = at_layer
                 .iter()
                 .map(|point| point.holdout_accuracy)

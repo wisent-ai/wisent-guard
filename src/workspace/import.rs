@@ -28,7 +28,11 @@ pub struct ImportReport {
 
 impl ImportReport {
     pub fn accepted(&self) -> bool {
-        matches!(self.status, "imported" | "unchanged")
+        match self.status {
+            "imported" => true,
+            "unchanged" => true,
+            _ => false,
+        }
     }
 }
 
@@ -137,32 +141,33 @@ pub fn import_pair_set(source: &Path, requested_name: Option<&str>) -> Result<Im
     }
     pair_set.save(&temporary)?;
     if let Err(error) = fs::hard_link(&temporary, &destination) {
-        let _ = fs::remove_file(&temporary);
+        let staging = left_behind(&temporary);
         if error.kind() == std::io::ErrorKind::AlreadyExists {
+            let committed = "the destination appeared while the import was being committed; it was not replaced";
             return Ok(ImportReport {
                 status: "conflicting",
                 source: source.display().to_string(),
                 id: Some(id),
                 path: Some(destination.display().to_string()),
                 pair_count: Some(pair_set.pairs.len()),
-                reason: Some("the destination appeared while the import was being committed; it was not replaced".to_owned()),
+                reason: Some(match staging {
+                    Some(note) => format!("{committed}; {note}"),
+                    None => committed.to_owned(),
+                }),
             });
         }
-        return Err(error).with_context(|| {
-            format!(
-                "failed to commit imported pair set {}",
-                destination.display()
-            )
-        });
+        let failure = anyhow::Error::new(error).context(format!(
+            "failed to commit imported pair set {}",
+            destination.display()
+        ));
+        return Err(with_note(failure, staging));
     }
     if let Err(error) = fs::remove_file(&temporary) {
-        let _ = fs::remove_file(&destination);
-        return Err(error).with_context(|| {
-            format!(
-                "failed to remove import staging file {}",
-                temporary.display()
-            )
-        });
+        let failure = anyhow::Error::new(error).context(format!(
+            "failed to remove import staging file {}",
+            temporary.display()
+        ));
+        return Err(with_note(failure, left_behind(&destination)));
     }
 
     state.pair_sets.push(PairSetEntry {
@@ -174,8 +179,7 @@ pub fn import_pair_set(source: &Path, requested_name: Option<&str>) -> Result<Im
     });
     state.active_pair_set = Some(id.clone());
     if let Err(error) = save_state(&state) {
-        let _ = fs::remove_file(&destination);
-        return Err(error);
+        return Err(with_note(error, left_behind(&destination)));
     }
 
     Ok(ImportReport {
@@ -195,6 +199,27 @@ fn pair_set_digest(pair_set: &PairSet) -> Result<String> {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect())
+}
+
+/// Remove `path` while undoing an import: `None` when it is gone, or the
+/// sentence naming it when it could not be removed and stays behind.
+/// Dropped, a committed pair set left unrecorded in pairs/ came back on the
+/// next import as a conflict nobody could explain.
+fn left_behind(path: &Path) -> Option<String> {
+    match fs::remove_file(path) {
+        Ok(()) => None,
+        Err(error) => Some(format!(
+            "{} could not be removed and is left behind: {error}",
+            path.display()
+        )),
+    }
+}
+
+fn with_note(failure: anyhow::Error, note: Option<String>) -> anyhow::Error {
+    match note {
+        Some(note) => failure.context(format!("rolling back the import: {note}")),
+        None => failure,
+    }
 }
 
 /// A workspace name is a file name: it starts with an ASCII letter or digit and

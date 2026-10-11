@@ -238,7 +238,9 @@ impl Runtime {
             return Ok(None);
         };
         if !scale.is_normal() {
-            bail!("every steering strength is zero ({strengths:?}), so the vectors would steer nothing");
+            bail!(
+                "every steering strength is zero ({strengths:?}), so the vectors would steer nothing"
+            );
         }
         let mut sums: BTreeMap<usize, Vec<f64>> = BTreeMap::new();
         for (artifact, strength) in parts {
@@ -251,14 +253,21 @@ impl Runtime {
                         slot.insert(scaled.collect());
                     }
                     Entry::Occupied(mut slot) => {
-                        slot.get_mut().iter_mut().zip(scaled).for_each(|(sum, part)| *sum += part);
+                        slot.get_mut()
+                            .iter_mut()
+                            .zip(scaled)
+                            .for_each(|(sum, part)| *sum += part);
                     }
                 }
             }
         }
         Ok(Some(SteeringPlan::new(
-            sums.into_iter()
-                .map(|(layer, values)| (layer, values.into_iter().map(|value| value as f32).collect())),
+            sums.into_iter().map(|(layer, values)| {
+                (
+                    layer,
+                    values.into_iter().map(|value| value as f32).collect(),
+                )
+            }),
             scale,
             self.hidden_size(),
             &self.device,

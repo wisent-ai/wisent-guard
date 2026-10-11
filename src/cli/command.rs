@@ -8,9 +8,7 @@ use super::decide::{CalibrateArgs, DecideArgs};
 use super::decisions::DecisionsCommand;
 use super::pairs::PairsCommand;
 use super::tune::TuneCommand;
-use super::vectors::{
-    ExtractArgs, GenerateArgs, OnboardingArgs, ParityArgs, VectorCommand,
-};
+use super::vectors::{ExtractArgs, GenerateArgs, OnboardingArgs, ParityArgs, VectorCommand};
 use super::workspace::WorkspaceCommand;
 
 #[derive(Debug, Subcommand)]

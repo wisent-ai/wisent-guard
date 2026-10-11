@@ -101,7 +101,8 @@ pub(in crate::cli) fn generate(args: GenerateArgs) -> Result<()> {
             strength.len()
         );
     }
-    let parts: Vec<(&SteeringArtifact, f64)> = artifacts.iter().zip(strength.iter().copied()).collect();
+    let parts: Vec<(&SteeringArtifact, f64)> =
+        artifacts.iter().zip(strength.iter().copied()).collect();
     // The system turn is read here for the same reason: an unreadable or
     // empty file is refused before the checkpoint is paid for.
     let system = match system.as_deref() {

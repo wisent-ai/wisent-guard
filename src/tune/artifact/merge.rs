@@ -322,7 +322,12 @@ pub(crate) fn write_checkpoint(
         .tokenizer
         .file_name()
         .and_then(|name| name.to_str())
-        .with_context(|| format!("tokenizer path {} has no file name", source.tokenizer.display()))?;
+        .with_context(|| {
+            format!(
+                "tokenizer path {} has no file name",
+                source.tokenizer.display()
+            )
+        })?;
     let required = [
         (&source.config, source.layout.config_file()),
         (&source.tokenizer, tokenizer_leaf),

@@ -25,7 +25,6 @@ pub use device::{DeviceChoice, Precision};
 pub use infer::{Completion, GenerationOptions};
 pub use load::{Checkpoint, Layout};
 
-
 pub struct Runtime {
     pub model_id: String,
     pub revision: Option<String>,

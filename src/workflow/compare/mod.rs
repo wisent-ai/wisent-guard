@@ -74,7 +74,10 @@ pub struct ComparisonReport {
 /// Compare `artifacts`, labelled by their trait names. They must come from
 /// one model at one width: a direction is a point in one model's residual
 /// stream, and two models' streams share no basis to compare in.
-pub fn compare(artifacts: &[SteeringArtifact], options: &CompareOptions) -> Result<ComparisonReport> {
+pub fn compare(
+    artifacts: &[SteeringArtifact],
+    options: &CompareOptions,
+) -> Result<ComparisonReport> {
     let [first, _second, ..] = artifacts else {
         bail!(
             "vector compare needs at least two artifacts and got {}",
@@ -101,12 +104,20 @@ pub fn compare(artifacts: &[SteeringArtifact], options: &CompareOptions) -> Resu
             artifacts.len()
         );
     }
-    let labels: Vec<String> = artifacts.iter().map(|artifact| artifact.trait_name.clone()).collect();
+    let labels: Vec<String> = artifacts
+        .iter()
+        .map(|artifact| artifact.trait_name.clone())
+        .collect();
     let layers = compared_layers(artifacts, options.layers.as_deref())?;
 
     let stacks: Vec<Vec<Vec<f64>>> = layers
         .iter()
-        .map(|&layer| artifacts.iter().map(|artifact| direction(artifact, layer)).collect())
+        .map(|&layer| {
+            artifacts
+                .iter()
+                .map(|artifact| direction(artifact, layer))
+                .collect()
+        })
         .collect();
     let mut per_layer = Vec::with_capacity(layers.len());
     let mut chords = Vec::with_capacity(layers.len());
@@ -126,7 +137,12 @@ pub fn compare(artifacts: &[SteeringArtifact], options: &CompareOptions) -> Resu
         chords.push(apart);
         per_layer.push(LayerSimilarity { layer, similarity });
     }
-    let similarity = geometry::mean(&per_layer.iter().map(|layer| &layer.similarity).collect::<Vec<_>>());
+    let similarity = geometry::mean(
+        &per_layer
+            .iter()
+            .map(|layer| &layer.similarity)
+            .collect::<Vec<_>>(),
+    );
     let distance = geometry::mean(&chords.iter().collect::<Vec<_>>());
 
     let uniqueness = labels
@@ -193,12 +209,14 @@ fn compared_layers(artifacts: &[SteeringArtifact], named: Option<&[usize]>) -> R
         }
         return Ok(named.to_vec());
     }
-    let common = carried.iter().fold(None::<BTreeSet<usize>>, |common, layers| {
-        Some(match common {
-            None => layers.clone(),
-            Some(common) => common.intersection(layers).copied().collect(),
-        })
-    });
+    let common = carried
+        .iter()
+        .fold(None::<BTreeSet<usize>>, |common, layers| {
+            Some(match common {
+                None => layers.clone(),
+                Some(common) => common.intersection(layers).copied().collect(),
+            })
+        });
     match common {
         Some(common) if !common.is_empty() => Ok(common.into_iter().collect()),
         _ => {
@@ -207,7 +225,10 @@ fn compared_layers(artifacts: &[SteeringArtifact], named: Option<&[usize]>) -> R
                 .zip(&carried)
                 .map(|(artifact, layers)| format!("{} {:?}", artifact.trait_name, layers))
                 .collect();
-            bail!("the artifacts share no layer to compare at: {}", listed.join(", "))
+            bail!(
+                "the artifacts share no layer to compare at: {}",
+                listed.join(", ")
+            )
         }
     }
 }
@@ -217,7 +238,13 @@ fn direction(artifact: &SteeringArtifact, layer: usize) -> Vec<f64> {
         .vectors
         .iter()
         .find(|vector| vector.layer == layer)
-        .map(|vector| vector.values.iter().map(|&value| f64::from(value)).collect())
+        .map(|vector| {
+            vector
+                .values
+                .iter()
+                .map(|&value| f64::from(value))
+                .collect()
+        })
         .expect("compared_layers keeps only layers every artifact carries")
 }
 

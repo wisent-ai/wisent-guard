@@ -35,7 +35,8 @@ pub(in crate::cli) fn compare(args: CompareArgs) -> Result<()> {
     let loaded = artifacts
         .iter()
         .map(|path| {
-            SteeringArtifact::load(path).with_context(|| format!("failed to compare {}", path.display()))
+            SteeringArtifact::load(path)
+                .with_context(|| format!("failed to compare {}", path.display()))
         })
         .collect::<Result<Vec<_>>>()?;
     let report = workflow::compare(&loaded, &CompareOptions { layers, clusters })?;

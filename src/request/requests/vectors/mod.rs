@@ -36,7 +36,10 @@ impl Validate for TrainRequest {
     fn validate(&self) -> Result<(), String> {
         self.model.check("vector/train")?;
         require(&self.pairs, "vector/train requires a pairs file".to_owned())?;
-        require(&self.output, "vector/train requires an output path".to_owned())
+        require(
+            &self.output,
+            "vector/train requires an output path".to_owned(),
+        )
     }
 }
 
@@ -62,8 +65,14 @@ pub(in crate::request) struct OptimizeRequest {
 impl Validate for OptimizeRequest {
     fn validate(&self) -> Result<(), String> {
         self.model.check("vector/optimize")?;
-        require(&self.pairs, "vector/optimize requires a pairs file".to_owned())?;
-        require(&self.output, "vector/optimize requires an output path".to_owned())
+        require(
+            &self.pairs,
+            "vector/optimize requires a pairs file".to_owned(),
+        )?;
+        require(
+            &self.output,
+            "vector/optimize requires an output path".to_owned(),
+        )
     }
 }
 
@@ -97,7 +106,10 @@ pub(in crate::request) struct EvaluateRequest {
 impl Validate for EvaluateRequest {
     fn validate(&self) -> Result<(), String> {
         self.model.check("vector/evaluate")?;
-        require(&self.pairs, "vector/evaluate requires a pairs file".to_owned())?;
+        require(
+            &self.pairs,
+            "vector/evaluate requires a pairs file".to_owned(),
+        )?;
         require(
             &self.vector,
             "vector/evaluate requires a steering artifact".to_owned(),
@@ -105,13 +117,16 @@ impl Validate for EvaluateRequest {
         if self.strengths.is_empty() {
             if self.batch_size.is_some() || self.max_sequence.is_some() {
                 return Err(
-                    "vector/evaluate takes batchSize and maxSequence only with strengths".to_owned(),
+                    "vector/evaluate takes batchSize and maxSequence only with strengths"
+                        .to_owned(),
                 );
             }
             return Ok(());
         }
         if self.batch_size.is_none() {
-            return Err("vector/evaluate with strengths requires batchSize; Ster assumes none".to_owned());
+            return Err(
+                "vector/evaluate with strengths requires batchSize; Ster assumes none".to_owned(),
+            );
         }
         if self.max_sequence.is_none() {
             return Err(
@@ -166,7 +181,10 @@ impl Validate for GenerateRequest {
     fn validate(&self) -> Result<(), String> {
         self.model.check("generate")?;
         for part in &self.steering {
-            require(&part.vector, "generate names a steering part with no vector".to_owned())?;
+            require(
+                &part.vector,
+                "generate names a steering part with no vector".to_owned(),
+            )?;
         }
         require(&self.prompt, "generate requires a prompt".to_owned())
     }
@@ -253,7 +271,10 @@ pub(in crate::request) struct CompareRequest {
 impl Validate for CompareRequest {
     fn validate(&self) -> Result<(), String> {
         for artifact in &self.artifacts {
-            require(artifact, "vector/compare names an empty artifact path".to_owned())?;
+            require(
+                artifact,
+                "vector/compare names an empty artifact path".to_owned(),
+            )?;
         }
         match self.artifacts.as_slice() {
             [_, _, ..] => Ok(()),
@@ -289,8 +310,14 @@ pub(in crate::request) struct ProjectRequest {
 impl Validate for ProjectRequest {
     fn validate(&self) -> Result<(), String> {
         self.model.check("vector/project")?;
-        require(&self.pairs, "vector/project requires a pairs file".to_owned())?;
-        require(&self.vector, "vector/project requires a steering artifact".to_owned())
+        require(
+            &self.pairs,
+            "vector/project requires a pairs file".to_owned(),
+        )?;
+        require(
+            &self.vector,
+            "vector/project requires a steering artifact".to_owned(),
+        )
     }
 }
 
@@ -342,7 +369,13 @@ pub(in crate::request) struct AblateRequest {
 impl Validate for AblateRequest {
     fn validate(&self) -> Result<(), String> {
         self.model.check("vector/ablate")?;
-        require(&self.vector, "vector/ablate requires a steering artifact".to_owned())?;
-        require(&self.output, "vector/ablate requires an output directory".to_owned())
+        require(
+            &self.vector,
+            "vector/ablate requires a steering artifact".to_owned(),
+        )?;
+        require(
+            &self.output,
+            "vector/ablate requires an output directory".to_owned(),
+        )
     }
 }

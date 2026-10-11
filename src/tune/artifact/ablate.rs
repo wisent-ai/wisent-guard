@@ -56,7 +56,9 @@ pub fn ablate(
     output: &Path,
 ) -> Result<AblationReport> {
     if !strength.is_normal() {
-        bail!("ablation strength {strength} changes nothing or nothing sensible; state a finite, non-zero strength");
+        bail!(
+            "ablation strength {strength} changes nothing or nothing sensible; state a finite, non-zero strength"
+        );
     }
     // Nothing is computed that an accelerator would help with at this size,
     // and the result goes straight to disk.
@@ -107,7 +109,11 @@ pub fn ablate(
                 vector.layer
             );
         }
-        let unit: Vec<f64> = vector.values.iter().map(|&value| f64::from(value) / length).collect();
+        let unit: Vec<f64> = vector
+            .values
+            .iter()
+            .map(|&value| f64::from(value) / length)
+            .collect();
         for target in [lora::Target::Output, lora::Target::Down] {
             let placement = architecture
                 .placement(target, vector.layer, &config)
@@ -127,7 +133,9 @@ pub fn ablate(
             }
             let stored = source.layout.stored_name(&placement.tensor);
             let name = match placement.without_root() {
-                Some(rootless) if !tensors.contains_key(&stored) => source.layout.stored_name(&rootless),
+                Some(rootless) if !tensors.contains_key(&stored) => {
+                    source.layout.stored_name(&rootless)
+                }
                 _ => stored,
             };
             let base = tensors
@@ -137,7 +145,11 @@ pub fn ablate(
             let widened = base.to_dtype(DType::F32)?;
             // `[outputs, inputs]`, outputs being the residual stream; GPT-2's
             // `Conv1D` stores the other way round and is turned to match.
-            let write = if placement.transposed { widened.t()? } else { widened };
+            let write = if placement.transposed {
+                widened.t()?
+            } else {
+                widened
+            };
             let rows: Vec<Vec<f32>> = write.to_vec2::<f32>()?;
             if rows.len() != unit.len() {
                 bail!(
@@ -147,10 +159,17 @@ pub fn ablate(
                 );
             }
             let updated = remove_direction(&rows, &unit, strength);
-            let inputs = updated.first().map(Vec::len).context("a projection has rows")?;
+            let inputs = updated
+                .first()
+                .map(Vec::len)
+                .context("a projection has rows")?;
             let flat: Vec<f32> = updated.into_iter().flatten().collect();
             let updated = Tensor::from_vec(flat, (unit.len(), inputs), &device)?;
-            let updated = if placement.transposed { updated.t()?.contiguous()? } else { updated };
+            let updated = if placement.transposed {
+                updated.t()?.contiguous()?
+            } else {
+                updated
+            };
             tensors.insert(name.clone(), updated.to_dtype(original)?);
             rewritten.push(name);
         }
@@ -162,7 +181,10 @@ pub fn ablate(
     let written = write_checkpoint(&source, output, &tensors)?;
     Ok(AblationReport {
         model: model.to_owned(),
-        model_revision: source.revision.clone().or_else(|| artifact.model_revision.clone()),
+        model_revision: source
+            .revision
+            .clone()
+            .or_else(|| artifact.model_revision.clone()),
         artifact: artifact_path.display().to_string(),
         trait_name: artifact.trait_name.clone(),
         output: output.display().to_string(),
@@ -180,13 +202,17 @@ pub fn ablate(
 /// its component along `unit`, accumulated in `f64`.
 fn remove_direction(rows: &[Vec<f32>], unit: &[f64], strength: f64) -> Vec<Vec<f32>> {
     let mut weighted = rows.iter().zip(unit).map(|(row, weight)| {
-        row.iter().map(|&value| weight * f64::from(value)).collect::<Vec<f64>>()
+        row.iter()
+            .map(|&value| weight * f64::from(value))
+            .collect::<Vec<f64>>()
     });
     let Some(first) = weighted.next() else {
         return Vec::new();
     };
     let along = weighted.fold(first, |mut sum, part| {
-        sum.iter_mut().zip(part).for_each(|(total, add)| *total += add);
+        sum.iter_mut()
+            .zip(part)
+            .for_each(|(total, add)| *total += add);
         sum
     });
     rows.iter()

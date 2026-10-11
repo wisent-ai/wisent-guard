@@ -13,7 +13,9 @@ pub(super) fn dot(left: &[f64], right: &[f64]) -> f64 {
 pub(super) fn unit(vector: &[f64], label: &str, layer: usize) -> Result<Vec<f64>> {
     let length = dot(vector, vector).sqrt();
     if !length.is_normal() {
-        bail!("{label}'s direction at layer {layer} has length {length}, so it has no angle to compare");
+        bail!(
+            "{label}'s direction at layer {layer} has length {length}, so it has no angle to compare"
+        );
     }
     Ok(vector.iter().map(|value| value / length).collect())
 }
@@ -45,7 +47,9 @@ fn remove_projection(vector: &[f64], basis: &[Vec<f64>]) -> Vec<f64> {
     let mut rest = vector.to_vec();
     for axis in basis {
         let along = dot(&rest, axis);
-        rest.iter_mut().zip(axis).for_each(|(value, unit)| *value -= along * unit);
+        rest.iter_mut()
+            .zip(axis)
+            .for_each(|(value, unit)| *value -= along * unit);
     }
     rest
 }
@@ -63,7 +67,13 @@ pub(super) fn mean(matrices: &[&Vec<Vec<f64>>]) -> Vec<Vec<f64>> {
             values
                 .iter()
                 .enumerate()
-                .map(|(column, _)| matrices.iter().map(|matrix| matrix[row][column]).sum::<f64>() / count)
+                .map(|(column, _)| {
+                    matrices
+                        .iter()
+                        .map(|matrix| matrix[row][column])
+                        .sum::<f64>()
+                        / count
+                })
                 .collect()
         })
         .collect()

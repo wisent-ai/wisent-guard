@@ -65,7 +65,10 @@ pub(super) fn sample_group(
             draw,
         )?;
         let turns = conversation.turns;
-        let mut assistant_positions = conversation.transcript.iter().enumerate()
+        let mut assistant_positions = conversation
+            .transcript
+            .iter()
+            .enumerate()
             .filter_map(|(index, (role, _))| (*role == "assistant").then_some(index));
         let mut total = 0f64;
         for turn in &turns {
@@ -79,7 +82,9 @@ pub(super) fn sample_group(
                 total += reward.score(prompt, turn)?;
             }
             if !total.is_finite() {
-                bail!("GRPO conversation reward sum is not finite ({total}); refusing the group before a policy update");
+                bail!(
+                    "GRPO conversation reward sum is not finite ({total}); refusing the group before a policy update"
+                );
             }
         }
         rewards.push(total);

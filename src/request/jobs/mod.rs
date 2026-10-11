@@ -14,9 +14,8 @@ use crate::{
 };
 
 use super::requests::{
-    AblateRequest, CompareRequest, CurveRequest, EvaluateRequest, ExtractRequest,
-    GenerateRequest, InspectRequest, OptimizeRequest, ParityRequest, ProjectRequest,
-    TrainRequest,
+    AblateRequest, CompareRequest, CurveRequest, EvaluateRequest, ExtractRequest, GenerateRequest,
+    InspectRequest, OptimizeRequest, ParityRequest, ProjectRequest, TrainRequest,
 };
 
 mod decide;
@@ -172,14 +171,17 @@ pub(in crate::request) fn compare_job(request: CompareRequest) -> Result<Value> 
         .artifacts
         .iter()
         .map(|path| {
-            SteeringArtifact::load(Path::new(path)).with_context(|| format!("failed to compare {path}"))
+            SteeringArtifact::load(Path::new(path))
+                .with_context(|| format!("failed to compare {path}"))
         })
         .collect::<Result<Vec<_>>>()?;
     let options = workflow::CompareOptions {
         layers: request.layers,
         clusters: request.clusters,
     };
-    Ok(serde_json::to_value(workflow::compare(&artifacts, &options)?)?)
+    Ok(serde_json::to_value(workflow::compare(
+        &artifacts, &options,
+    )?)?)
 }
 
 /// Mirrors `ster vector project`: the same reads, the same projection, and
@@ -195,7 +197,8 @@ pub(in crate::request) fn project_job(request: ProjectRequest) -> Result<Value> 
         strength: request.strength,
         components: request.components,
     };
-    let mut report = serde_json::to_value(workflow::project(&runtime, &pair_set, &artifact, &options)?)?;
+    let mut report =
+        serde_json::to_value(workflow::project(&runtime, &pair_set, &artifact, &options)?)?;
     chat.annotate(&mut report)?;
     Ok(report)
 }
@@ -208,7 +211,14 @@ pub(in crate::request) fn curve_job(request: CurveRequest) -> Result<Value> {
     let mut runtime = request.model.load_runtime_at(&request.precision)?;
     let chat = runtime.set_chat_template(ChatChoice::parse(&request.chat_template)?)?;
     let layers = parse_layers(&request.layers, runtime.layer_count())?;
-    let report = workflow::curve(&runtime, &pair_set, &layers, method, request.holdout, &request.sizes)?;
+    let report = workflow::curve(
+        &runtime,
+        &pair_set,
+        &layers,
+        method,
+        request.holdout,
+        &request.sizes,
+    )?;
     let mut report = serde_json::to_value(report)?;
     chat.annotate(&mut report)?;
     Ok(report)

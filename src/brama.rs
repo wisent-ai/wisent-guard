@@ -116,7 +116,10 @@ impl Gateway {
             // `ureq` hands back every non-2xx as this arm, response body intact.
             Err(ureq::Error::Status(status, response)) => {
                 let body = response.into_string().with_context(|| {
-                    format!("failed to read Brama refusal from {} with status {status}", self.base)
+                    format!(
+                        "failed to read Brama refusal from {} with status {status}",
+                        self.base
+                    )
                 })?;
                 return Err(refusal(status, &body));
             }
@@ -133,8 +136,9 @@ impl Gateway {
         let text = response
             .into_string()
             .context("failed to read Brama's completion body")?;
-        let value: Value = serde_json::from_str(&text)
-            .with_context(|| format!("Brama returned a completion body that is not JSON: {text}"))?;
+        let value: Value = serde_json::from_str(&text).with_context(|| {
+            format!("Brama returned a completion body that is not JSON: {text}")
+        })?;
         let content = value
             .get("choices")
             .and_then(Value::as_array)
@@ -235,4 +239,3 @@ fn refusal(status: u16, body: &str) -> anyhow::Error {
         ),
     }
 }
-

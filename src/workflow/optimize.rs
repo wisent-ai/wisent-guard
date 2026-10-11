@@ -60,10 +60,19 @@ pub struct Candidate {
 
 /// Cohen's d of the projections of `positive` and `negative` on
 /// `direction`, the spread pooled over both sides around their own means.
-pub(super) fn effect_size(positive: &[Vec<f32>], negative: &[Vec<f32>], direction: &[f32]) -> Option<f64> {
+pub(super) fn effect_size(
+    positive: &[Vec<f32>],
+    negative: &[Vec<f32>],
+    direction: &[f32],
+) -> Option<f64> {
     let project = |rows: &[Vec<f32>]| -> Vec<f64> {
         rows.iter()
-            .map(|row| row.iter().zip(direction).map(|(a, b)| f64::from(*a) * f64::from(*b)).sum())
+            .map(|row| {
+                row.iter()
+                    .zip(direction)
+                    .map(|(a, b)| f64::from(*a) * f64::from(*b))
+                    .sum()
+            })
             .collect()
     };
     let (positive, negative) = (project(positive), project(negative));
@@ -76,7 +85,9 @@ pub(super) fn effect_size(positive: &[Vec<f32>], negative: &[Vec<f32>], directio
         .map(|deviation| deviation * deviation)
         .collect();
     let spread = mean(&deviations).sqrt();
-    spread.is_normal().then(|| (positive_mean - negative_mean) / spread)
+    spread
+        .is_normal()
+        .then(|| (positive_mean - negative_mean) / spread)
 }
 
 /// How the pair set was cut.

@@ -39,7 +39,11 @@ impl BlockIndexer {
         spec: BlockIndexSpec,
     ) -> candle_core::Result<Self> {
         Ok(Self {
-            query: linear_no_bias(hidden, spec.heads * spec.head_dim, builder.pp("index_q_proj"))?,
+            query: linear_no_bias(
+                hidden,
+                spec.heads * spec.head_dim,
+                builder.pp("index_q_proj"),
+            )?,
             key: linear_no_bias(hidden, spec.head_dim, builder.pp("index_k_proj"))?,
             query_norm: norm.load(spec.head_dim, builder.pp("index_q_norm"))?,
             key_norm: norm.load(spec.head_dim, builder.pp("index_k_norm"))?,
@@ -86,9 +90,10 @@ impl BlockIndexer {
                       norm: &Norm,
                       branch_heads: usize|
          -> candle_core::Result<Tensor> {
-            let projected = projection
-                .forward(hidden)?
-                .reshape((batch, sequence, branch_heads, head_dim))?;
+            let projected =
+                projection
+                    .forward(hidden)?
+                    .reshape((batch, sequence, branch_heads, head_dim))?;
             let mut values = norm
                 .forward(&projected, mode.pass)?
                 .to_dtype(DType::F32)?

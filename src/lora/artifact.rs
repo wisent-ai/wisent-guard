@@ -111,15 +111,17 @@ impl Artifact {
     pub fn load(path: &Path, device: &Device) -> Result<Self> {
         // Preserve filesystem inspection errors instead of reporting an
         // unreadable artifact as absent.
-        if !path.try_exists().with_context(|| {
-            format!("failed to inspect adapter {}", path.display())
-        })? {
+        if !path
+            .try_exists()
+            .with_context(|| format!("failed to inspect adapter {}", path.display()))?
+        {
             bail!("failed to read adapter {}", path.display());
         }
         let sidecar = Self::sidecar_path(path);
-        if !sidecar.try_exists().with_context(|| {
-            format!("failed to inspect adapter sidecar {}", sidecar.display())
-        })? {
+        if !sidecar
+            .try_exists()
+            .with_context(|| format!("failed to inspect adapter sidecar {}", sidecar.display()))?
+        {
             bail!(
                 "adapter {} has no sidecar at {}; the pair is written together and must travel together",
                 path.display(),
@@ -246,10 +248,15 @@ impl Artifact {
                 let (outputs, inputs) = target.widths(widths);
                 let (a, b) = Adapter::tensor_names(layer, target);
                 for (name, expected) in [(a, [self.rank, inputs]), (b, [outputs, self.rank])] {
-                    let tensor = self.tensors.get(&name)
+                    let tensor = self
+                        .tensors
+                        .get(&name)
                         .with_context(|| format!("adapter artifact is missing tensor {name}"))?;
                     if tensor.dims() != expected {
-                        bail!("adapter tensor {name} has shape {:?}, expected {expected:?} for the model projection", tensor.dims());
+                        bail!(
+                            "adapter tensor {name} has shape {:?}, expected {expected:?} for the model projection",
+                            tensor.dims()
+                        );
                     }
                 }
             }

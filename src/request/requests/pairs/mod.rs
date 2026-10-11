@@ -243,8 +243,14 @@ pub(in crate::request) struct PairsMergeRequest {
 impl Validate for PairsMergeRequest {
     fn validate(&self) -> Result<(), String> {
         for source in &self.sources {
-            require(source, "pairs merge names an empty pair-set path".to_owned())?;
+            require(
+                source,
+                "pairs merge names an empty pair-set path".to_owned(),
+            )?;
         }
-        require(&self.output, "pairs merge requires an output path".to_owned())
+        require(
+            &self.output,
+            "pairs merge requires an output path".to_owned(),
+        )
     }
 }

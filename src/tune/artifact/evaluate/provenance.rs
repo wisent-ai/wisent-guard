@@ -21,7 +21,7 @@ pub(super) fn read(artifact: &Path) -> Result<Option<serde_json::Value>, String>
     let document = match serde_json::from_slice::<serde_json::Value>(&bytes) {
         Ok(document) => document,
         Err(error) if from_sidecar => {
-            return Err(format!("{} is not JSON: {error}", sidecar.display()))
+            return Err(format!("{} is not JSON: {error}", sidecar.display()));
         }
         Err(_) => return Ok(None),
     };

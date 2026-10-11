@@ -145,7 +145,12 @@ fn texts(value: Option<&Value>) -> Option<Vec<&str>> {
     value?
         .as_array()?
         .iter()
-        .map(|element| element.as_str().map(str::trim).filter(|text| !text.is_empty()))
+        .map(|element| {
+            element
+                .as_str()
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+        })
         .collect()
 }
 
@@ -174,12 +179,20 @@ pub(super) fn pair_of(
             .and_then(|index| usize::try_from(index).ok())
             .ok_or("answer is not a whole-number index")?,
         AnswerForm::Label => {
-            let labels = texts(fields.labels.as_deref().and_then(|pointer| row.pointer(pointer)))
-                .ok_or("labels are not a list of non-empty text")?;
+            let labels = texts(
+                fields
+                    .labels
+                    .as_deref()
+                    .and_then(|pointer| row.pointer(pointer)),
+            )
+            .ok_or("labels are not a list of non-empty text")?;
             if labels.len() != choices.len() {
                 return Err("labels and choices differ in length");
             }
-            let named = answer.as_str().map(str::trim).ok_or("answer is not a label")?;
+            let named = answer
+                .as_str()
+                .map(str::trim)
+                .ok_or("answer is not a label")?;
             labels
                 .iter()
                 .position(|label| *label == named)
