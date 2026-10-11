@@ -30,7 +30,9 @@ use anyhow::{bail, Context, Result};
 use serde::Serialize;
 
 use super::super::{batch, examples::ExampleSet, preflight::sequence_logprob};
-use crate::{artifact::Document, lora, model::Route, runtime::Runtime, workflow};
+use crate::{model::Route, runtime::Runtime, workflow};
+
+mod provenance;
 
 /// Warns when an artifact this run is consuming was produced in a different
 /// encoding, or at a different precision, than this run is using.
@@ -62,7 +64,7 @@ use crate::{artifact::Document, lora, model::Route, runtime::Runtime, workflow};
 /// top of the run rather than a gate in front of it. A record that exists and
 /// cannot be read is said, since the mismatch it would have shown is unknown.
 pub fn warn_on_provenance(artifact: &Path, subject: &str, runtime: &Runtime) {
-    let record = match provenance(artifact) {
+    let record = match provenance::read(artifact) {
         Ok(Some(record)) => record,
         Ok(None) => return,
         Err(cause) => {
@@ -90,49 +92,6 @@ pub fn warn_on_provenance(artifact: &Path, subject: &str, runtime: &Runtime) {
     }
 }
 
-/// The object recording how `artifact` was produced, whichever kind it is.
-///
-/// An adapter's is the `train` object of the sidecar written beside its
-/// safetensors; a steering artifact is itself JSON and records at the top
-/// level. Which one this is cannot be decided by looking for a sidecar:
-/// `sidecar_path` swaps the extension for `json`, so for a steering artifact —
-/// which is already `.json` — it names the artifact itself, that read succeeds,
-/// and the adapter branch then looks for a `train` object that a direction
-/// never had. So the bytes are read once and `Document::recognise` says what
-/// they are, which is honest where both the file name and the mere existence
-/// of a neighbouring file are not.
-///
-/// `Unrecognised` takes the adapter reading. A document that is neither shape
-/// has no provenance to disagree with, and the field lookups above miss
-/// silently on the `null` that produces.
-fn provenance(artifact: &Path) -> Result<Option<serde_json::Value>, String> {
-    let sidecar = lora::Artifact::sidecar_path(artifact);
-    // The sidecar when there is one; else the artifact itself, which is the
-    // record only when it is JSON. Only a missing file is passed over, and
-    // only the artifact may fail to be JSON: an adapter's weights are not.
-    let (bytes, from_sidecar) = match std::fs::read(&sidecar) {
-        Ok(bytes) => (bytes, true),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            match std::fs::read(artifact) {
-                Ok(bytes) => (bytes, false),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-                Err(error) => return Err(format!("{}: {error}", artifact.display())),
-            }
-        }
-        Err(error) => return Err(format!("{}: {error}", sidecar.display())),
-    };
-    let document = match serde_json::from_slice::<serde_json::Value>(&bytes) {
-        Ok(document) => document,
-        Err(error) if from_sidecar => {
-            return Err(format!("{} is not JSON: {error}", sidecar.display()))
-        }
-        Err(_) => return Ok(None),
-    };
-    Ok(Some(match Document::recognise(&bytes) {
-        Document::Steering => document,
-        Document::AdapterSidecar | Document::Unrecognised => document["train"].clone(),
-    }))
-}
 
 #[derive(Debug, Clone)]
 pub struct EvaluateOptions {

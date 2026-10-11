@@ -109,16 +109,17 @@ impl Artifact {
     }
 
     pub fn load(path: &Path, device: &Device) -> Result<Self> {
-        // The weights are named by the operator, the sidecar is derived from
-        // them, so an absent artifact must say so about the path that was
-        // actually asked for. Checking the sidecar first reported a missing
-        // sidecar for a path that had no weights either, which sends the
-        // reader looking for the wrong file.
-        if !path.exists() {
+        // Preserve filesystem inspection errors instead of reporting an
+        // unreadable artifact as absent.
+        if !path.try_exists().with_context(|| {
+            format!("failed to inspect adapter {}", path.display())
+        })? {
             bail!("failed to read adapter {}", path.display());
         }
         let sidecar = Self::sidecar_path(path);
-        if !sidecar.exists() {
+        if !sidecar.try_exists().with_context(|| {
+            format!("failed to inspect adapter sidecar {}", sidecar.display())
+        })? {
             bail!(
                 "adapter {} has no sidecar at {}; the pair is written together and must travel together",
                 path.display(),
