@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 pub(super) const WORKSPACE_SCHEMA: &str = "ster.workspace.v1";
@@ -79,15 +79,25 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
         .open(&temporary)
         .with_context(|| format!("failed to create {}", temporary.display()))?;
     if let Err(error) = file.write_all(bytes).and_then(|_| file.sync_all()) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error).with_context(|| format!("failed to write {}", temporary.display()));
+        let left = discard(&temporary);
+        return Err(error)
+            .with_context(|| format!("failed to write {}{left}", temporary.display()));
     }
     drop(file);
     if let Err(error) = fs::rename(&temporary, path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error).with_context(|| format!("failed to replace {}", path.display()));
+        let left = discard(&temporary);
+        return Err(error).with_context(|| format!("failed to replace {}{left}", path.display()));
     }
     Ok(())
+}
+
+/// What a failed write leaves: nothing when its temporary file is removed,
+/// otherwise that file and why it stayed, for the refusal to name.
+fn discard(temporary: &Path) -> String {
+    match fs::remove_file(temporary) {
+        Ok(()) => String::new(),
+        Err(error) => format!("; {} was left behind: {error}", temporary.display()),
+    }
 }
 
 pub(super) fn workspace_root() -> Result<PathBuf> {
