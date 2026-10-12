@@ -79,7 +79,11 @@ pub fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32> {
 
 fn validate_examples(positive: &[Vec<f32>], negative: &[Vec<f32>]) -> Result<()> {
     if positive.is_empty() || positive.len() != negative.len() {
-        bail!("training requires the same non-zero number of positive and negative examples");
+        bail!(
+            "training requires the same non-zero number of positive and negative examples; got {} positive and {} negative",
+            positive.len(),
+            negative.len()
+        );
     }
     let width = positive[0].len();
     if width == 0 {

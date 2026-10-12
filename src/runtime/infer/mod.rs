@@ -6,7 +6,7 @@ use candle_core::Tensor;
 
 use crate::model::{Cache, ForwardOutput, Mode, Route, SteeringPlan};
 
-use super::{Runtime, validate_layers};
+use super::{Runtime, requested_activations, validate_layers};
 
 mod generate;
 
@@ -296,7 +296,7 @@ impl Runtime {
         let output = self
             .model
             .forward(&input, 0, &mut cache, steering, layers)?;
-        Ok(output.activations.into_iter().collect())
+        requested_activations(output.activations, layers)
     }
 
     /// One prompt, tokenized the way this run has decided prompts are

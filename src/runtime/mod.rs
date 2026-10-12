@@ -125,3 +125,30 @@ pub(super) fn validate_layers(layers: &[usize], count: usize) -> Result<()> {
     }
     Ok(())
 }
+
+/// The activations one forward pass returned, checked against the layers it
+/// was asked for: exactly one non-empty vector per requested layer. A read
+/// that came back with fewer layers, a layer nobody asked for, or an empty
+/// vector is refused with the counts, so a run that would otherwise fit or
+/// export on fewer activations than prompts fails where the shortfall
+/// happened instead of producing a quieter artifact.
+pub(super) fn requested_activations(
+    read: std::collections::BTreeMap<usize, Vec<f32>>,
+    layers: &[usize],
+) -> Result<Vec<(usize, Vec<f32>)>> {
+    let requested: BTreeSet<usize> = layers.iter().copied().collect();
+    let returned: BTreeSet<usize> = read.keys().copied().collect();
+    if requested != returned {
+        let missing: Vec<usize> = requested.difference(&returned).copied().collect();
+        let unasked: Vec<usize> = returned.difference(&requested).copied().collect();
+        bail!(
+            "the forward pass returned activations at {} of {} requested layers (missing {missing:?}, not requested {unasked:?})",
+            requested.intersection(&returned).count(),
+            requested.len()
+        );
+    }
+    if let Some((layer, _)) = read.iter().find(|(_, values)| values.is_empty()) {
+        bail!("the forward pass returned an empty activation vector at layer {layer}");
+    }
+    Ok(read.into_iter().collect())
+}

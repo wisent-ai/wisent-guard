@@ -67,6 +67,22 @@ pairs as `steering: [{"vector": …, "strength": …}]`, each strength required.
 distribution, and a temperature of zero is argmax. The process ends with
 the operation; see [desktop requests](desktop-requests.md).
 
+Every command that reads hidden states counts what it read, so a run with
+too few pairs or activations fails with the counts instead of writing a
+quieter artifact. A pair set with no pairs is refused on load as
+`pair set {path} contains no pairs` (and `pairs import --count N` over an
+export that yields fewer is refused as `{source} yields {found} pairs, fewer
+than --count N`); a prompt set with no prompts as `prompt set contains no
+prompts`. Each forward pass must return one non-empty vector at every
+requested layer, or the run stops with `the forward pass returned activations
+at {found} of {requested} requested layers (missing [...], not requested
+[...])` or `the forward pass returned an empty activation vector at layer
+{layer}`; fitting a direction refuses unequal sides as `training requires the
+same non-zero number of positive and negative examples; got {positive}
+positive and {negative} negative`. `vector train`, `optimize`, `curve`,
+`evaluate`, `project` and `extract` all read through the same check, and as
+`ster request` operations they end with the same refusal as their error event.
+
 Several `--vector`/`--strength` pairs steer several traits at once, as
 wisent's `multi-steer` did: at every layer any of them carries, the sum of
 each vector times its strength is added to the residual stream. A direction
