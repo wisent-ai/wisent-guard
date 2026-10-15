@@ -38,9 +38,6 @@ use serde_json::{Value, json};
 pub const URL_VAR: &str = "BRAMA_URL";
 pub const BEARER_VAR: &str = "BRAMA_BEARER";
 
-/// Brama refuses `max_tokens` outside `1..=32768`; see [`Gateway::complete`].
-const MAX_TOKENS_LIMIT: usize = 32_768;
-
 pub struct Gateway {
     base: String,
     bearer: String,
@@ -77,11 +74,10 @@ impl Gateway {
 
     /// One buffered completion. Returns the assistant text, trimmed.
     ///
-    /// The two bound checks below duplicate limits Brama already enforces. That
-    /// is deliberate: a run that asks for 40000 tokens is wrong on the first
-    /// pair and every pair after it, so refusing here saves a round trip per
-    /// pair. The sentences are Brama's own, verbatim, so the operator reads the
-    /// same words whichever side of the wire refuses.
+    /// The bounds on `max_tokens` and `temperature` are Brama's: it refuses a
+    /// value outside them on the first pair, and that refusal reaches the
+    /// operator in Brama's own words through [`refusal`], so no second copy of
+    /// its limits is kept here to drift from them.
     ///
     /// The request body carries exactly `model`, `messages`, `max_tokens` and
     /// `temperature`. Brama's deserializer refuses unknown fields by name, so
@@ -91,12 +87,6 @@ impl Gateway {
     pub fn complete(&self, prompt: &str, max_tokens: usize, temperature: f64) -> Result<String> {
         if prompt.trim().is_empty() {
             bail!("the generator prompt is empty");
-        }
-        if max_tokens == 0 || max_tokens > MAX_TOKENS_LIMIT {
-            bail!("max_tokens must be between one and 32768");
-        }
-        if !temperature.is_finite() || !(0.0..=2.0).contains(&temperature) {
-            bail!("temperature must be finite and between zero and 2");
         }
         let body = json!({
             "model": self.model,
@@ -187,35 +177,46 @@ fn require_secure_transport(base: &str) -> Result<()> {
 }
 
 fn is_loopback(base: &str) -> bool {
-    let Some(authority) = base.strip_prefix("http://") else {
+    let Some(rest) = base.strip_prefix("http://") else {
         return false;
     };
-    let host = authority.split(['/', '?', '#']).next().unwrap_or_default();
-    // Strip the port, but not the colons inside a bracketed IPv6 literal.
-    let host = match host.strip_prefix('[') {
-        Some(rest) => rest.split(']').next().unwrap_or_default(),
-        None => host.split(':').next().unwrap_or_default(),
+    let authority = match rest.split_once(['/', '?', '#']) {
+        Some((authority, _)) => authority,
+        None => rest,
     };
-    host == "127.0.0.1" || host == "localhost" || host == "::1"
+    // Strip the port, but not the colons inside a bracketed IPv6 literal.
+    let host = match authority.strip_prefix('[') {
+        Some(bracketed) => match bracketed.split_once(']') {
+            Some((host, _)) => host,
+            None => return false,
+        },
+        None => match authority.split_once(':') {
+            Some((host, _)) => host,
+            None => authority,
+        },
+    };
+    host == "localhost"
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
 }
 
 /// `BRAMA_BEARER`, trimmed and required.
 ///
-/// Every failure collapses to one sentence that names the variable and nothing
-/// else. `env::VarError` is swallowed rather than propagated on purpose: its
-/// `NotUnicode` variant formats the offending value, which here is the bearer.
-///
-/// The sentence tells the operator to export it, because that is the only way
-/// it ever arrives: no launcher in this repository or on the fleet sets it.
+/// A value that is not Unicode is refused without being formatted, because
+/// the value is the bearer. The sentence tells the operator to export it,
+/// because that is the only way it ever arrives: no launcher in this
+/// repository or on the fleet sets it.
 fn bearer() -> Result<String> {
-    let bearer = env::var(BEARER_VAR).unwrap_or_default();
-    let bearer = bearer.trim();
-    if bearer.is_empty() {
-        bail!(
+    match env::var(BEARER_VAR) {
+        Ok(bearer) if !bearer.trim().is_empty() => Ok(bearer.trim().to_owned()),
+        Ok(_) | Err(env::VarError::NotPresent) => bail!(
             "{BEARER_VAR} is unset or empty; export Ster's own Brama bearer before running this command"
-        );
+        ),
+        Err(env::VarError::NotUnicode(_)) => bail!(
+            "{BEARER_VAR} is not Unicode; export Ster's own Brama bearer as text before running this command"
+        ),
     }
-    Ok(bearer.to_owned())
 }
 
 /// Turns a non-2xx into Brama's own words.
@@ -225,17 +226,16 @@ fn bearer() -> Result<String> {
 /// paraphrase of it. Anything else on the wire is a proxy or a misconfigured
 /// host; preserve that answer whole instead of pretending the envelope was there.
 fn refusal(status: u16, body: &str) -> anyhow::Error {
-    let message = serde_json::from_str::<Value>(body).ok().and_then(|value| {
-        value
+    if let Ok(value) = serde_json::from_str::<Value>(body) {
+        let message = value
             .get("error")
             .and_then(|error| error.get("message"))
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-    });
-    match message {
-        Some(message) => anyhow::anyhow!("brama refused the completion: {status} {message}"),
-        None => anyhow::anyhow!(
-            "brama refused the completion with {status} and a body that is not its error envelope: {body}"
-        ),
+            .and_then(Value::as_str);
+        if let Some(message) = message {
+            return anyhow::anyhow!("brama refused the completion: {status} {message}");
+        }
     }
+    anyhow::anyhow!(
+        "brama refused the completion with {status} and a body that is not its error envelope: {body}"
+    )
 }
