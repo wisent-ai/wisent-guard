@@ -186,7 +186,9 @@ set takes longer to report on rather than being sampled.
 `ster pairs synthesize` builds a set from a trait description, in this order:
 
 1. The opposite trait is derived with one generation, unless `--opposite` states
-   it. An empty answer falls back to `neutral and plain`.
+   it. An empty answer refuses the run as
+   `<generator> returned no opposite trait for "<trait>"; state it with --opposite`,
+   because every negative would otherwise answer as a trait nobody stated.
 2. Each attempt generates a question, then an answer in the trait's voice, then
    an answer in the opposite's voice. Each side is stored as
    `Question: {q}\nAnswer: {a}`, the shape the example above already uses, which

@@ -3,6 +3,8 @@
 //! generator the caller picked. Steering needs hidden states and stays local;
 //! writing pair text does not, so the writer may be a hosted route.
 
+use std::num::{FpCategory, NonZeroU64, NonZeroUsize};
+
 use anyhow::{Result, bail};
 use serde::Serialize;
 
@@ -14,10 +16,6 @@ use crate::{
     runtime::GenerationOptions,
     workflow,
 };
-
-/// Used when the model returns nothing for the opposite-trait question —
-/// verbatim from the Python generator's `"neutral and plain"` fallback.
-const DEFAULT_OPPOSITE: &str = "neutral and plain";
 
 /// Verbatim from the Python generator: the single instruction that produces
 /// the user question each pair answers.
@@ -61,6 +59,23 @@ pub struct SynthesisReport {
     pub diversity: diversity::Scores,
 }
 
+/// What a run has done so far, counted as it happens; every count starts at
+/// none.
+#[derive(Default)]
+struct Tally {
+    calls: u64,
+    attempts: usize,
+    rejected_empty: usize,
+    rejected_refusals: usize,
+    rejected_duplicates: usize,
+    refusal_retries: usize,
+}
+
+/// One more of what `count` counts.
+fn one_more(count: &mut usize) {
+    *count += NonZeroUsize::MIN.get();
+}
+
 /// Generate a contrastive pair set with `generator`.
 ///
 /// Port of `SyntheticContrastivePairsGenerator.generate`: one opposite-trait
@@ -73,10 +88,10 @@ pub fn synthesize(
     generator: Generator<'_>,
     options: &SynthesisOptions,
 ) -> Result<(PairSet, SynthesisReport)> {
-    if options.count == 0 {
+    if NonZeroUsize::new(options.count).is_none() {
         bail!("synthesis requires a pair count above zero");
     }
-    if options.retry_multiplier == 0 {
+    if NonZeroUsize::new(options.retry_multiplier).is_none() {
         bail!("synthesis requires a retry multiplier above zero");
     }
     // Every prompt in this loop is a constant, repeated for the whole run: the
@@ -84,8 +99,13 @@ pub fn synthesize(
     // decoder — Ster's own argmax path at or below zero temperature, and any
     // hosted sampler asked for the same — would return the same question and
     // the same answers forever and the whole run would dedupe to one pair.
-    // The reason is the loop's, so the refusal holds for every route.
-    if options.generation.temperature <= 0.0 {
+    // The reason is the loop's, so the refusal holds for every route. A
+    // temperature that is not a number is not above zero either.
+    let temperature = options.generation.temperature;
+    if temperature.is_nan()
+        || temperature.is_sign_negative()
+        || temperature.classify() == FpCategory::Zero
+    {
         bail!(
             "synthesis requires a temperature above zero; argmax generation repeats a single prompt"
         );
@@ -93,13 +113,16 @@ pub fn synthesize(
     options.dedupe.validate()?;
 
     let trait_name = resolve_trait_name(options);
-    let mut calls = 0u64;
-    let mut ask = |prompt: &str| -> Result<String> {
-        let text = generator.generate(prompt, options, calls)?;
-        calls = calls.wrapping_add(1);
+    let mut tally = Tally::default();
+    let ask = |prompt: &str, tally: &mut Tally| -> Result<String> {
+        let text = generator.generate(prompt, options, tally.calls)?;
+        tally.calls = tally.calls.wrapping_add(NonZeroU64::MIN.get());
         Ok(text)
     };
 
+    // The opposite is the caller's, or the generator's answer to one
+    // question; a generator that names none leaves the negatives nothing to
+    // be, so the run is refused rather than given an opposite nobody stated.
     let opposite = match options
         .opposite
         .as_deref()
@@ -108,15 +131,21 @@ pub fn synthesize(
     {
         Some(value) => value.to_owned(),
         None => {
-            let answer = ask(&format!(
-                "What is the OPPOSITE personality trait of: {}?\n\nDescribe the opposite in one sentence, be specific about what words/style/tone to use.",
-                options.trait_description
-            ))?;
+            let answer = ask(
+                &format!(
+                    "What is the OPPOSITE personality trait of: {}?\n\nDescribe the opposite in one sentence, be specific about what words/style/tone to use.",
+                    options.trait_description
+                ),
+                &mut tally,
+            )?;
             if answer.is_empty() {
-                DEFAULT_OPPOSITE.to_owned()
-            } else {
-                answer
+                bail!(
+                    "{} returned no opposite trait for {:?}; state it with --opposite",
+                    generator.label(),
+                    options.trait_description
+                );
             }
+            answer
         }
     };
 
@@ -132,58 +161,59 @@ pub fn synthesize(
     let mut index = dedupe::Index::new(options.dedupe)?;
     let mut kept: Vec<ContrastivePair> = Vec::with_capacity(options.count);
     let mut questions: Vec<String> = Vec::with_capacity(options.count);
-    let mut attempts = 0usize;
-    let mut rejected_empty = 0usize;
-    let mut rejected_refusals = 0usize;
-    let mut rejected_duplicates = 0usize;
-    let mut refusal_retries = 0usize;
     let max_attempts = options.count.saturating_mul(options.retry_multiplier);
 
-    while kept.len() < options.count && attempts < max_attempts {
-        attempts += 1;
+    while kept.len() < options.count && tally.attempts < max_attempts {
+        one_more(&mut tally.attempts);
         workflow::progress(format!(
             "synthesizing pair {}/{} (attempt {})",
-            kept.len() + 1,
+            kept.len() + NonZeroUsize::MIN.get(),
             options.count,
-            attempts
+            tally.attempts
         ));
 
-        let question = ask(QUESTION_INSTRUCTION)?;
+        let question = ask(QUESTION_INSTRUCTION, &mut tally)?;
         if question.is_empty() {
-            rejected_empty += 1;
+            one_more(&mut tally.rejected_empty);
             continue;
         }
 
-        let positive = ask(&persona_prompt(&question, &options.trait_description))?;
+        let positive = ask(
+            &persona_prompt(&question, &options.trait_description),
+            &mut tally,
+        )?;
         if positive.is_empty() {
-            rejected_empty += 1;
+            one_more(&mut tally.rejected_empty);
             continue;
         }
 
-        let mut negative = ask(&persona_prompt(&question, &opposite))?;
+        let mut negative = ask(&persona_prompt(&question, &opposite), &mut tally)?;
         if negative.is_empty() {
-            rejected_empty += 1;
+            one_more(&mut tally.rejected_empty);
             continue;
         }
 
         // A refusing positive has no repair path: the trait itself is what the
         // model declined to roleplay, so re-asking would refuse again.
         if refusal::looks_like_refusal(&positive, options.refusal_threshold) {
-            rejected_refusals += 1;
+            one_more(&mut tally.rejected_refusals);
             continue;
         }
 
         // `RefusalerCleaner` + `BaseRefusaler::fix_negative`: one re-prompt,
         // never a loop, and a still-refusing replacement drops the pair.
         if refusal::looks_like_refusal(&negative, options.refusal_threshold) {
-            refusal_retries += 1;
-            let replacement = ask(&format!(
-                "{ROLEPLAY_NEG_FIX}\n\nPrompt: {question}\nTrait label: {trait_name}\nTrait description: {opposite}"
-            ))?;
+            one_more(&mut tally.refusal_retries);
+            let replacement = ask(
+                &format!(
+                    "{ROLEPLAY_NEG_FIX}\n\nPrompt: {question}\nTrait label: {trait_name}\nTrait description: {opposite}"
+                ),
+                &mut tally,
+            )?;
             if replacement.is_empty()
                 || refusal::looks_like_refusal(&replacement, options.refusal_threshold)
             {
-                rejected_refusals += 1;
+                one_more(&mut tally.rejected_refusals);
                 continue;
             }
             negative = replacement;
@@ -199,7 +229,7 @@ pub fn synthesize(
             negative: format!("Question: {question}\nAnswer: {negative}"),
         };
         if index.insert(&pair).is_some() {
-            rejected_duplicates += 1;
+            one_more(&mut tally.rejected_duplicates);
             continue;
         }
         questions.push(question);
@@ -216,12 +246,12 @@ pub fn synthesize(
         trait_description: options.trait_description.clone(),
         opposite,
         requested: options.count,
-        attempts,
+        attempts: tally.attempts,
         kept: kept.len(),
-        rejected_empty,
-        rejected_refusals,
-        rejected_duplicates,
-        refusal_retries,
+        rejected_empty: tally.rejected_empty,
+        rejected_refusals: tally.rejected_refusals,
+        rejected_duplicates: tally.rejected_duplicates,
+        refusal_retries: tally.refusal_retries,
         diversity,
     };
     Ok((
