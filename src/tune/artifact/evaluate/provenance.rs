@@ -23,7 +23,20 @@ pub(super) fn read(artifact: &Path) -> Result<Option<serde_json::Value>, String>
         Err(error) if from_sidecar => {
             return Err(format!("{} is not JSON: {error}", sidecar.display()));
         }
-        Err(_) => return Ok(None),
+        // Without a sidecar the artifact itself is read: bytes that are not
+        // JSON at all are adapter weights, which hold no record. Any other
+        // failure is said, naming the artifact.
+        Err(error) => match error.classify() {
+            serde_json::error::Category::Syntax | serde_json::error::Category::Eof => {
+                return Ok(None);
+            }
+            serde_json::error::Category::Io | serde_json::error::Category::Data => {
+                return Err(format!(
+                    "{} cannot be read as JSON: {error}",
+                    artifact.display()
+                ));
+            }
+        },
     };
     // Steering documents already use the JSON extension, so their sidecar
     // path is the artifact itself. The document shape, not its path, decides
