@@ -40,13 +40,13 @@ pub fn run(reset: bool, import_pairs: Option<&Path>, name: Option<&str>) -> Resu
                 "Ster first-use journey complete: the imported pair set is active for training and evaluation."
             );
         } else {
-            bail!(
-                "{}",
-                report
-                    .reason
-                    .as_deref()
-                    .unwrap_or("Ster did not accept the pair set")
-            );
+            match report.reason.as_deref() {
+                Some(reason) => bail!("{reason}"),
+                None => bail!(
+                    "Ster did not accept the pair set {} and its import report states no reason",
+                    source.display()
+                ),
+            }
         }
         return Ok(());
     }
@@ -125,11 +125,14 @@ pub fn record_pair_set_imported(path: &Path) -> Result<()> {
     save_state(&state)
 }
 
+/// The journey compiled into this binary, checked against what the reader
+/// relies on. It is embedded at build time, so it is always the file this code
+/// was written with: who it is for, its screens, and every transition's
+/// target and priority.
 fn canonical_definition() -> Result<Value> {
     let definition: Value =
         serde_json::from_str(DEFINITION).context("parse canonical onboarding journey")?;
-    if definition.get("schema_version").and_then(Value::as_u64) != Some(1)
-        || definition.get("product_id").and_then(Value::as_str) != Some(PRODUCT_ID)
+    if definition.get("product_id").and_then(Value::as_str) != Some(PRODUCT_ID)
         || definition.get("journey_id").and_then(Value::as_str) != Some(JOURNEY_ID)
         || definition.get("journey_version").and_then(Value::as_str) != Some(JOURNEY_VERSION)
         || definition.get("first_success_fact").and_then(Value::as_str) != Some(FIRST_SUCCESS_FACT)
@@ -177,16 +180,17 @@ fn canonical_definition() -> Result<Value> {
     }
 
     for screen in screens {
+        let screen_id = screen
+            .get("screen_id")
+            .and_then(Value::as_str)
+            .context("canonical onboarding screen has no id")?;
         for transition in screen
             .get("transitions")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
-            let target = transition
-                .get("next_screen_id")
-                .and_then(Value::as_str)
-                .context("canonical onboarding transition has no target")?;
+            let (target, _) = edge(screen_id, transition)?;
             if !screen_ids.contains(&target) {
                 bail!("canonical onboarding transition target does not exist: {target}");
             }
@@ -207,26 +211,44 @@ pub(super) fn screen_by_id<'a>(definition: &'a Value, screen_id: &str) -> Result
         .with_context(|| format!("canonical onboarding screen is unavailable: {screen_id}"))
 }
 
+/// One transition's target and priority, refused naming the screen and the
+/// target when either is missing or the priority is not a whole number. Read
+/// as the lowest, a transition that lost its priority decided the next screen
+/// whenever it was the only one or tied with another.
+fn edge<'a>(screen_id: &str, transition: &'a Value) -> Result<(&'a str, i64)> {
+    let target = transition
+        .get("next_screen_id")
+        .and_then(Value::as_str)
+        .with_context(|| format!("canonical onboarding transition of {screen_id} has no target"))?;
+    let priority = transition
+        .get("priority")
+        .and_then(Value::as_i64)
+        .with_context(|| {
+            format!(
+                "canonical onboarding transition from {screen_id} to {target} declares no whole-number priority"
+            )
+        })?;
+    Ok((target, priority))
+}
+
+/// The target of the highest-priority transition; of equal priorities, the
+/// last one listed.
 fn next_screen_id(screen: &Value) -> Result<Option<String>> {
     let Some(transitions) = screen.get("transitions").and_then(Value::as_array) else {
         return Ok(None);
     };
-    transitions
-        .iter()
-        .max_by_key(|transition| {
-            transition
-                .get("priority")
-                .and_then(Value::as_i64)
-                .unwrap_or_default()
-        })
-        .map(|transition| {
-            transition
-                .get("next_screen_id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-                .context("canonical onboarding transition has no target")
-        })
-        .transpose()
+    let screen_id = screen
+        .get("screen_id")
+        .and_then(Value::as_str)
+        .context("canonical onboarding screen has no id")?;
+    let mut chosen: Option<(i64, &str)> = None;
+    for transition in transitions {
+        let (target, rank) = edge(screen_id, transition)?;
+        if chosen.is_none_or(|(best, _)| rank >= best) {
+            chosen = Some((rank, target));
+        }
+    }
+    Ok(chosen.map(|(_, target)| target.to_string()))
 }
 
 fn render(screen: &Value) -> Result<()> {
