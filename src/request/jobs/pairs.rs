@@ -62,9 +62,12 @@ pub(in crate::request) fn workspace_remove_job(request: WorkspacePairSetRequest)
 pub(in crate::request) fn pairs_import_job(request: PairsImportRequest) -> Result<Value> {
     let options = pairs::benchmark::ImportOptions {
         benchmark: pairs::benchmark::Benchmark::parse(&request.benchmark)?,
-        trait_name: request
-            .trait_name
-            .unwrap_or_else(|| request.benchmark.clone()),
+        // As `ster pairs import` documents: the set is named for its benchmark
+        // unless the caller names its trait.
+        trait_name: match request.trait_name {
+            Some(name) => name,
+            None => request.benchmark.clone(),
+        },
         source: request.source.into(),
         examples: request.examples.map(Into::into),
         fields: pairs::benchmark::ChoiceFields::from_parts(
@@ -142,8 +145,11 @@ pub(in crate::request) fn pairs_synthesize_job(request: PairsSynthesizeRequest) 
             pairs::synthesize(pairs::Generator::Local(&runtime), &options)?
         }
         "brama" => {
-            // `Validate` has already refused a brama request without a route.
-            let route = request.generator_model.as_deref().unwrap_or_default();
+            // `Validate` refuses a brama request without a route; a job built
+            // any other way is refused the same way rather than routed to "".
+            let Some(route) = request.generator_model.as_deref() else {
+                bail!("pairs synthesize with the brama generator requires generatorModel");
+            };
             let gateway = brama::Gateway::from_env(route)?;
             pairs::synthesize(pairs::Generator::Gateway(&gateway), &options)?
         }
