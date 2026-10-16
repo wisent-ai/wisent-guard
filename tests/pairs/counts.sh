@@ -14,10 +14,11 @@
 # accepted, and its answer go to the run's report.txt; a failed check stops
 # the run.
 #
-# Usage: STER=target/debug/ster tests/pairs/counts.sh
+# Usage: STER=target/debug/ster STER_TEST_SEED=<seed> tests/pairs/counts.sh
 set -eu
 cd "$(dirname "$0")/../.."
 BIN=${STER:?set STER to the ster binary under test, e.g. STER=target/debug/ster}
+SEED=${STER_TEST_SEED:?set STER_TEST_SEED to the seed the imports draw with; ster assumes none}
 RUN="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 ROOT="$PWD/target/real-tests/pairs/counts-$RUN"
 REPORT="$ROOT/report.txt"
@@ -57,7 +58,7 @@ refused() {
 TOY="$ROOT/toy-model"
 PAIRS=docs/examples/pairs.json
 PROMPTS=docs/examples/prompts.json
-SEED=$(git rev-parse --short HEAD | wc -c | tr -d ' ')
+echo "seed: $SEED" >>"$REPORT"
 run accepted toy-model "$TOY"
 LAYERS=$(jq .num_hidden_layers "$TOY/config.json")
 ALL=$(jq -r '[range(.num_hidden_layers)] | map(tostring) | join(",")' "$TOY/config.json")
@@ -72,7 +73,8 @@ check "a refused import writes nothing" "$(test -e "$ROOT/none.pairs.json" && ec
 ONE="$ROOT/one.csv"
 printf 'question,matching,not_matching\nIs it calm?,Yes,No\nIs it quiet?,,\n' >"$ONE"
 YIELD=$(grep -c ',Yes,No$' "$ONE")
-ASKED=$((YIELD + YIELD))
+# One pair asked for each question the export holds, answered or not.
+ASKED=$(grep -c '^Is it' "$ONE")
 run refused pairs import --benchmark bipo --source "$ONE" --count "$ASKED" --seed "$SEED" --output "$ROOT/few.pairs.json"
 refused "yields $YIELD pairs, fewer than --count $ASKED"
 
