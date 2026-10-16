@@ -119,7 +119,12 @@ pub fn export_peft(
                     tensor.contiguous()?,
                 );
             }
-            let leaf = module.rsplit('.').next().unwrap_or(module).to_owned();
+            // The leaf is the last dotted part; a module with no dot is its own.
+            let leaf = match module.rsplit_once('.') {
+                Some((_, leaf)) => leaf,
+                None => module,
+            }
+            .to_owned();
             if !modules.contains(&leaf) {
                 modules.push(leaf);
             }
