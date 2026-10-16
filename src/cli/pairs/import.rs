@@ -55,9 +55,14 @@ pub(super) struct ImportArgs {
 }
 
 pub(super) fn run(args: ImportArgs) -> Result<()> {
+    // --trait's help: the set is named after the benchmark when none is given.
+    let trait_name = match args.trait_name {
+        Some(trait_name) => trait_name,
+        None => args.benchmark.clone(),
+    };
     let options = ImportOptions {
         benchmark: Benchmark::parse(&args.benchmark)?,
-        trait_name: args.trait_name.unwrap_or_else(|| args.benchmark.clone()),
+        trait_name,
         source: args.source,
         examples: args.examples,
         fields: ChoiceFields::from_parts(
