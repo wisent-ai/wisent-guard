@@ -16,11 +16,15 @@ use super::onboarding;
 mod ablate;
 mod compare;
 mod curve;
+mod extract;
 mod generate;
+mod parity;
 mod project;
 mod strength;
 
+pub(super) use extract::{ExtractArgs, extract};
 pub(super) use generate::{GenerateArgs, generate};
+pub(super) use parity::{ParityArgs, parity};
 
 use super::{ModelArgs, resolve_pairs};
 
@@ -149,50 +153,6 @@ pub(super) struct EvaluateArgs {
     strength: strength::StrengthArgs,
 }
 
-/// `ster extract`
-#[derive(Debug, clap::Args)]
-pub(super) struct ExtractArgs {
-    #[command(flatten)]
-    model: ModelArgs,
-    /// JSON file shaped as {"prompts": ["..."]}.
-    #[arg(long)]
-    input: PathBuf,
-    #[arg(long)]
-    output: PathBuf,
-    #[arg(long, default_value = "all")]
-    layers: String,
-    /// auto reads every prompt through the model's own chat template when
-    /// it publishes one, off reads it as raw text. The exported
-    /// activations are the states the model reached; this is what it was
-    /// reading when it reached them.
-    #[arg(long, default_value = "auto", value_parser = ChatChoice::parse)]
-    chat_template: ChatChoice,
-    /// Dtype the base weights are mapped at: f32, f16, or bf16. The
-    /// exported activations are F32 either way; this is the width they
-    /// were computed in. bf16 needs --device metal.
-    #[arg(long, default_value = "f32", value_parser = Precision::parse)]
-    precision: Precision,
-}
-
-/// `ster parity`
-#[derive(Debug, clap::Args)]
-pub(super) struct ParityArgs {
-    #[command(flatten)]
-    model: ModelArgs,
-    /// JSON file shaped as {"records": [{"tokenIds": [...] or "tokenIdsFile":
-    /// "ids.json", "hidden": "states.safetensors", "tensor": "hidden_states"}]}:
-    /// token ids and the states after the final norm another implementation
-    /// recorded for their first positions, [positions, hidden]; paths are
-    /// relative to this file and "tensor" defaults to hidden_states.
-    #[arg(long)]
-    input: PathBuf,
-    /// Dtype the base weights are mapped at: f32, f16, or bf16. The states
-    /// are compared in F32 either way; this is the width Ster computed them
-    /// in. bf16 needs --device metal.
-    #[arg(long, default_value = "f32", value_parser = Precision::parse)]
-    precision: Precision,
-}
-
 /// `ster vector inspect`
 #[derive(Debug, clap::Args)]
 pub(super) struct InspectArgs {
@@ -286,32 +246,6 @@ pub(super) fn evaluate(args: EvaluateArgs) -> Result<()> {
     }
     chat.annotate(&mut report)?;
     super::answer(&report)?;
-    Ok(())
-}
-pub(super) fn extract(args: ExtractArgs) -> Result<()> {
-    let ExtractArgs {
-        model,
-        input,
-        output,
-        layers,
-        chat_template,
-        precision,
-    } = args;
-    let mut runtime = model.load_at(precision)?;
-    runtime.set_chat_template(chat_template)?;
-    let layers = parse_layers(&layers, runtime.layer_count())?;
-    workflow::extract(&runtime, &input, &output, &layers)?;
-    println!("{}", output.display());
-    Ok(())
-}
-pub(super) fn parity(args: ParityArgs) -> Result<()> {
-    let ParityArgs {
-        model,
-        input,
-        precision,
-    } = args;
-    let runtime = model.load_at(precision)?;
-    super::answer(&workflow::parity(&runtime, &input)?)?;
     Ok(())
 }
 pub(super) fn inspect(args: InspectArgs) -> Result<()> {
