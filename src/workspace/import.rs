@@ -12,6 +12,10 @@ use crate::PairSet;
 
 use super::state::{PairSetEntry, load_state, save_state, workspace_root};
 
+/// How much of a pair set's BLAKE2b-512 digest the workspace keeps as its
+/// content identity, as every recorded `digest` holds it.
+const PAIR_SET_DIGEST_BYTES: usize = 16; // https://github.com/wisent-ai/ster/blob/main/docs/guide/pair-sets/workspace.md "the first 16 bytes are kept"
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportReport {
     pub status: &'static str,
@@ -61,21 +65,22 @@ pub fn import_pair_set(source: &Path, requested_name: Option<&str>) -> Result<Im
     };
     let source = fs::canonicalize(source)
         .with_context(|| format!("failed to resolve pair set {}", source.display()))?;
-    let id = match requested_name {
-        Some(name) => match validate_name(name) {
-            Ok(()) => name.to_owned(),
-            Err(reason) => {
-                return Ok(ImportReport {
-                    status: "rejected",
-                    source: source.display().to_string(),
-                    id: None,
-                    path: None,
-                    pair_count: Some(pair_set.pairs.len()),
-                    reason: Some(reason),
-                });
-            }
-        },
+    let named = match requested_name {
+        Some(name) => validate_name(name).map(|()| name.to_owned()),
         None => derived_name(&source),
+    };
+    let id = match named {
+        Ok(id) => id,
+        Err(reason) => {
+            return Ok(ImportReport {
+                status: "rejected",
+                source: source.display().to_string(),
+                id: None,
+                path: None,
+                pair_count: Some(pair_set.pairs.len()),
+                reason: Some(reason),
+            });
+        }
     };
     let digest = pair_set_digest(&pair_set)?;
     let mut state = load_state()?;
@@ -195,7 +200,7 @@ pub fn import_pair_set(source: &Path, requested_name: Option<&str>) -> Result<Im
 fn pair_set_digest(pair_set: &PairSet) -> Result<String> {
     let bytes = serde_json::to_vec(pair_set)?;
     let digest = Blake2b512::digest(bytes);
-    Ok(digest[..16]
+    Ok(digest[..PAIR_SET_DIGEST_BYTES]
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect())
@@ -226,11 +231,13 @@ fn with_note(failure: anyhow::Error, note: Option<String>) -> anyhow::Error {
 /// holds only letters, digits, dots, underscores and hyphens. How long it may be
 /// is the filesystem's to say, and it says so when the set is written.
 fn validate_name(name: &str) -> std::result::Result<(), String> {
-    let valid = !name.is_empty()
+    let valid = name
+        .as_bytes()
+        .first()
+        .is_some_and(u8::is_ascii_alphanumeric)
         && name
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-        && name.as_bytes()[0].is_ascii_alphanumeric();
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'));
     if valid {
         Ok(())
     } else {
@@ -238,11 +245,22 @@ fn validate_name(name: &str) -> std::result::Result<(), String> {
     }
 }
 
-fn derived_name(source: &Path) -> String {
+/// The id a set imported without --name takes: its file name's letters and
+/// digits, lowercased, each run of anything else one hyphen. A name that
+/// holds none, or is not UTF-8, gives no id, and the reason names the file
+/// and the flag that supplies one.
+fn derived_name(source: &Path) -> std::result::Result<String, String> {
+    let refused = |why: &str| {
+        format!(
+            "{} {why}, so no pair-set id can be derived from it; name the set with --name",
+            source.display()
+        )
+    };
     let stem = source
         .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("pairs");
+        .ok_or_else(|| refused("has no file name"))?
+        .to_str()
+        .ok_or_else(|| refused("has a file name that is not UTF-8"))?;
     let mut name = String::new();
     let mut separator = false;
     for character in stem.chars() {
@@ -256,10 +274,8 @@ fn derived_name(source: &Path) -> String {
             separator = true;
         }
     }
-    let name = name.trim_end_matches('-');
     if name.is_empty() {
-        "pairs".to_owned()
-    } else {
-        name.to_owned()
+        return Err(refused("has no ASCII letter or digit in its file name"));
     }
+    Ok(name)
 }

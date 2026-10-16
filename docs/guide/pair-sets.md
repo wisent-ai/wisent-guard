@@ -2,6 +2,8 @@
 
 The file every training and evaluation command reads, and the commands that
 author it. The [README](../../README.md) links here from its command list.
+How a finished set is taken into the workspace, named and recognised again is
+on [pair sets in the workspace](pair-sets/workspace.md).
 
 
 
