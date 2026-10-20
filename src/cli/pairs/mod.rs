@@ -7,9 +7,8 @@ use anyhow::{Result, bail};
 use clap::Subcommand;
 use serde_json::json;
 use ster::{
-    ChatChoice, ContrastivePair, DeviceChoice, GenerationOptions, PairSet, Precision, Runtime,
-    brama,
-    pairs::{self, InspectOptions, SynthesisOptions, quality::dedupe::DedupeOptions},
+    ContrastivePair, PairSet,
+    pairs::{self, InspectOptions, quality::dedupe::DedupeOptions},
 };
 
 use super::resolve_pairs;
@@ -17,10 +16,11 @@ use super::resolve_pairs;
 mod edit;
 mod import;
 mod merge;
+mod synthesize;
 
 #[derive(Debug, Subcommand)]
 pub(super) enum PairsCommand {
-    /// Report duplicates, refusals, length balance, and diversity for a set.
+    /// Report duplicates, length balance, and diversity for a set.
     Inspect {
         /// Pair-set JSON. Omit it to inspect the active imported set.
         #[arg(long)]
@@ -31,9 +31,6 @@ pub(super) enum PairsCommand {
         /// Banded-LSH band count, a divisor of 64; more bands catch more near-duplicates.
         #[arg(long)]
         dedupe_bands: u32,
-        /// Refusal score at or above which a side is flagged; Ster assumes none.
-        #[arg(long)]
-        refusal_threshold: f32,
         /// Longer-over-shorter character ratio above which a pair is
         /// counted as unbalanced; Ster assumes none.
         #[arg(long)]
@@ -72,77 +69,7 @@ pub(super) enum PairsCommand {
         trait_name: Option<String>,
     },
     /// Generate a contrastive pair set locally or with a hosted model.
-    Synthesize {
-        /// Where the pair text comes from: local or brama. Steering always
-        /// needs a local model; writing pairs does not, so this route may be
-        /// hosted. Neither is assumed.
-        #[arg(long)]
-        generator: String,
-        /// Route the Brama generator writes with: a Brama alias, a canonical
-        /// provider/model route, or a selector. Wisent's own served model is
-        /// wisent-backend/chat/primary. Required with --generator brama.
-        #[arg(long)]
-        generator_model: Option<String>,
-        /// Hugging Face model id or local model directory.
-        #[arg(long)]
-        model: Option<String>,
-        /// Immutable Hugging Face revision; defaults to main.
-        #[arg(long)]
-        revision: Option<String>,
-        /// Runtime device: cpu, metal, or cuda; an unknown one is a usage error.
-        #[arg(long, default_value = "cpu", value_parser = DeviceChoice::parse)]
-        device: DeviceChoice,
-        /// Dtype the local generator's base weights are mapped at: f32, f16,
-        /// or bf16. Ignored by --generator brama, which loads no weights.
-        /// bf16 needs --device metal.
-        #[arg(long, default_value = "f32", value_parser = Precision::parse)]
-        precision: Precision,
-        /// auto asks the local generator through the model's own chat
-        /// template when it publishes one, off asks it as raw text. An
-        /// instruct checkpoint spoken to without its markers answers with
-        /// meta-instructional debris — "Step 3: Make sure your emojis are
-        /// visually appealing" — rather than the pair text that was asked
-        /// for. Ignored by --generator brama, which is already a chat API.
-        #[arg(long, default_value = "auto", value_parser = ChatChoice::parse)]
-        chat_template: ChatChoice,
-        /// One-sentence description of the trait the positive side shows.
-        #[arg(long = "trait")]
-        trait_description: String,
-        /// Number of pairs to keep after refusal and duplicate rejection.
-        #[arg(long)]
-        count: usize,
-        /// Pair-set JSON the generated pairs are written to.
-        #[arg(long)]
-        output: PathBuf,
-        /// Artifact label; defaults to the trait description, truncated.
-        #[arg(long)]
-        trait_name: Option<String>,
-        /// Skip the opposite-trait generation step and use this text.
-        #[arg(long)]
-        opposite: Option<String>,
-        /// Attempt budget is count times this multiplier; Ster assumes none.
-        #[arg(long)]
-        retry_multiplier: usize,
-        /// SimHash Hamming distance below which two pairs count as near-duplicates.
-        #[arg(long)]
-        dedupe_bits: u32,
-        /// Banded-LSH band count, a divisor of 64; more bands catch more near-duplicates.
-        #[arg(long)]
-        dedupe_bands: u32,
-        /// Refusal score at or above which a generated side is rejected.
-        #[arg(long)]
-        refusal_threshold: f32,
-        /// Token budget of one generated side.
-        #[arg(long)]
-        max_new_tokens: usize,
-        /// Must exceed zero; argmax generation would repeat one pair.
-        #[arg(long)]
-        temperature: f64,
-        #[arg(long)]
-        top_p: f64,
-        #[arg(long)]
-        seed: u64,
-    },
+    Synthesize(synthesize::SynthesizeArgs),
     /// Write a pair set from a TruthfulQA, Do-Not-Answer or LiveCodeBench export.
     Import(import::ImportArgs),
     /// Write one pair set out of several, every pair of each in order, for
@@ -159,14 +86,12 @@ pub(super) fn run(command: PairsCommand) -> Result<()> {
             pairs,
             dedupe_bits,
             dedupe_bands,
-            refusal_threshold,
             unbalanced_ratio,
         } => {
             let file = resolve_pairs(pairs)?;
             let pair_set = PairSet::load(&file)?;
             let options = InspectOptions {
                 dedupe: DedupeOptions::new(dedupe_bits, dedupe_bands),
-                refusal_threshold,
                 unbalanced_ratio,
             };
             let report = pairs::inspect(&pair_set, &options)?;
@@ -194,8 +119,8 @@ pub(super) fn run(command: PairsCommand) -> Result<()> {
             if let Some(name) = trait_name {
                 pair_set.trait_name = name;
             }
+            let index = pair_set.pairs.len();
             pair_set.pairs.push(ContrastivePair { positive, negative });
-            let index = pair_set.pairs.len() - 1;
             pair_set.save(&file)?;
             super::answer(&json!({
                 "path": file.display().to_string(),
@@ -206,10 +131,10 @@ pub(super) fn run(command: PairsCommand) -> Result<()> {
         PairsCommand::Remove { pairs: file, index } => {
             let mut pair_set = PairSet::load(&file)?;
             if index >= pair_set.pairs.len() {
-                // Inclusive upper bound, matching the layer-range refusals.
                 bail!(
-                    "pair index {index} is outside the set's 0..{} range",
-                    pair_set.pairs.len() - 1
+                    "pair index {index} is outside the set: {} holds {} pair(s), indexed from 0",
+                    file.display(),
+                    pair_set.pairs.len()
                 );
             }
             let removed = pair_set.pairs.remove(index);
@@ -233,76 +158,7 @@ pub(super) fn run(command: PairsCommand) -> Result<()> {
             negative,
             trait_name,
         } => edit::run(&file, index, positive, negative, trait_name)?,
-        PairsCommand::Synthesize {
-            generator,
-            generator_model,
-            model,
-            revision,
-            device,
-            precision,
-            chat_template,
-            trait_description,
-            count,
-            output,
-            trait_name,
-            opposite,
-            retry_multiplier,
-            dedupe_bits,
-            dedupe_bands,
-            refusal_threshold,
-            max_new_tokens,
-            temperature,
-            top_p,
-            seed,
-        } => {
-            let options = SynthesisOptions {
-                trait_description,
-                trait_name: trait_name.unwrap_or_default(),
-                opposite,
-                count,
-                retry_multiplier,
-                dedupe: DedupeOptions::new(dedupe_bits, dedupe_bands),
-                refusal_threshold,
-                generation: GenerationOptions {
-                    strength: None,
-                    max_new_tokens,
-                    temperature,
-                    top_p: Some(top_p),
-                    seed,
-                },
-            };
-            // The runtime or the gateway is built inside the arm that uses it:
-            // `--generator brama` must not load weights or touch a device, and
-            // `--generator local` must not read the gateway's environment.
-            let (pair_set, report) = match generator.as_str() {
-                "local" => {
-                    let Some(model) = model else {
-                        bail!("pairs synthesize with --generator local requires --model");
-                    };
-                    let mut runtime =
-                        Runtime::load_at(&model, revision.as_deref(), device, precision)?;
-                    // Synthesis is the first step of the funnel and everything
-                    // downstream inherits what it writes. Addressed without
-                    // its markers, an instruct checkpoint answers a pair
-                    // request with instructions about answering pair requests.
-                    runtime.set_chat_template(chat_template)?;
-                    pairs::synthesize(pairs::Generator::Local(&runtime), &options)?
-                }
-                "brama" => {
-                    let Some(route) = generator_model else {
-                        bail!("pairs synthesize with --generator brama requires --generator-model");
-                    };
-                    let gateway = brama::Gateway::from_env(&route)?;
-                    pairs::synthesize(pairs::Generator::Gateway(&gateway), &options)?
-                }
-                value => bail!("unknown generator {value:?}; expected local or brama"),
-            };
-            pair_set.save(&output)?;
-            super::answer(&json!({
-                "path": output.display().to_string(),
-                "report": report,
-            }))?;
-        }
+        PairsCommand::Synthesize(args) => synthesize::run(args)?,
     }
     Ok(())
 }

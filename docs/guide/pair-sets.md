@@ -12,7 +12,7 @@ five subcommands:
 
 ```text
 ster pairs inspect --pairs <FILE> --dedupe-bits <BITS> --dedupe-bands <BANDS>
-                   --refusal-threshold <SCORE> --unbalanced-ratio <RATIO>
+                   --unbalanced-ratio <RATIO>
 ster pairs add --pairs <FILE> --positive <TEXT> --negative <TEXT> [--trait <NAME>]
 ster pairs remove --pairs <FILE> --index <N>
 ster pairs edit --pairs <FILE> --index <N> [--positive <TEXT>] [--negative <TEXT>] [--trait <NAME>]
@@ -22,7 +22,7 @@ ster pairs synthesize --trait <TRAIT_DESCRIPTION> --count <COUNT> --output <OUTP
                       [--chat-template auto|off] [--precision f32|f16|bf16]
                       [--trait-name <NAME>] [--opposite <TEXT>]
                       --retry-multiplier <N> --dedupe-bits <BITS>
-                      --dedupe-bands <BANDS> --refusal-threshold <SCORE>
+                      --dedupe-bands <BANDS>
                       --max-new-tokens <N> --temperature <T>
                       --top-p <P> --seed <SEED>
 ster pairs import --benchmark truthfulqa|dna|livecodebench|bipo|choices --source <FILE> --output <FILE>
@@ -32,18 +32,21 @@ ster pairs import --benchmark truthfulqa|dna|livecodebench|bipo|choices --source
 ```
 
 Every number is the caller's: Ster assumes no deduplication distance, band
-count, refusal threshold, length ratio, attempt budget, token budget,
-temperature, nucleus mass or seed, so leaving one out is a usage error that
-names the missing flag (`error: the following required arguments were not
-provided: --refusal-threshold <REFUSAL_THRESHOLD>`, exit 2). The same fields are
+count, length ratio, attempt budget, token budget, temperature, nucleus mass
+or seed, so leaving one out is a usage error that names the missing flag
+(`error: the following required arguments were not provided:
+--unbalanced-ratio <UNBALANCED_RATIO>`, exit 2). The same fields are
 required in the `pairs/inspect`, `pairs/synthesize` and `pairs/import` request
-bodies, where a missing one is refused as `missing field \`refusalThreshold\``.
+bodies, where a missing one is refused as `missing field \`unbalancedRatio\``.
+No refusal score is asked for: whether a side refused is the writing model's
+judgement during synthesis, and `--refusal-threshold` is refused as an
+unexpected argument.
 
 Each subcommand prints a pretty JSON document on stdout, as the other commands
 do, and each write leaves a pretty JSON pair set with a trailing newline. `add`
 creates the file, and its parent directory, when it does not exist, and
 `--trait` sets or replaces the trait name on the file. `remove` takes a
-zero-based index and refuses one outside the set with `pair index {i} is outside the set's 0..{n-1} range`.
+zero-based index and refuses one outside the set with `pair index {i} is outside the set: {path} holds {n} pair(s), indexed from 0`.
 It also refuses to remove the last pair, because a set is validated before it is
 saved: the file is left untouched and the refusal is `pair set {path} contains no pairs`.
 `edit` takes the same index and changes only the sides given, or with
@@ -152,10 +155,11 @@ one `ster pairs add` built, one `ster pairs synthesize` generated, or one
 
 `ster pairs inspect` loads no model; every judgement it makes is textual. For
 the set it reports `trait_name`, `pair_count`, `duplicate_count`,
-`refusal_count`, `unbalanced_count`, `unbalanced_ratio`, and `diversity`. For
+`unbalanced_count`, `unbalanced_ratio`, and `diversity`. For
 each pair it reports `index`, both texts, `positive_chars` and `negative_chars`,
-`positive_words` and `negative_words`, `duplicate`, `positive_refusal` and
-`negative_refusal`, and `length_ratio`.
+`positive_words` and `negative_words`, `duplicate`, and `length_ratio`. It
+makes no refusal finding: whether a side declines its role is a judgement a
+model makes, and inspection loads none.
 
 Duplicates are found by SimHash over the normalized positive and negative text,
 with 64-bit fingerprints built from BLAKE2b feature hashes and bucketed by
@@ -164,15 +168,6 @@ fingerprints differ in at most `--dedupe-bits` bits. The `duplicate` field is
 `{"kind":"exact","of":N}` or `{"kind":"near","of":N,"distance":B}`, naming the
 earlier pair. The first occurrence wins, so pair order decides which of two
 near-identical pairs is flagged: the later one.
-
-Refusals are scored across ten weighted families — `ai_disclaimer`, `policy`,
-`apology_hedge`, `unable`, `cannot_action`, `prefer_rather`, `decline_refuse`,
-`no_support`, `no_ability`, and `refusal_word` — and a side is flagged at or
-above `--refusal-threshold`. A flag carries the score, the family, and the text
-that matched, for example
-`{"score":0.9,"family":"ai_disclaimer","snippet":"As an AI language model"}`. A
-refusal is a useless example because it differs from the other side along the
-refusal axis rather than along the trait axis.
 
 `length_ratio` is the longer side over the shorter side in characters, and
 `unbalanced_count` counts the pairs above `--unbalanced-ratio`, which the report
@@ -195,10 +190,20 @@ set takes longer to report on rather than being sampled.
    an answer in the opposite's voice. Each side is stored as
    `Question: {q}\nAnswer: {a}`, the shape the example above already uses, which
    keeps the two sides matched on everything but the trait.
-3. A negative that reads as a refusal is asked again exactly once with a repair
-   instruction; if it still refuses, the pair is dropped. A refusing positive is
-   dropped immediately, because the trait itself is what the model declined and
-   re-asking would refuse again.
+3. Each answer is judged by the same generator that wrote it: it is asked
+   whether the answer declined to answer as its personality, and must reply
+   with exactly `{"refuses": true}` or `{"refuses": false}`. Any other reply
+   stops the run with
+   `<generator> answered the refusal judgement with "<reply>", which is not exactly {"refuses": true} or {"refuses": false}`,
+   because a verdict nobody can read is not a verdict. No list of refusal
+   phrasings is consulted, so a refusal worded any way, in any language, is
+   judged the same. A refusal is a useless example because it differs from the
+   other side along the refusal axis rather than along the trait axis. A
+   negative judged a refusal is asked again exactly once with a repair
+   instruction, and the replacement is judged in turn; if it still refuses,
+   the pair is dropped. A refusing positive is dropped immediately, because
+   the trait itself is what the model declined and re-asking would refuse
+   again.
 4. A pair within `--dedupe-bits` of a pair already kept is dropped.
 5. The attempt budget is `--count` times `--retry-multiplier`, and every attempt
    prints one `synthesizing pair 3/20 (attempt 7)` progress line on stderr.
@@ -217,7 +222,9 @@ generation to a hosted model through the Brama gateway. `--model`,
 hosted one, which loads no weights, resolves no device, and downloads nothing.
 The local route refuses a missing model with `pairs synthesize with --generator local requires --model`,
 the hosted route refuses a missing route with `pairs synthesize with --generator brama requires --generator-model`,
-and anything else is `unknown generator "cloud"; expected local or brama`.
+and anything else is refused by the argument parser as
+`error: invalid value 'cloud' for '--generator <GENERATOR>'` with the two
+possible values, exit 2.
 
 `--chat-template` belongs to the local route for the same reason `--model`
 does. `auto`, the default, asks the local generator through the model's own chat

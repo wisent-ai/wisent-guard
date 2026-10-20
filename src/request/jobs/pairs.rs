@@ -89,7 +89,6 @@ pub(in crate::request) fn pairs_inspect_job(request: PairsInspectRequest) -> Res
     let pair_set = PairSet::load(Path::new(&request.pairs))?;
     let options = InspectOptions {
         dedupe: DedupeOptions::new(request.dedupe_bits, request.dedupe_bands),
-        refusal_threshold: request.refusal_threshold,
         unbalanced_ratio: request.unbalanced_ratio,
     };
     let report = pairs::inspect(&pair_set, &options)?;
@@ -118,12 +117,11 @@ pub(in crate::request) fn pairs_save_job(request: PairsSaveRequest) -> Result<Va
 pub(in crate::request) fn pairs_synthesize_job(request: PairsSynthesizeRequest) -> Result<Value> {
     let options = SynthesisOptions {
         trait_description: request.trait_description,
-        trait_name: request.trait_name,
+        trait_name: Some(request.trait_name),
         opposite: request.opposite,
         count: request.count,
         retry_multiplier: request.retry_multiplier,
         dedupe: DedupeOptions::new(request.dedupe_bits, request.dedupe_bands),
-        refusal_threshold: request.refusal_threshold,
         generation: GenerationOptions {
             strength: None,
             max_new_tokens: request.max_new_tokens,

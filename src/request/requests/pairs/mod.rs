@@ -1,7 +1,11 @@
 //! The pair-authoring operations' requests: importing a set into the
 //! workspace, auditing one, saving one, and writing one with a model.
 
+use std::num::NonZeroUsize;
+
 use serde::Deserialize;
+
+use crate::pairs::quality::dedupe::DedupeOptions;
 
 use super::defaults::*;
 use super::{ModelRequest, Validate, require};
@@ -58,11 +62,10 @@ impl Validate for WorkspacePairSetRequest {
 pub(in crate::request) struct PairsInspectRequest {
     #[serde(default)]
     pub(in crate::request) pairs: String,
-    /// The deduplication and refusal settings are the caller's; Ster assumes
+    /// The deduplication and balance settings are the caller's; Ster assumes
     /// none, and a body without one is refused by name.
     pub(in crate::request) dedupe_bits: u32,
     pub(in crate::request) dedupe_bands: u32,
-    pub(in crate::request) refusal_threshold: f32,
     pub(in crate::request) unbalanced_ratio: f64,
 }
 
@@ -141,7 +144,6 @@ pub(in crate::request) struct PairsSynthesizeRequest {
     pub(in crate::request) retry_multiplier: usize,
     pub(in crate::request) dedupe_bits: u32,
     pub(in crate::request) dedupe_bands: u32,
-    pub(in crate::request) refusal_threshold: f32,
     pub(in crate::request) max_new_tokens: usize,
     pub(in crate::request) temperature: f64,
     pub(in crate::request) top_p: f64,
@@ -155,10 +157,14 @@ impl Validate for PairsSynthesizeRequest {
         match self.generator.as_str() {
             "" => return Err("pairs synthesize requires a generator, local or brama".to_owned()),
             "local" => self.model.check("pairs synthesize")?,
-            "brama" => require(
-                self.generator_model.as_deref().unwrap_or_default(),
-                "pairs synthesize with the brama generator requires generatorModel".to_owned(),
-            )?,
+            "brama" => {
+                let missing =
+                    "pairs synthesize with the brama generator requires generatorModel".to_owned();
+                match self.generator_model.as_deref() {
+                    Some(route) => require(route, missing)?,
+                    None => return Err(missing),
+                }
+            }
             _ => return Err("unknown generator; expected local or brama".to_owned()),
         }
         require(
@@ -169,10 +175,14 @@ impl Validate for PairsSynthesizeRequest {
             &self.output,
             "pairs synthesize requires an output path".to_owned(),
         )?;
-        if self.count == 0 {
+        // Both are refused again inside the run, but only after a local
+        // model has loaded; stated here, the refusal arrives before it.
+        if NonZeroUsize::new(self.count).is_none() {
             return Err("pairs synthesize requires a pair count above zero".to_owned());
         }
-        Ok(())
+        DedupeOptions::new(self.dedupe_bits, self.dedupe_bands)
+            .validate()
+            .map_err(|error| error.to_string())
     }
 }
 

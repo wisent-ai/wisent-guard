@@ -7,6 +7,7 @@
 //! share — the progress channel, the artifact summary every command prints,
 //! and the layer-selection parser.
 
+use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
 use anyhow::{Context, Result, bail};
@@ -20,7 +21,6 @@ mod extract;
 mod optimize;
 mod parity;
 mod project;
-mod responses;
 mod train;
 
 pub use compare::{CompareOptions, ComparisonReport, compare};
@@ -30,7 +30,6 @@ pub use extract::{PromptSet, extract};
 pub use optimize::{Candidate, Holdout, Selection, optimize};
 pub use parity::{ParityReport, parity};
 pub use project::{ProjectOptions, ProjectionReport, Side, project};
-pub use responses::{Response, ResponseEntry, ResponsesReport, inspect_responses};
 pub use train::train;
 
 /// Progress lines the workflows print while running. The CLI leaves the sink
@@ -94,11 +93,15 @@ fn norm(values: &[f32]) -> f64 {
 }
 
 pub fn parse_layers(value: &str, count: usize) -> Result<Vec<usize>> {
-    if count == 0 {
+    if NonZeroUsize::new(count).is_none() {
         bail!("model has no layers");
     }
     if value == "all" {
-        return Ok((0..count).collect());
+        let mut every = Vec::with_capacity(count);
+        for layer in 0..count {
+            every.push(layer);
+        }
+        return Ok(every);
     }
     let mut layers = Vec::new();
     for segment in value
@@ -131,10 +134,7 @@ pub fn parse_layers(value: &str, count: usize) -> Result<Vec<usize>> {
         bail!("no layers selected");
     }
     if let Some(layer) = layers.iter().copied().find(|layer| *layer >= count) {
-        bail!(
-            "layer {layer} is outside the model's 0..{} range",
-            count - 1
-        );
+        bail!("layer {layer} is outside the model's {count} layers, counted from the first");
     }
     Ok(layers)
 }

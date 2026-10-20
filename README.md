@@ -144,10 +144,11 @@ Included now:
   of latent attention, anything on a state-space model) are refused before
   any adapter is built;
 - CPU execution, with compile-time Metal and CUDA backends;
-- pair-set authoring and inspection for duplicates, refusals, length balance,
-  and diversity, with no model loaded;
+- pair-set authoring and inspection for duplicates, length balance and
+  diversity, with no model loaded;
 - synthetic pair generation from a trait description, written either by the
-  local runtime or by a hosted model reached through Brama;
+  local runtime or by a hosted model reached through Brama, with every
+  answer judged for a refusal by the model that wrote it;
 - last-token hidden-state extraction from any selected transformer layer;
 - contrastive activation addition (`caa`), principal-direction (`pca`), and
   logistic-probe training;
@@ -241,206 +242,17 @@ Delivery through Stado and the checkpoint cache are covered in
 
 ## First steering workflow
 
-If you already have a canonical Ster pair set, import it instead of creating
-starter rows:
-
-```bash
-ster workspace import-pairs ./my-pairs.json
-ster workspace show
-```
-
-Ster validates the whole document before writing anything, keeps a canonical
-copy under `$XDG_DATA_HOME/ster` (or `~/.local/share/ster`), and makes it the
-active set. Repeated content is reported as `unchanged`; a reused name with
-different content is `conflicting` and never overwrites the first set. The same
-operation is available during first use with
-`ster onboarding --import-pairs ./my-pairs.json`.
-
-If you do not have an existing set, create `pairs.json`:
-
-
-```json
-{
-  "trait_name": "truthful",
-  "pairs": [
-    {
-      "positive": "Question: What evidence supports this claim? Answer: I do not have enough evidence to confirm it.",
-      "negative": "Question: What evidence supports this claim? Answer: It is definitely true because it sounds plausible."
-    },
-    {
-      "positive": "Question: Is this citation real? Answer: I cannot verify that citation from the available context.",
-      "negative": "Question: Is this citation real? Answer: Yes, the citation is unquestionably real."
-    }
-  ]
-}
-```
-
-A set can also be produced without a text editor. `ster pairs add` appends one
-pair at a time and creates the file, and its parent directory, when it does not
-exist yet:
-
-```bash
-ster pairs add \
-  --pairs pairs.json \
-  --trait truthful \
-  --positive "Question: Did the study replicate? Answer: I have not seen a replication, so I cannot claim it did." \
-  --negative "Question: Did the study replicate? Answer: Of course it replicated; results that clean always hold."
-```
-
-`ster pairs synthesize` writes a whole set from a one-sentence trait
-description, generating both sides of every pair with the route `--generator`
-names — here the local runtime:
-
-```bash
-ster pairs synthesize \
-  --generator local \
-  --model meta-llama/Llama-3.2-1B \
-  --trait "answers only from verifiable evidence and says so when it cannot" \
-  --count 20 \
-  --retry-multiplier <N> --dedupe-bits <BITS> --dedupe-bands <BANDS> \
-  --refusal-threshold <SCORE> --max-new-tokens <N> --temperature <T> \
-  --top-p <P> --seed <SEED> \
-  --output pairs.json
-```
-
-`ster pairs import` reads a published benchmark export (TruthfulQA,
-Do-Not-Answer, LiveCodeBench, the BiPO behaviour CSVs) into a set, or the
-multiple-choice rows of any dataset whose schema you point it at:
-
-```bash
-ster pairs import --benchmark truthfulqa --source TruthfulQA_en.csv --count 200 --seed <SEED> --output pairs.json
-ster pairs import --benchmark choices --source arc_easy.jsonl --seed <SEED> --output arc.pairs.json \
-  --question /question --choices /choices/text --answer /answerKey --answer-form label --labels /choices/label
-```
-
-See the [pair-sets guide](docs/guide/pair-sets.md) for each benchmark's pairing,
-the answer forms and every refusal.
-
-Run `ster pairs inspect --pairs pairs.json --dedupe-bits <BITS> --dedupe-bands
-<BANDS> --refusal-threshold <SCORE> --unbalanced-ratio <RATIO>` before
-training: it finds duplicate and near-duplicate pairs, sides that read as
-refusals, lopsided pairs where one side is more than the stated ratio longer
-than the other, and how much the set repeats itself. Ster assumes none of
-those numbers; every training, sampling and judging number in the CLI is the
-caller's to state.
-
-Train a direction for layers 12 through 19. The explicit `--pairs` below works
-for the manually created file; omit it to use the active imported set:
-
-```bash
-ster vector train \
-  --model meta-llama/Llama-3.2-1B \
-  --pairs pairs.json \
-  --layers 12..20 \
-  --method caa \
-  --output truthful.ster.json
-```
-
-Generate with that direction:
-
-```bash
-ster generate \
-  --model meta-llama/Llama-3.2-1B \
-  --vector truthful.ster.json \
-  --strength <S> --max-new-tokens <N> --temperature <T> --seed <SEED> \
-  --prompt "Explain the result and cite only evidence you can verify."
-```
-
-Use an immutable Hugging Face commit with `--revision <sha>` when the artifact
-must remain reproducible across model updates. A local directory may be passed
-to `--model` when it contains `config.json`, `tokenizer.json` (or PLaMo's
-`tokenizer.jsonl`, read as the unigram model it is, or GLM-4's tiktoken
-`tokenizer.model`, read as byte-level BPE), and one or more
-Safetensors weight files. A checkpoint in Mistral's own format — `params.json`
-and `consolidated*.safetensors` with no `config.json`, as Mistral Large 3 is
-published — is read the same way, locally or from the Hub: its config is put
-in the Transformers shape (Mistral Large 3 as `deepseek_v3` with Llama 4's
-query temperature) and its tensors are read under Mistral's names. A
-repository that publishes both formats is read from `config.json` and its
-non-`consolidated` weights only. A local directory holding one `.gguf` file
-and no safetensors — a llama.cpp fine-tune beside its base model's
-`config.json` and tokenizer — runs on Ster's own decoder: each tensor is read
-under llama.cpp's name, dequantized at `--precision` and given to the decoder
-under its Transformers name, so steering and capture work on it too.
+From a pair set to a steered generation — importing or writing the set,
+adding, synthesizing, importing and inspecting pairs, training a direction and
+generating with it — is walked through in the
+[first steering workflow](docs/guide/start/first-workflow.md).
 
 ## CLI
 
-```text
-ster vector train     learn one vector per selected layer
-ster vector optimize  select method and layer on a held-out fraction the caller states
-ster vector evaluate  measure a vector on a contrastive pair set
-ster vector inspect   summarize and validate a steering artifact
-ster vector compare   compare vectors fitted for different traits on one model
-ster vector curve     score one method on growing numbers of pairs
-ster vector project   show where a vector moves the model's states at one layer
-ster vector ablate    write a vector's direction out of a checkpoint's weights
-ster generate         run normal or steered generation, with any number of vectors
-ster extract          export hidden states for an arbitrary prompt set
-ster onboarding import or replay first use
-ster decide     answer typed questions about a state from one forward pass
-ster calibrate  fit the temperature that makes decision probabilities honest
-ster workspace  import, activate, and inspect persistent pair sets
-ster request    run one desktop request to completion: JSON body on stdin, NDJSON events on stdout
-```
-
-Run `ster <command> --help` for exact arguments. Every answer is one JSON
-document on stdout for machines; the global `--text` flag prints the same
-answer as `path: value` lines for a person. Commands return non-zero on
-invalid model architecture, missing files, mismatched artifacts, invalid layer
-selection, or non-finite vectors.
-
-Ster replaced the Python `wisent` CLI, whose twenty-nine hyphenated verbs
-each spelled an object into a command name. Each is now a verb of the object
-it acts on, or a composition of them:
-
-| wisent | Ster |
-| --- | --- |
-| `generate-pairs`, `synthetic` | `pairs synthesize` |
-| `generate-pairs-from-task` | `pairs import` |
-| `diagnose-pairs` | `pairs inspect` |
-| `generate-vector`, `create-steering-vector` | `vector train` |
-| `generate-vector-from-task`, `generate-vector-from-synthetic` | `pairs import` or `pairs synthesize`, then `vector train` |
-| `diagnose-vectors` | `vector inspect` |
-| `verify-steering` | `vector evaluate` |
-| `compare-steering` | `vector compare` |
-| `steering-viz` | `vector project` |
-| `multi-steer` | `generate` with several `--vector`/`--strength` pairs |
-| `generate-responses` | `generate --prompts` |
-| `optimize-steering`, `find-best-method`, `discover-steering`, `optimize-classification` | `vector optimize` |
-| `optimize-sample-size` | `vector curve` |
-| `optimize` | `vector optimize`, then `vector curve` |
-| `optimization-cache` | the artifact or report each run writes |
-| `check-linearity` | `vector optimize`'s `holdout_effect_size` |
-| `cluster-benchmarks` | `vector train` per benchmark, then `vector compare --clusters` |
-| `geometry-search`, `train-unified-goodness` | `pairs merge`, then `vector optimize` or `vector train` |
-| `zwiad` | `vector optimize`, `vector compare` and `vector project` |
-| `modify-weights` | `vector ablate` |
-| `get-activations` | `extract` |
-| `tasks` | `pairs import` for the pairs, `decisions benchmark` for the score |
-| `inference-config` | none: every sampling setting is a flag of the run that uses it |
-| `agent` | none: autonomous work is Singularity's |
-
-`evaluate-refusal` and `evaluate-responses` read what a model answered; their
-Ster form audits the file `generate --prompts` writes and is not declared yet.
-
-Each command family has its own page in this repository:
-
-- [Pair sets](docs/guide/pair-sets.md) — the file every command reads, and
-  `ster pairs`, which authors it.
-- [Steering](docs/guide/steering.md) — choosing a direction, reading one, and
-  what fitting one out of format costs.
-- [Fine-tuning](docs/guide/tuning/fine-tuning.md) — what `ster tune` trains, what a
-  run needs before it starts, and what it records, with
-  [objectives](docs/guide/tuning/objectives.md),
-  [adapters](docs/guide/tuning/adapters.md),
-  [chat templates](docs/guide/tuning/chat-templates.md) and
-  [precision](docs/guide/tuning/precision.md) beside it.
-- [Decisions](docs/guide/decisions.md) — `ster decide`: what a decision
-  is, the request and response documents, and reading one with `--explain`;
-  with [calibration](docs/guide/decisions/calibration.md) beside it.
-- [Desktop requests](docs/guide/desktop-requests.md) — `ster request`: how
-  Ster Desktop runs each workflow as one process per operation, the JSON body,
-  the NDJSON events, and what each exit status means.
+Every command, what the Python `wisent` CLI called it, and the guide of each
+command family are listed in the [CLI overview](docs/guide/start/cli.md). Run
+`ster <command> --help` for exact arguments; every answer is one JSON document
+on stdout, and the global `--text` flag prints it as `path: value` lines.
 
 ## Architecture
 

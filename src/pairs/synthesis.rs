@@ -31,12 +31,12 @@ const ROLEPLAY_NEG_FIX: &str = "You are fixing ONLY the negative example of a co
 #[derive(Debug, Clone)]
 pub struct SynthesisOptions {
     pub trait_description: String,
-    pub trait_name: String,
+    /// The set's label; unnamed or blank, the trait description labels it.
+    pub trait_name: Option<String>,
     pub opposite: Option<String>,
     pub count: usize,
     pub retry_multiplier: usize,
     pub dedupe: DedupeOptions,
-    pub refusal_threshold: f32,
     pub generation: GenerationOptions,
 }
 
@@ -193,16 +193,26 @@ pub fn synthesize(
             continue;
         }
 
+        // Whether an answer declined its role is the generator's judgement,
+        // asked once per answer and read in one exact form.
+        let refuses = |personality: &str, answer: &str, tally: &mut Tally| -> Result<bool> {
+            let text = ask(
+                &refusal::judgement_prompt(&question, personality, answer),
+                tally,
+            )?;
+            refusal::verdict(&generator.label(), &text)
+        };
+
         // A refusing positive has no repair path: the trait itself is what the
         // model declined to roleplay, so re-asking would refuse again.
-        if refusal::looks_like_refusal(&positive, options.refusal_threshold) {
+        if refuses(&options.trait_description, &positive, &mut tally)? {
             one_more(&mut tally.rejected_refusals);
             continue;
         }
 
         // `RefusalerCleaner` + `BaseRefusaler::fix_negative`: one re-prompt,
         // never a loop, and a still-refusing replacement drops the pair.
-        if refusal::looks_like_refusal(&negative, options.refusal_threshold) {
+        if refuses(&opposite, &negative, &mut tally)? {
             one_more(&mut tally.refusal_retries);
             let replacement = ask(
                 &format!(
@@ -210,15 +220,12 @@ pub fn synthesize(
                 ),
                 &mut tally,
             )?;
-            if replacement.is_empty()
-                || refusal::looks_like_refusal(&replacement, options.refusal_threshold)
-            {
+            if replacement.is_empty() || refuses(&opposite, &replacement, &mut tally)? {
                 one_more(&mut tally.rejected_refusals);
                 continue;
             }
             negative = replacement;
         }
-
         // Ster's `ContrastivePair` carries two strings and no separate prompt
         // field, so the question is folded into both sides in the shape the
         // README and the docs already publish. Folding it in identically is
@@ -273,9 +280,8 @@ fn persona_prompt(question: &str, personality: &str) -> String {
 
 /// The set's trait name: the one given, else the trait's description itself.
 fn resolve_trait_name(options: &SynthesisOptions) -> String {
-    let name = options.trait_name.trim();
-    if !name.is_empty() {
-        return name.to_owned();
+    match options.trait_name.as_deref().map(str::trim) {
+        Some(name) if !name.is_empty() => name.to_owned(),
+        _ => options.trait_description.trim().to_owned(),
     }
-    options.trait_description.trim().to_owned()
 }
